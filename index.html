@@ -430,7 +430,7 @@ function App(){
         v==="home"&&t(Home,{data:d,onTx:sAtx,onView:sV,onSetBudget:b=>pst({budget:b})}),
         v==="calendar"&&t(Calend,{data:d,onTx:sAtx,presetAdd:(ts,k)=>{window.__pd=ts;window.__pt=k||"expense";sV("add")}}),
         v==="stats"&&t(Stats,{data:d,onTx:sAtx,onView:sV}),
-        v==="add"&&t(Editor,{data:d,onSave:sFE,onCancel:()=>sV("home"),presetDate:window.__pd,presetType:window.__pt,clearPreset:()=>{window.__pd=null;window.__pt=null}}),
+        v==="add"&&t(Editor,{data:d,onSave:sFE,onCancel:()=>sV("home"),presetDate:window.__pd,presetType:window.__pt,presetMode:window.__pm,clearPreset:()=>{window.__pd=null;window.__pt=null;window.__pm=null}}),
         v==="edit"&&ed&&t(Editor,{data:d,onSave:({expense})=>uE({...ed,...expense}),onCancel:()=>{sEd(null);sV("home")},editing:ed}),
         v==="more"&&t(More,{data:d,onClose:()=>sV("home"),onView:sV}),
         v==="search"&&t(SrchS,{data:d,onClose:()=>sV("home"),onTx:sAtx}),
@@ -506,7 +506,7 @@ return o("div",{className:"st",children:[
       o("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,marginTop:8,textAlign:"right"},children:["— ",q.a.toUpperCase()]}),
     ]}),
     o("div",{className:"g g2",style:{gap:8,marginTop:12},children:[
-      o("button",{onClick:()=>onView("chat"),className:"act98 trt",style:{display:"flex",flexDirection:"column",alignItems:"flex-start",gap:6,padding:"12px 14px",background:`linear-gradient(135deg,${c.ac}15 0%,${c.sf} 100%)`,border:`1px solid ${c.ac}40`,borderRadius:14,color:c.tx,textAlign:"left"},children:[
+      o("button",{onClick:()=>{window.__pm="paste";onView("add")},className:"act98 trt",style:{display:"flex",flexDirection:"column",alignItems:"flex-start",gap:6,padding:"12px 14px",background:`linear-gradient(135deg,${c.ac}15 0%,${c.sf} 100%)`,border:`1px solid ${c.ac}40`,borderRadius:14,color:c.tx,textAlign:"left"},children:[
         t("div",{style:{width:32,height:32,borderRadius:9,background:c.ac+"25",color:c.ac,display:"flex",alignItems:"center",justifyContent:"center"},children:t(Clp,{size:15})}),
         t("div",{style:{fontSize:13,fontWeight:500},children:"Smart Paste"}),
         t("div",{style:{fontSize:10.5,color:c.tm,lineHeight:1.3},children:"Paste SMS / expense / income"}),
@@ -704,7 +704,7 @@ return o("div",{style:{padding:"8px 24px 0"},className:"st",children:[
 ]})}
 
 // === EDITOR ===
-function Editor({data,onSave,onCancel,presetDate,presetType,clearPreset,editing}){const{accounts,currency,cards=[]}=data;const iE=!!editing;const[tp,sTp]=useState(iE?(editing.type==="income"?"income":"expense"):(presetType==="income"?"income":"expense"));const iI=tp==="income";const[md,sMd]=useState("manual");const[am,sAm]=useState(iE?String(editing.amount):"");const[ct,sCt]=useState(iE?editing.category:(presetType==="income"?"salary":"food"));const[sb,sSb]=useState(iE&&editing.subcategory||null);const[mc,sMc]=useState(iE&&editing.merchant||"");const[py,sPy]=useState(iE&&editing.payee||"");const[nt,sNt]=useState(iE&&editing.note||"");const[ph,sPh]=useState(iE?(editing.photos||[]):[]);const[aId,sAId]=useState(iE?editing.accountId:accounts[0].id);const[cId,sCId]=useState(iE&&editing.cardId||null);const[mop,sMop]=useState(iE?(editing.cardId?"card":"account"):"account");const[bk,sBk]=useState(iE&&editing.bank||"");const[ct2,sCt2]=useState(iE&&editing.cardType||"");const[c4,sC4]=useState(iE&&editing.cardLast4||"");const[dt,sDt]=useState(iE?editing.date:(presetDate||Date.now()));const[smsT,sSms]=useState("");const[ex,sEx]=useState(null);const[rc,sRc]=useState(false);const[fq,sFq]=useState("monthly");const[pf,sPf]=useState(false);const phR=useRef(null);
+function Editor({data,onSave,onCancel,presetDate,presetType,presetMode,clearPreset,editing}){const{accounts,currency,cards=[]}=data;const iE=!!editing;const[tp,sTp]=useState(iE?(editing.type==="income"?"income":"expense"):(presetType==="income"?"income":"expense"));const iI=tp==="income";const[md,sMd]=useState(presetMode||"manual");const[am,sAm]=useState(iE?String(editing.amount):"");const[ct,sCt]=useState(iE?editing.category:(presetType==="income"?"salary":"food"));const[sb,sSb]=useState(iE&&editing.subcategory||null);const[mc,sMc]=useState(iE&&editing.merchant||"");const[py,sPy]=useState(iE&&editing.payee||"");const[nt,sNt]=useState(iE&&editing.note||"");const[ph,sPh]=useState(iE?(editing.photos||[]):[]);const[aId,sAId]=useState(iE?editing.accountId:accounts[0].id);const[cId,sCId]=useState(iE&&editing.cardId||null);const[mop,sMop]=useState(iE?(editing.cardId?"card":"account"):"account");const[bk,sBk]=useState(iE&&editing.bank||"");const[ct2,sCt2]=useState(iE&&editing.cardType||"");const[c4,sC4]=useState(iE&&editing.cardLast4||"");const[dt,sDt]=useState(iE?editing.date:(presetDate||Date.now()));const[smsT,sSms]=useState("");const[ex,sEx]=useState(null);const[rc,sRc]=useState(false);const[fq,sFq]=useState("monthly");const[pf,sPf]=useState(false);const phR=useRef(null);
 useEffect(()=>{if(presetDate&&clearPreset)clearPreset()},[]);
 const acc=accounts.find(a=>a.id===aId)||accounts[0],ev2=ev(am),iX=/[+\-*/×÷]/.test(am),va=ev2!=null&&ev2>0;
 const dStr=ts=>{const d=new Date(ts);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
