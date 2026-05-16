@@ -646,7 +646,7 @@ return o("div",{className:"st",children:[
           o("div",{className:"f ia jb",children:[
             o("div",{className:"f ia",style:{gap:6},children:[
               t("div",{style:{width:6,height:6,borderRadius:"50%",background:c.co}}),
-              t("div",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1.5,color:c.co,fontWeight:600},children:"SPENDING BY ACCOUNT"}),
+              t("div",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1.5,color:c.co,fontWeight:600},children:"SPENDINGS BY ACCOUNT"}),
             ]}),
             t("button",{onClick:()=>sFlt({title:"Account Spending",items:monExp.filter(e=>!e.cardId)}),style:{fontFamily:F.mo,fontSize:10,color:c.ac,background:"transparent",border:"none",letterSpacing:.5},children:"VIEW ALL"}),
           ]}),
@@ -664,7 +664,7 @@ return o("div",{className:"st",children:[
           o("div",{className:"f ia jb",children:[
             o("div",{className:"f ia",style:{gap:6},children:[
               t("div",{style:{width:6,height:6,borderRadius:"50%",background:c.sk}}),
-              t("div",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1.5,color:c.sk,fontWeight:600},children:"SPENDING BY CARD"}),
+              t("div",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1.5,color:c.sk,fontWeight:600},children:"SPENDINGS BY CARD"}),
             ]}),
             t("button",{onClick:()=>sFlt({title:"Card Spending",items:monExp.filter(e=>!!e.cardId)}),style:{fontFamily:F.mo,fontSize:10,color:c.ac,background:"transparent",border:"none",letterSpacing:.5},children:"VIEW ALL"}),
           ]}),
@@ -938,7 +938,6 @@ return o("div",{className:"fi",style:{paddingTop:48,paddingBottom:32},children:[
     ucr.length===0
       ?t("div",{style:{margin:"0 24px",padding:"14px 16px",background:c.sf,borderRadius:12,border:`1px solid ${c.brs}`,fontSize:12,color:c.tm,textAlign:"center"},children:"No cards added yet. Go to Cards section to add one."})
       :o("div",{className:"f sx",style:{padding:"0 24px",gap:8,overflowX:"auto"},children:[
-          t("button",{onClick:()=>sCId(null),className:"act95 tr f ia",style:{gap:6,padding:"10px 12px",background:cId?c.sf:c.sf3,border:`1px solid ${cId?c.brs:c.ac}`,borderRadius:11,flexShrink:0,fontSize:13,color:cId?c.td:c.tx},children:"None"}),
           ...ucr.map(cr=>{const ac2=cId===cr.id;return o("button",{key:cr.id,onClick:()=>sCId(cr.id),className:"act95 tr f ia",style:{gap:8,padding:"10px 12px",background:ac2?c.sf3:c.sf,border:`1px solid ${ac2?c.ac:c.brs}`,borderRadius:11,flexShrink:0,fontSize:13,color:ac2?c.tx:c.td,fontWeight:ac2?500:400},children:[t("span",{style:{fontSize:14},children:"💳"}),t("span",{children:cr.name}),cr.last4&&o("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm},children:["··",cr.last4]})]})})
         ]}),
   ]}),
