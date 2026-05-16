@@ -475,18 +475,34 @@ function Nav({view,setView}){const tabs=[{id:"home",icon:Hm,label:"Home"},{id:"c
 
 // === HOME ===
 const MX={daily:30,weekly:4.33,biweekly:2.17,monthly:1,yearly:0.0833};
-function FilteredTxSheet({title,items,accounts,currency,onClose,onHome,onTx}){const exportXls=()=>{if(!window.XLSX){alert("Excel library not loaded");return}const rows=items.map(e=>{const cat=co(e.category),acc=accounts.find(a=>a.id===e.accountId);return{"Date":new Date(e.date).toLocaleDateString("en-US"),"Type":e.type,"Merchant":e.merchant||e.payee||cat.label,"Category":cat.label,"Account":acc?acc.name:"","Amount":(e.type==="income"||e.type==="transfer-in")?e.amount:-e.amount,"Currency":e.currency||currency,"Note":e.note||""}});const ws=window.XLSX.utils.json_to_sheet(rows),wb=window.XLSX.utils.book_new();window.XLSX.utils.book_append_sheet(wb,ws,"Transactions");window.XLSX.writeFile(wb,title.replace(/[^a-zA-Z0-9]+/g,"_")+".xlsx")};
+function FilteredTxSheet({title,items,accounts,currency,onClose,onHome,onTx}){
+  const[sort,setSort]=useState("date-desc");
+  const SORTS=[
+    {id:"date-desc",l:"Date ↓"},
+    {id:"date-asc",l:"Date ↑"},
+    {id:"value-desc",l:"Value ↓"},
+    {id:"value-asc",l:"Value ↑"},
+    {id:"alpha",l:"A → Z"},
+    {id:"type",l:"Type"},
+  ];
+  const label=(e)=>e.merchant||e.payee||co(e.category).label||"";
+  const typeOrder=(e)=>e.type==="income"?0:e.type==="expense"?1:2;
+  const sorted=useMemo(()=>{const a=[...items];if(sort==="date-desc")a.sort((x,y)=>y.date-x.date);else if(sort==="date-asc")a.sort((x,y)=>x.date-y.date);else if(sort==="value-desc")a.sort((x,y)=>y.amount-x.amount);else if(sort==="value-asc")a.sort((x,y)=>x.amount-y.amount);else if(sort==="alpha")a.sort((x,y)=>label(x).localeCompare(label(y)));else if(sort==="type")a.sort((x,y)=>typeOrder(x)-typeOrder(y)||y.date-x.date);return a},[items,sort]);
+  const exportXls=()=>{if(!window.XLSX){alert("Excel library not loaded");return}const rows=sorted.map(e=>{const cat=co(e.category),acc=accounts.find(a=>a.id===e.accountId);return{"Date":new Date(e.date).toLocaleDateString("en-US"),"Type":e.type,"Merchant":label(e),"Category":cat.label,"Account":acc?acc.name:"","Amount":(e.type==="income"||e.type==="transfer-in")?e.amount:-e.amount,"Currency":e.currency||currency,"Note":e.note||""}});const ws=window.XLSX.utils.json_to_sheet(rows),wb=window.XLSX.utils.book_new();window.XLSX.utils.book_append_sheet(wb,ws,"Transactions");window.XLSX.writeFile(wb,title.replace(/[^a-zA-Z0-9]+/g,"_")+".xlsx")};
 return o("div",{className:"fx f fc",style:{inset:0,background:c.bg,zIndex:45},children:[
-  o("div",{className:"f ia",style:{padding:"max(env(safe-area-inset-top),14px) 14px 12px",background:c.bg,borderBottom:`1px solid ${c.brs}`,flexShrink:0,gap:10},children:[
-    t("button",{onClick:onHome||onClose,className:"act90 trt f ia",style:{gap:8,background:"transparent",border:"none",color:"inherit",flexShrink:0},children:[t(Logo,{}),]}),
-    t("div",{style:{fontFamily:F.se,fontSize:20,fontStyle:"italic",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:c.tx},children:title}),
-    t("button",{onClick:onClose,className:"act90 trt",style:{width:36,height:36,borderRadius:10,background:c.sf,border:`1px solid ${c.brs}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(X,{size:16,color:c.tx})}),
+  o("div",{style:{padding:"max(env(safe-area-inset-top),14px) 14px 0",background:c.bg,borderBottom:`1px solid ${c.brs}`,flexShrink:0},children:[
+    o("div",{className:"f ia",style:{gap:10,paddingBottom:10},children:[
+      t("button",{onClick:onHome||onClose,className:"act90 trt f ia",style:{gap:8,background:"transparent",border:"none",color:"inherit",flexShrink:0},children:[t(Logo,{})]}),
+      t("div",{style:{fontFamily:F.se,fontSize:20,fontStyle:"italic",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:c.tx},children:title}),
+      t("button",{onClick:onClose,className:"act90 trt",style:{width:36,height:36,borderRadius:10,background:c.sf,border:`1px solid ${c.brs}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(X,{size:16,color:c.tx})}),
+    ]}),
+    t("div",{className:"f",style:{gap:6,paddingBottom:10,overflowX:"auto",WebkitOverflowScrolling:"touch"},children:SORTS.map(s=>t("button",{key:s.id,onClick:()=>setSort(s.id),className:"act95 tr",style:{padding:"5px 12px",background:sort===s.id?c.ac:c.sf,border:`1px solid ${sort===s.id?"transparent":c.brs}`,borderRadius:999,fontSize:11,fontFamily:F.mo,color:sort===s.id?"#0a0a0a":c.td,whiteSpace:"nowrap",flexShrink:0},children:s.l}))}),
   ]}),
   o("div",{style:{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
-    t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,padding:"10px 20px 4px"},children:items.length+" TRANSACTIONS"}),
-    items.length===0
+    t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,padding:"10px 20px 4px"},children:sorted.length+" TRANSACTIONS"}),
+    sorted.length===0
       ?t("div",{style:{padding:"8px 20px"},children:t(ES,{title:t("em",{children:"nothing here"}),subtitle:"No transactions for this filter"})})
-      :t("div",{style:{margin:"8px 16px 100px",background:c.sf,borderRadius:18,border:`1px solid ${c.brs}`},children:items.map((e,i)=>t(TX,{key:e.id,expense:e,accounts,isLast:i===items.length-1,onClick:()=>onTx(e)}))})
+      :t("div",{style:{margin:"8px 16px 100px",background:c.sf,borderRadius:18,border:`1px solid ${c.brs}`},children:sorted.map((e,i)=>t(TX,{key:e.id,expense:e,accounts,isLast:i===sorted.length-1,onClick:()=>onTx(e)}))})
   ]}),
   o("div",{style:{position:"absolute",bottom:0,left:0,right:0,padding:"12px 16px",paddingBottom:"max(env(safe-area-inset-bottom),12px)",background:`linear-gradient(0deg,${c.bg} 60%,transparent)`,pointerEvents:"none"},children:[
     t("button",{onClick:exportXls,className:"act90 trt f ia jc",style:{width:"100%",gap:8,padding:"14px 0",background:c.ac,border:"none",borderRadius:14,fontSize:13,fontFamily:F.mo,color:"#0a0a0a",letterSpacing:.5,fontWeight:600,pointerEvents:"auto"},children:[t(Dl,{size:14,color:"#0a0a0a"}),"EXPORT TO XLSX"]}),
