@@ -348,22 +348,8 @@ const Logo=()=>ce("svg",{width:36,height:36,viewBox:"0 0 36 36",fill:"none",styl
 function AppHeader({onMenu,onSearch,onToggleTheme,isDark,onHome}){
   const btnStyle={width:34,height:34,borderRadius:10,background:isDark?"rgba(255,255,255,0.07)":"rgba(0,0,0,0.06)",border:`1px solid ${isDark?"rgba(255,255,255,0.10)":"rgba(0,0,0,0.10)"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0};
   const now=new Date();
-  const dayNum=now.getDate();
-  const monthStr=now.toLocaleDateString("en-US",{month:"short"}).toUpperCase();
-  const yearStr=String(now.getFullYear());
-  const dayName=now.toLocaleDateString("en-US",{weekday:"short"}).toUpperCase();
-  const CalWidget=o("div",{style:{width:38,height:44,borderRadius:5,overflow:"hidden",flexShrink:0,boxShadow:"0 2px 6px rgba(0,0,0,0.35)",border:"1px solid rgba(0,0,0,0.18)"},children:[
-    o("div",{style:{background:"#D32F2F",padding:"2px 0",textAlign:"center"},children:[
-      t("div",{style:{fontFamily:F.mo,fontSize:7,color:"#fff",fontWeight:700,letterSpacing:.5,lineHeight:1},children:yearStr}),
-      t("div",{style:{fontFamily:F.mo,fontSize:7.5,color:"rgba(255,255,255,0.85)",letterSpacing:1,lineHeight:1,marginTop:1},children:monthStr}),
-    ]}),
-    t("div",{style:{background:"#fff",textAlign:"center",padding:"2px 0 1px"},children:
-      t("div",{style:{fontFamily:"'Fraunces','Georgia',serif",fontSize:18,fontWeight:700,color:"#111",lineHeight:1},children:dayNum})
-    }),
-    t("div",{style:{background:"#111",textAlign:"center",padding:"2px 0"},children:
-      t("div",{style:{fontFamily:F.mo,fontSize:6.5,color:"#fff",fontWeight:600,letterSpacing:.8,lineHeight:1},children:dayName})
-    }),
-  ]});
+  const dayStr=now.toLocaleDateString("en-US",{weekday:"short"}).toUpperCase();
+  const dateStr=now.toLocaleDateString("en-US",{day:"numeric",month:"short"}).toUpperCase();
   return t("div",{className:"fx f jc",style:{top:0,left:0,right:0,zIndex:28,background:isDark?"linear-gradient(135deg,#1C1B16 0%,#111009 100%)":"linear-gradient(135deg,#F2EFE6 0%,#E8E4DA 100%)",borderBottom:`1px solid ${isDark?"rgba(219,255,77,0.18)":"rgba(0,0,0,0.10)"}`,boxShadow:isDark?"0 2px 24px rgba(0,0,0,0.5)":"0 2px 16px rgba(0,0,0,0.08)",paddingTop:"env(safe-area-inset-top)"},children:o("div",{className:"f ia jb",style:{width:"100%",maxWidth:440,padding:"8px 14px"},children:[
     t("button",{onClick:onMenu,className:"act90 trt",style:btnStyle,children:t(Menu,{size:18,color:c.tx})}),
     t("button",{onClick:onHome,className:"act90 trt f ia",style:{gap:9,background:"transparent",border:"none",color:"inherit"},children:[
@@ -372,7 +358,10 @@ function AppHeader({onMenu,onSearch,onToggleTheme,isDark,onHome}){
         t("div",{style:{fontFamily:F.mo,fontSize:9,letterSpacing:2,color:c.ac,lineHeight:1,marginBottom:2},children:"EXPENSE"}),
         t("div",{style:{fontFamily:F.se,fontSize:17,fontStyle:"italic",lineHeight:1,color:c.tx},children:"Tracker Pro"})
       ]}),
-      CalWidget,
+      o("div",{style:{marginLeft:6,paddingLeft:10,borderLeft:`1px solid ${isDark?"rgba(255,255,255,0.10)":"rgba(0,0,0,0.10)"}`,display:"flex",flexDirection:"column",alignItems:"flex-start"},children:[
+        t("div",{style:{fontFamily:F.mo,fontSize:8,letterSpacing:1.5,color:c.tm,lineHeight:1,marginBottom:3},children:dayStr}),
+        t("div",{style:{fontFamily:F.mo,fontSize:11,letterSpacing:.5,color:c.td,lineHeight:1,fontWeight:500},children:dateStr}),
+      ]}),
     ]}),
     o("div",{className:"f ia",style:{gap:6},children:[
       t("button",{onClick:onSearch,className:"act90 trt",style:btnStyle,children:t(Srch,{size:16,color:c.tx})}),
