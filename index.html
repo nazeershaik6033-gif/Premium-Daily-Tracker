@@ -13,6 +13,9 @@
 <link rel="manifest" href="manifest.json"/>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 36 36' fill='none'%3E%3Crect x='1' y='2' width='17' height='21' rx='2' fill='%23FDE68A' stroke='%231a1a1a' stroke-width='1.3'/%3E%3Cpath d='M13 2 L19 8 L13 8 Z' fill='%23F59E0B' stroke='%231a1a1a' stroke-width='1.3' stroke-linejoin='round'/%3E%3Cline x1='4' y1='11' x2='14' y2='11' stroke='%23444' stroke-width='.9'/%3E%3Cline x1='4' y1='14' x2='14' y2='14' stroke='%23444' stroke-width='.9'/%3E%3Ctext x='9' y='21' text-anchor='middle' font-size='8' font-weight='bold' fill='%23222' font-family='sans-serif'%3E%E2%82%B9%3C/text%3E%3Crect x='16' y='10' width='19' height='23' rx='3' fill='%234ade80' stroke='%231a1a1a' stroke-width='1.3'/%3E%3Crect x='18' y='12' width='15' height='5.5' rx='1.5' fill='%2393c5fd'/%3E%3Crect x='18' y='20' width='4' height='3.2' rx='.8' fill='%2315803d'/%3E%3Crect x='23' y='20' width='4' height='3.2' rx='.8' fill='%2315803d'/%3E%3Crect x='28' y='20' width='4.5' height='3.2' rx='.8' fill='%23f97316'/%3E%3Crect x='18' y='24.5' width='4' height='3.2' rx='.8' fill='%2315803d'/%3E%3Crect x='23' y='24.5' width='4' height='3.2' rx='.8' fill='%2315803d'/%3E%3Crect x='28' y='24.5' width='4.5' height='3.2' rx='.8' fill='%23f97316'/%3E%3Cellipse cx='9.5' cy='33' rx='7' ry='2' fill='%23F59E0B' stroke='%231a1a1a' stroke-width='1'/%3E%3Cellipse cx='9.5' cy='31' rx='7' ry='2' fill='%23FBBF24' stroke='%231a1a1a' stroke-width='1'/%3E%3Cellipse cx='9.5' cy='29' rx='7' ry='2' fill='%23F59E0B' stroke='%231a1a1a' stroke-width='1'/%3E%3Ctext x='9.5' y='30.5' text-anchor='middle' font-size='5' font-weight='bold' fill='%2378350f' font-family='sans-serif'%3E%E2%82%B9%3C/text%3E%3C/svg%3E"/>
 <title>Expense Tracker Pro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Instrument+Serif&family=JetBrains+Mono:wght@400;500;600&family=Geist:wght@400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js" crossorigin></script>
@@ -477,7 +480,7 @@ function App(){
   return o("div",{style:{background:c.bg,color:c.tx,fontFamily:F.sa,minHeight:"100vh",width:"100%"},className:"f jc",children:[
     t(Gr,{}),
     t(AppHeader,{onMenu:()=>sSbar(true),onSearch:()=>sV("search"),onToggleTheme:toggleTheme,isDark,onHome:()=>sV("home")}),
-    o("div",{className:"r w100",style:{maxWidth:440,minHeight:"100vh",background:c.bg,borderLeft:`1px solid ${c.brs}`,borderRight:`1px solid ${c.brs}`,overflow:"hidden",zIndex:2},children:[
+    o("div",{className:"r w100",style:{maxWidth:440,minHeight:"100vh",background:c.bg,borderLeft:`1px solid ${c.brs}`,borderRight:`1px solid ${c.brs}`,overflow:"hidden"},children:[
       o("div",{style:{paddingBottom:128,paddingTop:52},children:[
         v==="home"&&t(Home,{data:d,onTx:sAtx,onView:sV,onSetBudget:b=>pst({budget:b})}),
         v==="calendar"&&t(Calend,{data:d,onTx:sAtx,presetAdd:(ts,k)=>{window.__pd=ts;window.__pt=k||"expense";sV("add")}}),
