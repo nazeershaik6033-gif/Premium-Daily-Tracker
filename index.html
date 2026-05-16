@@ -1265,6 +1265,10 @@ function UpcomingExp({data,onAdd,onDelete,onClose}){
   const doAdd=()=>{if(!title.trim()||!amt)return;onAdd({title:title.trim(),amount:parseFloat(amt),date:new Date(dt+"T00:00:00").getTime(),note:note.trim()||null});sTitle("");sAmt("");sDt(new Date(Date.now()+30*864e5).toISOString().slice(0,10));sNote("");sShowForm(false)};
   return o("div",{style:{padding:"8px 24px 32px"},children:[
     t(SH,{title:t("em",{children:"Upcoming Expenses"}),onBack:onClose,right:t("button",{onClick:()=>sShowForm(x=>!x),className:"act90 trt",style:{width:38,height:38,borderRadius:12,background:c.ac,color:"#0a0a0a",display:"flex",alignItems:"center",justifyContent:"center",border:"none"},children:showForm?t(X,{size:18}):t(Plus,{size:20,strokeWidth:2.5})})}),
+    o("div",{style:{background:threshold>0?c.ro+"10":c.sf,borderRadius:10,padding:"10px 14px",marginBottom:12,border:`1px solid ${threshold>0?c.ro+"30":c.brs}`,display:"flex",alignItems:"center",justifyContent:"space-between"},children:[
+      o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:2},children:"ALERT THRESHOLD"}),t("div",{style:{fontFamily:F.mo,fontSize:14,fontWeight:600,color:threshold>0?c.ro:c.td},children:threshold>0?fm(threshold,currency):"Not set"})]}),
+      t("div",{style:{fontSize:10,color:c.tm,fontFamily:F.mo,letterSpacing:.3},children:threshold>0?"Expenses ≥ this amount are flagged BIG":"Set in Settings → Big Expense Alert"}),
+    ]}),
     showForm&&o("div",{style:{background:c.sf,borderRadius:14,padding:16,border:`1px solid ${c.brs}`,marginBottom:16},children:[
       t("div",{style:{fontFamily:F.se,fontSize:15,fontStyle:"italic",marginBottom:12},children:"Plan a future expense"}),
       t("input",{value:title,onChange:e=>sTitle(e.target.value),placeholder:"What is it? (e.g. MacBook, Vacation)",style:{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${c.brs}`,background:c.sf2,color:c.tx,fontSize:14,fontFamily:F.sa,boxSizing:"border-box",marginBottom:8,outline:"none"}}),
