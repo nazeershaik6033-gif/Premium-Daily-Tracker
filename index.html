@@ -587,6 +587,62 @@ return o("div",{style:{padding:"8px 24px 0"},className:"st",children:[
   ]}),
 ]})}
 
+// === CUSTOM SVG CHARTS ===
+function SvgBar({data,height,acKey,acCol,baseCol}){
+  if(!data||!data.length)return null;
+  const padB=24,padT=6,max=Math.max(...data.map(d=>d.value),1);
+  const W=data.length*50,cH=height-padB-padT,bW=36;
+  return ce("svg",{width:"100%",height,viewBox:`0 0 ${W} ${height}`,preserveAspectRatio:"none",style:{display:"block"}},
+    ...data.flatMap((d,i)=>{
+      const bH=Math.max(4,(d.value/max)*cH),x=i*50+7,y=padT+cH-bH;
+      const isAc=acKey!=null?d[acKey]:(i===data.length-1);
+      const fill=isAc?(acCol||c.ac):(baseCol||c.sf3);
+      const lbl=d.value>=1000?(d.value/1000).toFixed(1)+"k":d.value>0?String(Math.round(d.value)):"";
+      return[
+        ce("rect",{key:"r"+i,x,y,width:bW,height:bH,rx:5,fill}),
+        lbl&&ce("text",{key:"v"+i,x:x+bW/2,y:Math.max(y-3,padT+4),textAnchor:"middle",fontSize:8,fill:isAc?(acCol||c.ac):(baseCol||c.sf3),fontFamily:"monospace"},lbl),
+        ce("text",{key:"l"+i,x:x+bW/2,y:height-6,textAnchor:"middle",fontSize:9,fill:c.tm,fontFamily:"monospace"},d.label)
+      ].filter(Boolean);
+    })
+  );
+}
+function SvgDonut({data,size,innerR,outerR}){
+  const cx=size/2,cy=size/2,total=data.reduce((s,d)=>s+d.value,0);
+  if(!total)return ce("svg",{width:"100%",height:size});
+  let ang=-Math.PI/2;
+  return ce("svg",{width:"100%",height:size,viewBox:`0 0 ${size} ${size}`},
+    ...data.map((d,i)=>{
+      const sweep=(d.value/total)*Math.PI*2,gap=data.length>1?0.03:0;
+      const a1=ang+gap/2,a2=ang+sweep-gap/2;
+      ang+=sweep;
+      const large=sweep-gap>Math.PI?1:0;
+      const path=`M${cx+outerR*Math.cos(a1)},${cy+outerR*Math.sin(a1)}A${outerR},${outerR},0,${large},1,${cx+outerR*Math.cos(a2)},${cy+outerR*Math.sin(a2)}L${cx+innerR*Math.cos(a2)},${cy+innerR*Math.sin(a2)}A${innerR},${innerR},0,${large},0,${cx+innerR*Math.cos(a1)},${cy+innerR*Math.sin(a1)}Z`;
+      return ce("path",{key:i,d:path,fill:d.color||c.ac});
+    })
+  );
+}
+function SvgArea({data,height,lineCol,fillCol}){
+  if(!data||data.length<2)return ce("svg",{width:"100%",height});
+  const W=300,padB=22,padT=8,H=height-padB-padT;
+  const vals=data.map(d=>d.value),minV=Math.min(...vals),maxV=Math.max(...vals,minV+1);
+  const scX=i=>(i/(data.length-1))*W,scY=v=>padT+H-((v-minV)/(maxV-minV))*H;
+  const polyPts=data.map((d,i)=>`${scX(i)},${scY(d.value)}`).join(" ");
+  const lc=lineCol||c.gd,fc=fillCol||c.gd;
+  const step=Math.max(1,Math.ceil(data.length/5));
+  return ce("svg",{width:"100%",height,viewBox:`0 0 ${W} ${height}`,preserveAspectRatio:"none",style:{display:"block"}},
+    ce("defs",{},ce("linearGradient",{id:"svgag",x1:"0",y1:"0",x2:"0",y2:"1"},
+      ce("stop",{offset:"0%",stopColor:fc,stopOpacity:.35}),
+      ce("stop",{offset:"100%",stopColor:fc,stopOpacity:.02})
+    )),
+    ce("polygon",{points:`0,${padT+H} ${polyPts} ${W},${padT+H}`,fill:"url(#svgag)"}),
+    ce("polyline",{points:polyPts,fill:"none",stroke:lc,strokeWidth:2,strokeLinejoin:"round",strokeLinecap:"round"}),
+    ...data.filter((_,i)=>i===0||i===data.length-1||i%step===0).map(d=>{
+      const i=data.indexOf(d);
+      return ce("text",{key:i,x:scX(i),y:height-5,textAnchor:i===0?"start":i===data.length-1?"end":"middle",fontSize:9,fill:c.tm,fontFamily:"monospace"},d.label);
+    })
+  );
+}
+
 // === STATS ===
 function Stats({data,onTx,onView}){const{expenses,currency,monthStartDay,categoryBudgets={}}=data;const[range,sRange]=useState("month");const st=useMemo(()=>range==="week"?ws():range==="year"?ys():ps(new Date(),monthStartDay),[range,monthStartDay]);const monExp=useMemo(()=>expenses.filter(e=>e.date>=st&&e.type==="expense"),[expenses,st]);const tot=monExp.reduce((s,e)=>s+e.amount,0);
 const trend=useMemo(()=>{const a=[],td=new Date();for(let i=5;i>=0;i--){const d=new Date(td.getFullYear(),td.getMonth()-i,1),s=mss(d.getFullYear(),d.getMonth(),monthStartDay),e=mse(d.getFullYear(),d.getMonth(),monthStartDay),v=expenses.filter(x=>x.date>=s&&x.date<e&&x.type==="expense").reduce((ac,x)=>ac+x.amount,0);a.push({label:d.toLocaleDateString("en-US",{month:"short"}),value:Math.round(v*100)/100,isCurrent:i===0})}return a},[expenses,monthStartDay]);
@@ -620,17 +676,17 @@ return o("div",{style:{padding:"8px 24px 0"},className:"st",children:[
   ]}),
   o("div",{style:{marginTop:20,background:c.sf,borderRadius:18,border:`1px solid ${c.brs}`,padding:18},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:12},children:"6-MONTH OVERVIEW"}),
-    t("div",{style:{height:140},children:t(RC,{width:"100%",height:"100%",children:o(BarChart,{data:trend,margin:{top:4,right:0,bottom:0,left:0},children:[t(XAxis,{dataKey:"label",axisLine:false,tickLine:false,tick:{fill:c.tm,fontSize:11,fontFamily:F.sa}}),t(Bar,{dataKey:"value",radius:[6,6,0,0],children:trend.map((d,i)=>t(Cell,{key:i,fill:d.isCurrent?c.ac:c.sf3}))})]})})}),
+    t(SvgBar,{data:trend,height:140,acKey:"isCurrent",acCol:c.ac,baseCol:c.sf3}),
   ]}),
   o("div",{style:{marginTop:20,background:c.sf,borderRadius:18,border:`1px solid ${c.brs}`,padding:18},children:[
     o("div",{className:"f ib jb",style:{marginBottom:12},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:"LAST 7 DAYS"}),t("span",{style:{fontFamily:F.mo,fontSize:13},children:fm(last7.reduce((s,d)=>s+d.value,0),currency)})]}),
-    t("div",{style:{height:120},children:t(RC,{width:"100%",height:"100%",children:o(BarChart,{data:last7,margin:{top:4,right:0,bottom:0,left:0},children:[t(XAxis,{dataKey:"label",axisLine:false,tickLine:false,tick:{fill:c.tm,fontSize:11,fontFamily:F.sa}}),t(Bar,{dataKey:"value",radius:[6,6,0,0],children:last7.map((d,i)=>t(Cell,{key:i,fill:i===6?c.ac:c.sf3}))})]})})}),
+    t(SvgBar,{data:last7,height:120,acKey:null,acCol:c.ac,baseCol:c.sf3}),
   ]}),
   byCat.length>0&&(()=>{const byAcct=data.accounts.map(a=>{const sp=monExp.filter(e=>e.accountId===a.id).reduce((s,e)=>s+e.amount,0);return{id:a.id,label:a.name,emoji:a.emoji,value:sp}}).filter(x=>x.value>0).sort((a,b)=>b.value-a.value);return byAcct.length>1?o("div",{style:{marginTop:20,background:c.sf,borderRadius:18,border:`1px solid ${c.brs}`,padding:18},children:[t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:12},children:"BY ACCOUNT"}),byAcct.map(a=>{const pct=tot>0?(a.value/tot)*100:0;return o("div",{key:a.id,className:"f ia",style:{gap:12,marginBottom:8},children:[t("span",{style:{fontSize:14},children:a.emoji}),o("div",{className:"f1 minw0",children:[o("div",{className:"f jb",style:{fontSize:12,marginBottom:4},children:[t("span",{children:a.label}),o("span",{style:{fontFamily:F.mo,color:c.td},children:[fm(a.value,currency)," · ",pct.toFixed(1),"%"]})]}),t("div",{style:{height:3,background:c.sf2,borderRadius:999},children:t("div",{style:{width:pct+"%",height:"100%",background:c.ac,borderRadius:999}})})]})]})})]}):null})(),
   byCat.length>0&&o("div",{style:{marginTop:20,background:c.sf,borderRadius:18,border:`1px solid ${c.brs}`,padding:18},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:8},children:"BY CATEGORY"}),
     o("div",{style:{height:200,position:"relative"},children:[
-      t(RC,{width:"100%",height:200,children:o(PieChart,{children:[t(Pie,{data:byCat,dataKey:"value",nameKey:"label",innerRadius:55,outerRadius:88,paddingAngle:2,stroke:"none",children:byCat.map((cc2,i)=>t(Cell,{key:i,fill:cc2.color}))}),t(Tooltip,{contentStyle:{background:c.sf3,border:`1px solid ${c.brs}`,borderRadius:8,fontSize:12,color:c.tx},formatter:v=>fm(v,currency)})]})}),
+      t(SvgDonut,{data:byCat,size:200,innerR:55,outerR:88}),
       t("div",{style:{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",pointerEvents:"none"},children:o(Fragment,{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1},children:"TOTAL"}),t("div",{style:{fontFamily:F.mo,fontSize:18,fontWeight:500},children:fm(catTot,currency)})]})}),
     ]}),
     t("div",{style:{marginTop:16},children:byCat.map(cc2=>{const pct=catTot>0?(cc2.value/catTot)*100:0;return o("div",{key:cc2.id,className:"f ia",style:{gap:12,marginBottom:8},children:[t("span",{style:{fontSize:14},children:cc2.emoji}),o("div",{className:"f1 minw0",children:[o("div",{className:"f jb",style:{fontSize:12},children:[t("span",{children:cc2.label}),o("span",{style:{fontFamily:F.mo,color:c.td},children:[fm(cc2.value,currency)," · ",pct.toFixed(1),"%"]})]}),t("div",{style:{marginTop:4,height:3,background:c.sf2,borderRadius:999},children:t("div",{style:{width:pct+"%",height:"100%",background:cc2.color,borderRadius:999}})})]})]})})}),
@@ -975,12 +1031,7 @@ return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
   t("div",{className:"f",style:{gap:4,padding:4,marginTop:16,background:c.sf,borderRadius:12,border:`1px solid ${c.brs}`},children:["12","24"].map(r=>t("button",{key:r,onClick:()=>sRange(r),className:"f1 tr",style:{padding:"8px 0",background:range===r?c.sf3:"transparent",color:range===r?c.tx:c.td,borderRadius:9,fontSize:12,fontWeight:range===r?500:400,border:"none"},children:r+" months"}))}),
   o("div",{style:{marginTop:16,background:c.sf,borderRadius:18,border:`1px solid ${c.brs}`,padding:18},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:8},children:"NET WORTH TREND"}),
-    t("div",{style:{height:200},children:t(RC,{width:"100%",height:"100%",children:o(AreaChart,{data:s,margin:{top:8,right:0,bottom:0,left:0},children:[
-      t("defs",{children:o("linearGradient",{id:"nwg",x1:"0",y1:"0",x2:"0",y2:"1",children:[t("stop",{offset:"0%",stopColor:c.gd,stopOpacity:.4}),t("stop",{offset:"100%",stopColor:c.gd,stopOpacity:0})]})}),
-      t(XAxis,{dataKey:"label",axisLine:false,tickLine:false,tick:{fill:c.tm,fontSize:10,fontFamily:F.mo}}),
-      t(Tooltip,{contentStyle:{background:c.sf3,border:`1px solid ${c.brs}`,borderRadius:8,fontSize:12,color:c.tx},formatter:v=>fm(v,currency),labelFormatter:l=>s.find(x=>x.label===l)?.full||l}),
-      t(Area,{type:"monotone",dataKey:"value",stroke:c.gd,strokeWidth:2,fill:"url(#nwg)"}),
-    ]})})}),
+    t(SvgArea,{data:s,height:200,lineCol:c.gd,fillCol:c.gd}),
   ]}),
   o("div",{style:{marginTop:16,background:c.sf,borderRadius:18,border:`1px solid ${c.brs}`,padding:18},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:12},children:"BY ACCOUNT"}),
