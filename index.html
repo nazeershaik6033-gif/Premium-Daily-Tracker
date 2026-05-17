@@ -35,7 +35,7 @@ if(typeof Recharts === 'undefined') {
 }
 </script>
 <style>
-:root{--nf:'SF Mono',ui-monospace,monospace;--tf:-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,sans-serif;--ns:20px}
+:root{--nf:'SF Mono',ui-monospace,monospace;--tf:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display',system-ui,sans-serif;--ns:14px}
 *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
 html,body,#root{height:100%;height:100dvh;margin:0;padding:0;background:#0E0D0B;overflow:hidden}
 html{height:-webkit-fill-available}
@@ -235,7 +235,7 @@ const lightC={bg:"#F5F3EE",sf:"#ECEAE3",sf2:"#E2DFD7",sf3:"#D6D2C8",br:"#C0BDB3"
 let c={...darkC};
 const F={se:"'Instrument Serif','Times New Roman',serif",dp:"'Fraunces','Instrument Serif',serif",sa:"'Geist',-apple-system,system-ui,sans-serif",mo:"'JetBrains Mono','SF Mono',ui-monospace,monospace"};
 const FONT_OPT=[
-  {id:'system',l:'SF Pro',f:"-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,sans-serif"},
+  {id:'system',l:'SF Pro',f:"-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display',system-ui,sans-serif"},
   {id:'geist',l:'Geist',f:"'Geist',-apple-system,system-ui,sans-serif"},
   {id:'inter',l:'Inter',f:"'Inter',-apple-system,system-ui,sans-serif"},
   {id:'roboto',l:'Roboto',f:"'Roboto',sans-serif"},
@@ -253,7 +253,7 @@ const FONT_OPT=[
 const NUM_SZ=[14,16,18,20,24,28,32];
 const gNF=d=>FONT_OPT.find(f=>f.id===(d?.fontPrefs?.numFont||'sfmono'))?.f||FONT_OPT.find(f=>f.id==='sfmono').f;
 const gTF=d=>FONT_OPT.find(f=>f.id===(d?.fontPrefs?.txtFont||'system'))?.f||FONT_OPT[0].f;
-const gNS=d=>d?.fontPrefs?.numSize||20;
+const gNS=d=>d?.fontPrefs?.numSize||14;
 
 const QQ=[{q:"Do not save what is left after spending; spend what is left after saving.",a:"Warren Buffett"},{q:"An investment in knowledge pays the best interest.",a:"Benjamin Franklin"},{q:"Beware of little expenses; a small leak will sink a great ship.",a:"Benjamin Franklin"},{q:"The price of anything is the amount of life you exchange for it.",a:"Henry David Thoreau"},{q:"A budget is telling your money where to go instead of wondering where it went.",a:"Dave Ramsey"},{q:"Wealth consists not in having great possessions, but in having few wants.",a:"Epictetus"},{q:"It's not how much money you make, but how much money you keep.",a:"Robert Kiyosaki"},{q:"The habit of saving is itself an education.",a:"T. T. Munger"},{q:"Never spend your money before you have it.",a:"Thomas Jefferson"},{q:"Frugality includes all the other virtues.",a:"Cicero"},{q:"Compound interest is the eighth wonder of the world.",a:"Albert Einstein"},{q:"Don't tell me what you value, show me your budget.",a:"Joe Biden"},{q:"The art is not in making money, but in keeping it.",a:"Proverb"},{q:"Save money and money will save you.",a:"Jamaican Proverb"},{q:"Every time you borrow money, you're robbing your future self.",a:"Nathan W. Morris"},{q:"A penny saved is a penny earned.",a:"Benjamin Franklin"},{q:"Money is a terrible master but an excellent servant.",a:"P. T. Barnum"},{q:"He who buys what he does not need, steals from himself.",a:"Swedish Proverb"},{q:"Annual income twenty pounds, annual expenditure nineteen six, result happiness.",a:"Charles Dickens"},{q:"Risk comes from not knowing what you're doing.",a:"Warren Buffett"}];
 
