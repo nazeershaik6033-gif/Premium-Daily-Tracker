@@ -99,13 +99,13 @@ body{background:#fff!important;color:#000!important}
   flex-shrink:0;
   display:flex;
   justify-content:center;
-  padding-top:2px;
+  padding-top:4px;
 }
 .nav-inner{
   width:100%;
   max-width:440px;
-  padding:2px 12px;
-  padding-bottom:calc(env(safe-area-inset-bottom,0px) + 4px);
+  padding:0 12px;
+  padding-bottom:max(env(safe-area-inset-bottom,0px),6px);
 }
 </style>
 </head>
@@ -511,7 +511,7 @@ function App(){
 
   if(d.loading)return t("div",{style:{background:c.bg,color:c.tx,height:"100dvh"},className:"f ia jc",children:t("div",{style:{fontFamily:F.se,fontSize:32,color:c.td,fontStyle:"italic"},children:"loading…"})});
 
-  const nav=!["add","edit","chat","billScan","recurring","accounts","newAccount","newCard","editCard","newRecurring","newTransfer","newProfile","newBill","editBill","newGoal","editGoal","backup","monthlyReport","categoryBudgets","wealth","bills","goals","cardDetail","more","search","profiles","transfer","editAccount","editRecurring","categories","tips","userMgr","upcomingExp","expPlanner"].includes(v);
+  const nav=!["newAccount","editAccount","newCard","editCard","newRecurring","editRecurring","newBill","editBill","newGoal","editGoal","newTransfer","newProfile","backup"].includes(v);
   return o("div",{style:{background:c.bg,color:c.tx,fontFamily:'var(--tf)',height:"100dvh",maxHeight:"100dvh",width:"100%",overflow:"hidden",display:"flex",flexDirection:"column",alignItems:"center"},className:"",children:[
     t(Gr,{}),
     t(AppHeader,{onMenu:()=>sSbar(true),onSearch:()=>sV("search"),onToggleTheme:toggleTheme,isDark,onHome:()=>sV("home")}),
@@ -565,7 +565,7 @@ function App(){
 }
 
 // === BOTTOM NAV ===
-function Nav({view,setView}){const tabs=[{id:"home",icon:Hm,label:"Home"},{id:"calendar",icon:Cal,label:"Calendar"},{id:"add",icon:Plus,label:"Add",main:true},{id:"stats",icon:BarChart3,label:"Stats"},{id:"settings",icon:Gear,label:"Settings"}];return t("div",{className:"nav-bar noprint",style:{background:c.bg,borderTop:`1px solid ${c.brs}`},children:t("div",{className:"nav-inner",children:o("div",{className:"f ia jb",style:{background:c.sf,border:`1px solid ${c.brs}`,borderRadius:999,padding:"4px 8px"},children:tabs.map(tb=>{const a=view===tb.id;if(tb.main)return t("button",{key:tb.id,onClick:()=>setView("add"),className:"act90 trt",style:{width:48,height:48,borderRadius:999,background:c.ac,color:"#0a0a0a",display:"flex",alignItems:"center",justifyContent:"center",border:"none",boxShadow:`0 4px 20px ${c.ac}50`,flexShrink:0},children:t(Plus,{size:22,strokeWidth:2.5})});const I=tb.icon;return o("button",{key:tb.id,onClick:()=>setView(tb.id),className:"act90 trt f fc ia",style:{padding:"8px 12px",background:"transparent",border:"none",gap:2,color:a?c.ac:c.td,flexShrink:0},children:[t(I,{size:18,strokeWidth:a?2.5:2}),t("span",{style:{fontSize:9,fontFamily:F.mo,letterSpacing:.5,textTransform:"uppercase"},children:tb.label})]})})})})})}
+function Nav({view,setView}){const tabs=[{id:"home",icon:Hm,label:"Home"},{id:"calendar",icon:Cal,label:"Calendar"},{id:"add",icon:Plus,label:"Add",main:true},{id:"stats",icon:BarChart3,label:"Stats"},{id:"settings",icon:Gear,label:"Settings"}];return t("div",{className:"nav-bar noprint",style:{background:c.bg,borderTop:`1px solid ${c.brs}`},children:t("div",{className:"nav-inner",children:o("div",{className:"f ia jb",style:{background:c.sf,border:`1px solid ${c.brs}`,borderRadius:999,padding:"4px 8px"},children:tabs.map(tb=>{const a=view===tb.id;if(tb.main)return t("button",{key:tb.id,onClick:()=>setView("add"),className:"act90 trt",style:{width:48,height:48,borderRadius:999,background:c.ac,color:"#0a0a0a",display:"flex",alignItems:"center",justifyContent:"center",border:"none",boxShadow:`0 4px 20px ${c.ac}50`,flexShrink:0},children:t(Plus,{size:22,strokeWidth:2.5})});const I=tb.icon;return o("button",{key:tb.id,onClick:()=>setView(tb.id),className:"act90 trt f fc ia",style:{padding:"6px 10px",background:"transparent",border:"none",gap:2,color:a?c.ac:c.td,flexShrink:0},children:[t(I,{size:18,strokeWidth:a?2.5:2}),t("span",{style:{fontSize:9,fontFamily:F.mo,letterSpacing:.5,textTransform:"uppercase"},children:tb.label})]})})})})})}
 
 
 // === HOME ===
