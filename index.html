@@ -1473,10 +1473,15 @@ function ExpPlanner({data,onSave,onDelete,onClose}){
   const[tenure,setTenure]=useState(12);
   const[rate,sRate]=useState("12");
   const[result,sResult]=useState(null);
+  const[editDet,sEditDet]=useState(false);
+  const[manIncome,sManIncome]=useState("");
+  const[manRec,sManRec]=useState("");
   const msd=monthStartDay;
   const TENURES=[{v:0,l:"Full payment"},{v:3,l:"3 months"},{v:6,l:"6 months"},{v:12,l:"12 months"},{v:24,l:"24 months"}];
   const monthlyRecurring=useMemo(()=>recurring.reduce((s,r)=>s+r.amount*(MX[r.frequency]||1),0),[recurring]);
   const monthlyIncome=useMemo(()=>{const fp=financeProfile||{};if(fp.monthlyIncome)return fp.monthlyIncome;const mst=ps(new Date(),msd);return expenses.filter(e=>e.type==="income"&&e.date>=mst).reduce((s,e)=>s+e.amount,0)||0},[financeProfile,expenses,msd]);
+  const effIncome=manIncome!=""?parseFloat(manIncome)||0:monthlyIncome;
+  const effRecurring=manRec!=""?parseFloat(manRec)||0:monthlyRecurring;
   const calcEMI=(principal,months,annualRate)=>{if(months===0)return 0;const r=annualRate/12/100;if(r===0)return principal/months;return principal*r*Math.pow(1+r,months)/(Math.pow(1+r,months)-1)};
   const analyse=()=>{
     const p=parseFloat(cost),r=parseFloat(rate)||0;
@@ -1484,13 +1489,13 @@ function ExpPlanner({data,onSave,onDelete,onClose}){
     const emi=tenure===0?p:calcEMI(p,tenure,r);
     const totalPayable=tenure===0?p:emi*tenure;
     const interest=totalPayable-p;
-    const surplus=monthlyIncome-monthlyRecurring;
+    const surplus=effIncome-effRecurring;
     const afterEMI=surplus-emi;
-    const incomeRatio=monthlyIncome>0?afterEMI/monthlyIncome:0;
-    const verdict=afterEMI>=monthlyIncome*0.2?"green":afterEMI>=0?"yellow":"red";
+    const incomeRatio=effIncome>0?afterEMI/effIncome:0;
+    const verdict=afterEMI>=effIncome*0.2?"green":afterEMI>=0?"yellow":"red";
     const breakEven=tenure===0?null:new Date(Date.now()+tenure*30*864e5);
-    const safeRec=TENURES.slice(1).find(t2=>{const e=calcEMI(p,t2.v,r);return (surplus-e)>=monthlyIncome*0.15})||null;
-    sResult({name:name.trim(),cost:p,tenure,rate:r,emi,totalPayable,interest,surplus,afterEMI,incomeRatio,verdict,breakEven,safeRec,monthlyIncome,monthlyRecurring});
+    const safeRec=TENURES.slice(1).find(t2=>{const e=calcEMI(p,t2.v,r);return (surplus-e)>=effIncome*0.15})||null;
+    sResult({name:name.trim(),cost:p,tenure,rate:r,emi,totalPayable,interest,surplus,afterEMI,incomeRatio,verdict,breakEven,safeRec,monthlyIncome:effIncome,monthlyRecurring:effRecurring});
   };
   const VerdictColors={green:c.mt,yellow:c.gd,red:c.ro};
   const VerdictLabels={green:"✓ Comfortable",yellow:"⚠ Tight but possible",red:"✗ Unaffordable"};
@@ -1506,8 +1511,14 @@ function ExpPlanner({data,onSave,onDelete,onClose}){
       t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:"EMI TENURE"}),
       t("div",{style:{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14},children:TENURES.map(t2=>t("button",{key:t2.v,onClick:()=>setTenure(t2.v),className:"act90 trt",style:{padding:"6px 12px",borderRadius:8,background:tenure===t2.v?c.ac:"transparent",color:tenure===t2.v?"#0a0a0a":c.td,border:`1px solid ${tenure===t2.v?c.ac:c.brs}`,fontSize:12,fontFamily:F.mo},children:t2.l}))}),
       o("div",{style:{background:c.sf2,borderRadius:10,padding:"10px 12px",marginBottom:14},children:[
-        t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:"AUTO-DETECTED FROM YOUR DATA"}),
-        o("div",{className:"g g2",style:{gap:8},children:[
+        o("div",{className:"f ia jb",style:{marginBottom:8},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1},children:editDet?"EDIT VALUES":"AUTO-DETECTED FROM YOUR DATA"}),
+          t("button",{onClick:()=>{if(editDet){sManIncome("");sManRec("")}else{sManIncome(String(monthlyIncome||""));sManRec(String(Math.round(monthlyRecurring)||""))}sEditDet(e=>!e)},style:{background:"transparent",border:"none",color:editDet?c.ac:c.tm,padding:"2px 4px"},children:editDet?t(X,{size:13}):t(Pencil,{size:13})}),
+        ]}),
+        editDet?o("div",{className:"g g2",style:{gap:8},children:[
+          o("div",{children:[t("div",{style:{fontSize:10,color:c.td,marginBottom:4},children:"Monthly income"}),t("input",{type:"number",value:manIncome,onChange:e=>sManIncome(e.target.value),placeholder:String(monthlyIncome||"0"),style:{width:"100%",padding:"8px 10px",borderRadius:8,border:`1px solid ${c.brs}`,background:c.sf,color:c.tx,fontSize:13,fontFamily:F.mo,outline:"none",boxSizing:"border-box"}})]}),
+          o("div",{children:[t("div",{style:{fontSize:10,color:c.td,marginBottom:4},children:"Recurring/mo"}),t("input",{type:"number",value:manRec,onChange:e=>sManRec(e.target.value),placeholder:String(Math.round(monthlyRecurring)||"0"),style:{width:"100%",padding:"8px 10px",borderRadius:8,border:`1px solid ${c.brs}`,background:c.sf,color:c.tx,fontSize:13,fontFamily:F.mo,outline:"none",boxSizing:"border-box"}})]}),
+        ]}):o("div",{className:"g g2",style:{gap:8},children:[
           o("div",{children:[t("div",{style:{fontSize:10,color:c.td,marginBottom:2},children:"Monthly income"}),t("div",{style:{fontFamily:F.mo,fontSize:13,fontWeight:600,color:c.mt},children:monthlyIncome>0?fm(monthlyIncome,currency):"Not set"})]}),
           o("div",{children:[t("div",{style:{fontSize:10,color:c.td,marginBottom:2},children:"Recurring/mo"}),t("div",{style:{fontFamily:F.mo,fontSize:13,fontWeight:600,color:c.co},children:fm(monthlyRecurring,currency)})]}),
         ]}),
