@@ -542,9 +542,9 @@ function App(){
         v==="upcomingExp"&&t(UpcomingExp,{data:d,onAdd:aUE,onDelete:dUE,onClose:()=>sV("home")}),
         v==="expPlanner"&&t(ExpPlanner,{data:d,onSave:aEP,onDelete:dEP,onClose:()=>sV("home")}),
       ]}),
-      atx&&t(TxSht,{expense:atx,accounts:d.accounts,cards:d.cards||[],onClose:()=>sAtx(null),onDelete:()=>dE(atx.id),onEdit:()=>{sEd(atx);sAtx(null);sV("edit")}}),
-      nav&&t(Nav,{view:v,setView:sV}),
     ]}),
+    atx&&t(TxSht,{expense:atx,accounts:d.accounts,cards:d.cards||[],onClose:()=>sAtx(null),onDelete:()=>dE(atx.id),onEdit:()=>{sEd(atx);sAtx(null);sV("edit")}}),
+    nav&&t(Nav,{view:v,setView:sV}),
     sbar&&t(Sidebar,{data:d,onClose:()=>sSbar(false),onView:sV,activeUser}),
   ]})
 }
