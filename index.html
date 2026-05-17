@@ -502,7 +502,7 @@ function App(){
     t(Gr,{}),
     t(AppHeader,{onMenu:()=>sSbar(true),onSearch:()=>sV("search"),onToggleTheme:toggleTheme,isDark,onHome:()=>sV("home")}),
     o("div",{className:"r w100",style:{maxWidth:440,height:"100%",background:c.bg,borderLeft:`1px solid ${c.brs}`,borderRight:`1px solid ${c.brs}`,overflow:"hidden",display:"flex",flexDirection:"column"},children:[
-      o("div",{style:{paddingBottom:128,paddingTop:52,flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
+      o("div",{style:{paddingBottom:24,paddingTop:52,flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
         v==="home"&&t(Home,{data:d,onTx:sAtx,onView:sV,onSetBudget:b=>pst({budget:b})}),
         v==="calendar"&&t(Calend,{data:d,onTx:sAtx,presetAdd:(ts,k)=>{window.__pd=ts;window.__pt=k||"expense";sV("add")}}),
         v==="stats"&&t(Stats,{data:d,onTx:sAtx,onView:sV}),
@@ -542,15 +542,15 @@ function App(){
         v==="upcomingExp"&&t(UpcomingExp,{data:d,onAdd:aUE,onDelete:dUE,onClose:()=>sV("home")}),
         v==="expPlanner"&&t(ExpPlanner,{data:d,onSave:aEP,onDelete:dEP,onClose:()=>sV("home")}),
       ]}),
+      nav&&t(Nav,{view:v,setView:sV}),
     ]}),
     atx&&t(TxSht,{expense:atx,accounts:d.accounts,cards:d.cards||[],onClose:()=>sAtx(null),onDelete:()=>dE(atx.id),onEdit:()=>{sEd(atx);sAtx(null);sV("edit")}}),
-    nav&&t(Nav,{view:v,setView:sV}),
     sbar&&t(Sidebar,{data:d,onClose:()=>sSbar(false),onView:sV,activeUser}),
   ]})
 }
 
 // === BOTTOM NAV ===
-function Nav({view,setView}){const tabs=[{id:"home",icon:Hm,label:"Home"},{id:"calendar",icon:Cal,label:"Calendar"},{id:"add",icon:Plus,label:"Add",main:true},{id:"stats",icon:BarChart3,label:"Stats"},{id:"settings",icon:Gear,label:"Settings"}];return t("div",{className:"fx",style:{bottom:0,left:0,right:0,paddingBottom:"env(safe-area-inset-bottom)",display:"flex",justifyContent:"center",zIndex:30,pointerEvents:"none"},children:t("div",{style:{width:"100%",maxWidth:440,padding:"12px 16px 14px",background:`linear-gradient(180deg,transparent 0%,${c.bg} 30%,${c.bg} 100%)`,pointerEvents:"auto"},children:o("div",{className:"f ia jb",style:{background:c.sf,border:`1px solid ${c.brs}`,borderRadius:999,padding:"6px 8px"},children:tabs.map(tb=>{const a=view===tb.id;if(tb.main)return t("button",{key:tb.id,onClick:()=>setView("add"),className:"act90 trt",style:{width:46,height:46,borderRadius:999,background:c.ac,color:"#0a0a0a",display:"flex",alignItems:"center",justifyContent:"center",border:"none",boxShadow:`0 4px 16px ${c.ac}40`},children:t(Plus,{size:22,strokeWidth:2.5})});const I=tb.icon;return o("button",{key:tb.id,onClick:()=>setView(tb.id),className:"act90 trt f fc ia",style:{padding:"8px 14px",background:"transparent",border:"none",gap:2,color:a?c.ac:c.td},children:[t(I,{size:18,strokeWidth:a?2.5:2}),t("span",{style:{fontSize:9,fontFamily:F.mo,letterSpacing:.5,textTransform:"uppercase"},children:tb.label})]})})})})})}
+function Nav({view,setView}){const tabs=[{id:"home",icon:Hm,label:"Home"},{id:"calendar",icon:Cal,label:"Calendar"},{id:"add",icon:Plus,label:"Add",main:true},{id:"stats",icon:BarChart3,label:"Stats"},{id:"settings",icon:Gear,label:"Settings"}];return t("div",{style:{flexShrink:0,paddingBottom:"env(safe-area-inset-bottom)",display:"flex",justifyContent:"center",background:c.bg,borderTop:`1px solid ${c.brs}`},children:t("div",{style:{width:"100%",maxWidth:440,padding:"8px 16px 10px"},children:o("div",{className:"f ia jb",style:{background:c.sf,border:`1px solid ${c.brs}`,borderRadius:999,padding:"6px 8px"},children:tabs.map(tb=>{const a=view===tb.id;if(tb.main)return t("button",{key:tb.id,onClick:()=>setView("add"),className:"act90 trt",style:{width:46,height:46,borderRadius:999,background:c.ac,color:"#0a0a0a",display:"flex",alignItems:"center",justifyContent:"center",border:"none",boxShadow:`0 4px 16px ${c.ac}40`},children:t(Plus,{size:22,strokeWidth:2.5})});const I=tb.icon;return o("button",{key:tb.id,onClick:()=>setView(tb.id),className:"act90 trt f fc ia",style:{padding:"8px 14px",background:"transparent",border:"none",gap:2,color:a?c.ac:c.td},children:[t(I,{size:18,strokeWidth:a?2.5:2}),t("span",{style:{fontSize:9,fontFamily:F.mo,letterSpacing:.5,textTransform:"uppercase"},children:tb.label})]})})})})})}
 
 // === HOME ===
 const MX={daily:30,weekly:4.33,biweekly:2.17,monthly:1,yearly:0.0833};
