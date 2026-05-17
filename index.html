@@ -515,7 +515,7 @@ function App(){
     t(Gr,{}),
     t(AppHeader,{onMenu:()=>sSbar(true),onSearch:()=>sV("search"),onToggleTheme:toggleTheme,isDark,onHome:()=>sV("home")}),
     o("div",{className:"r w100",style:{maxWidth:440,flex:1,minHeight:0,background:c.bg,borderLeft:`1px solid ${c.brs}`,borderRight:`1px solid ${c.brs}`,overflow:"hidden",display:"flex",flexDirection:"column"},children:[
-      o("div",{style:{paddingBottom:0,paddingTop:"calc(52px + env(safe-area-inset-top))",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
+      o("div",{style:{paddingBottom:8,paddingTop:"calc(52px + env(safe-area-inset-top))",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
         v==="home"&&t(Home,{data:d,onTx:sAtx,onView:sV,onSetBudget:b=>pst({budget:b}),onFlt:sFlt}),
         v==="calendar"&&t(Calend,{data:d,onTx:sAtx,presetAdd:(ts,k)=>{window.__pd=ts;window.__pt=k||"expense";sV("add")}}),
         v==="stats"&&t(Stats,{data:d,onTx:sAtx,onView:sV,onFlt:sFlt}),
