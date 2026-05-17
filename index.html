@@ -35,7 +35,7 @@ if(typeof Recharts === 'undefined') {
 }
 </script>
 <style>
-:root{--nf:-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,sans-serif;--tf:-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,sans-serif;--ns:20px}
+:root{--nf:'SF Mono',ui-monospace,monospace;--tf:-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,sans-serif;--ns:20px}
 *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
 html,body,#root{height:100%;margin:0;padding:0;background:#0E0D0B;overflow:hidden}
 body{overscroll-behavior-y:none;-webkit-font-smoothing:antialiased;-webkit-touch-callout:none}
@@ -249,7 +249,7 @@ const FONT_OPT=[
   {id:'courier',l:'Courier',f:"'Courier New',Courier,monospace"},
 ];
 const NUM_SZ=[14,16,18,20,24,28,32];
-const gNF=d=>FONT_OPT.find(f=>f.id===(d?.fontPrefs?.numFont||'system'))?.f||FONT_OPT[0].f;
+const gNF=d=>FONT_OPT.find(f=>f.id===(d?.fontPrefs?.numFont||'sfmono'))?.f||FONT_OPT.find(f=>f.id==='sfmono').f;
 const gTF=d=>FONT_OPT.find(f=>f.id===(d?.fontPrefs?.txtFont||'system'))?.f||FONT_OPT[0].f;
 const gNS=d=>d?.fontPrefs?.numSize||20;
 
@@ -1542,7 +1542,7 @@ function ExpPlanner({data,onSave,onDelete,onClose}){
 }
 function Settings({data,persist,onClose,onBackup,onCategories,onView}){const{budget,budgetPeriod,currency,monthStartDay,financeProfile}=data;const fp=financeProfile||{};const[b,sB]=useState(budget==null?"":String(budget));const[bp,sBp]=useState(budgetPeriod||"monthly");const[cu,sCu]=useState(currency||"$");const[ms,sMs]=useState(monthStartDay||1);const[ak,sAk]=useState(gAK()||"");const[show,sShow]=useState(false);const[fz,sFz]=useState(data.fontSize||"medium");const[at,sAt]=useState(data.alertThreshold!=null?String(data.alertThreshold):"");
 const fpx=data.fontPrefs||{};
-const[numFont,sNumFont]=useState(fpx.numFont||'system');
+const[numFont,sNumFont]=useState(fpx.numFont||'sfmono');
 const[numSize,sNumSize]=useState(fpx.numSize||20);
 const[txtFont,sTxtFont]=useState(fpx.txtFont||'system');const[inc,sInc]=useState(String(fp.monthlyIncome||""));const[fxE,sFxE]=useState(String(fp.fixedExpenses||""));const[spg,sSpg]=useState(String(fp.savingsGoalPct||"20"));const[efm,sEfm]=useState(String(fp.emergencyFundMonths||"6"));const[dbt,sDbt]=useState(String(fp.totalDebt||""));const save=()=>{persist({budget:parseFloat(b)||null,budgetPeriod:bp,currency:cu,monthStartDay:parseInt(ms)||1,fontSize:fz,alertThreshold:parseFloat(at)||null,fontPrefs:{numFont,numSize,txtFont},financeProfile:{monthlyIncome:parseFloat(inc)||null,fixedExpenses:parseFloat(fxE)||null,savingsGoalPct:parseFloat(spg)||20,emergencyFundMonths:parseFloat(efm)||6,totalDebt:parseFloat(dbt)||null}});sAK(ak.trim()||null);onClose()};
 return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
