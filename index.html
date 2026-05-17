@@ -515,7 +515,7 @@ function App(){
         v==="accounts"&&t(Accts,{data:d,onClose:()=>sV("more"),onAdd:()=>sV("newAccount"),onDelete:dA,onEdit:a=>{sEAcc(a);sV("editAccount")}}),
         v==="newAccount"&&t(NewAcc,{onSave:a=>{aA(a);sV("accounts")},onCancel:()=>sV("accounts")}),
         v==="editAccount"&&eAcc&&t(NewAcc,{onSave:a=>{uA({...eAcc,...a});sEAcc(null);sV("accounts")},onCancel:()=>{sEAcc(null);sV("accounts")},editing:eAcc}),
-        v==="cards"&&t(Cards,{data:d,onClose:()=>sV("home"),onAdd:()=>sV("newCard"),onSelect:cr=>{sCdId(cr.id);sV("cardDetail")}}),
+        v==="cards"&&t(Cards,{data:d,onClose:()=>sV("home"),onAdd:()=>sV("newCard"),onSelect:cr=>{sCdId(cr.id);sV("cardDetail")},onFlt:sFlt}),
         v==="cardDetail"&&cdId&&t(CardDet,{data:d,cardId:cdId,onClose:()=>sV("cards"),onEdit:()=>{const cr=(d.cards||[]).find(x=>x.id===cdId);sECa(cr);sV("editCard")},onPay:({accountId,amount})=>aCP({cardId:cdId,accountId,amount,date:Date.now()}),onDelete:()=>{dC(cdId);sCdId(null);sV("cards")},onTx:sAtx}),
         v==="newCard"&&t(NewCard,{onSave:cr=>{aC(cr);sV("cards")},onCancel:()=>sV("cards")}),
         v==="editCard"&&eCa&&t(NewCard,{onSave:cr=>{uC({...eCa,...cr});sECa(null);sV("cardDetail")},onCancel:()=>{sECa(null);sV("cardDetail")},editing:eCa}),
@@ -1023,12 +1023,13 @@ function NewAcc({onSave,onCancel,editing}){const iE=!!editing;const[n,sN]=useSta
 ]})]})}
 
 // === CARDS (CRED-style) ===
-function Cards({data,onClose,onAdd,onSelect}){const{cards=[],expenses,currency,monthStartDay}=data;const[tab,sTab]=useState("due");
-  const cy=useMemo(()=>cards.map(cr=>({card:cr,cycle:cr.type==="credit"?cc(cr,expenses):null,monthSpent:expenses.filter(e=>e.cardId===cr.id&&e.date>=ps(new Date(),monthStartDay)&&e.type!=="card-payment").reduce((s,e)=>s+e.amount,0)})),[cards,expenses,monthStartDay]);
+function Cards({data,onClose,onAdd,onSelect,onFlt}){const{cards=[],expenses,currency,monthStartDay}=data;const[tab,sTab]=useState("due");
+  const cy=useMemo(()=>cards.map(cr=>{const cycle=cr.type==="credit"?cc(cr,expenses):null;const sinceDate=cycle?cycle.lastClose:ps(new Date(),monthStartDay);const recentSpend=expenses.filter(e=>e.cardId===cr.id&&e.date>=sinceDate&&e.type!=="card-payment").reduce((s,e)=>s+e.amount,0);return{card:cr,cycle,sinceDate,recentSpend}}),[cards,expenses,monthStartDay]);
   const cD=cy.filter(x=>x.cycle&&x.cycle.outstanding>0).sort((a,b)=>a.cycle.daysUntilDue-b.cycle.daysUntilDue);
   const cC=cy.filter(x=>!x.cycle||x.cycle.outstanding<=0);
   const tDue=cD.reduce((s,x)=>s+x.cycle.outstanding,0);
-  const mSp=cy.reduce((s,x)=>s+x.monthSpent,0);
+  const tSp=cy.reduce((s,x)=>s+x.recentSpend,0);
+  const allCardExp=useMemo(()=>expenses.filter(e=>e.cardId&&e.type!=="card-payment"),[expenses]);
 return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
   t(SH,{title:t("em",{children:"Cards"}),onBack:onClose,right:t("button",{onClick:onAdd,className:"act90 trt",style:{width:38,height:38,borderRadius:12,background:c.ac,color:"#0a0a0a",display:"flex",alignItems:"center",justifyContent:"center",border:"none"},children:t(Plus,{size:20,strokeWidth:2.5})})}),
   cards.length===0?t(ES,{title:t("em",{children:"no cards yet"}),subtitle:"Add credit & debit cards to track statements separately",cta:"+ Add first card",onCta:onAdd}):o(Fragment,{children:[
@@ -1036,39 +1037,58 @@ return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
       o("div",{className:"f ia jb",children:[
         o("div",{className:"f",style:{gap:4,background:c.sf2,borderRadius:999,padding:4},children:[
           o("button",{onClick:()=>sTab("due"),className:"tr f ia",style:{padding:"6px 14px",gap:6,background:tab==="due"?c.cr:"transparent",color:tab==="due"?"#0a0a0a":c.td,borderRadius:999,fontSize:11,fontFamily:F.mo,letterSpacing:.5,fontWeight:600,border:"none"},children:["TOTAL DUE",cD.length>0&&t("span",{style:{display:"inline-flex",alignItems:"center",justifyContent:"center",width:18,height:18,borderRadius:999,background:c.co,color:"#fff",fontSize:9},children:cD.length})]}),
-          t("button",{onClick:()=>sTab("month"),className:"tr",style:{padding:"6px 14px",background:tab==="month"?c.cr:"transparent",color:tab==="month"?"#0a0a0a":c.td,borderRadius:999,fontSize:11,fontFamily:F.mo,letterSpacing:.5,fontWeight:600,border:"none"},children:"THIS MONTH"}),
+          t("button",{onClick:()=>sTab("spends"),className:"tr",style:{padding:"6px 14px",background:tab==="spends"?c.cr:"transparent",color:tab==="spends"?"#0a0a0a":c.td,borderRadius:999,fontSize:11,fontFamily:F.mo,letterSpacing:.5,fontWeight:600,border:"none"},children:"RECENT SPENDS"}),
         ]}),
         t("div",{style:{width:36,height:36,borderRadius:10,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",color:c.gd},children:t(Wallet,{size:16})}),
       ]}),
       o("div",{style:{marginTop:20,textAlign:"center"},children:[
-        t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1},children:tab==="due"?`STATEMENT DUE FOR ${cD.length} ${cD.length===1?"CARD":"CARDS"}`:`SPENT ON ${cards.length} ${cards.length===1?"CARD":"CARDS"}`}),
-        o("div",{className:"f ib jc",style:{gap:6,marginTop:8},children:[t("span",{style:{fontFamily:F.mo,fontSize:24,color:c.td},children:currency}),t("span",{style:{fontFamily:'var(--nf)',fontSize:64,fontWeight:300,letterSpacing:-2,color:tab==="due"?c.cr:c.tx,lineHeight:1},children:fs(tab==="due"?tDue:mSp,"").replace(currency,"")})]}),
-        cD.length===1&&tab==="due"&&t("button",{className:"act95 tr",onClick:()=>onSelect(cD[0].card),style:{marginTop:18,padding:"12px 32px",background:"#0a0a0a",color:c.cr,borderRadius:999,fontSize:14,fontWeight:600,border:`1px solid ${c.brs}`},children:"Pay bill"}),
+        t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1},children:tab==="due"?`TOTAL OUTSTANDING · ${cD.length} ${cD.length===1?"CARD":"CARDS"}`:`TOTAL SPENT · ${cards.length} ${cards.length===1?"CARD":"CARDS"}`}),
+        o("div",{className:"f ib jc",style:{gap:6,marginTop:8},children:[t("span",{style:{fontFamily:F.mo,fontSize:24,color:c.td},children:currency}),t("span",{style:{fontFamily:'var(--nf)',fontSize:64,fontWeight:300,letterSpacing:-2,color:tab==="due"?c.cr:c.tx,lineHeight:1},children:fs(tab==="due"?tDue:tSp,"").replace(currency,"")})]}),
+        tab==="due"&&cD.length>1&&t("button",{className:"act95 tr",onClick:()=>onSelect(cD[0].card),style:{marginTop:18,padding:"12px 32px",background:"#0a0a0a",color:c.cr,borderRadius:999,fontSize:14,fontWeight:600,border:`1px solid ${c.brs}`},children:"Pay all cards"}),
+        tab==="due"&&cD.length===1&&t("button",{className:"act95 tr",onClick:()=>onSelect(cD[0].card),style:{marginTop:18,padding:"12px 32px",background:"#0a0a0a",color:c.cr,borderRadius:999,fontSize:14,fontWeight:600,border:`1px solid ${c.brs}`},children:"Pay dues"}),
+        tab==="spends"&&t("button",{className:"act95 tr f ia jc",onClick:()=>onFlt&&onFlt({title:"Card transactions",items:allCardExp}),style:{marginTop:18,padding:"10px 28px",gap:6,background:"transparent",color:c.ac,borderRadius:999,fontSize:13,fontWeight:600,border:`1px solid ${c.brs}`,display:"inline-flex",margin:"18px auto 0"}},["View transactions",t(CR,{size:14})]),
       ]}),
     ]}),
-    cD.length>0&&o("div",{style:{marginTop:20},children:[
-      o("div",{className:"f ib jb",style:{marginBottom:12},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:"BILLS DUE"}),t(Pl,{col:c.cr,children:`${cD.length} OUTSTANDING`})]}),
-      t("div",{style:{display:"flex",flexDirection:"column",gap:16},children:cD.map(x=>t(BigCard,{key:x.card.id,card:x.card,cycle:x.cycle,currency,onClick:()=>onSelect(x.card)}))}),
-    ]}),
-    cC.length>0&&o("div",{style:{marginTop:24},children:[
-      o("div",{className:"f ib jb",style:{marginBottom:12},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:cD.length>0?"NO DUES":"YOUR CARDS"}),t(Pl,{col:c.mt,children:`${cC.length} CLEAR`})]}),
-      t("div",{style:{position:"relative"},children:cC.map((x,i)=>t(StackCard,{key:x.card.id,card:x.card,cycle:x.cycle,monthSpent:x.monthSpent,currency,total:cC.length,index:i,onClick:()=>onSelect(x.card)}))}),
+    tab==="due"?o(Fragment,{children:[
+      cD.length>0&&o("div",{style:{marginTop:20},children:[
+        o("div",{className:"f ib jb",style:{marginBottom:12},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:"BILLS DUE"}),t(Pl,{col:c.cr,children:`${cD.length} OUTSTANDING`})]}),
+        t("div",{style:{display:"flex",flexDirection:"column",gap:16},children:cD.map(x=>t(BigCard,{key:x.card.id,card:x.card,cycle:x.cycle,currency,onClick:()=>onSelect(x.card)}))}),
+      ]}),
+      cC.length>0&&o("div",{style:{marginTop:24},children:[
+        o("div",{className:"f ib jb",style:{marginBottom:12},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:cD.length>0?"NO DUES":"YOUR CARDS"}),t(Pl,{col:c.mt,children:`${cC.length} CLEAR`})]}),
+        t("div",{style:{position:"relative"},children:cC.map((x,i)=>t(StackCard,{key:x.card.id,card:x.card,cycle:x.cycle,monthSpent:x.recentSpend,currency,total:cC.length,index:i,onClick:()=>onSelect(x.card)}))}),
+      ]}),
+    ]}):o("div",{style:{marginTop:20},children:[
+      o("div",{className:"f ib jb",style:{marginBottom:12},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:"RECENT SPENDS"}),t(Pl,{col:c.gd,children:`${cards.length} ${cards.length===1?"CARD":"CARDS"}`})]}),
+      t("div",{style:{display:"flex",flexDirection:"column",gap:12},children:cy.map(x=>t(SpendCard,{key:x.card.id,card:x.card,sinceDate:x.sinceDate,recentSpend:x.recentSpend,currency,onClick:()=>onSelect(x.card)}))}),
     ]}),
   ]}),
 ]})}
 
-function BigCard({card,cycle,currency,onClick}){const g=gr(card.gradient||"ink"),nw=NW.find(x=>x.id===card.network)||NW[5];const ov=cycle.overdue,soon=!ov&&cycle.daysUntilDue<=5;return t("button",{onClick,className:"w100 act98 tr",style:{background:"transparent",border:"none",padding:0,color:"inherit",display:"block",textAlign:"left"},children:o("div",{style:{borderRadius:18,padding:18,background:`linear-gradient(135deg,${g.from} 0%,${g.to} 100%)`,position:"relative",overflow:"hidden",boxShadow:"0 8px 28px rgba(0,0,0,0.45)"},children:[
+function BigCard({card,cycle,currency,onClick}){const g=gr(card.gradient||"ink"),nw=NW.find(x=>x.id===card.network)||NW[5];const ov=cycle.overdue,soon=!ov&&cycle.daysUntilDue<=5;const dueLbl=ov?"OVERDUE":cycle.daysUntilDue===0?"DUE TODAY":`DUE IN ${cycle.daysUntilDue} DAYS`;const dueOn=new Date(cycle.dueDate).toLocaleDateString("en-US",{month:"short",day:"numeric"});return t("button",{onClick,className:"w100 act98 tr",style:{background:"transparent",border:"none",padding:0,color:"inherit",display:"block",textAlign:"left"},children:o("div",{style:{borderRadius:18,padding:18,background:`linear-gradient(135deg,${g.from} 0%,${g.to} 100%)`,position:"relative",overflow:"hidden",boxShadow:"0 8px 28px rgba(0,0,0,0.45)"},children:[
   t("div",{style:{position:"absolute",top:-40,right:-40,width:160,height:160,borderRadius:"50%",background:"rgba(255,255,255,0.06)"}}),
   o("div",{className:"f ist jb",style:{position:"relative",marginBottom:18},children:[
     o("div",{children:[t("div",{style:{fontSize:11,letterSpacing:1,color:"rgba(255,255,255,0.7)",fontFamily:F.mo,fontWeight:500},children:(card.bankName||"BANK").toUpperCase()}),t("div",{style:{fontSize:16,color:"#fff",fontWeight:600,marginTop:2},children:card.name})]}),
-    o("div",{className:"trg",children:[t("div",{style:{fontFamily:F.mo,fontSize:18,color:"#fff",fontWeight:700,letterSpacing:-.5},children:fm(cycle.outstanding,currency)}),t("div",{style:{fontFamily:F.mo,fontSize:10,color:"rgba(255,255,255,0.7)",letterSpacing:.5,marginTop:2},children:ov?"OVERDUE":`DUE IN ${cycle.daysUntilDue}d`})]}),
+    o("div",{className:"trg",children:[t("div",{style:{fontFamily:F.mo,fontSize:18,color:"#fff",fontWeight:700,letterSpacing:-.5},children:fm(cycle.outstanding,currency)}),t("div",{style:{fontFamily:F.mo,fontSize:10,color:ov?"rgba(255,120,120,0.95)":soon?"rgba(255,210,100,0.95)":"rgba(255,255,255,0.8)",letterSpacing:.5,marginTop:3,fontWeight:700},children:dueLbl}),!ov&&t("div",{style:{fontFamily:F.mo,fontSize:9,color:"rgba(255,255,255,0.5)",letterSpacing:.3,marginTop:1},children:`ON ${dueOn.toUpperCase()}`})]}),
   ]}),
   t("div",{style:{fontFamily:F.mo,fontSize:14,letterSpacing:3,color:"rgba(255,255,255,0.85)",position:"relative",marginBottom:18},children:card.last4?`•••• •••• •••• ${card.last4}`:"•••• •••• •••• ····"}),
   o("div",{className:"f ia jb",style:{position:"relative"},children:[
     o("div",{className:"f ia",style:{gap:8},children:[t("span",{style:{fontSize:10,letterSpacing:1,color:"rgba(255,255,255,0.6)",fontFamily:F.mo,textTransform:"uppercase"},children:card.type}),t("span",{style:{color:"rgba(255,255,255,0.4)"},children:"·"}),t("span",{style:{fontSize:10,letterSpacing:1,color:"rgba(255,255,255,0.7)",fontFamily:F.mo,fontWeight:600,textTransform:"uppercase"},children:nw.label})]}),
-    t("div",{style:{padding:"6px 14px",background:"#fff",borderRadius:999,fontSize:12,fontWeight:600,color:"#0a0a0a"},children:"Pay now"}),
+    t("div",{style:{padding:"6px 14px",background:"#fff",borderRadius:999,fontSize:12,fontWeight:600,color:"#0a0a0a"},children:ov?"Pay overdue":"Pay dues"}),
   ]}),
-  (ov||soon)&&t("div",{style:{position:"absolute",top:14,right:14,padding:"3px 8px",borderRadius:999,background:ov?c.ro:c.co,fontSize:9,fontFamily:F.mo,letterSpacing:.5,fontWeight:600,color:"#fff"},children:ov?"OVERDUE":"DUE SOON"}),
+  (ov||soon)&&t("div",{style:{position:"absolute",top:0,left:0,right:0,height:3,borderTopLeftRadius:18,borderTopRightRadius:18,background:ov?c.ro:c.co}}),
+]})})}
+
+function SpendCard({card,sinceDate,recentSpend,currency,onClick}){const g=gr(card.gradient||"ink"),nw=NW.find(x=>x.id===card.network)||NW[5];const since=new Date(sinceDate).toLocaleDateString("en-US",{month:"short",day:"numeric"});return t("button",{onClick,className:"w100 act98 tr",style:{background:"transparent",border:"none",padding:0,color:"inherit",display:"block",textAlign:"left"},children:o("div",{style:{borderRadius:16,padding:16,background:`linear-gradient(135deg,${g.from} 0%,${g.to} 100%)`,position:"relative",overflow:"hidden",boxShadow:"0 4px 16px rgba(0,0,0,0.35)"},children:[
+  t("div",{style:{position:"absolute",top:-30,right:-30,width:120,height:120,borderRadius:"50%",background:"rgba(255,255,255,0.05)"}}),
+  o("div",{className:"f ist jb",style:{position:"relative",marginBottom:14},children:[
+    o("div",{children:[t("div",{style:{fontSize:10,letterSpacing:1,color:"rgba(255,255,255,0.6)",fontFamily:F.mo,fontWeight:500},children:(card.bankName||"BANK").toUpperCase()}),t("div",{style:{fontSize:14,color:"#fff",fontWeight:600,marginTop:2},children:card.name})]}),
+    o("div",{className:"trg",children:[t("div",{style:{fontFamily:F.mo,fontSize:16,color:"#fff",fontWeight:700,letterSpacing:-.3},children:fm(recentSpend,currency)}),t("div",{style:{fontFamily:F.mo,fontSize:9,color:"rgba(255,255,255,0.7)",letterSpacing:.5,marginTop:3},children:`SPENT SINCE ${since.toUpperCase()}`})]}),
+  ]}),
+  o("div",{className:"f ia jb",style:{position:"relative"},children:[
+    t("div",{style:{fontFamily:F.mo,fontSize:12,letterSpacing:2,color:"rgba(255,255,255,0.7)"},children:card.last4?`•••• ${card.last4}`:"•••• ····"}),
+    o("div",{className:"f ia",style:{gap:6},children:[t("span",{style:{fontSize:9,letterSpacing:1,color:"rgba(255,255,255,0.5)",fontFamily:F.mo,textTransform:"uppercase"},children:card.type}),t("span",{style:{fontSize:9,letterSpacing:1,color:"rgba(255,255,255,0.65)",fontFamily:F.mo,fontWeight:600,textTransform:"uppercase"},children:nw.label})]}),
+  ]}),
 ]})})}
 
 function StackCard({card,cycle,monthSpent,currency,total,index,onClick}){const g=gr(card.gradient||"ink"),nw=NW.find(x=>x.id===card.network)||NW[5];return t("button",{onClick,className:"w100 act98 tr",style:{background:"transparent",border:"none",padding:0,color:"inherit",display:"block",textAlign:"left",marginTop:total>1&&index>0?-46:0,position:"relative",zIndex:index+1},children:o("div",{style:{borderRadius:16,padding:16,background:`linear-gradient(135deg,${g.from} 0%,${g.to} 100%)`,position:"relative",overflow:"hidden",boxShadow:"0 4px 16px rgba(0,0,0,0.35)"},children:[
