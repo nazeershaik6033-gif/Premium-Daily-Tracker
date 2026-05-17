@@ -99,14 +99,13 @@ body{background:#fff!important;color:#000!important}
   flex-shrink:0;
   display:flex;
   justify-content:center;
-  padding-top:4px;
-  /* padding-bottom is handled by .nav-inner */
+  padding-top:2px;
 }
 .nav-inner{
   width:100%;
   max-width:440px;
-  padding:4px 16px 8px;
-  padding-bottom:calc(env(safe-area-inset-bottom,0px) + 8px);
+  padding:2px 12px;
+  padding-bottom:calc(env(safe-area-inset-bottom,0px) + 4px);
 }
 </style>
 </head>
@@ -517,7 +516,7 @@ function App(){
     t(Gr,{}),
     t(AppHeader,{onMenu:()=>sSbar(true),onSearch:()=>sV("search"),onToggleTheme:toggleTheme,isDark,onHome:()=>sV("home")}),
     o("div",{className:"r w100",style:{maxWidth:440,flex:1,minHeight:0,background:c.bg,borderLeft:`1px solid ${c.brs}`,borderRight:`1px solid ${c.brs}`,overflow:"hidden",display:"flex",flexDirection:"column"},children:[
-      o("div",{style:{paddingBottom:24,paddingTop:"calc(52px + env(safe-area-inset-top))",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
+      o("div",{style:{paddingBottom:8,paddingTop:"calc(52px + env(safe-area-inset-top))",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
         v==="home"&&t(Home,{data:d,onTx:sAtx,onView:sV,onSetBudget:b=>pst({budget:b}),onFlt:sFlt}),
         v==="calendar"&&t(Calend,{data:d,onTx:sAtx,presetAdd:(ts,k)=>{window.__pd=ts;window.__pt=k||"expense";sV("add")}}),
         v==="stats"&&t(Stats,{data:d,onTx:sAtx,onView:sV,onFlt:sFlt}),
