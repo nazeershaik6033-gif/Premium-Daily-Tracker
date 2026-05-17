@@ -37,17 +37,15 @@ if(typeof Recharts === 'undefined') {
 <style>
 :root{--nf:'SF Mono',ui-monospace,monospace;--tf:-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,sans-serif;--ns:20px}
 *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
-html,body,#root{height:100%;height:100dvh;margin:0;padding:0;background:#0E0D0B;overflow:hidden}
-html{height:-webkit-fill-available}
-body{min-height:100vh;min-height:-webkit-fill-available;min-height:100dvh}
-body{overscroll-behavior-y:none;-webkit-font-smoothing:antialiased;-webkit-touch-callout:none}
+html{height:-webkit-fill-available;margin:0;padding:0;background:#0E0D0B;overflow:hidden}
+body{height:100%;height:-webkit-fill-available;margin:0;padding:0;background:#0E0D0B;overflow:hidden;overscroll-behavior-y:none;-webkit-font-smoothing:antialiased;-webkit-touch-callout:none}
+#root{height:100%;height:var(--app-height,100%);margin:0;padding:0;padding-top:env(safe-area-inset-top);overflow:hidden}
 div,span,button,h1,h2,h3,h4,h5,h6,p,label,a{-webkit-user-select:none;user-select:none}
 button{border:none;background:none;padding:0;color:inherit;font:inherit;cursor:pointer}
 input,textarea,select{-webkit-user-select:text!important;user-select:text!important;-webkit-touch-callout:default;touch-action:auto;font-size:16px}
 input:focus,textarea:focus,select:focus{outline:none}
 .sx::-webkit-scrollbar,.sy::-webkit-scrollbar{display:none}
 .sx,.sy{scrollbar-width:none}
-#root{padding-top:env(safe-area-inset-top);height:calc(100dvh - env(safe-area-inset-top))}
 .spl{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0E0D0B;color:#A39B8C;font-family:'Instrument Serif','Times New Roman',serif;font-style:italic;font-size:28px;z-index:100;transition:opacity 300ms}
 .spl.hide{opacity:0;pointer-events:none}
 .grain{display:none}
@@ -98,6 +96,16 @@ body{background:#fff!important;color:#000!important}
 .prtx{color:#000!important}.prdm{color:#666!important}
 }
 </style>
+<script>
+// iOS PWA standalone mode: fix 100vh blank space bug
+// Sets --app-height CSS variable to the real window inner height
+function setAppHeight(){
+  document.documentElement.style.setProperty('--app-height', window.innerHeight + 'px');
+}
+setAppHeight();
+window.addEventListener('resize', setAppHeight);
+window.addEventListener('orientationchange', function(){ setTimeout(setAppHeight, 300); });
+</script>
 </head>
 <body>
 <div id="root"></div>
@@ -499,13 +507,13 @@ function App(){
   useEffect(()=>{document.documentElement.style.zoom=d.fontSize==="small"?"0.88":d.fontSize==="large"?"1.12":"1"},[d.fontSize]);
   useEffect(()=>{const s=document.documentElement.style;s.setProperty('--nf',gNF(d));s.setProperty('--tf',gTF(d));s.setProperty('--ns',gNS(d)+'px')},[d.fontPrefs]);
 
-  if(d.loading)return t("div",{style:{background:c.bg,color:c.tx,height:"100dvh"},className:"f ia jc",children:t("div",{style:{fontFamily:F.se,fontSize:32,color:c.td,fontStyle:"italic"},children:"loading…"})});
+  if(d.loading)return t("div",{style:{background:c.bg,color:c.tx,height:"var(--app-height,100dvh)"},className:"f ia jc",children:t("div",{style:{fontFamily:F.se,fontSize:32,color:c.td,fontStyle:"italic"},children:"loading…"})});
 
   const nav=!["add","edit","chat","billScan","recurring","accounts","newAccount","newCard","editCard","newRecurring","newTransfer","newProfile","newBill","editBill","newGoal","editGoal","backup","monthlyReport","categoryBudgets","wealth","bills","goals","cardDetail","more","search","profiles","transfer","editAccount","editRecurring","categories","tips","userMgr","upcomingExp","expPlanner"].includes(v);
-  return o("div",{style:{background:c.bg,color:c.tx,fontFamily:'var(--tf)',height:"100dvh",maxHeight:"100dvh",width:"100%",overflow:"hidden",display:"flex",flexDirection:"column",alignItems:"center"},className:"",children:[
+  return o("div",{style:{background:c.bg,color:c.tx,fontFamily:'var(--tf)',height:"var(--app-height,100%)",width:"100%",overflow:"hidden",display:"flex",flexDirection:"column",alignItems:"center"},className:"",children:[
     t(Gr,{}),
     t(AppHeader,{onMenu:()=>sSbar(true),onSearch:()=>sV("search"),onToggleTheme:toggleTheme,isDark,onHome:()=>sV("home")}),
-    o("div",{className:"r w100",style:{maxWidth:440,flex:1,minHeight:0,background:c.bg,borderLeft:`1px solid ${c.brs}`,borderRight:`1px solid ${c.brs}`,overflow:"hidden",display:"flex",flexDirection:"column"},children:[
+    o("div",{className:"r w100",style:{maxWidth:440,flex:1,minHeight:0,maxHeight:"var(--app-height,100%)",background:c.bg,borderLeft:`1px solid ${c.brs}`,borderRight:`1px solid ${c.brs}`,overflow:"hidden",display:"flex",flexDirection:"column"},children:[
       o("div",{style:{paddingBottom:24,paddingTop:"calc(52px + env(safe-area-inset-top))",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
         v==="home"&&t(Home,{data:d,onTx:sAtx,onView:sV,onSetBudget:b=>pst({budget:b}),onFlt:sFlt}),
         v==="calendar"&&t(Calend,{data:d,onTx:sAtx,presetAdd:(ts,k)=>{window.__pd=ts;window.__pt=k||"expense";sV("add")}}),
