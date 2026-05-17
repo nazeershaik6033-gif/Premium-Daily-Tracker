@@ -500,7 +500,7 @@ function App(){
   if(d.loading)return t("div",{style:{background:c.bg,color:c.tx,minHeight:"100vh"},className:"f ia jc",children:t("div",{style:{fontFamily:F.se,fontSize:32,color:c.td,fontStyle:"italic"},children:"loading…"})});
 
   const nav=!["add","edit","chat","billScan","recurring","accounts","newAccount","newCard","editCard","newRecurring","newTransfer","newProfile","newBill","editBill","newGoal","editGoal","backup","monthlyReport","categoryBudgets","wealth","bills","goals","cardDetail","more","search","profiles","transfer","editAccount","editRecurring","categories","tips","userMgr","upcomingExp","expPlanner"].includes(v);
-  return o("div",{style:{background:c.bg,color:c.tx,fontFamily:'var(--tf)',height:"100vh",width:"100%",overflow:"hidden"},className:"f jc",children:[
+  return o("div",{style:{background:c.bg,color:c.tx,fontFamily:'var(--tf)',height:"100%",width:"100%",overflow:"hidden"},className:"f jc",children:[
     t(Gr,{}),
     t(AppHeader,{onMenu:()=>sSbar(true),onSearch:()=>sV("search"),onToggleTheme:toggleTheme,isDark,onHome:()=>sV("home")}),
     o("div",{className:"r w100",style:{maxWidth:440,height:"100%",background:c.bg,borderLeft:`1px solid ${c.brs}`,borderRight:`1px solid ${c.brs}`,overflow:"hidden",display:"flex",flexDirection:"column"},children:[
