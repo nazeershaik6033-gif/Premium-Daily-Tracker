@@ -432,6 +432,7 @@ function Sidebar({data,onClose,onView,activeUser,onUpdateUser}){
 ]})})})]})]})}
 function App(){
   const[v,sV]=useState("home");
+  const navFromRef=useRef("home");
   const[d,sD]=useState({expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],bills:[],goals:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,fontSize:"medium",loading:true,investmentPlans:[]});
   const[atx,sAtx]=useState(null);
   const[ed,sEd]=useState(null);
@@ -529,34 +530,34 @@ function App(){
         v==="stats"&&t(Stats,{data:d,onTx:sAtx,onView:sV,onFlt:sFlt}),
         v==="add"&&t(Editor,{data:d,onSave:sFE,onCancel:()=>sV("home"),presetDate:window.__pd,presetType:window.__pt,presetMode:window.__pm,clearPreset:()=>{window.__pd=null;window.__pt=null;window.__pm=null}}),
         v==="edit"&&ed&&t(Editor,{data:d,onSave:({expense})=>uE({...ed,...expense}),onCancel:()=>{sEd(null);sV("home")},editing:ed}),
-        v==="more"&&t(More,{data:d,onClose:()=>sV("home"),onView:sV}),
+        v==="more"&&t(More,{data:d,onClose:()=>sV("home"),onView:(id)=>{navFromRef.current="more";sV(id)}}),
         v==="search"&&t(SrchS,{data:d,onClose:()=>sV("home"),onTx:sAtx}),
-        v==="accounts"&&t(Accts,{data:d,onClose:()=>sV("more"),onAdd:()=>sV("newAccount"),onDelete:dA,onEdit:a=>{sEAcc(a);sV("editAccount")}}),
+        v==="accounts"&&t(Accts,{data:d,onClose:()=>sV(navFromRef.current),onAdd:()=>sV("newAccount"),onDelete:dA,onEdit:a=>{sEAcc(a);sV("editAccount")}}),
         v==="newAccount"&&t(NewAcc,{onSave:a=>{aA(a);sV("accounts")},onCancel:()=>sV("accounts")}),
         v==="editAccount"&&eAcc&&t(NewAcc,{onSave:a=>{uA({...eAcc,...a});sEAcc(null);sV("accounts")},onCancel:()=>{sEAcc(null);sV("accounts")},editing:eAcc}),
         v==="cards"&&t(Cards,{data:d,onClose:()=>sV("home"),onAdd:()=>sV("newCard"),onSelect:cr=>{sCdId(cr.id);sV("cardDetail")},onFlt:sFlt,onReorder:(newCards)=>pst({cards:newCards})}),
         v==="cardDetail"&&cdId&&t(CardDet,{data:d,cardId:cdId,onClose:()=>sV("cards"),onEdit:()=>{const cr=(d.cards||[]).find(x=>x.id===cdId);sECa(cr);sV("editCard")},onPay:({accountId,amount})=>aCP({cardId:cdId,accountId,amount,date:Date.now()}),onDelete:()=>{dC(cdId);sCdId(null);sV("cards")},onTx:sAtx}),
         v==="newCard"&&t(NewCard,{onSave:cr=>{aC(cr);sV("cards")},onCancel:()=>sV("cards")}),
         v==="editCard"&&eCa&&t(NewCard,{onSave:cr=>{uC({...eCa,...cr});sECa(null);sV("cardDetail")},onCancel:()=>{sECa(null);sV("cardDetail")},editing:eCa}),
-        v==="transfer"&&t(Xfer,{data:d,onSave:dT,onCancel:()=>sV("more")}),
-        v==="recurring"&&t(Recur,{data:d,onAdd:()=>sV("newRecurring"),onDelete:dR,onEdit:r=>{sERec(r);sV("editRecurring")},onClose:()=>sV("more")}),
+        v==="transfer"&&t(Xfer,{data:d,onSave:dT,onCancel:()=>sV(navFromRef.current)}),
+        v==="recurring"&&t(Recur,{data:d,onAdd:()=>sV("newRecurring"),onDelete:dR,onEdit:r=>{sERec(r);sV("editRecurring")},onClose:()=>sV(navFromRef.current)}),
         v==="newRecurring"&&t(NewRec,{data:d,onSave:r=>{aR(r);sV("recurring")},onCancel:()=>sV("recurring")}),
         v==="editRecurring"&&eRec&&t(NewRec,{data:d,editing:eRec,onSave:r=>{uR({...eRec,...r});sERec(null);sV("recurring")},onCancel:()=>{sERec(null);sV("recurring")}}),
-        v==="profiles"&&t(Profs,{data:d,onClose:()=>sV("more"),onAdd:()=>sV("newProfile"),onUse:p=>{aE({...p,date:Date.now(),source:"profile"});sV("home")},onDelete:dP}),
+        v==="profiles"&&t(Profs,{data:d,onClose:()=>sV(navFromRef.current),onAdd:()=>sV("newProfile"),onUse:p=>{aE({...p,date:Date.now(),source:"profile"});sV("home")},onDelete:dP}),
         v==="newProfile"&&t(NewProf,{data:d,onSave:p=>{aP(p);sV("profiles")},onCancel:()=>sV("profiles")}),
-        v==="bills"&&t(Bills,{data:d,onClose:()=>sV("more"),onAdd:()=>{sEBi(null);sV("newBill")},onEdit:b=>{sEBi(b);sV("editBill")},onDelete:dBi,onMarkPaid:mBP}),
+        v==="bills"&&t(Bills,{data:d,onClose:()=>sV(navFromRef.current),onAdd:()=>{sEBi(null);sV("newBill")},onEdit:b=>{sEBi(b);sV("editBill")},onDelete:dBi,onMarkPaid:mBP}),
         v==="newBill"&&t(NewBill,{data:d,onSave:b=>{aBi(b);sV("bills")},onCancel:()=>sV("bills")}),
         v==="editBill"&&eBi&&t(NewBill,{data:d,editing:eBi,onSave:b=>{uBi({...eBi,...b});sEBi(null);sV("bills")},onCancel:()=>{sEBi(null);sV("bills")}}),
-        v==="goals"&&t(Goals,{data:d,onClose:()=>sV("more"),onAdd:()=>{sEGo(null);sV("newGoal")},onEdit:g=>{sEGo(g);sV("editGoal")},onDelete:dGo,onContribute:(g,amt)=>uGo({...g,currentBalance:(g.currentBalance||0)+amt})}),
+        v==="goals"&&t(Goals,{data:d,onClose:()=>sV(navFromRef.current),onAdd:()=>{sEGo(null);sV("newGoal")},onEdit:g=>{sEGo(g);sV("editGoal")},onDelete:dGo,onContribute:(g,amt)=>uGo({...g,currentBalance:(g.currentBalance||0)+amt})}),
         v==="newGoal"&&t(NewGoal,{data:d,onSave:g=>{aGo(g);sV("goals")},onCancel:()=>sV("goals")}),
         v==="editGoal"&&eGo&&t(NewGoal,{data:d,editing:eGo,onSave:g=>{uGo({...eGo,...g});sEGo(null);sV("goals")},onCancel:()=>{sEGo(null);sV("goals")}}),
-        v==="wealth"&&t(Wealth,{data:d,onClose:()=>sV("more")}),
-        v==="monthlyReport"&&t(MReport,{data:d,onClose:()=>sV("more")}),
-        v==="categoryBudgets"&&t(CatBud,{data:d,persist:pst,onClose:()=>sV("more")}),
-        v==="settings"&&t(Settings,{data:d,persist:pst,onClose:()=>sV("home"),onBackup:()=>sV("backup"),onCategories:()=>sV("categories"),onView:sV}),
+        v==="wealth"&&t(Wealth,{data:d,onClose:()=>sV(navFromRef.current)}),
+        v==="monthlyReport"&&t(MReport,{data:d,onClose:()=>sV(navFromRef.current)}),
+        v==="categoryBudgets"&&t(CatBud,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
+        v==="settings"&&t(Settings,{data:d,persist:pst,onClose:()=>sV("home"),onBackup:()=>sV("backup"),onCategories:()=>{navFromRef.current="settings";sV("categories")},onView:sV}),
         v==="backup"&&t(Backup,{data:d,persist:pst,onClose:()=>sV("home")}),
-        v==="tips"&&t(Tips,{data:d,onClose:()=>sV("more")}),
-        v==="categories"&&t(CatMgr,{data:d,persist:pst,onClose:()=>sV("more")}),
+        v==="tips"&&t(Tips,{data:d,onClose:()=>sV(navFromRef.current)}),
+        v==="categories"&&t(CatMgr,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
         v==="chat"&&t(Chat,{data:d,onAddExpense:aE,onView:sV,onClose:()=>sV("home")}),
         v==="billScan"&&t(BillScan,{data:d,onAddExpense:aE,onClose:()=>sV("home")}),
         v==="userMgr"&&t(UserMgr,{users,activeUser,onSwitch:async u=>{await switchUser(u);sV("home")},onAdd:addUserFn,onDelete:delUserFn,onUpdate:updateUserFn,onClose:()=>sV("home")}),
@@ -567,7 +568,7 @@ function App(){
       nav&&t(Nav,{view:v,setView:sV}),
     ]}),
     atx&&t(TxSht,{expense:atx,accounts:d.accounts,cards:d.cards||[],onClose:()=>sAtx(null),onDelete:()=>dE(atx.id),onEdit:()=>{sEd(atx);sAtx(null);sV("edit")}}),
-    sbar&&t(Sidebar,{data:d,onClose:()=>sSbar(false),onView:sV,activeUser,onUpdateUser:updateUserFn}),
+    sbar&&t(Sidebar,{data:d,onClose:()=>sSbar(false),onView:(id)=>{navFromRef.current=v;sV(id)},activeUser,onUpdateUser:updateUserFn}),
     flt&&t(FilteredTxSheet,{title:flt.title,items:flt.items,accounts:d.accounts,currency:d.currency,onClose:()=>sFlt(null),onHome:()=>{sFlt(null);sV("home")},onTx:sAtx}),
   ]})
 }
@@ -931,7 +932,7 @@ const pCl=async()=>{try{tSms(await navigator.clipboard.readText())}catch{alert("
 const op=s=>{if(!am)return;const l=am.slice(-1);if("+-*/×÷".includes(l))sAm(am.slice(0,-1)+s);else sAm(am+s)};
 const oPh=async fs2=>{const ls=[];for(const f of fs2){if(!f.type.startsWith("image/"))continue;if(f.size>2.5e6){alert(`"${f.name}" is over 2.5MB.`);continue}const d2=await new Promise(r=>{const rd2=new FileReader();rd2.onload=()=>r(rd2.result);rd2.readAsDataURL(f)});ls.push({id:Date.now()+Math.random(),data:d2,name:f.name})}sPh([...ph,...ls])};
 const sv=()=>{if(!va)return;onSave({expense:{type:tp,amount:ev2,accountId:aId,cardId:!iI&&mop==="card"?cId||null:null,payMode:iI?"account":mop,category:ct,subcategory:sb||null,merchant:mc.trim()||null,payee:py.trim()||null,note:nt.trim()||null,photos:ph.length?ph:null,bank:bk.trim()||null,cardType:ct2.trim()||null,cardLast4:c4||null,date:dt,currency:ex?.currency||acc.currency||currency,source:md==="paste"?"sms":(iE?editing.source:"manual")},makeRecurring:rc,frequency:rc?fq:null,makeProfile:pf})};
-const cs=iI?CI:CE,mp=iI?MI:ME,ucr=cards.filter(c2=>!c2.isExternal);
+const cs=iI?ciAll():ceAll(),mp=iI?{...MI,...Object.fromEntries(_custCI.map(x=>[x.id,x]))}:{...ME,...Object.fromEntries(_custCE.map(x=>[x.id,x]))},ucr=cards.filter(c2=>!c2.isExternal);
 return o("div",{className:"fi",style:{paddingTop:48,paddingBottom:32},children:[
   t(SH,{title:t("em",{children:iE?(iI?"Edit income":"Edit expense"):(iI?"New income":"New expense")}),onBack:onCancel}),
   !iE&&t("div",{style:{padding:"0 24px",marginBottom:20},children:o("div",{className:"f",style:{gap:4,padding:4,background:c.sf,borderRadius:12,border:`1px solid ${c.brs}`},children:[
