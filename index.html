@@ -415,7 +415,7 @@ function Sidebar({data,onClose,onView,activeUser,onUpdateUser}){
   const monExp=data.expenses.filter(e=>e.date>=mst&&e.type==="expense");const monInc=data.expenses.filter(e=>e.date>=mst&&e.type==="income");
   const totExp=monExp.reduce((s,e)=>s+e.amount,0);const totInc=monInc.reduce((s,e)=>s+e.amount,0);
   const[editing,setEditing]=useState(false);
-  const[order,setOrder]=useState(()=>{try{const s=localStorage.getItem(SB_ORDER_KEY);return s?JSON.parse(s):DEFAULT_SB}catch{return DEFAULT_SB}});
+  const[order,setOrder]=useState(()=>{try{const s=localStorage.getItem(SB_ORDER_KEY);if(!s)return DEFAULT_SB;const stored=JSON.parse(s);const known=new Set(stored.filter(x=>x!=="sep"));const newItems=DEFAULT_SB.filter(x=>x!=="sep"&&!known.has(x));if(!newItems.length)return stored;const merged=[...stored];for(const item of newItems){const di=DEFAULT_SB.indexOf(item);let ins=false;for(let i=di-1;i>=0;i--){if(DEFAULT_SB[i]==="sep")continue;const p=merged.indexOf(DEFAULT_SB[i]);if(p!==-1){merged.splice(p+1,0,item);ins=true;break}}if(!ins)merged.unshift(item)}return merged}catch{return DEFAULT_SB}});
   const saveOrder=(o2)=>{setOrder(o2);try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2))}catch{}};
   const move=(idx,dir)=>{const o2=[...order];const ni=idx+dir;if(ni<0||ni>=o2.length)return;[o2[idx],o2[ni]]=[o2[ni],o2[idx]];saveOrder(o2)};
   const[dragIdx,setDragIdx]=useState(null);
