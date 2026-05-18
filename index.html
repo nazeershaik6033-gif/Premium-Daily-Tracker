@@ -117,7 +117,17 @@ body{background:#fff!important;color:#000!important}
 </div>
 <script>
 (function(){
-  if('serviceWorker' in navigator){try{navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(r){r.unregister()})})}catch(e){}}
+  if('serviceWorker' in navigator){
+    if(navigator.serviceWorker.controller){
+      navigator.serviceWorker.getRegistrations().then(function(regs){
+        Promise.all(regs.map(function(r){return r.unregister()})).then(function(){
+          location.reload();
+        });
+      });
+      return;
+    }
+    try{navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(r){r.unregister()})})}catch(e){}
+  }
   var setStatus=function(s){var el=document.getElementById('splashStatus');if(el)el.textContent=s};
   var setDetail=function(s){var el=document.getElementById('splashDetail');if(el)el.textContent=s};
   var showErr=function(m){
