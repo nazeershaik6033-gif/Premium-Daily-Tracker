@@ -453,8 +453,8 @@ function fireReminderNotif(d){
 function App(){
   const[v,sV]=useState("home");
   const navFromRef=useRef("home");
-  const dRef=useRef(null);dRef.current=d;
   const[d,sD]=useState({expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],bills:[],goals:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,fontSize:"medium",loading:true,investmentPlans:[],reminderEnabled:false,reminderTime:"21:00"});
+  const dRef=useRef(null);dRef.current=d;
   const[atx,sAtx]=useState(null);
   const[ed,sEd]=useState(null);
   const[eCa,sECa]=useState(null);
