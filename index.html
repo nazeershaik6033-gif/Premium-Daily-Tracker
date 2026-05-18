@@ -407,8 +407,8 @@ function AppHeader({onMenu,onSearch,onToggleTheme,isDark,onHome}){
   ]})})
 }
 const SB_ORDER_KEY="etp-sidebar-order";
-const DEFAULT_SB=["userMgr","upcomingExp","expPlanner","sep","cards","bills","goals","wealth","monthlyReport","sep","accounts","transfer","recurring","profiles","categoryBudgets","categories","backup","tips","settings"];
-const SB_META={userMgr:{e:"👥",l:"Switch User",s:"Manage profiles"},upcomingExp:{e:"📅",l:"Upcoming Expenses",s:"Plan & get alerts"},expPlanner:{e:"🧮",l:"Expense Planner",s:"Can I afford this EMI?"},cards:{e:"💳",l:"Cards",acc:true},bills:{e:"🔔",l:"Bills & Reminders",acc:true},goals:{e:"🎯",l:"Goals & Debt",acc:true},wealth:{e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},monthlyReport:{e:"📰",l:"Monthly Report",s:"Print or share PDF",acc:true},accounts:{e:"🏦",l:"Accounts"},transfer:{e:"↔️",l:"Transfer",s:"Move funds"},recurring:{e:"🔁",l:"Recurring"},profiles:{e:"⚡",l:"Quick profiles"},categoryBudgets:{e:"📏",l:"Category budgets",s:"Set spending limits"},categories:{e:"🏷️",l:"Categories",s:"Manage expense types"},backup:{e:"💾",l:"Backup & Restore",s:"Export or import data"},tips:{e:"💡",l:"Financial Health",s:"Tips & scores"},settings:{e:"⚙️",l:"Settings",s:"Currency, budget, backup"}};
+const DEFAULT_SB=["userMgr","upcomingExp","expPlanner","investCalc","sep","cards","bills","goals","wealth","monthlyReport","sep","accounts","transfer","recurring","profiles","categoryBudgets","categories","backup","tips","settings"];
+const SB_META={userMgr:{e:"👥",l:"Switch User",s:"Manage profiles"},upcomingExp:{e:"📅",l:"Upcoming Expenses",s:"Plan & get alerts"},expPlanner:{e:"🧮",l:"Expense Planner",s:"Can I afford this EMI?"},investCalc:{e:"📈",l:"Investment Calculator",s:"Compound growth & SIP planner"},cards:{e:"💳",l:"Cards",acc:true},bills:{e:"🔔",l:"Bills & Reminders",acc:true},goals:{e:"🎯",l:"Goals & Debt",acc:true},wealth:{e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},monthlyReport:{e:"📰",l:"Monthly Report",s:"Print or share PDF",acc:true},accounts:{e:"🏦",l:"Accounts"},transfer:{e:"↔️",l:"Transfer",s:"Move funds"},recurring:{e:"🔁",l:"Recurring"},profiles:{e:"⚡",l:"Quick profiles"},categoryBudgets:{e:"📏",l:"Category budgets",s:"Set spending limits"},categories:{e:"🏷️",l:"Categories",s:"Manage expense types"},backup:{e:"💾",l:"Backup & Restore",s:"Export or import data"},tips:{e:"💡",l:"Financial Health",s:"Tips & scores"},settings:{e:"⚙️",l:"Settings",s:"Currency, budget, backup"}};
 function Sidebar({data,onClose,onView,activeUser,onUpdateUser}){
   const go=(id)=>{onView(id);onClose()};
   const msd=data.monthStartDay||1;const mst=ps(new Date(),msd);
@@ -432,7 +432,7 @@ function Sidebar({data,onClose,onView,activeUser,onUpdateUser}){
 ]})})})]})]})}
 function App(){
   const[v,sV]=useState("home");
-  const[d,sD]=useState({expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],bills:[],goals:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,fontSize:"medium",loading:true});
+  const[d,sD]=useState({expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],bills:[],goals:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,fontSize:"medium",loading:true,investmentPlans:[]});
   const[atx,sAtx]=useState(null);
   const[ed,sEd]=useState(null);
   const[eCa,sECa]=useState(null);
@@ -462,14 +462,14 @@ function App(){
   const cu=usrs.find(u=>u.id===auid)||usrs[0];
   setUsers(usrs);setActiveUser(cu);
   const dk="etp-data-"+cu.id;
-  let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],bills:[],goals:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,expensePlans:[]};
-  try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,expenses:p.expenses||[],recurring:p.recurring||[],accounts:p.accounts&&p.accounts.length?p.accounts:[DA],profiles:p.profiles||[],cards:p.cards||[],bills:p.bills||[],goals:p.goals||[],categoryBudgets:p.categoryBudgets||{},customExpenseCategories:p.customExpenseCategories||[],customIncomeCategories:p.customIncomeCategories||[],categoryOverrides:p.categoryOverrides||{},financeProfile:p.financeProfile||null,budget:p.budget??null,budgetPeriod:p.budgetPeriod||"monthly",currency:p.currency||"₹",monthStartDay:p.monthStartDay||1,fontSize:p.fontSize||"medium",upcomingExpenses:p.upcomingExpenses||[],alertThreshold:p.alertThreshold??null,expensePlans:p.expensePlans||[]};i.expenses=i.expenses.map(e=>e.accountId?e:{...e,accountId:i.accounts[0].id,type:e.type||"expense"});_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[]}}catch(e){console.error("load",e)}
+  let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],bills:[],goals:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,expensePlans:[],investmentPlans:[]};
+  try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,expenses:p.expenses||[],recurring:p.recurring||[],accounts:p.accounts&&p.accounts.length?p.accounts:[DA],profiles:p.profiles||[],cards:p.cards||[],bills:p.bills||[],goals:p.goals||[],categoryBudgets:p.categoryBudgets||{},customExpenseCategories:p.customExpenseCategories||[],customIncomeCategories:p.customIncomeCategories||[],categoryOverrides:p.categoryOverrides||{},financeProfile:p.financeProfile||null,budget:p.budget??null,budgetPeriod:p.budgetPeriod||"monthly",currency:p.currency||"₹",monthStartDay:p.monthStartDay||1,fontSize:p.fontSize||"medium",upcomingExpenses:p.upcomingExpenses||[],alertThreshold:p.alertThreshold??null,expensePlans:p.expensePlans||[],investmentPlans:p.investmentPlans||[]};i.expenses=i.expenses.map(e=>e.accountId?e:{...e,accountId:i.accounts[0].id,type:e.type||"expense"});_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[]}}catch(e){console.error("load",e)}
   if(i.recurring.length>0){const{newExpenses,updatedRecurring}=pr(i.recurring,i.expenses);if(newExpenses.length>0){i.expenses=[...newExpenses,...i.expenses].sort((a,b)=>b.date-a.date);i.recurring=updatedRecurring}}
   sD({...i,loading:false});
   try{await window.storage.set(dk,JSON.stringify(strip(i)))}catch{}
 })()},[]);
 
-  const strip=x=>({expenses:x.expenses,recurring:x.recurring,accounts:x.accounts,profiles:x.profiles,cards:x.cards||[],bills:x.bills||[],goals:x.goals||[],categoryBudgets:x.categoryBudgets||{},customExpenseCategories:x.customExpenseCategories||[],customIncomeCategories:x.customIncomeCategories||[],categoryOverrides:x.categoryOverrides||{},financeProfile:x.financeProfile||null,budget:x.budget,budgetPeriod:x.budgetPeriod,currency:x.currency,monthStartDay:x.monthStartDay,fontSize:x.fontSize||"medium",upcomingExpenses:x.upcomingExpenses||[],alertThreshold:x.alertThreshold??null,expensePlans:x.expensePlans||[]});
+  const strip=x=>({expenses:x.expenses,recurring:x.recurring,accounts:x.accounts,profiles:x.profiles,cards:x.cards||[],bills:x.bills||[],goals:x.goals||[],categoryBudgets:x.categoryBudgets||{},customExpenseCategories:x.customExpenseCategories||[],customIncomeCategories:x.customIncomeCategories||[],categoryOverrides:x.categoryOverrides||{},financeProfile:x.financeProfile||null,budget:x.budget,budgetPeriod:x.budgetPeriod,currency:x.currency,monthStartDay:x.monthStartDay,fontSize:x.fontSize||"medium",upcomingExpenses:x.upcomingExpenses||[],alertThreshold:x.alertThreshold??null,expensePlans:x.expensePlans||[],investmentPlans:x.investmentPlans||[]});
 
   const pst=async(p)=>{const n={...d,...p};_custCE=n.customExpenseCategories||[];_custCI=n.customIncomeCategories||[];_catOv=n.categoryOverrides||{};sD(n);const dk=activeUser?"etp-data-"+activeUser.id:KS;try{await window.storage.set(dk,JSON.stringify(strip(n)))}catch(e){console.error(e)}};
 
@@ -499,7 +499,7 @@ function App(){
   const uGo=(g)=>pst({goals:(d.goals||[]).map(x=>x.id===g.id?{...x,...g}:x)});
   const dGo=(id)=>pst({goals:(d.goals||[]).filter(g=>g.id!==id)});
 
-  const switchUser=async(u)=>{localStorage.setItem(KAU,u.id);setActiveUser(u);sD(prev=>({...prev,loading:true}));const dk="etp-data-"+u.id;let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],bills:[],goals:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,expensePlans:[]};try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,...p,accounts:p.accounts&&p.accounts.length?p.accounts:[DA],categoryOverrides:p.categoryOverrides||{},upcomingExpenses:p.upcomingExpenses||[]};_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[]}}catch{}if(i.recurring.length>0){const{newExpenses,updatedRecurring}=pr(i.recurring,i.expenses);if(newExpenses.length>0){i.expenses=[...newExpenses,...i.expenses].sort((a,b)=>b.date-a.date);i.recurring=updatedRecurring}}sD({...i,loading:false})};
+  const switchUser=async(u)=>{localStorage.setItem(KAU,u.id);setActiveUser(u);sD(prev=>({...prev,loading:true}));const dk="etp-data-"+u.id;let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],bills:[],goals:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,expensePlans:[],investmentPlans:[]};try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,...p,accounts:p.accounts&&p.accounts.length?p.accounts:[DA],categoryOverrides:p.categoryOverrides||{},upcomingExpenses:p.upcomingExpenses||[]};_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[]}}catch{}if(i.recurring.length>0){const{newExpenses,updatedRecurring}=pr(i.recurring,i.expenses);if(newExpenses.length>0){i.expenses=[...newExpenses,...i.expenses].sort((a,b)=>b.date-a.date);i.recurring=updatedRecurring}}sD({...i,loading:false})};
   const addUserFn=async(u)=>{const nu=[...users,{...u,id:"u_"+uid(),createdAt:Date.now()}];setUsers(nu);await window.storage.set(KU,JSON.stringify(nu))};
   const updateUserFn=async(u)=>{const nu=users.map(x=>x.id===u.id?u:x);setUsers(nu);await window.storage.set(KU,JSON.stringify(nu));if(activeUser?.id===u.id)setActiveUser(u)};
   const delUserFn=async(id)=>{if(users.length<=1){alert("Cannot delete the only user.");return}const nu=users.filter(u=>u.id!==id);setUsers(nu);await window.storage.set(KU,JSON.stringify(nu));await window.storage.delete("etp-data-"+id);if(activeUser?.id===id)await switchUser(nu[0])};
@@ -508,6 +508,8 @@ function App(){
   const uUE=(e)=>pst({upcomingExpenses:(d.upcomingExpenses||[]).map(x=>x.id===e.id?{...x,...e}:x)});
   const aEP=(p)=>pst({expensePlans:[{...p,id:"ep_"+uid(),savedAt:Date.now()},...(d.expensePlans||[])]});
   const dEP=(id)=>pst({expensePlans:(d.expensePlans||[]).filter(p=>p.id!==id)});
+  const aIP=(p)=>pst({investmentPlans:[{...p,id:"inv_"+uid(),savedAt:Date.now()},...(d.investmentPlans||[])]});
+  const dIP=(id)=>pst({investmentPlans:(d.investmentPlans||[]).filter(p=>p.id!==id)});
 
   useEffect(()=>{document.documentElement.style.zoom=d.fontSize==="small"?"0.88":d.fontSize==="large"?"1.12":"1"},[d.fontSize]);
   useEffect(()=>{const s=document.documentElement.style;s.setProperty('--nf',gNF(d));s.setProperty('--tf',gTF(d));s.setProperty('--ns',gNS(d)+'px')},[d.fontPrefs]);
@@ -558,6 +560,7 @@ function App(){
         v==="userMgr"&&t(UserMgr,{users,activeUser,onSwitch:async u=>{await switchUser(u);sV("home")},onAdd:addUserFn,onDelete:delUserFn,onUpdate:updateUserFn,onClose:()=>sV("home")}),
         v==="upcomingExp"&&t(UpcomingExp,{data:d,onAdd:aUE,onDelete:dUE,onUpdate:uUE,onClose:()=>sV("home")}),
         v==="expPlanner"&&t(ExpPlanner,{data:d,onSave:aEP,onDelete:dEP,onClose:()=>sV("home")}),
+        v==="investCalc"&&t(InvCalc,{data:d,onSave:aIP,onDelete:dIP,onClose:()=>sV("home")}),
       ]}),
       nav&&t(Nav,{view:v,setView:sV}),
     ]}),
@@ -1539,6 +1542,156 @@ function UpcomingExp({data,onAdd,onDelete,onUpdate,onClose}){
         ]}),
       ]});
     })})
+  ]});
+}
+function InvCalc({data,onSave,onDelete,onClose}){
+  const{currency,investmentPlans=[]}=data;
+  const[mode,setMode]=useState("endAmt");
+  const[label,setLabel]=useState("");
+  const[startAmt,setStartAmt]=useState("100000");
+  const[contrib,setContrib]=useState("5000");
+  const[contribFreq,setContribFreq]=useState("monthly");
+  const[rate,setRate]=useState("12");
+  const[years,setYears]=useState("10");
+  const[targetAmt,setTargetAmt]=useState("1000000");
+  const[result,setResult]=useState(null);
+  const[showTable,setShowTable]=useState(false);
+
+  const simulate=(P,mSIP,yrC,annRate,numYears)=>{
+    let bal=P,invested=P;const r=annRate/100/12;const rows=[];
+    for(let yr=1;yr<=Math.round(numYears);yr++){
+      for(let mo=1;mo<=12;mo++){bal+=mSIP;invested+=mSIP;bal*=(1+r)}
+      bal+=yrC;invested+=yrC;
+      rows.push({year:yr,balance:Math.round(bal),invested:Math.round(invested),interest:Math.round(bal-invested)});
+    }
+    return rows;
+  };
+  const getFV=(P,mSIP,yrC,annRate,numYears)=>{const rows=simulate(P,mSIP,yrC,annRate,numYears);return rows.length?rows[rows.length-1].balance:P};
+  const solveP=(target,mSIP,yrC,annRate,numYears)=>{let lo=0,hi=target*10;for(let i=0;i<60;i++){const mid=(lo+hi)/2;getFV(mid,mSIP,yrC,annRate,numYears)>target?hi=mid:lo=mid}return(lo+hi)/2};
+  const solveRate=(P,mSIP,yrC,target,numYears)=>{let lo=0,hi=100;for(let i=0;i<60;i++){const mid=(lo+hi)/2;getFV(P,mSIP,yrC,mid,numYears)>target?hi=mid:lo=mid}return(lo+hi)/2};
+  const solveYears=(P,mSIP,yrC,annRate,target)=>{let lo=0,hi=100;for(let i=0;i<60;i++){const mid=(lo+hi)/2;getFV(P,mSIP,yrC,annRate,mid)>target?hi=mid:lo=mid}return(lo+hi)/2};
+
+  const calculate=()=>{
+    const P=parseFloat(startAmt)||0,C=parseFloat(contrib)||0,R=parseFloat(rate)||0;
+    const Y=parseFloat(years)||0,T=parseFloat(targetAmt)||0;
+    const mSIP=contribFreq==="monthly"?C:0,yrC=contribFreq==="annual"?C:0;
+    let solvedP=P,solvedR=R,solvedY=Y;
+    if(mode==="startAmt")solvedP=solveP(T,mSIP,yrC,R,Y);
+    else if(mode==="rate")solvedR=solveRate(P,mSIP,yrC,T,Y);
+    else if(mode==="years")solvedY=solveYears(P,mSIP,yrC,R,T);
+    const rows=simulate(solvedP,mSIP,yrC,solvedR,solvedY);
+    if(!rows.length)return;
+    const last=rows[rows.length-1];
+    const cagr=solvedP>0?((last.balance/solvedP)**(1/solvedY)-1)*100:0;
+    setResult({mode,P:solvedP,mSIP,yrC,rate:solvedR,years:solvedY,finalAmount:last.balance,totalInvested:last.invested,totalInterest:last.interest,cagr,rows});
+  };
+
+  const MODES=[{id:"endAmt",l:"End Amount"},{id:"startAmt",l:"Start Amount"},{id:"rate",l:"Return Rate"},{id:"years",l:"Duration"}];
+  const FREQ=[{id:"monthly",l:"Monthly"},{id:"annual",l:"Annual"},{id:"none",l:"None"}];
+  const inpS={width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${c.brs}`,background:c.sf2,color:c.tx,fontSize:14,fontFamily:F.mo,outline:"none",boxSizing:"border-box"};
+
+  const SvgInvChart=({rows,height=160})=>{
+    if(!rows||rows.length<2)return null;
+    const W=300,padB=24,padT=6,padL=0,H=height-padB-padT;
+    const maxV=Math.max(...rows.map(r=>r.balance),1);
+    const scX=i=>padL+(i/(rows.length-1))*(W-padL);
+    const scY=v=>padT+H-v/maxV*H;
+    const balPts=rows.map((r,i)=>`${scX(i)},${scY(r.balance)}`).join(" ");
+    const invPts=rows.map((r,i)=>`${scX(i)},${scY(r.invested)}`).join(" ");
+    const step=Math.max(1,Math.floor(rows.length/5));
+    const lbls=rows.filter((_,i)=>i===0||i===rows.length-1||i%step===0);
+    return ce("svg",{width:"100%",height,viewBox:`0 0 ${W} ${height}`,preserveAspectRatio:"none",style:{display:"block"}},
+      ce("defs",{},
+        ce("linearGradient",{id:"icg1",x1:"0",y1:"0",x2:"0",y2:"1"},ce("stop",{offset:"0%",stopColor:c.mt,stopOpacity:.45}),ce("stop",{offset:"100%",stopColor:c.mt,stopOpacity:.05})),
+        ce("linearGradient",{id:"icg2",x1:"0",y1:"0",x2:"0",y2:"1"},ce("stop",{offset:"0%",stopColor:c.ac,stopOpacity:.35}),ce("stop",{offset:"100%",stopColor:c.ac,stopOpacity:.05}))
+      ),
+      ce("polygon",{points:`${scX(0)},${padT+H} ${balPts} ${scX(rows.length-1)},${padT+H}`,fill:"url(#icg1)"}),
+      ce("polygon",{points:`${scX(0)},${padT+H} ${invPts} ${scX(rows.length-1)},${padT+H}`,fill:"url(#icg2)"}),
+      ce("polyline",{points:balPts,fill:"none",stroke:c.mt,strokeWidth:1.8,strokeLinejoin:"round",strokeLinecap:"round"}),
+      ce("polyline",{points:invPts,fill:"none",stroke:c.ac,strokeWidth:1.5,strokeLinejoin:"round",strokeLinecap:"round",strokeDasharray:"4 3"}),
+      ...lbls.map(r=>{const i=rows.indexOf(r);return ce("text",{key:r.year,x:scX(i),y:height-5,textAnchor:"middle",fontSize:8,fill:c.tm,fontFamily:F.mo},r.year+"y")})
+    );
+  };
+
+  return o("div",{style:{padding:"8px 24px 32px"},children:[
+    t(SH,{title:t("em",{children:"Investment Calculator"}),onBack:onClose}),
+    o("div",{style:{display:"flex",gap:4,background:c.sf2,borderRadius:999,padding:4,marginBottom:16},children:MODES.map(m=>t("button",{key:m.id,onClick:()=>{setMode(m.id);setResult(null)},className:"act95 tr f1",style:{padding:"7px 0",background:mode===m.id?c.sf3:"transparent",color:mode===m.id?c.tx:c.td,borderRadius:999,fontSize:10,fontFamily:F.mo,letterSpacing:.4,fontWeight:mode===m.id?600:400,border:mode===m.id?`1px solid ${c.brs}`:"none"},children:m.l}))}),
+    o("div",{style:{background:c.sf,borderRadius:14,padding:16,border:`1px solid ${c.brs}`,marginBottom:16},children:[
+      mode!=="startAmt"&&o("div",{style:{marginBottom:12},children:[
+        t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:4},children:"STARTING AMOUNT"}),
+        t("input",{value:startAmt,onChange:e=>setStartAmt(e.target.value),type:"number",placeholder:"100000",style:inpS}),
+      ]}),
+      o("div",{style:{marginBottom:12},children:[
+        t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:4},children:"CONTRIBUTION"}),
+        t("input",{value:contrib,onChange:e=>setContrib(e.target.value),type:"number",placeholder:"5000",style:{...inpS,marginBottom:8}}),
+        o("div",{className:"f ia",style:{gap:6},children:FREQ.map(f=>t("button",{key:f.id,onClick:()=>setContribFreq(f.id),className:"act95 tr",style:{padding:"5px 14px",background:contribFreq===f.id?c.ac:c.sf2,color:contribFreq===f.id?"#0a0a0a":c.td,borderRadius:999,fontSize:11,fontFamily:F.mo,fontWeight:600,border:"none"},children:f.l}))}),
+      ]}),
+      mode!=="rate"&&o("div",{style:{marginBottom:12},children:[
+        t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:4},children:"ANNUAL RETURN (%)"}),
+        t("input",{value:rate,onChange:e=>setRate(e.target.value),type:"number",placeholder:"12",style:inpS}),
+      ]}),
+      mode!=="years"&&o("div",{style:{marginBottom:12},children:[
+        t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:4},children:"DURATION (YEARS)"}),
+        t("input",{value:years,onChange:e=>setYears(e.target.value),type:"number",placeholder:"10",style:inpS}),
+      ]}),
+      mode!=="endAmt"&&o("div",{style:{marginBottom:12},children:[
+        t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:4},children:mode==="startAmt"?"TARGET CORPUS":mode==="rate"?"TARGET AMOUNT":"TARGET AMOUNT"}),
+        t("input",{value:targetAmt,onChange:e=>setTargetAmt(e.target.value),type:"number",placeholder:"1000000",style:inpS}),
+      ]}),
+      t("button",{onClick:calculate,className:"act90 trt w100",style:{padding:"12px",background:c.ac,color:"#0a0a0a",borderRadius:10,fontSize:14,fontWeight:600,border:"none",marginTop:4},children:"Calculate"}),
+    ]}),
+    result&&o("div",{style:{background:c.sf,borderRadius:14,border:`1px solid ${c.brs}`,padding:16,marginBottom:16},children:[
+      o("div",{className:"g g3",style:{gap:8,marginBottom:16},children:[
+        o("div",{style:{background:c.sf2,borderRadius:10,padding:"10px 12px"},children:[t("div",{style:{fontFamily:F.mo,fontSize:8,color:c.tm,letterSpacing:1,marginBottom:3},children:mode==="rate"?"RETURN RATE":mode==="years"?"DURATION":mode==="startAmt"?"START NEEDED":"FINAL VALUE"}),t("div",{style:{fontFamily:F.mo,fontSize:13,fontWeight:700,color:c.mt},children:mode==="rate"?result.rate.toFixed(2)+"%":mode==="years"?Math.round(result.years)+"y":fs(result.finalAmount,currency)})]}),
+        o("div",{style:{background:c.sf2,borderRadius:10,padding:"10px 12px"},children:[t("div",{style:{fontFamily:F.mo,fontSize:8,color:c.tm,letterSpacing:1,marginBottom:3},children:"TOTAL INVESTED"}),t("div",{style:{fontFamily:F.mo,fontSize:13,fontWeight:600,color:c.tx},children:fs(result.totalInvested,currency)})]}),
+        o("div",{style:{background:c.sf2,borderRadius:10,padding:"10px 12px"},children:[t("div",{style:{fontFamily:F.mo,fontSize:8,color:c.tm,letterSpacing:1,marginBottom:3},children:"INTEREST EARNED"}),t("div",{style:{fontFamily:F.mo,fontSize:13,fontWeight:600,color:c.co},children:fs(result.totalInterest,currency)})]}),
+      ]}),
+      o("div",{className:"f ia jb",style:{marginBottom:12},children:[
+        o("div",{className:"f ia",style:{gap:8},children:[
+          t("span",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1},children:"CAGR"}),
+          t("span",{style:{fontFamily:F.mo,fontSize:13,fontWeight:700,color:c.ac}},result.cagr.toFixed(2)+"%"),
+        ]}),
+        o("div",{className:"f ia",style:{gap:8},children:[
+          t("span",{style:{width:12,height:3,borderRadius:99,background:c.mt,display:"inline-block"}}),t("span",{style:{fontSize:10,color:c.td,fontFamily:F.mo},children:"Balance"}),
+          t("span",{style:{width:12,height:2,borderRadius:99,background:c.ac,display:"inline-block",marginLeft:6}}),t("span",{style:{fontSize:10,color:c.td,fontFamily:F.mo},children:"Invested"}),
+        ]}),
+      ]}),
+      t(SvgInvChart,{rows:result.rows,height:160}),
+      t("button",{onClick:()=>setShowTable(s=>!s),className:"act95 tr",style:{width:"100%",marginTop:12,padding:"8px",background:c.sf2,color:c.td,borderRadius:8,fontSize:11,fontFamily:F.mo,letterSpacing:.5,border:"none"},children:showTable?"HIDE YEAR TABLE ▲":"SHOW YEAR TABLE ▼"}),
+      showTable&&o("div",{style:{marginTop:8,overflowX:"auto"},children:[
+        o("div",{style:{display:"grid",gridTemplateColumns:"40px 1fr 1fr 1fr 1fr",gap:"1px 0",minWidth:300},children:[
+          ...["YR","BALANCE","INVESTED","INTEREST","GROWTH"].map((h,i)=>t("div",{key:i,style:{fontFamily:F.mo,fontSize:8,color:c.tm,letterSpacing:.8,padding:"4px 6px",background:c.sf2,textAlign:i>0?"right":"center"}},h)),
+          ...result.rows.flatMap((r,i)=>[
+            t("div",{key:"y"+i,style:{fontFamily:F.mo,fontSize:11,color:c.td,padding:"5px 6px",background:i%2?c.sf2+"80":"transparent",textAlign:"center",borderTop:`1px solid ${c.brs}`}},r.year),
+            t("div",{key:"b"+i,style:{fontFamily:F.mo,fontSize:11,color:c.tx,padding:"5px 6px",background:i%2?c.sf2+"80":"transparent",textAlign:"right",borderTop:`1px solid ${c.brs}`}},fs(r.balance,currency)),
+            t("div",{key:"i"+i,style:{fontFamily:F.mo,fontSize:11,color:c.td,padding:"5px 6px",background:i%2?c.sf2+"80":"transparent",textAlign:"right",borderTop:`1px solid ${c.brs}`}},fs(r.invested,currency)),
+            t("div",{key:"int"+i,style:{fontFamily:F.mo,fontSize:11,color:c.co,padding:"5px 6px",background:i%2?c.sf2+"80":"transparent",textAlign:"right",borderTop:`1px solid ${c.brs}`}},fs(r.interest,currency)),
+            t("div",{key:"g"+i,style:{fontFamily:F.mo,fontSize:11,color:c.mt,padding:"5px 6px",background:i%2?c.sf2+"80":"transparent",textAlign:"right",borderTop:`1px solid ${c.brs}`}},r.invested>0?"+"+Math.round((r.balance/r.invested-1)*100)+"%":"—"),
+          ]),
+        ]}),
+      ]}),
+    ]}),
+    result&&o("div",{style:{background:c.sf,borderRadius:14,border:`1px solid ${c.brs}`,padding:16,marginBottom:16},children:[
+      t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:8},children:"SAVE SCENARIO"}),
+      t("input",{value:label,onChange:e=>setLabel(e.target.value),placeholder:"Scenario name (e.g. NIFTY SIP 10yr)",style:{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${c.brs}`,background:c.sf2,color:c.tx,fontSize:14,fontFamily:'var(--tf)',outline:"none",boxSizing:"border-box",marginBottom:10}}),
+      t("button",{onClick:()=>{if(!label.trim())return;onSave({...result,label:label.trim()});setLabel("")},className:"act90 trt w100",style:{padding:"11px",background:c.ac,color:"#0a0a0a",borderRadius:10,fontSize:13,fontWeight:600,border:"none"},children:"Save Scenario"}),
+    ]}),
+    investmentPlans.length>0&&o("div",{style:{marginTop:8},children:[
+      t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:10},children:"SAVED SCENARIOS"}),
+      o("div",{style:{display:"flex",flexDirection:"column",gap:8},children:investmentPlans.map(p=>o("div",{key:p.id,style:{background:c.sf,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px"},children:[
+        o("div",{className:"f ia jb",children:[
+          o("button",{onClick:()=>{setMode(p.mode||"endAmt");setResult(p);setShowTable(false)},className:"f1 tl act99",style:{background:"transparent",border:"none",textAlign:"left"},children:[
+            t("div",{style:{fontSize:13,color:c.tx,fontWeight:500,marginBottom:3},children:p.label}),
+            o("div",{className:"f ia",style:{gap:10,flexWrap:"wrap"},children:[
+              o("span",{style:{fontFamily:F.mo,fontSize:10,color:c.mt},children:[fs(p.finalAmount,currency)," final"]}),
+              o("span",{style:{fontFamily:F.mo,fontSize:10,color:c.td},children:[p.rate.toFixed(1),"% · ",Math.round(p.years),"y"]}),
+              o("span",{style:{fontFamily:F.mo,fontSize:10,color:c.ac},children:[p.cagr.toFixed(1),"% CAGR"]}),
+            ]}),
+          ]}),
+          t("button",{onClick:()=>onDelete(p.id),style:{padding:4,background:"transparent",border:"none",color:c.tm},children:t(X,{size:13})}),
+        ]}),
+      ]}))}),
+    ]}),
   ]});
 }
 function ExpPlanner({data,onSave,onDelete,onClose}){
