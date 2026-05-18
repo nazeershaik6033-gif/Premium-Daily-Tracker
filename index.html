@@ -117,6 +117,7 @@ body{background:#fff!important;color:#000!important}
 </div>
 <script>
 (function(){
+  if('serviceWorker' in navigator){try{navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(r){r.unregister()})})}catch(e){}}
   var setStatus=function(s){var el=document.getElementById('splashStatus');if(el)el.textContent=s};
   var setDetail=function(s){var el=document.getElementById('splashDetail');if(el)el.textContent=s};
   var showErr=function(m){
@@ -524,7 +525,7 @@ function App(){
 
   useEffect(()=>{document.documentElement.style.zoom="1"},[]);
   useEffect(()=>{const s=document.documentElement.style;s.setProperty('--nf',gNF(d));s.setProperty('--tf',gTF(d));s.setProperty('--ns',gNS(d)+'px')},[d.fontPrefs]);
-  useEffect(()=>{try{if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(regs=>{regs.forEach(r=>{if(!r.active?.scriptURL?.includes('sw.js'))r.unregister()})});navigator.serviceWorker.register('./sw.js').then(()=>{navigator.serviceWorker.addEventListener('message',ev=>{if(ev.data?.type==='REMINDER_TICK')fireReminderNotif(dRef.current)})}).catch(()=>{})}}catch{}try{const p=new URLSearchParams(location.search);if(p.get('action')==='add'){history.replaceState(null,'','./');sV('add')}if(p.get('view')==='stats'){history.replaceState(null,'','./');sV('stats')}}catch{}},[]);
+  useEffect(()=>{try{const p=new URLSearchParams(location.search);if(p.get('action')==='add'){history.replaceState(null,'','./');sV('add')}if(p.get('view')==='stats'){history.replaceState(null,'','./');sV('stats')}}catch{}},[]);
   useEffect(()=>{if(!d.reminderEnabled||!d.reminderTime||Notification.permission!=='granted')return;const[hh,mm]=d.reminderTime.split(':').map(Number);const now=new Date(),next=new Date();next.setHours(hh,mm,0,0);if(next<=now)next.setDate(next.getDate()+1);const tid=setTimeout(()=>{fireReminderNotif(dRef.current)},next-now);return()=>clearTimeout(tid)},[d.reminderEnabled,d.reminderTime]);
 
   if(d.loading)return t("div",{style:{background:c.bg,color:c.tx,height:"100dvh"},className:"f ia jc",children:t("div",{style:{fontFamily:F.se,fontSize:32,color:c.td,fontStyle:"italic"},children:"loading…"})});
