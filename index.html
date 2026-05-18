@@ -430,10 +430,20 @@ function Sidebar({data,onClose,onView,activeUser,onUpdateUser}){
   ]}),
   editing&&t("div",{"data-grip-idx":i,style:{paddingRight:12,paddingLeft:4,color:c.td,cursor:"grab",display:"flex",alignItems:"center",userSelect:"none",touchAction:"none"},children:t(GripV,{size:18})}),
 ]})})})]})]})}
+function fireReminderNotif(d){
+  const today=d.expenses.filter(e=>{const ed=new Date(e.date),n=new Date();return ed.toDateString()===n.toDateString()&&e.type==='expense'});
+  const total=today.reduce((s,e)=>s+e.amount,0);
+  const body=today.length>0?`You logged ${today.length} expense${today.length>1?'s':''} today (${d.currency||''}${total.toLocaleString('en-IN')}). Keep it up!`:"Don't forget to log today's expenses!";
+  if(Notification.permission==='granted'){
+    if(navigator.serviceWorker?.controller){navigator.serviceWorker.controller.postMessage({type:'SHOW_REMINDER',body})}
+    else{try{new Notification('💰 Expense Reminder',{body,tag:'daily-reminder',icon:'./manifest.json'})}catch{}}
+  }
+}
 function App(){
   const[v,sV]=useState("home");
   const navFromRef=useRef("home");
-  const[d,sD]=useState({expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],bills:[],goals:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,fontSize:"medium",loading:true,investmentPlans:[]});
+  const dRef=useRef(null);dRef.current=d;
+  const[d,sD]=useState({expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],bills:[],goals:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,fontSize:"medium",loading:true,investmentPlans:[],reminderEnabled:false,reminderTime:"21:00"});
   const[atx,sAtx]=useState(null);
   const[ed,sEd]=useState(null);
   const[eCa,sECa]=useState(null);
@@ -463,14 +473,14 @@ function App(){
   const cu=usrs.find(u=>u.id===auid)||usrs[0];
   setUsers(usrs);setActiveUser(cu);
   const dk="etp-data-"+cu.id;
-  let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],bills:[],goals:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,expensePlans:[],investmentPlans:[]};
-  try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,expenses:p.expenses||[],recurring:p.recurring||[],accounts:p.accounts&&p.accounts.length?p.accounts:[DA],profiles:p.profiles||[],cards:p.cards||[],bills:p.bills||[],goals:p.goals||[],categoryBudgets:p.categoryBudgets||{},customExpenseCategories:p.customExpenseCategories||[],customIncomeCategories:p.customIncomeCategories||[],categoryOverrides:p.categoryOverrides||{},financeProfile:p.financeProfile||null,budget:p.budget??null,budgetPeriod:p.budgetPeriod||"monthly",currency:p.currency||"₹",monthStartDay:p.monthStartDay||1,fontSize:p.fontSize||"medium",upcomingExpenses:p.upcomingExpenses||[],alertThreshold:p.alertThreshold??null,expensePlans:p.expensePlans||[],investmentPlans:p.investmentPlans||[]};i.expenses=i.expenses.map(e=>e.accountId?e:{...e,accountId:i.accounts[0].id,type:e.type||"expense"});_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[]}}catch(e){console.error("load",e)}
+  let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],bills:[],goals:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,expensePlans:[],investmentPlans:[],reminderEnabled:false,reminderTime:"21:00"};
+  try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,expenses:p.expenses||[],recurring:p.recurring||[],accounts:p.accounts&&p.accounts.length?p.accounts:[DA],profiles:p.profiles||[],cards:p.cards||[],bills:p.bills||[],goals:p.goals||[],categoryBudgets:p.categoryBudgets||{},customExpenseCategories:p.customExpenseCategories||[],customIncomeCategories:p.customIncomeCategories||[],categoryOverrides:p.categoryOverrides||{},financeProfile:p.financeProfile||null,budget:p.budget??null,budgetPeriod:p.budgetPeriod||"monthly",currency:p.currency||"₹",monthStartDay:p.monthStartDay||1,fontSize:p.fontSize||"medium",upcomingExpenses:p.upcomingExpenses||[],alertThreshold:p.alertThreshold??null,expensePlans:p.expensePlans||[],investmentPlans:p.investmentPlans||[],reminderEnabled:p.reminderEnabled||false,reminderTime:p.reminderTime||"21:00"};i.expenses=i.expenses.map(e=>e.accountId?e:{...e,accountId:i.accounts[0].id,type:e.type||"expense"});_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[]}}catch(e){console.error("load",e)}
   if(i.recurring.length>0){const{newExpenses,updatedRecurring}=pr(i.recurring,i.expenses);if(newExpenses.length>0){i.expenses=[...newExpenses,...i.expenses].sort((a,b)=>b.date-a.date);i.recurring=updatedRecurring}}
   sD({...i,loading:false});
   try{await window.storage.set(dk,JSON.stringify(strip(i)))}catch{}
 })()},[]);
 
-  const strip=x=>({expenses:x.expenses,recurring:x.recurring,accounts:x.accounts,profiles:x.profiles,cards:x.cards||[],bills:x.bills||[],goals:x.goals||[],categoryBudgets:x.categoryBudgets||{},customExpenseCategories:x.customExpenseCategories||[],customIncomeCategories:x.customIncomeCategories||[],categoryOverrides:x.categoryOverrides||{},financeProfile:x.financeProfile||null,budget:x.budget,budgetPeriod:x.budgetPeriod,currency:x.currency,monthStartDay:x.monthStartDay,fontSize:x.fontSize||"medium",upcomingExpenses:x.upcomingExpenses||[],alertThreshold:x.alertThreshold??null,expensePlans:x.expensePlans||[],investmentPlans:x.investmentPlans||[]});
+  const strip=x=>({expenses:x.expenses,recurring:x.recurring,accounts:x.accounts,profiles:x.profiles,cards:x.cards||[],bills:x.bills||[],goals:x.goals||[],categoryBudgets:x.categoryBudgets||{},customExpenseCategories:x.customExpenseCategories||[],customIncomeCategories:x.customIncomeCategories||[],categoryOverrides:x.categoryOverrides||{},financeProfile:x.financeProfile||null,budget:x.budget,budgetPeriod:x.budgetPeriod,currency:x.currency,monthStartDay:x.monthStartDay,fontSize:x.fontSize||"medium",upcomingExpenses:x.upcomingExpenses||[],alertThreshold:x.alertThreshold??null,expensePlans:x.expensePlans||[],investmentPlans:x.investmentPlans||[],reminderEnabled:x.reminderEnabled||false,reminderTime:x.reminderTime||"21:00"});
 
   const pst=async(p)=>{const n={...d,...p};_custCE=n.customExpenseCategories||[];_custCI=n.customIncomeCategories||[];_catOv=n.categoryOverrides||{};sD(n);const dk=activeUser?"etp-data-"+activeUser.id:KS;try{await window.storage.set(dk,JSON.stringify(strip(n)))}catch(e){console.error(e)}};
 
@@ -500,7 +510,7 @@ function App(){
   const uGo=(g)=>pst({goals:(d.goals||[]).map(x=>x.id===g.id?{...x,...g}:x)});
   const dGo=(id)=>pst({goals:(d.goals||[]).filter(g=>g.id!==id)});
 
-  const switchUser=async(u)=>{localStorage.setItem(KAU,u.id);setActiveUser(u);sD(prev=>({...prev,loading:true}));const dk="etp-data-"+u.id;let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],bills:[],goals:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,expensePlans:[],investmentPlans:[]};try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,...p,accounts:p.accounts&&p.accounts.length?p.accounts:[DA],categoryOverrides:p.categoryOverrides||{},upcomingExpenses:p.upcomingExpenses||[]};_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[]}}catch{}if(i.recurring.length>0){const{newExpenses,updatedRecurring}=pr(i.recurring,i.expenses);if(newExpenses.length>0){i.expenses=[...newExpenses,...i.expenses].sort((a,b)=>b.date-a.date);i.recurring=updatedRecurring}}sD({...i,loading:false})};
+  const switchUser=async(u)=>{localStorage.setItem(KAU,u.id);setActiveUser(u);sD(prev=>({...prev,loading:true}));const dk="etp-data-"+u.id;let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],bills:[],goals:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,expensePlans:[],investmentPlans:[],reminderEnabled:false,reminderTime:"21:00"};try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,...p,accounts:p.accounts&&p.accounts.length?p.accounts:[DA],categoryOverrides:p.categoryOverrides||{},upcomingExpenses:p.upcomingExpenses||[]};_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[]}}catch{}if(i.recurring.length>0){const{newExpenses,updatedRecurring}=pr(i.recurring,i.expenses);if(newExpenses.length>0){i.expenses=[...newExpenses,...i.expenses].sort((a,b)=>b.date-a.date);i.recurring=updatedRecurring}}sD({...i,loading:false})};
   const addUserFn=async(u)=>{const nu=[...users,{...u,id:"u_"+uid(),createdAt:Date.now()}];setUsers(nu);await window.storage.set(KU,JSON.stringify(nu))};
   const updateUserFn=async(u)=>{const nu=users.map(x=>x.id===u.id?u:x);setUsers(nu);await window.storage.set(KU,JSON.stringify(nu));if(activeUser?.id===u.id)setActiveUser(u)};
   const delUserFn=async(id)=>{if(users.length<=1){alert("Cannot delete the only user.");return}const nu=users.filter(u=>u.id!==id);setUsers(nu);await window.storage.set(KU,JSON.stringify(nu));await window.storage.delete("etp-data-"+id);if(activeUser?.id===id)await switchUser(nu[0])};
@@ -514,6 +524,8 @@ function App(){
 
   useEffect(()=>{document.documentElement.style.zoom="1"},[]);
   useEffect(()=>{const s=document.documentElement.style;s.setProperty('--nf',gNF(d));s.setProperty('--tf',gTF(d));s.setProperty('--ns',gNS(d)+'px')},[d.fontPrefs]);
+  useEffect(()=>{if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').then(reg=>{navigator.serviceWorker.addEventListener('message',ev=>{if(ev.data?.type==='REMINDER_TICK')fireReminderNotif(dRef.current)})}).catch(()=>{})}const p=new URLSearchParams(location.search);if(p.get('action')==='add'){history.replaceState(null,'','./');sV('add')}if(p.get('view')==='stats'){history.replaceState(null,'','./');sV('stats')}},[]);
+  useEffect(()=>{if(!d.reminderEnabled||!d.reminderTime||Notification.permission!=='granted')return;const[hh,mm]=d.reminderTime.split(':').map(Number);const now=new Date(),next=new Date();next.setHours(hh,mm,0,0);if(next<=now)next.setDate(next.getDate()+1);const tid=setTimeout(()=>{fireReminderNotif(dRef.current)},next-now);return()=>clearTimeout(tid)},[d.reminderEnabled,d.reminderTime]);
 
   if(d.loading)return t("div",{style:{background:c.bg,color:c.tx,height:"100dvh"},className:"f ia jc",children:t("div",{style:{fontFamily:F.se,fontSize:32,color:c.td,fontStyle:"italic"},children:"loading…"})});
 
@@ -1794,10 +1806,11 @@ function ExpPlanner({data,onSave,onDelete,onClose}){
   ]});
 }
 function Settings({data,persist,onClose,onBackup,onCategories,onView}){const{budget,budgetPeriod,currency,monthStartDay,financeProfile}=data;const fp=financeProfile||{};const[b,sB]=useState(budget==null?"":String(budget));const[bp,sBp]=useState(budgetPeriod||"monthly");const[cu,sCu]=useState(currency||"₹");const[ms,sMs]=useState(monthStartDay||1);const[ak,sAk]=useState(gAK()||"");const[show,sShow]=useState(false);const[fz,sFz]=useState(data.fontSize||"medium");const[at,sAt]=useState(data.alertThreshold!=null?String(data.alertThreshold):"");
+const[remEn,sRemEn]=useState(data.reminderEnabled||false);const[remTime,sRemTime]=useState(data.reminderTime||"21:00");const[notifPerm,sNotifPerm]=useState(typeof Notification!=='undefined'?Notification.permission:'unsupported');
 const fpx=data.fontPrefs||{};
 const[numFont,sNumFont]=useState(fpx.numFont||'sfmono');
 const[numSize,sNumSize]=useState(fpx.numSize||14);
-const[txtFont,sTxtFont]=useState(fpx.txtFont||'system');const[inc,sInc]=useState(String(fp.monthlyIncome||""));const[fxE,sFxE]=useState(String(fp.fixedExpenses||""));const[spg,sSpg]=useState(String(fp.savingsGoalPct||"20"));const[efm,sEfm]=useState(String(fp.emergencyFundMonths||"6"));const[dbt,sDbt]=useState(String(fp.totalDebt||""));const save=()=>{persist({budget:parseFloat(b)||null,budgetPeriod:bp,currency:cu,monthStartDay:parseInt(ms)||1,fontSize:fz,alertThreshold:parseFloat(at)||null,fontPrefs:{numFont,numSize,txtFont},financeProfile:{monthlyIncome:parseFloat(inc)||null,fixedExpenses:parseFloat(fxE)||null,savingsGoalPct:parseFloat(spg)||20,emergencyFundMonths:parseFloat(efm)||6,totalDebt:parseFloat(dbt)||null}});sAK(ak.trim()||null);onClose()};
+const[txtFont,sTxtFont]=useState(fpx.txtFont||'system');const[inc,sInc]=useState(String(fp.monthlyIncome||""));const[fxE,sFxE]=useState(String(fp.fixedExpenses||""));const[spg,sSpg]=useState(String(fp.savingsGoalPct||"20"));const[efm,sEfm]=useState(String(fp.emergencyFundMonths||"6"));const[dbt,sDbt]=useState(String(fp.totalDebt||""));const save=()=>{persist({budget:parseFloat(b)||null,budgetPeriod:bp,currency:cu,monthStartDay:parseInt(ms)||1,fontSize:fz,alertThreshold:parseFloat(at)||null,fontPrefs:{numFont,numSize,txtFont},reminderEnabled:remEn,reminderTime:remTime,financeProfile:{monthlyIncome:parseFloat(inc)||null,fixedExpenses:parseFloat(fxE)||null,savingsGoalPct:parseFloat(spg)||20,emergencyFundMonths:parseFloat(efm)||6,totalDebt:parseFloat(dbt)||null}});sAK(ak.trim()||null);if(remEn&&notifPerm==='granted'){try{navigator.serviceWorker?.ready.then(reg=>reg.periodicSync?.register('expense-reminder',{minInterval:86400000}).catch(()=>{}))}catch{}}onClose()};
 return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
   t(SH,{title:t("em",{children:"Settings"}),onBack:onClose,right:t("button",{onClick:save,className:"act95 trt",style:{padding:"8px 14px",background:c.ac,color:"#0a0a0a",borderRadius:10,fontSize:12,fontWeight:600,border:"none"},children:"Save"})}),
   o("div",{style:{background:c.sf,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden",marginBottom:16},children:[
@@ -1845,6 +1858,23 @@ return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
   ]}),
   o("div",{style:{background:c.sf,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:12},children:"MONTH STARTS ON DAY"}),t("input",{type:"number",min:"1",max:"28",value:ms,onChange:e=>sMs(e.target.value),style:{width:"100%",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:11,padding:"10px 12px",color:c.tx,fontSize:14,outline:"none",fontFamily:F.mo,textAlign:"center"}}),t("div",{style:{fontSize:11,color:c.tm,marginTop:6,textAlign:"center"},children:"e.g., 1 = calendar month, 25 = pay-cycle month"}),
+  ]}),
+  o("div",{style:{background:c.sf,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
+    t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:14},children:"NOTIFICATIONS & REMINDER"}),
+    notifPerm==='unsupported'?t("div",{style:{fontSize:12,color:c.tm,marginBottom:12,padding:"10px 12px",background:c.sf2,borderRadius:10},children:"Notifications not supported in this browser."}):null,
+    notifPerm==='denied'&&t("div",{style:{fontSize:12,color:c.ro,marginBottom:12,padding:"10px 12px",background:c.ro+"15",borderRadius:10,border:`1px solid ${c.ro}30`},children:"Notifications are blocked. Enable in browser/OS settings."}),
+    notifPerm!=='granted'&&notifPerm!=='denied'&&notifPerm!=='unsupported'&&t("button",{onClick:async()=>{const r=await Notification.requestPermission();sNotifPerm(r)},className:"act90 trt w100",style:{padding:"11px",background:c.ac,color:"#0a0a0a",borderRadius:10,fontSize:13,fontWeight:600,border:"none",marginBottom:12},children:"Allow Notifications"}),
+    notifPerm==='granted'&&t("div",{style:{padding:"8px 12px",background:c.mt+"15",border:`1px solid ${c.mt}30`,borderRadius:10,marginBottom:12,fontSize:11,color:c.mt,fontFamily:F.mo},children:"✓ Notifications enabled"}),
+    o("div",{className:"f ia jb",style:{marginBottom:remEn?12:0},children:[
+      o("div",{children:[t("div",{style:{fontSize:13,color:c.tx},children:"Daily expense reminder"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:remEn?"Fires at "+remTime+" each day":"Install as PWA for background reminders"})]}),
+      t("button",{onClick:()=>sRemEn(e=>!e),style:{width:40,height:24,borderRadius:999,background:remEn?c.ac:c.sf2,position:"relative",border:"none",flexShrink:0,transition:"background 200ms"},children:t("div",{style:{position:"absolute",top:3,left:remEn?18:3,width:18,height:18,borderRadius:999,background:remEn?"#0a0a0a":c.tm,transition:"left 200ms"}})}),
+    ]}),
+    remEn&&o("div",{style:{marginBottom:8},children:[
+      t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:"REMINDER TIME"}),
+      t("input",{type:"time",value:remTime,onChange:e=>sRemTime(e.target.value),style:{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${c.brs}`,background:c.sf2,color:c.tx,fontSize:14,fontFamily:F.mo,outline:"none",boxSizing:"border-box"}}),
+      notifPerm==='granted'&&t("button",{onClick:()=>fireReminderNotif({expenses:data.expenses,currency:data.currency}),className:"act95 tr",style:{width:"100%",marginTop:8,padding:"9px",background:c.sf3,color:c.tx,borderRadius:9,fontSize:11,fontFamily:F.mo,letterSpacing:.5,border:`1px solid ${c.brs}`},children:"📬 Send test notification"}),
+    ]}),
+    t("div",{style:{fontSize:10,color:c.tm,marginTop:4,lineHeight:1.5},children:"Works when app is open · Install as PWA for background (Android Chrome)"}),
   ]}),
   o("div",{style:{background:c.sf,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:12},children:"ANTHROPIC API KEY"}),o("div",{className:"f ia",style:{gap:8,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:11,padding:"10px 12px"},children:[t(KeyI,{size:14,color:c.tm}),t("input",{type:show?"text":"password",value:ak,onChange:e=>sAk(e.target.value),placeholder:"sk-ant-…",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:13,fontFamily:F.mo}}),t("button",{onClick:()=>sShow(!show),style:{background:"transparent",border:"none",color:c.tm},children:show?t(EyeOff,{size:14}):t(Eye,{size:14})})]}),t("div",{style:{fontSize:11,color:c.tm,marginTop:6},children:"Needed for AI chat & bill scan. Stored locally only."}),
