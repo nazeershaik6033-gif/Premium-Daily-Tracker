@@ -415,7 +415,7 @@ function Sidebar({data,onClose,onView,activeUser,onUpdateUser}){
   const monExp=data.expenses.filter(e=>e.date>=mst&&e.type==="expense");const monInc=data.expenses.filter(e=>e.date>=mst&&e.type==="income");
   const totExp=monExp.reduce((s,e)=>s+e.amount,0);const totInc=monInc.reduce((s,e)=>s+e.amount,0);
   const[editing,setEditing]=useState(false);
-  const[order,setOrder]=useState(()=>{try{const s=localStorage.getItem(SB_ORDER_KEY);return s?JSON.parse(s):DEFAULT_SB}catch{return DEFAULT_SB}});
+  const[order,setOrder]=useState(()=>{try{const s=localStorage.getItem(SB_ORDER_KEY);if(!s)return DEFAULT_SB;const stored=JSON.parse(s);const known=new Set(stored.filter(x=>x!=="sep"));const newItems=DEFAULT_SB.filter(x=>x!=="sep"&&!known.has(x));if(!newItems.length)return stored;const merged=[...stored];for(const item of newItems){const di=DEFAULT_SB.indexOf(item);let ins=false;for(let i=di-1;i>=0;i--){if(DEFAULT_SB[i]==="sep")continue;const p=merged.indexOf(DEFAULT_SB[i]);if(p!==-1){merged.splice(p+1,0,item);ins=true;break}}if(!ins)merged.unshift(item)}return merged}catch{return DEFAULT_SB}});
   const saveOrder=(o2)=>{setOrder(o2);try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2))}catch{}};
   const move=(idx,dir)=>{const o2=[...order];const ni=idx+dir;if(ni<0||ni>=o2.length)return;[o2[idx],o2[ni]]=[o2[ni],o2[idx]];saveOrder(o2)};
   const[dragIdx,setDragIdx]=useState(null);
@@ -511,13 +511,15 @@ function App(){
   const aIP=(p)=>pst({investmentPlans:[{...p,id:"inv_"+uid(),savedAt:Date.now()},...(d.investmentPlans||[])]});
   const dIP=(id)=>pst({investmentPlans:(d.investmentPlans||[]).filter(p=>p.id!==id)});
 
-  useEffect(()=>{document.documentElement.style.zoom=d.fontSize==="small"?"0.88":d.fontSize==="large"?"1.12":"1"},[d.fontSize]);
+  useEffect(()=>{document.documentElement.style.zoom="1"},[]);
   useEffect(()=>{const s=document.documentElement.style;s.setProperty('--nf',gNF(d));s.setProperty('--tf',gTF(d));s.setProperty('--ns',gNS(d)+'px')},[d.fontPrefs]);
 
   if(d.loading)return t("div",{style:{background:c.bg,color:c.tx,height:"100dvh"},className:"f ia jc",children:t("div",{style:{fontFamily:F.se,fontSize:32,color:c.td,fontStyle:"italic"},children:"loading…"})});
 
   const nav=!["newAccount","editAccount","newCard","editCard","newRecurring","editRecurring","newBill","editBill","newGoal","editGoal","newTransfer","newProfile","backup"].includes(v);
-  return o("div",{style:{background:c.bg,color:c.tx,fontFamily:'var(--tf)',height:"100dvh",maxHeight:"100dvh",width:"100%",overflow:"hidden",display:"flex",flexDirection:"column",alignItems:"center"},className:"",children:[
+  const fzScale=d.fontSize==="small"?0.88:d.fontSize==="large"?1.12:1;
+  const fzH=`${(100/fzScale).toFixed(4)}dvh`;
+  return o("div",{style:{background:c.bg,color:c.tx,fontFamily:'var(--tf)',height:fzH,maxHeight:fzH,width:"100%",overflow:"hidden",display:"flex",flexDirection:"column",alignItems:"center",zoom:fzScale,transformOrigin:"top left"},className:"",children:[
     t(Gr,{}),
     t(AppHeader,{onMenu:()=>sSbar(true),onSearch:()=>sV("search"),onToggleTheme:toggleTheme,isDark,onHome:()=>sV("home")}),
     o("div",{className:"r w100",style:{maxWidth:440,flex:1,minHeight:0,background:c.bg,borderLeft:`1px solid ${c.brs}`,borderRight:`1px solid ${c.brs}`,overflow:"hidden",display:"flex",flexDirection:"column"},children:[
