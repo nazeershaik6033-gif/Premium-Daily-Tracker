@@ -289,7 +289,7 @@ const ceAll=()=>[...CE.filter(x=>!(_catOv[x.id]?.hidden)),..._custCE],ciAll=()=>
 const FQ=[{id:"daily",label:"Daily",short:"/day"},{id:"weekly",label:"Weekly",short:"/wk"},{id:"biweekly",label:"Bi-weekly",short:"/2wk"},{id:"monthly",label:"Monthly",short:"/mo"},{id:"yearly",label:"Yearly",short:"/yr"}];
 const MFQ=Object.fromEntries(FQ.map(x=>[x.id,x]));
 const AT=[{id:"cash",label:"Cash",emoji:"💵"},{id:"checking",label:"Checking",emoji:"🏦"},{id:"savings",label:"Savings",emoji:"🐖"},{id:"credit",label:"Credit Card",emoji:"💳"},{id:"investment",label:"Investment",emoji:"📈"},{id:"other",label:"Other",emoji:"💼"}];
-const CUR=["$","€","£","₹","¥","C$","A$","CHF","kr"];
+const CUR=["₹","$","€","£","¥","C$","A$","CHF","kr"];
 const NW=[{id:"visa",label:"Visa",color:"#1A1F71"},{id:"mastercard",label:"Mastercard",color:"#EB001B"},{id:"amex",label:"Amex",color:"#006FCF"},{id:"rupay",label:"RuPay",color:"#097A3F"},{id:"discover",label:"Discover",color:"#FF6000"},{id:"other",label:"Other",color:"#666"}];
 const GR=[{id:"purple",from:"#6B46C1",to:"#3B1B6B",name:"Royal Purple"},{id:"ink",from:"#1E293B",to:"#0F172A",name:"Midnight Ink"},{id:"ember",from:"#DC2626",to:"#7F1D1D",name:"Ember Red"},{id:"forest",from:"#047857",to:"#064E3B",name:"Forest Green"},{id:"ocean",from:"#0369A1",to:"#0C4A6E",name:"Deep Ocean"},{id:"gold",from:"#A16207",to:"#713F12",name:"Aged Gold"},{id:"rose",from:"#BE185D",to:"#831843",name:"Rose Noir"},{id:"slate",from:"#475569",to:"#1E293B",name:"Platinum"}];
 const gr=id=>GR.find(g=>g.id===id)||GR[1];
@@ -1816,12 +1816,60 @@ function ExpPlanner({data,onSave,onDelete,onClose}){
     ]}),
   ]});
 }
+function ResetCurrencies({data,persist,onClose}){
+const[replaced,sReplaced]=useState(new Set());
+const nrE=data.expenses.filter(e=>e.currency&&e.currency!=="₹"&&!replaced.has(e.id));
+const nrA=data.accounts.filter(a=>a.currency&&a.currency!=="₹"&&!replaced.has(a.id));
+const nrR=(data.recurring||[]).filter(r=>r.currency&&r.currency!=="₹"&&!replaced.has(r.id));
+const total=nrE.length+nrA.length+nrR.length;
+const replaceOne=(type,id)=>{
+  sReplaced(prev=>new Set([...prev,id]));
+  if(type==="expense")persist({expenses:data.expenses.map(e=>e.id===id?{...e,currency:"₹"}:e)});
+  else if(type==="account")persist({accounts:data.accounts.map(a=>a.id===id?{...a,currency:"₹"}:a)});
+  else if(type==="recurring")persist({recurring:(data.recurring||[]).map(r=>r.id===id?{...r,currency:"₹"}:r)});
+};
+const replaceAll=()=>{persist({expenses:data.expenses.map(e=>({...e,currency:"₹"})),accounts:data.accounts.map(a=>({...a,currency:"₹"})),recurring:(data.recurring||[]).map(r=>({...r,currency:"₹"}))});onClose();};
+const mkRow=(type,id,label,sub,sym)=>o("div",{key:id,style:{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:`1px solid ${c.brs}`},children:[
+  t("span",{style:{background:c.sf2,color:c.tm,fontFamily:F.mo,fontSize:9,letterSpacing:.5,padding:"2px 6px",borderRadius:4,flexShrink:0},children:type.toUpperCase()}),
+  o("div",{style:{flex:1,overflow:"hidden"},children:[
+    t("div",{style:{fontSize:13,color:c.tx,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"},children:label}),
+    sub?t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:sub}):null,
+  ]}),
+  t("span",{style:{fontFamily:F.mo,fontSize:13,color:c.co,marginRight:4},children:sym}),
+  t("button",{onClick:()=>replaceOne(type,id),className:"act90 trt",style:{padding:"5px 10px",background:c.sf3,border:`1px solid ${c.brs}`,borderRadius:8,color:c.tx,fontFamily:F.mo,fontSize:11,flexShrink:0},children:"→₹"}),
+]});
+return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
+  t(SH,{title:t("em",{children:"Reset Currencies"}),onBack:onClose}),
+  total===0
+    ?t("div",{style:{background:c.sf,borderRadius:16,border:`1px solid ${c.brs}`,padding:24,textAlign:"center",marginTop:16},children:[
+        t("div",{style:{fontSize:28,marginBottom:8},children:"✓"}),
+        t("div",{style:{fontSize:14,color:c.tx},children:"All entries are already in ₹"}),
+      ]})
+    :o("div",{children:[
+        t("button",{onClick:replaceAll,className:"act90 trt w100",style:{marginBottom:20,padding:"13px 16px",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:12,fontFamily:F.mo,fontSize:13,fontWeight:700,letterSpacing:.3},children:`Replace All → ₹  (${total} entries)`}),
+        nrA.length>0?o("div",{style:{background:c.sf,borderRadius:14,border:`1px solid ${c.brs}`,padding:"0 16px",marginBottom:12},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,padding:"10px 0 6px"},children:"ACCOUNTS"}),
+          ...nrA.map(a=>mkRow("account",a.id,a.emoji+" "+a.name,null,a.currency)),
+        ]}):null,
+        nrE.length>0?o("div",{style:{background:c.sf,borderRadius:14,border:`1px solid ${c.brs}`,padding:"0 16px",marginBottom:12},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,padding:"10px 0 6px"},children:"EXPENSES"}),
+          ...nrE.map(e=>mkRow("expense",e.id,e.merchant||e.category||"Expense",new Date(e.date).toLocaleDateString("en-US",{month:"short",day:"numeric"}),e.currency)),
+        ]}):null,
+        nrR.length>0?o("div",{style:{background:c.sf,borderRadius:14,border:`1px solid ${c.brs}`,padding:"0 16px",marginBottom:12},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,padding:"10px 0 6px"},children:"RECURRING"}),
+          ...nrR.map(r=>mkRow("recurring",r.id,r.merchant||r.category||"Recurring",r.frequency,r.currency)),
+        ]}):null,
+      ]}),
+]});
+}
 function Settings({data,persist,onClose,onBackup,onCategories,onView}){const{budget,budgetPeriod,currency,monthStartDay,financeProfile}=data;const fp=financeProfile||{};const[b,sB]=useState(budget==null?"":String(budget));const[bp,sBp]=useState(budgetPeriod||"monthly");const[cu,sCu]=useState(currency||"₹");const[ms,sMs]=useState(monthStartDay||1);const[ak,sAk]=useState(gAK()||"");const[show,sShow]=useState(false);const[fz,sFz]=useState(data.fontSize||"medium");const[at,sAt]=useState(data.alertThreshold!=null?String(data.alertThreshold):"");
+const[showResetCur,sShowResetCur]=useState(false);
 const[remEn,sRemEn]=useState(data.reminderEnabled||false);const[remTime,sRemTime]=useState(data.reminderTime||"21:00");const[notifPerm,sNotifPerm]=useState(typeof Notification!=='undefined'?Notification.permission:'unsupported');
 const fpx=data.fontPrefs||{};
 const[numFont,sNumFont]=useState(fpx.numFont||'sfmono');
 const[numSize,sNumSize]=useState(fpx.numSize||14);
 const[txtFont,sTxtFont]=useState(fpx.txtFont||'system');const[inc,sInc]=useState(String(fp.monthlyIncome||""));const[fxE,sFxE]=useState(String(fp.fixedExpenses||""));const[spg,sSpg]=useState(String(fp.savingsGoalPct||"20"));const[efm,sEfm]=useState(String(fp.emergencyFundMonths||"6"));const[dbt,sDbt]=useState(String(fp.totalDebt||""));const save=()=>{persist({budget:parseFloat(b)||null,budgetPeriod:bp,currency:cu,monthStartDay:parseInt(ms)||1,fontSize:fz,alertThreshold:parseFloat(at)||null,fontPrefs:{numFont,numSize,txtFont},reminderEnabled:remEn,reminderTime:remTime,financeProfile:{monthlyIncome:parseFloat(inc)||null,fixedExpenses:parseFloat(fxE)||null,savingsGoalPct:parseFloat(spg)||20,emergencyFundMonths:parseFloat(efm)||6,totalDebt:parseFloat(dbt)||null}});sAK(ak.trim()||null);if(remEn&&notifPerm==='granted'){try{navigator.serviceWorker?.ready.then(reg=>reg.periodicSync?.register('expense-reminder',{minInterval:86400000}).catch(()=>{}))}catch{}}onClose()};
+if(showResetCur)return t(ResetCurrencies,{data,persist,onClose:()=>sShowResetCur(false)});
 return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
   t(SH,{title:t("em",{children:"Settings"}),onBack:onClose,right:t("button",{onClick:save,className:"act95 trt",style:{padding:"8px 14px",background:c.ac,color:"#0a0a0a",borderRadius:10,fontSize:12,fontWeight:600,border:"none"},children:"Save"})}),
   o("div",{style:{background:c.sf,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden",marginBottom:16},children:[
@@ -1845,6 +1893,7 @@ return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
   o("div",{style:{background:c.sf,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:12},children:"CURRENCY"}),t("div",{className:"g g5",style:{gap:6},children:CUR.map(x=>t("button",{key:x,onClick:()=>sCu(x),style:{padding:"10px 0",background:cu===x?c.sf3:c.sf2,border:`1px solid ${cu===x?c.ac:c.brs}`,borderRadius:10,color:c.tx,fontFamily:F.mo,fontSize:14,fontWeight:500},children:x}))}),
     t("div",{style:{fontSize:11,color:c.tm,marginTop:8,textAlign:"center"},children:"Default for all new entries and smart paste"}),
+    t("button",{onClick:()=>sShowResetCur(true),className:"act90 trt w100",style:{marginTop:12,padding:"11px 14px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,color:c.td,fontFamily:F.mo,fontSize:12,letterSpacing:.5,display:"flex",alignItems:"center",justifyContent:"space-between"},children:[t("span",{children:"RESET ALL CURRENCIES TO ₹"}),t("span",{style:{color:c.ac,fontSize:14},children:"→"})]}),
   ]}),
   t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:8,marginTop:20},children:"BIG EXPENSE ALERT"}),
   o("div",{style:{background:c.sf,borderRadius:14,padding:16,border:`1px solid ${c.brs}`,marginBottom:4},children:[
