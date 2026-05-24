@@ -1139,16 +1139,16 @@ return o("div",{style:{padding:"8px 24px 0"},className:"st",children:[
 ]})}
 
 // === EDITOR ===
-function Editor({data,onSave,onCancel,presetDate,presetType,presetMode,clearPreset,editing}){const{accounts,currency,cards=[]}=data;const iE=!!editing;const[tp,sTp]=useState(iE?(editing.type==="income"?"income":"expense"):(presetType==="income"?"income":"expense"));const iI=tp==="income";const[md,sMd]=useState(presetMode||"manual");const[am,sAm]=useState(iE?String(editing.amount):"");const[ct,sCt]=useState(iE?editing.category:(presetType==="income"?"salary":"food"));const[sb,sSb]=useState(iE&&editing.subcategory||null);const[mc,sMc]=useState(iE&&editing.merchant||"");const[py,sPy]=useState(iE&&editing.payee||"");const[nt,sNt]=useState(iE&&editing.note||"");const[ph,sPh]=useState(iE?(editing.photos||[]):[]);const[aId,sAId]=useState(iE?editing.accountId:accounts[0].id);const[cId,sCId]=useState(iE&&editing.cardId||null);const[mop,sMop]=useState(iE?(editing.cardId?"card":"account"):"account");const[bk,sBk]=useState(iE&&editing.bank||"");const[ct2,sCt2]=useState(iE&&editing.cardType||"");const[c4,sC4]=useState(iE&&editing.cardLast4||"");const[dt,sDt]=useState(iE?editing.date:(presetDate||Date.now()));const[smsT,sSms]=useState("");const[ex,sEx]=useState(null);const[rc,sRc]=useState(false);const[fq,sFq]=useState("monthly");const[pf,sPf]=useState(false);const phR=useRef(null);
+function Editor({data,onSave,onCancel,presetDate,presetType,presetMode,clearPreset,editing}){const{accounts,currency,cards=[]}=data;const iE=!!editing;const[tp,sTp]=useState(iE?(editing.type==="income"?"income":"expense"):(presetType==="income"?"income":"expense"));const iI=tp==="income";const[md,sMd]=useState(presetMode||"manual");const[am,sAm]=useState(iE?String(editing.amount):"");const[ct,sCt]=useState(iE?editing.category:(presetType==="income"?"salary":"food"));const[sb,sSb]=useState(iE&&editing.subcategory||null);const[mc,sMc]=useState(iE&&editing.merchant||"");const[py,sPy]=useState(iE&&editing.payee||"");const[nt,sNt]=useState(iE&&editing.note||"");const[ph,sPh]=useState(iE?(editing.photos||[]):[]);const[aId,sAId]=useState(iE?editing.accountId:null);const[cId,sCId]=useState(iE&&editing.cardId||null);const[mop,sMop]=useState(iE?(editing.cardId?"card":"account"):"account");const[bk,sBk]=useState(iE&&editing.bank||"");const[ct2,sCt2]=useState(iE&&editing.cardType||"");const[c4,sC4]=useState(iE&&editing.cardLast4||"");const[dt,sDt]=useState(iE?editing.date:(presetDate||Date.now()));const[smsT,sSms]=useState("");const[ex,sEx]=useState(null);const[rc,sRc]=useState(false);const[fq,sFq]=useState("monthly");const[pf,sPf]=useState(false);const phR=useRef(null);
 useEffect(()=>{if(presetDate&&clearPreset)clearPreset()},[]);
-const acc=accounts.find(a=>a.id===aId)||accounts[0],ev2=ev(am),iX=/[+\-*/×÷]/.test(am),va=ev2!=null&&ev2>0&&(iI||mop!=="card"||!!cId);
+const acc=accounts.find(a=>a.id===aId)||null,ev2=ev(am),iX=/[+\-*/×÷]/.test(am),va=ev2!=null&&ev2>0&&(mop==="card"?!!cId:!!aId);
 const dStr=ts=>{const d=new Date(ts);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
 const sDStr=s=>{if(!s)return;const[y,m,d]=s.split("-").map(Number);const dd=new Date(dt);dd.setFullYear(y,m-1,d);sDt(dd.getTime())};
 const tSms=s=>{sSms(s);if(s.trim().length>4){const e=sms(s);sEx(e);if(e){if(e.amount)sAm(String(e.amount));if(e.category)sCt(e.category);if(e.merchant)sMc(e.merchant);if(e.bank)sBk(e.bank);if(e.cardType)sCt2(e.cardType);if(e.cardLast4)sC4(e.cardLast4);if(e.date)sDt(e.date)}}else sEx(null)};
 const pCl=async()=>{try{tSms(await navigator.clipboard.readText())}catch{alert("Clipboard blocked. Paste into the box.")}};
 const op=s=>{if(!am)return;const l=am.slice(-1);if("+-*/×÷".includes(l))sAm(am.slice(0,-1)+s);else sAm(am+s)};
 const oPh=async fs2=>{const ls=[];for(const f of fs2){if(!f.type.startsWith("image/"))continue;if(f.size>2.5e6){alert(`"${f.name}" is over 2.5MB.`);continue}const d2=await new Promise(r=>{const rd2=new FileReader();rd2.onload=()=>r(rd2.result);rd2.readAsDataURL(f)});ls.push({id:Date.now()+Math.random(),data:d2,name:f.name})}sPh([...ph,...ls])};
-const sv=()=>{if(!va)return;onSave({expense:{type:tp,amount:ev2,accountId:aId,cardId:!iI&&mop==="card"?cId||null:null,payMode:iI?"account":mop,category:ct,subcategory:sb||null,merchant:mc.trim()||null,payee:py.trim()||null,note:nt.trim()||null,photos:ph.length?ph:null,bank:bk.trim()||null,cardType:ct2.trim()||null,cardLast4:c4||null,date:dt,currency:ex?.currency||acc.currency||currency,source:md==="paste"?"sms":(iE?editing.source:"manual")},makeRecurring:rc,frequency:rc?fq:null,makeProfile:pf})};
+const sv=()=>{if(!va)return;onSave({expense:{type:tp,amount:ev2,accountId:aId,cardId:!iI&&mop==="card"?cId||null:null,payMode:iI?"account":mop,category:ct,subcategory:sb||null,merchant:mc.trim()||null,payee:py.trim()||null,note:nt.trim()||null,photos:ph.length?ph:null,bank:bk.trim()||null,cardType:ct2.trim()||null,cardLast4:c4||null,date:dt,currency:ex?.currency||acc?.currency||currency,source:md==="paste"?"sms":(iE?editing.source:"manual")},makeRecurring:rc,frequency:rc?fq:null,makeProfile:pf})};
 const cs=iI?ciAll():ceAll(),mp=iI?{...MI,...Object.fromEntries(_custCI.map(x=>[x.id,x]))}:{...ME,...Object.fromEntries(_custCE.map(x=>[x.id,x]))},ucr=cards.filter(c2=>!c2.isExternal);
 return o("div",{className:"fi",style:{paddingTop:48,paddingBottom:32},children:[
   t(SH,{title:t("em",{children:iE?(iI?"Edit income":"Edit expense"):(iI?"New income":"New expense")}),onBack:onCancel}),
@@ -1177,10 +1177,10 @@ return o("div",{className:"fi",style:{paddingTop:48,paddingBottom:32},children:[
   o("div",{style:{padding:"0 24px",marginBottom:12,textAlign:"center"},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,marginBottom:8},children:"AMOUNT"}),
     o("div",{className:"f ia jc",style:{gap:4},children:[
-      t("span",{style:{fontFamily:F.mo,fontSize:28,color:am?c.td:c.tm,fontWeight:400},children:ex?.currency||acc.currency||currency}),
+      t("span",{style:{fontFamily:F.mo,fontSize:28,color:am?c.td:c.tm,fontWeight:400},children:ex?.currency||acc?.currency||currency}),
       t("input",{type:"text",inputMode:"decimal",value:am,onChange:e=>{const v=e.target.value.replace(/[^\d.+\-*/×÷() ]/g,"");sAm(v)},placeholder:"0",style:{fontFamily:'var(--nf)',fontSize:56,fontWeight:300,background:"transparent",border:"none",outline:"none",color:c.tx,textAlign:"center",width:"70%",letterSpacing:-1.5,caretColor:c.ac}}),
     ]}),
-    t("div",{style:{fontFamily:F.mo,fontSize:13,color:iX?c.ac:"transparent",height:18,marginTop:2},children:iX&&ev2!=null?`= ${fm(ev2,acc.currency||currency)}`:"\u00A0"}),
+    t("div",{style:{fontFamily:F.mo,fontSize:13,color:iX?c.ac:"transparent",height:18,marginTop:2},children:iX&&ev2!=null?`= ${fm(ev2,acc?.currency||currency)}`:"\u00A0"}),
   ]}),
   o("div",{style:{padding:"0 24px",marginBottom:20},children:[
     t("div",{className:"g g5",style:{gap:6},children:[{l:"+",f:()=>op("+")},{l:"−",f:()=>op("-")},{l:"×",f:()=>op("×")},{l:"÷",f:()=>op("÷")},{l:"⌫",f:()=>sAm(am.slice(0,-1))}].map(x=>t("button",{key:x.l,onClick:x.f,className:"act90 trt",style:{padding:"10px 0",background:c.sf,border:`1px solid ${c.brs}`,borderRadius:10,color:c.tx,fontFamily:F.mo,fontSize:16},children:x.l}))}),
@@ -1193,8 +1193,8 @@ return o("div",{className:"fi",style:{paddingTop:48,paddingBottom:32},children:[
   !iI&&o("div",{style:{padding:"0 24px",marginBottom:20},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,marginBottom:8},children:"MODE OF PAYMENT"}),
     o("div",{className:"f",style:{gap:4,padding:4,background:c.sf,borderRadius:12,border:`1px solid ${c.brs}`},children:[
-      o("button",{onClick:()=>{sMop("account");sCId(null);if(!aId||!accounts.find(a=>a.id===aId))sAId(accounts[0]?.id)},className:"act95 tr f ia jc",style:{flex:1,padding:"10px 0",gap:6,background:mop==="account"?c.sf3:"transparent",color:mop==="account"?c.tx:c.td,borderRadius:9,fontSize:13,fontWeight:mop==="account"?500:400,border:"none"},children:"🏦 Account"}),
-      o("button",{onClick:()=>{sMop("card");if(!cId&&ucr.length>0)sCId(ucr[0].id)},className:"act95 tr f ia jc",style:{flex:1,padding:"10px 0",gap:6,background:mop==="card"?c.sf3:"transparent",color:mop==="card"?c.tx:c.td,borderRadius:9,fontSize:13,fontWeight:mop==="card"?500:400,border:"none"},children:"💳 Card"}),
+      o("button",{onClick:()=>{sMop("account");sCId(null)},className:"act95 tr f ia jc",style:{flex:1,padding:"10px 0",gap:6,background:mop==="account"?c.sf3:"transparent",color:mop==="account"?c.tx:c.td,borderRadius:9,fontSize:13,fontWeight:mop==="account"?500:400,border:"none"},children:"🏦 Account"}),
+      o("button",{onClick:()=>sMop("card"),className:"act95 tr f ia jc",style:{flex:1,padding:"10px 0",gap:6,background:mop==="card"?c.sf3:"transparent",color:mop==="card"?c.tx:c.td,borderRadius:9,fontSize:13,fontWeight:mop==="card"?500:400,border:"none"},children:"💳 Card"}),
     ]}),
   ]}),
   (iI||mop==="account")&&o("div",{style:{marginBottom:20},children:[
@@ -1208,6 +1208,17 @@ return o("div",{className:"fi",style:{paddingTop:48,paddingBottom:32},children:[
       :o("div",{className:"f sx",style:{padding:"0 24px",gap:8,overflowX:"auto"},children:[
           ...ucr.map(cr=>{const ac2=cId===cr.id;return o("button",{key:cr.id,onClick:()=>sCId(cr.id),className:"act95 tr f ia",style:{gap:8,padding:"10px 12px",background:ac2?c.sf3:c.sf,border:`1px solid ${ac2?c.ac:c.brs}`,borderRadius:11,flexShrink:0,fontSize:13,color:ac2?c.tx:c.td,fontWeight:ac2?500:400},children:[t("span",{style:{fontSize:14},children:"💳"}),t("span",{children:cr.name}),cr.last4&&o("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm},children:["··",cr.last4]})]})})
         ]}),
+  ]}),
+  (aId||cId)&&o("div",{style:{padding:"0 24px",marginBottom:20},children:[
+    t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,marginBottom:8},children:"SELECTED MODE"}),
+    o("div",{className:"f ia",style:{gap:10,padding:"12px 14px",background:c.sf,borderRadius:12,border:`1px solid ${c.ac}30`},children:[
+      t("span",{style:{fontSize:16},children:mop==="card"?"💳":(accounts.find(a=>a.id===aId)?.emoji||"🏦")}),
+      o("span",{style:{fontFamily:F.mo,fontSize:11,color:c.td,letterSpacing:.5},children:[mop==="card"?"Card":"Account"," · "]}),
+      t("span",{style:{fontSize:13,fontWeight:600,color:c.tx},children:mop==="card"?(cards.find(cr=>cr.id===cId)?.name||"—"):(accounts.find(a=>a.id===aId)?.name||"—")}),
+    ]}),
+  ]}),
+  !aId&&!cId&&o("div",{style:{padding:"0 24px",marginBottom:20},children:[
+    t("div",{style:{fontFamily:F.mo,fontSize:11,color:c.co,letterSpacing:.5,padding:"10px 14px",background:c.co+"12",borderRadius:10,border:`1px solid ${c.co}30`},children:"⚠ Select an account or card above to enable saving"}),
   ]}),
   o("div",{style:{marginBottom:20},children:[
     t("div",{style:{padding:"0 24px",marginBottom:12,fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1},children:iI?"INCOME SOURCE":"CATEGORY"}),
