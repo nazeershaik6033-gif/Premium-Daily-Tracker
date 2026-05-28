@@ -2754,16 +2754,16 @@ function CatMgr({data,persist,onClose}){
                   ]}),
                 ]})
               )
-              :o("div",{className:"f ia",style:{gap:12,padding:"12px 16px"}},
+              :o("div",{className:"f ia",style:{gap:12,padding:"12px 16px"},children:[
                 t("span",{style:{fontSize:18},children:ov.emoji||cat.emoji}),
-                o("div",{className:"f1 minw0"},
+                o("div",{className:"f1 minw0",children:[
                   t("div",{style:{fontSize:14,fontWeight:500},children:ov.label||cat.label}),
                   !isBuiltin&&t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.ac,letterSpacing:.5},children:"CUSTOM"}),
-                ),
+                ]}),
                 t("button",{onClick:()=>isBuiltin?startEdit(cat):startCustEdit(cat),style:{width:30,height:30,borderRadius:8,background:c.sf2,border:`1px solid ${c.brs}`,display:"flex",alignItems:"center",justifyContent:"center",color:c.td},children:t(Pencil,{size:13})}),
                 t("button",{onClick:()=>sDelId((isBuiltin?"bi:":"cu:")+cat.id),style:{width:30,height:30,borderRadius:8,background:"transparent",border:"none",display:"flex",alignItems:"center",justifyContent:"center",color:c.tm},children:t(X,{size:14})}),
                 t("div",{"data-grip":i,style:{padding:"0 4px",color:c.td,cursor:"grab",display:"flex",alignItems:"center",userSelect:"none",touchAction:"none"},children:t(GripV,{size:18})}),
-              )
+              ]})
             );
           })
         }),
