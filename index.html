@@ -2703,7 +2703,7 @@ function CatMgr({data,persist,onClose}){
             const isEd=isBuiltin?editId===cat.id:custEditId===cat.id;
             const isDragging=dragCatFrom===i;
             const isOver=dragCatIdx===i&&dragCatFrom!==null&&dragCatFrom!==i;
-            return o("div",{key:cat.id,"data-cat-idx":i,style:{borderBottom:i===orderedList.length-1?"none":`1px solid ${c.brs}`,opacity:isDragging?0.4:1,background:isOver?c.ac+"18":"transparent",transition:"background 0.12s"}},
+            return o("div",{key:cat.id,"data-cat-idx":i,style:{borderBottom:i===orderedList.length-1?"none":`1px solid ${c.brs}`,opacity:isDragging?0.4:1,background:isOver?c.ac+"18":"transparent",transition:"background 0.12s"},children:
               isEd?(
                 isBuiltin?o("div",{style:{padding:"12px 16px"},children:[
                   o("div",{className:"f ia",style:{gap:8,marginBottom:8},children:[
@@ -2764,7 +2764,7 @@ function CatMgr({data,persist,onClose}){
                 t("button",{onClick:()=>sDelId((isBuiltin?"bi:":"cu:")+cat.id),style:{width:30,height:30,borderRadius:8,background:"transparent",border:"none",display:"flex",alignItems:"center",justifyContent:"center",color:c.tm},children:t(X,{size:14})}),
                 t("div",{"data-grip":i,style:{padding:"0 4px",color:c.td,cursor:"grab",display:"flex",alignItems:"center",userSelect:"none",touchAction:"none"},children:t(GripV,{size:18})}),
               ]})
-            );
+            });
           })
         }),
         hiddenBI.length>0&&o("div",{style:{marginBottom:16},children:[
