@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/>
-<meta name="theme-color" content="#0C0A07"/>
+<meta name="theme-color" content="#1B1B1D"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="Expense Pro"/>
@@ -15,7 +15,7 @@
 <title>Expense Tracker Pro</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Instrument+Serif&family=JetBrains+Mono:wght@400;500;600&family=Geist:wght@400;500;600&family=Inter:wght@400;500;600&family=Roboto:wght@400;500;700&family=Playfair+Display:wght@400;500;600&family=DM+Serif+Display&family=Lato:wght@400;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Instrument+Serif&family=JetBrains+Mono:wght@400;500;600&family=Geist:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=Roboto:wght@400;500;700&family=Playfair+Display:wght@400;500;600&family=DM+Serif+Display&family=Lato:wght@400;700&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js" crossorigin></script>
@@ -37,7 +37,7 @@ if(typeof Recharts === 'undefined') {
 <style>
 :root{--nf:'SF Mono',ui-monospace,monospace;--tf:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display',system-ui,sans-serif;--ns:14px}
 *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
-html{height:-webkit-fill-available;height:100dvh}body{min-height:-webkit-fill-available;min-height:100dvh;margin:0;padding:0;background:#0C0A07;overflow:hidden}#root{height:100dvh;margin:0;padding:0;overflow:hidden}
+html{height:-webkit-fill-available;height:100dvh}body{min-height:-webkit-fill-available;min-height:100dvh;margin:0;padding:0;background:#1B1B1D;overflow:hidden}#root{height:100dvh;margin:0;padding:0;overflow:hidden}
 body{overscroll-behavior-y:none;-webkit-font-smoothing:antialiased;-webkit-touch-callout:none}
 div,span,button,h1,h2,h3,h4,h5,h6,p,label,a{-webkit-user-select:none;user-select:none}
 button{border:none;background:none;padding:0;color:inherit;font:inherit;cursor:pointer}
@@ -45,7 +45,7 @@ input,textarea,select{-webkit-user-select:text!important;user-select:text!import
 input:focus,textarea:focus,select:focus{outline:none}
 .sx::-webkit-scrollbar,.sy::-webkit-scrollbar{display:none}
 .sx,.sy{scrollbar-width:none}
-.spl{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0C0A07;color:#A39B8C;font-family:'Instrument Serif','Times New Roman',serif;font-style:italic;font-size:28px;z-index:100;transition:opacity 300ms}
+.spl{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#1B1B1D;color:#A39B8C;font-family:'Instrument Serif','Times New Roman',serif;font-style:italic;font-size:28px;z-index:100;transition:opacity 300ms}
 .spl.hide{opacity:0;pointer-events:none}
 .grain{display:none}
 @keyframes fu{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
@@ -110,8 +110,8 @@ body{background:#fff!important;color:#000!important}
 </head>
 <body>
 <div id="root"></div>
-<div id="splash" style="position:fixed;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0C0A07;color:#F5F1E8;font-family:-apple-system,system-ui,sans-serif;font-size:18px;z-index:99999;padding:20px;text-align:center;">
-  <div id="splashTitle" style="font-family:'Fraunces','Instrument Serif',serif;font-style:italic;font-size:36px;color:#E8C887;margin-bottom:18px;">loading&hellip;</div>
+<div id="splash" style="position:fixed;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#1B1B1D;color:#F5F1E8;font-family:-apple-system,system-ui,sans-serif;font-size:18px;z-index:99999;padding:20px;text-align:center;">
+  <div id="splashTitle" style="font-family:'Fraunces','Instrument Serif',serif;font-style:italic;font-size:36px;color:#F4F4F6;margin-bottom:18px;">loading&hellip;</div>
   <div id="splashStatus" style="color:#A39B8C;font-size:13px;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;">initializing</div>
   <div id="splashDetail" style="color:#6E6759;font-size:11px;font-family:'JetBrains Mono',monospace;margin-top:12px;max-width:340px;line-height:1.5;word-break:break-word;"></div>
 </div>
@@ -132,7 +132,7 @@ body{background:#fff!important;color:#000!important}
   var setDetail=function(s){var el=document.getElementById('splashDetail');if(el)el.textContent=s};
   var showErr=function(m){
     var s=document.getElementById('splash');if(!s)return;
-    s.innerHTML='<div style="max-width:380px;padding:24px;text-align:left;font-family:monospace;font-size:13px;line-height:1.5;color:#FF6B6B;"><div style="color:#E8C887;font-style:italic;font-family:\'Instrument Serif\',serif;font-size:26px;margin-bottom:14px;">Couldn&rsquo;t load.</div><div style="color:#A39B8C;font-size:10px;margin-bottom:10px;letter-spacing:1px;text-transform:uppercase;">Error</div><div style="word-break:break-word;">'+String(m||'').replace(/[<>]/g,'')+'</div><div style="margin-top:24px;padding:10px 16px;background:#1E1810;border-radius:8px;color:#E8C887;text-align:center;font-size:12px;">Tap to retry</div></div>';
+    s.innerHTML='<div style="max-width:380px;padding:24px;text-align:left;font-family:monospace;font-size:13px;line-height:1.5;color:#FF6B6B;"><div style="color:#F4F4F6;font-style:italic;font-family:\'Instrument Serif\',serif;font-size:26px;margin-bottom:14px;">Couldn&rsquo;t load.</div><div style="color:#A39B8C;font-size:10px;margin-bottom:10px;letter-spacing:1px;text-transform:uppercase;">Error</div><div style="word-break:break-word;">'+String(m||'').replace(/[<>]/g,'')+'</div><div style="margin-top:24px;padding:10px 16px;background:#1E1810;border-radius:8px;color:#F4F4F6;text-align:center;font-size:12px;">Tap to retry</div></div>';
     s.style.cursor='pointer';
     s.onclick=function(){location.reload()};
   };
@@ -254,7 +254,7 @@ const KU="etp-users",KAU="etp-active-user";
 
 // === THEME ===
 // CRED-2020 (Fabrik) — luxury dark, gradient depth, champagne gold + jewel tones, Cirka-style serif
-const darkC={bg:"#0C0A07",bgg:"radial-gradient(125% 80% at 50% -8%,#1B140B 0%,#100C06 46%,#0A0805 100%)",sf:"#16130D",sfg:"linear-gradient(158deg,#1E1811 0%,#15110A 64%,#100C06 100%)",sf2:"#211D15",sf3:"#2C271C",br:"#3A3326",brs:"#272016",tx:"#F4EEE1",td:"#A89E8C",tm:"#6E6555",ac:"#D4AF7A",gd:"#E8C887",cr:"#E2B27A",co:"#E0566E",ro:"#DB4D63",mt:"#3FBE8A",sk:"#5B97D9",lv:"#B594E0",hf:"'Fraunces','Instrument Serif',serif"};
+const darkC={bg:"#1B1B1D",bgg:"#1B1B1D",sf:"#242427",sfg:"#242427",sf2:"#2C2C30",sf3:"#34343A",br:"#3A3A40",brs:"#303036",tx:"#F4F4F6",td:"#9B9BA2",tm:"#6C6C74",ac:"#FFFFFF",gd:"#FFD66B",cr:"#FF9E7A",co:"#FF5A6E",ro:"#FF4D63",mt:"#2FC59B",sk:"#4D7BF0",lv:"#9B8CFF",hf:"'Space Grotesk','Geist',-apple-system,system-ui,sans-serif"};
 const lightC={bg:"#F5F3EE",bgg:"#F5F3EE",sf:"#ECEAE3",sfg:"#ECEAE3",sf2:"#E2DFD7",sf3:"#D6D2C8",br:"#C0BDB3",brs:"#CCCAC0",tx:"#1A1814",td:"#4A4640",tm:"#7A7670",ac:"#1A7A2E",gd:"#8B6A14",cr:"#7A4020",co:"#CC4400",ro:"#CC2020",mt:"#156830",sk:"#0E5FA0",lv:"#5E2EA0",hf:"'Instrument Serif','Times New Roman',serif"};
 const navyC={bg:"#0F1117",bgg:"#0F1117",sf:"#1A1E2E",sfg:"#1A1E2E",sf2:"#232840",sf3:"#2D3354",br:"#2E3555",brs:"#262B45",tx:"#F1F5F9",td:"#94A3B8",tm:"#64748B",ac:"#6366F1",gd:"#F59E0B",cr:"#FB7185",co:"#F97316",ro:"#EF4444",mt:"#10B981",sk:"#38BDF8",lv:"#A78BFA",hf:"'Instrument Serif','Times New Roman',serif"};
 let c={...darkC};
@@ -468,10 +468,10 @@ const Pl=({children,col=c.ac})=>t("span",{style:{display:"inline-flex",alignItem
 const Mast=({date=new Date()})=>o("div",{className:"f ia",style:{gap:12,color:c.tm,fontFamily:F.mo,fontSize:10,letterSpacing:1.3},children:[t("div",{style:{flex:1,height:1,background:c.br}}),t("span",{children:date.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"}).toUpperCase()}),t("div",{style:{flex:1,height:1,background:c.br}})]});
 const IB=({onClick,children,size=36})=>t("button",{onClick,className:"act90 trt",style:{width:size,height:size,borderRadius:11,background:c.sfg,border:`1px solid ${c.brs}`,display:"flex",alignItems:"center",justifyContent:"center"},children});
 const BB=({onClick})=>t(IB,{onClick,size:38,children:t(CL,{size:20,color:c.tx})});
-const SH=({title,onBack,right})=>o("div",{className:"f ia jb",style:{padding:"0 24px",marginBottom:20},children:[onBack?t(BB,{onClick:onBack}):t("div",{style:{width:38}}),t("div",{style:{fontFamily:c.hf,fontSize:24,fontStyle:"italic"},children:title}),right||t("div",{style:{width:38}})]});
-const ES=({title,subtitle,cta,onCta})=>o("div",{className:"tc",style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:"48px 24px"},children:[t("div",{style:{fontFamily:c.hf,fontSize:22,color:c.td,fontStyle:"italic"},children:title}),subtitle&&t("div",{style:{fontSize:13,color:c.tm,marginTop:8},children:subtitle}),cta&&t("button",{onClick:onCta,className:"act95 trt",style:{marginTop:20,padding:"10px 18px",background:c.ac,color:"#0a0a0a",borderRadius:11,fontSize:13,fontWeight:600,border:"none"},children:cta})]});
+const SH=({title,onBack,right})=>o("div",{className:"f ia jb",style:{padding:"0 24px",marginBottom:20},children:[onBack?t(BB,{onClick:onBack}):t("div",{style:{width:38}}),t("div",{style:{fontFamily:c.hf,fontSize:24},children:title}),right||t("div",{style:{width:38}})]});
+const ES=({title,subtitle,cta,onCta})=>o("div",{className:"tc",style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:"48px 24px"},children:[t("div",{style:{fontFamily:c.hf,fontSize:22,color:c.td},children:title}),subtitle&&t("div",{style:{fontSize:13,color:c.tm,marginTop:8},children:subtitle}),cta&&t("button",{onClick:onCta,className:"act95 trt",style:{marginTop:20,padding:"10px 18px",background:c.ac,color:"#0a0a0a",borderRadius:11,fontSize:13,fontWeight:600,border:"none"},children:cta})]});
 const Sht=({children,onClose})=>t("div",{className:"fx f iend",style:{inset:0,background:"rgba(0,0,0,.6)",zIndex:50},onClick:onClose,children:t("div",{className:"w100 shn",onClick:e=>e.stopPropagation(),style:{maxWidth:440,margin:"0 auto",maxHeight:"85vh",overflowY:"auto",background:c.sfg,borderTopLeftRadius:24,borderTopRightRadius:24,padding:"20px 24px 32px",borderTop:`1px solid ${c.br}`},children:o(Fragment,{children:[t("div",{style:{width:40,height:4,margin:"0 auto 16px",borderRadius:999,background:c.br}}),children]})})});
-const CSht=({title,subtitle,onClose,onConfirm,confirmLabel="Confirm",danger=true})=>t(Sht,{onClose,children:o(Fragment,{children:[t("div",{style:{fontFamily:c.hf,fontSize:22,fontStyle:"italic"},children:title}),subtitle&&t("div",{style:{fontSize:13,color:c.td,marginTop:8},children:subtitle}),o("div",{className:"g g2",style:{gap:8,marginTop:20},children:[t("button",{onClick:onClose,className:"act95 trt",style:{padding:"14px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,color:c.tx,fontWeight:500,fontSize:14},children:"Cancel"}),t("button",{onClick:onConfirm,className:"act95 trt",style:{padding:"14px 0",background:danger?c.ro:c.ac,color:danger?"#fff":"#0a0a0a",borderRadius:12,fontWeight:600,fontSize:14,border:"none"},children:confirmLabel})]})]})});
+const CSht=({title,subtitle,onClose,onConfirm,confirmLabel="Confirm",danger=true})=>t(Sht,{onClose,children:o(Fragment,{children:[t("div",{style:{fontFamily:c.hf,fontSize:22},children:title}),subtitle&&t("div",{style:{fontSize:13,color:c.td,marginTop:8},children:subtitle}),o("div",{className:"g g2",style:{gap:8,marginTop:20},children:[t("button",{onClick:onClose,className:"act95 trt",style:{padding:"14px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,color:c.tx,fontWeight:500,fontSize:14},children:"Cancel"}),t("button",{onClick:onConfirm,className:"act95 trt",style:{padding:"14px 0",background:danger?c.ro:c.ac,color:danger?"#fff":"#0a0a0a",borderRadius:12,fontWeight:600,fontSize:14,border:"none"},children:confirmLabel})]})]})});
 
 function FI({label,value,onChange,placeholder,type="text",readOnly,small,mono,icon}){return o("div",{children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:label.toUpperCase()}),o("div",{className:"f ia",style:{background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,padding:small?"10px 12px":"12px 14px",gap:8},children:[icon&&t("span",{style:{color:c.tm,display:"flex"},children:icon}),t("input",{type,value:value||"",onChange:e=>onChange&&onChange(e.target.value),placeholder,readOnly,style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:14,fontFamily:mono?F.mo:F.sa}})]})]})}
 
@@ -507,13 +507,13 @@ function AppHeader({onMenu,onSearch,onToggleTheme,isDark,theme,onHome}){
   const now=new Date();
   const dayStr=now.toLocaleDateString("en-US",{weekday:"short"}).toUpperCase();
   const dateStr=now.toLocaleDateString("en-US",{day:"numeric",month:"short"}).toUpperCase();
-  return t("div",{className:"fx f jc",style:{top:0,left:0,right:0,zIndex:28,background:theme==="navy"?"linear-gradient(135deg,#1A1E2E 0%,#0F1117 100%)":isDark?"linear-gradient(180deg,#1A150D 0%,#0E0B06 100%)":"linear-gradient(135deg,#F2EFE6 0%,#E8E4DA 100%)",borderBottom:`1px solid ${theme==="navy"?"rgba(99,102,241,0.25)":isDark?"rgba(212,175,122,0.22)":"rgba(0,0,0,0.10)"}`,boxShadow:isDark?"0 2px 28px rgba(0,0,0,0.6)":"0 2px 16px rgba(0,0,0,0.08)",paddingTop:"env(safe-area-inset-top)"},children:o("div",{className:"f ia jb",style:{width:"100%",maxWidth:440,padding:"8px 14px"},children:[
+  return t("div",{className:"fx f jc",style:{top:0,left:0,right:0,zIndex:28,background:theme==="navy"?"linear-gradient(135deg,#1A1E2E 0%,#0F1117 100%)":isDark?"linear-gradient(180deg,#212124 0%,#161618 100%)":"linear-gradient(135deg,#F2EFE6 0%,#E8E4DA 100%)",borderBottom:`1px solid ${theme==="navy"?"rgba(99,102,241,0.25)":isDark?"rgba(255,255,255,0.10)":"rgba(0,0,0,0.10)"}`,boxShadow:isDark?"0 2px 28px rgba(0,0,0,0.6)":"0 2px 16px rgba(0,0,0,0.08)",paddingTop:"env(safe-area-inset-top)"},children:o("div",{className:"f ia jb",style:{width:"100%",maxWidth:440,padding:"8px 14px"},children:[
     t("button",{onClick:onMenu,className:"act90 trt",style:btnStyle,children:t(Menu,{size:18,color:c.tx})}),
     t("button",{onClick:onHome,className:"act90 trt f ia",style:{gap:9,background:"transparent",border:"none",color:"inherit"},children:[
       t(Logo,{}),
       o("div",{children:[
         t("div",{style:{fontFamily:F.mo,fontSize:9,letterSpacing:2,color:c.ac,lineHeight:1,marginBottom:2},children:"EXPENSE"}),
-        t("div",{style:{fontFamily:c.hf,fontSize:17,fontStyle:"italic",lineHeight:1,color:c.tx},children:"Tracker Pro"})
+        t("div",{style:{fontFamily:c.hf,fontSize:17,lineHeight:1,color:c.tx},children:"Tracker Pro"})
       ]}),
       o("div",{style:{marginLeft:6,paddingLeft:10,borderLeft:`1px solid ${isDark?"rgba(255,255,255,0.10)":"rgba(0,0,0,0.10)"}`,display:"flex",flexDirection:"column",alignItems:"flex-start"},children:[
         t("div",{style:{fontFamily:F.mo,fontSize:8,letterSpacing:1.5,color:c.tm,lineHeight:1,marginBottom:3},children:dayStr}),
@@ -542,7 +542,7 @@ function Sidebar({data,onClose,onView,activeUser,onUpdateUser}){
   const[overIdx,setOverIdx]=useState(null);
   const dragRef=useRef({active:false});
   const sbPointerDrop=()=>{const{startIdx,lastOver}=dragRef.current;dragRef.current={active:false};if(startIdx!=null&&lastOver!=null&&startIdx!==lastOver){const o2=[...order];const[itm]=o2.splice(startIdx,1);o2.splice(lastOver,0,itm);saveOrder(o2)}setDragIdx(null);setOverIdx(null)};
-  const items=order.map((id,i)=>{if(id==="sep")return"sep";const m=SB_META[id];if(!m)return null;let s=m.s||"";if(id==="cards")s=`${(data.cards||[]).length} cards`;else if(id==="bills")s=`${(data.bills||[]).length} bills`;else if(id==="goals")s=`${(data.goals||[]).length} active`;else if(id==="accounts")s=`${data.accounts.length} active`;else if(id==="recurring")s=`${data.recurring.length} subscriptions`;else if(id==="profiles")s=`${data.profiles.length} saved`;return{...m,id,s}}).filter(Boolean);return o(Fragment,{children:[t("div",{onClick:onClose,className:"fx",style:{inset:0,background:"rgba(0,0,0,.55)",zIndex:35}}),o("div",{className:"fx f fc slid",style:{top:0,left:0,bottom:0,width:"min(80vw,300px)",background:c.sfg,zIndex:36,borderRight:`1px solid ${c.brs}`,overflowY:"auto",paddingBottom:"env(safe-area-inset-bottom)"},children:[o("div",{style:{padding:"max(env(safe-area-inset-top),16px) 20px 16px"},children:[o("div",{className:"f ia",style:{gap:12,marginBottom:14},children:[t(Logo,{}),o("div",{className:"f1 minw0",children:[t("div",{style:{fontFamily:c.hf,fontSize:18,fontStyle:"italic",lineHeight:1,color:c.tx},children:"Expense Tracker Pro"}),t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.ac,letterSpacing:1.5,marginTop:2},children:"PREMIUM"})]}),o("div",{className:"f ia",style:{gap:6},children:[t("button",{onClick:()=>setEditing(e=>!e),style:{background:editing?c.ac+"20":"transparent",border:editing?`1px solid ${c.ac}40`:"none",color:editing?c.ac:c.tm,display:"flex",padding:6,borderRadius:8},children:t(ArrowUpDown,{size:14})}),t("button",{onClick:onClose,style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(X,{size:16})})]})]})  ,activeUser&&o("div",{className:"f ia jb",style:{marginBottom:10},children:[o("div",{className:"f ia",style:{gap:6},children:[t("span",{style:{fontSize:16}},activeUser.emoji),t("span",{style:{fontFamily:F.mo,fontSize:11,color:c.tm,letterSpacing:.5}},activeUser.name)]}),onUpdateUser&&t("button",{onClick:()=>go("userMgr"),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:2},children:t(Pencil,{size:12})})]}),o("div",{className:"g g2",style:{gap:8},children:[o("div",{style:{background:c.sf2,borderRadius:10,padding:"10px 12px"},children:[t("div",{style:{fontFamily:F.mo,fontSize:8,color:c.co,letterSpacing:1,marginBottom:3},children:"SPENT"}),t("div",{style:{fontFamily:F.mo,fontSize:14,fontWeight:600,color:c.tx},children:fm(totExp,data.currency)})]}),o("div",{style:{background:c.sf2,borderRadius:10,padding:"10px 12px"},children:[t("div",{style:{fontFamily:F.mo,fontSize:8,color:c.mt,letterSpacing:1,marginBottom:3},children:"INCOME"}),t("div",{style:{fontFamily:F.mo,fontSize:14,fontWeight:600,color:c.tx},children:fm(totInc,data.currency)})]})]})]})  ,t(Hr,{}),t("div",{style:{padding:"4px 0 8px"},onPointerDown:editing?(e)=>{const g=e.target.closest('[data-grip-idx]');if(!g)return;e.currentTarget.setPointerCapture(e.pointerId);const idx=parseInt(g.getAttribute('data-grip-idx'));dragRef.current={active:true,startIdx:idx,lastOver:idx};setDragIdx(idx);setOverIdx(idx)}:null,onPointerMove:editing?(e)=>{if(!dragRef.current.active)return;const its=e.currentTarget.querySelectorAll('[data-item-idx]');for(let k=0;k<its.length;k++){const r=its[k].getBoundingClientRect();if(e.clientY>=r.top&&e.clientY<=r.bottom){if(dragRef.current.lastOver!==k){dragRef.current.lastOver=k;setOverIdx(k)}break}}}:null,onPointerUp:editing?sbPointerDrop:null,onPointerCancel:editing?()=>{dragRef.current={active:false};setDragIdx(null);setOverIdx(null)}:null,children:items.map((item,i)=>{if(item==="sep")return editing?null:t(Hr,{key:i,mt:"4px",mb:"4px"});return o("div",{key:item.id,"data-item-idx":i,className:"f ia",style:{gap:0,opacity:editing&&dragIdx===i?0.5:1,background:editing&&overIdx===i&&dragIdx!==i?c.ac+"15":"transparent",transition:"background 0.15s"},children:[
+  const items=order.map((id,i)=>{if(id==="sep")return"sep";const m=SB_META[id];if(!m)return null;let s=m.s||"";if(id==="cards")s=`${(data.cards||[]).length} cards`;else if(id==="bills")s=`${(data.bills||[]).length} bills`;else if(id==="goals")s=`${(data.goals||[]).length} active`;else if(id==="accounts")s=`${data.accounts.length} active`;else if(id==="recurring")s=`${data.recurring.length} subscriptions`;else if(id==="profiles")s=`${data.profiles.length} saved`;return{...m,id,s}}).filter(Boolean);return o(Fragment,{children:[t("div",{onClick:onClose,className:"fx",style:{inset:0,background:"rgba(0,0,0,.55)",zIndex:35}}),o("div",{className:"fx f fc slid",style:{top:0,left:0,bottom:0,width:"min(80vw,300px)",background:c.sfg,zIndex:36,borderRight:`1px solid ${c.brs}`,overflowY:"auto",paddingBottom:"env(safe-area-inset-bottom)"},children:[o("div",{style:{padding:"max(env(safe-area-inset-top),16px) 20px 16px"},children:[o("div",{className:"f ia",style:{gap:12,marginBottom:14},children:[t(Logo,{}),o("div",{className:"f1 minw0",children:[t("div",{style:{fontFamily:c.hf,fontSize:18,lineHeight:1,color:c.tx},children:"Expense Tracker Pro"}),t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.ac,letterSpacing:1.5,marginTop:2},children:"PREMIUM"})]}),o("div",{className:"f ia",style:{gap:6},children:[t("button",{onClick:()=>setEditing(e=>!e),style:{background:editing?c.ac+"20":"transparent",border:editing?`1px solid ${c.ac}40`:"none",color:editing?c.ac:c.tm,display:"flex",padding:6,borderRadius:8},children:t(ArrowUpDown,{size:14})}),t("button",{onClick:onClose,style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(X,{size:16})})]})]})  ,activeUser&&o("div",{className:"f ia jb",style:{marginBottom:10},children:[o("div",{className:"f ia",style:{gap:6},children:[t("span",{style:{fontSize:16}},activeUser.emoji),t("span",{style:{fontFamily:F.mo,fontSize:11,color:c.tm,letterSpacing:.5}},activeUser.name)]}),onUpdateUser&&t("button",{onClick:()=>go("userMgr"),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:2},children:t(Pencil,{size:12})})]}),o("div",{className:"g g2",style:{gap:8},children:[o("div",{style:{background:c.sf2,borderRadius:10,padding:"10px 12px"},children:[t("div",{style:{fontFamily:F.mo,fontSize:8,color:c.co,letterSpacing:1,marginBottom:3},children:"SPENT"}),t("div",{style:{fontFamily:F.mo,fontSize:14,fontWeight:600,color:c.tx},children:fm(totExp,data.currency)})]}),o("div",{style:{background:c.sf2,borderRadius:10,padding:"10px 12px"},children:[t("div",{style:{fontFamily:F.mo,fontSize:8,color:c.mt,letterSpacing:1,marginBottom:3},children:"INCOME"}),t("div",{style:{fontFamily:F.mo,fontSize:14,fontWeight:600,color:c.tx},children:fm(totInc,data.currency)})]})]})]})  ,t(Hr,{}),t("div",{style:{padding:"4px 0 8px"},onPointerDown:editing?(e)=>{const g=e.target.closest('[data-grip-idx]');if(!g)return;e.currentTarget.setPointerCapture(e.pointerId);const idx=parseInt(g.getAttribute('data-grip-idx'));dragRef.current={active:true,startIdx:idx,lastOver:idx};setDragIdx(idx);setOverIdx(idx)}:null,onPointerMove:editing?(e)=>{if(!dragRef.current.active)return;const its=e.currentTarget.querySelectorAll('[data-item-idx]');for(let k=0;k<its.length;k++){const r=its[k].getBoundingClientRect();if(e.clientY>=r.top&&e.clientY<=r.bottom){if(dragRef.current.lastOver!==k){dragRef.current.lastOver=k;setOverIdx(k)}break}}}:null,onPointerUp:editing?sbPointerDrop:null,onPointerCancel:editing?()=>{dragRef.current={active:false};setDragIdx(null);setOverIdx(null)}:null,children:items.map((item,i)=>{if(item==="sep")return editing?null:t(Hr,{key:i,mt:"4px",mb:"4px"});return o("div",{key:item.id,"data-item-idx":i,className:"f ia",style:{gap:0,opacity:editing&&dragIdx===i?0.5:1,background:editing&&overIdx===i&&dragIdx!==i?c.ac+"15":"transparent",transition:"background 0.15s"},children:[
   o("button",{onClick:()=>editing?null:go(item.id),className:"f1 f ia trc",style:{gap:12,padding:"11px 16px",background:item.hi?"rgba(219,255,77,0.06)":item.acc?"rgba(200,164,101,0.04)":"transparent",border:"none",cursor:editing?"default":"pointer"},children:[
     t("div",{style:{width:36,height:36,borderRadius:10,background:item.hi?c.ac+"20":item.acc?c.gd+"15":c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0,border:item.hi?`1px solid ${c.ac}40`:item.acc?`1px solid ${c.gd}30`:"none"},children:item.e}),
     o("div",{className:"f1 tl",children:[t("div",{style:{fontSize:14,color:item.hi?c.ac:item.acc?c.cr:c.tx,fontWeight:item.hi||item.acc?500:400},children:item.l}),item.s&&t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:item.s})]}),
@@ -623,7 +623,7 @@ function App(){
   const themeC=theme==="navy"?navyC:theme==="light"?lightC:darkC;
   Object.assign(c,themeC);
   const THEME_CYCLE={dark:"navy",navy:"light",light:"dark"};
-  const THEME_BG={dark:"#0C0A07",navy:"#0F1117",light:"#F5F3EE"};
+  const THEME_BG={dark:"#1B1B1D",navy:"#0F1117",light:"#F5F3EE"};
   const applyTheme=(next)=>{setTheme(next);const nc=next==="navy"?navyC:next==="light"?lightC:darkC;Object.assign(c,nc);localStorage.setItem("etp-theme",next);document.body.style.background=THEME_BG[next];document.querySelector('meta[name="theme-color"]')?.setAttribute("content",THEME_BG[next])};
   const toggleTheme=()=>applyTheme(THEME_CYCLE[theme]);
 
@@ -697,7 +697,7 @@ function App(){
   useEffect(()=>{if(!d.reminderEnabled||!d.reminderTime||Notification.permission!=='granted')return;const[hh,mm]=d.reminderTime.split(':').map(Number);const now=new Date(),next=new Date();next.setHours(hh,mm,0,0);if(next<=now)next.setDate(next.getDate()+1);const tid=setTimeout(()=>{fireReminderNotif(dRef.current)},next-now);return()=>clearTimeout(tid)},[d.reminderEnabled,d.reminderTime]);
   useEffect(()=>{if(d.loading||d.backupFreq==="off")return;const interval=d.backupFreq==="weekly"?7*864e5:30*864e5;if(Date.now()-d.lastBackupAt<interval)return;const dd=dRef.current;const j={version:"v3.1",exportedAt:new Date().toISOString(),expenses:dd.expenses,recurring:dd.recurring,accounts:dd.accounts,profiles:dd.profiles,cards:dd.cards||[],bills:dd.bills||[],goals:dd.goals||[],categoryBudgets:dd.categoryBudgets||{},monthlyRestrictionLogs:dd.monthlyRestrictionLogs||[],customExpenseCategories:dd.customExpenseCategories||[],customIncomeCategories:dd.customIncomeCategories||[],categoryOverrides:dd.categoryOverrides||{},budget:dd.budget,budgetPeriod:dd.budgetPeriod,currency:dd.currency,monthStartDay:dd.monthStartDay};const blob=new Blob([JSON.stringify(j,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`expense-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url);pst({lastBackupAt:Date.now()})},[d.loading]);
 
-  if(d.loading)return t("div",{style:{background:c.bg,color:c.tx,height:"100dvh"},className:"f ia jc",children:t("div",{style:{fontFamily:c.hf,fontSize:32,color:c.td,fontStyle:"italic"},children:"loading…"})});
+  if(d.loading)return t("div",{style:{background:c.bg,color:c.tx,height:"100dvh"},className:"f ia jc",children:t("div",{style:{fontFamily:c.hf,fontSize:32,color:c.td},children:"loading…"})});
 
   const nav=!["newAccount","editAccount","newCard","editCard","newRecurring","editRecurring","newBill","editBill","newGoal","editGoal","newTransfer","newProfile","backup"].includes(v);
   const fzScale=d.fontSize==="small"?0.88:d.fontSize==="large"?1.12:1;
@@ -780,7 +780,7 @@ return o("div",{className:"fx f fc",style:{inset:0,background:c.bg,zIndex:45},ch
   o("div",{style:{padding:"max(env(safe-area-inset-top),14px) 14px 0",background:c.bg,borderBottom:`1px solid ${c.brs}`,flexShrink:0},children:[
     o("div",{className:"f ia",style:{gap:10,paddingBottom:10},children:[
       t("button",{onClick:onClose,className:"act90 trt f ia",style:{gap:4,background:"transparent",border:"none",color:"inherit",flexShrink:0},children:[t(CL,{size:18,color:c.tx}),t("div",{style:{fontFamily:F.mo,fontSize:9,letterSpacing:1,color:c.tm},children:"BACK"})]}),
-      t("div",{style:{fontFamily:c.hf,fontSize:20,fontStyle:"italic",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:c.tx},children:title}),
+      t("div",{style:{fontFamily:c.hf,fontSize:20,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:c.tx},children:title}),
       t("button",{onClick:()=>{onHome?onHome():onClose()},className:"act90 trt",style:{width:36,height:36,borderRadius:10,background:c.sfg,border:`1px solid ${c.brs}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(Hm,{size:16,color:c.tx})}),
     ]}),
     t("div",{className:"f",style:{gap:6,paddingBottom:10,overflowX:"auto",WebkitOverflowScrolling:"touch"},children:SORTS.map(s=>t("button",{key:s.id,onClick:()=>setSort(s.id),className:"act95 tr",style:{padding:"5px 12px",background:sort===s.id?c.ac:c.sf,border:`1px solid ${sort===s.id?"transparent":c.brs}`,borderRadius:999,fontSize:11,fontFamily:F.mo,color:sort===s.id?"#0a0a0a":c.td,whiteSpace:"nowrap",flexShrink:0},children:s.l}))}),
@@ -802,28 +802,48 @@ const monExp=useMemo(()=>expenses.filter(e=>e.date>=periodStart&&e.type==="expen
 return o("div",{className:"st",children:[
 
   o("div",{style:{padding:"16px 24px 0"},children:[
-    o("div",{style:{background:c.sfg,borderRadius:16,padding:"14px 16px",border:`1px solid ${c.brs}`,position:"relative"},children:[
-      t("div",{style:{position:"absolute",top:6,left:14,fontFamily:c.hf,fontSize:36,color:c.gd,lineHeight:1,opacity:.7},children:"\u201C"}),
-      t("div",{style:{fontFamily:c.hf,fontStyle:"italic",fontSize:18,lineHeight:1.35,color:c.tx,marginLeft:18,marginTop:4},children:q.q}),
-      o("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,marginTop:8,textAlign:"right"},children:["— ",q.a.toUpperCase()]}),
-    ]}),
-    o("div",{className:"g g2",style:{gap:8,marginTop:12},children:[
-      o("button",{onClick:()=>{window.__pm="paste";onView("add")},className:"act98 trt",style:{display:"flex",flexDirection:"column",alignItems:"flex-start",gap:6,padding:"12px 14px",background:`linear-gradient(135deg,${c.ac}15 0%,${c.sf} 100%)`,border:`1px solid ${c.ac}40`,borderRadius:14,color:c.tx,textAlign:"left"},children:[
-        t("div",{style:{width:32,height:32,borderRadius:9,background:c.ac+"25",color:c.ac,display:"flex",alignItems:"center",justifyContent:"center"},children:t(Clp,{size:15})}),
-        t("div",{style:{fontSize:13,fontWeight:500},children:"Smart Paste"}),
-        t("div",{style:{fontSize:10.5,color:c.tm,lineHeight:1.3},children:"Paste SMS / expense / income"}),
+    t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:27,color:c.tx,lineHeight:1.1,letterSpacing:-0.6},children:"welcome back"}),
+    t("div",{style:{fontFamily:F.sa,fontSize:13.5,color:c.td,marginTop:6,lineHeight:1.4},children:"here's where your money stands today"}),
+    cDue.length>0
+      ?o("button",{onClick:()=>onView("cards"),className:"act98 trt",style:{display:"block",width:"100%",textAlign:"left",marginTop:18,padding:"18px",background:"#FFFFFF",borderRadius:20,border:"none",boxShadow:"0 12px 34px rgba(0,0,0,0.45)"},children:[
+        o("div",{className:"f ia jb",children:[
+          o("div",{className:"f ia",style:{gap:12},children:[
+            t("div",{style:{width:46,height:46,borderRadius:13,background:"#F0F0F2",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22},children:"💳"}),
+            o("div",{children:[
+              t("div",{style:{fontFamily:c.hf,fontWeight:600,fontSize:16,color:"#15151A"},children:cDue[0].card.name}),
+              cDue[0].card.last4&&t("div",{style:{fontFamily:F.mo,fontSize:12,color:"#8A8A90",marginTop:2,letterSpacing:.5},children:"XXXX "+cDue[0].card.last4}),
+            ]}),
+          ]}),
+          t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:19,color:"#15151A"},children:fm(cDue[0].cycle.outstanding,data.currency)}),
+        ]}),
+        o("div",{className:"f ia jb",style:{marginTop:16},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:11,fontWeight:700,letterSpacing:1.6,color:cDue[0].cycle.overdue?"#E5384F":"#8A8A90"},children:cDue[0].cycle.overdue?"OVERDUE":"DUE SOON"}),
+          t("div",{style:{padding:"11px 26px",background:"#15151A",color:"#fff",borderRadius:999,fontFamily:c.hf,fontWeight:600,fontSize:14},children:"Pay now"}),
+        ]}),
+      ]})
+      :o("div",{style:{marginTop:18,padding:"22px 20px",background:"#FFFFFF",borderRadius:20,boxShadow:"0 12px 34px rgba(0,0,0,0.45)"},children:[
+        t("div",{style:{fontFamily:F.mo,fontSize:10.5,fontWeight:700,letterSpacing:1.6,color:"#8A8A90"},children:periodLabel.toUpperCase()+" · SPENT"}),
+        t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:36,color:"#15151A",marginTop:6,letterSpacing:-1.2,lineHeight:1},children:fm(totExp,data.currency)}),
+        o("div",{className:"f ia jb",style:{marginTop:18},children:[
+          t("div",{style:{fontFamily:F.sa,fontSize:13,color:"#5A5A60"},children:(netCF>=0?"+":"")+fm(netCF,data.currency)+" net"}),
+          t("button",{onClick:()=>{window.__pm="paste";onView("add")},style:{padding:"11px 26px",background:"#15151A",color:"#fff",borderRadius:999,fontFamily:c.hf,fontWeight:600,fontSize:14,border:"none"},children:"add expense"}),
+        ]}),
       ]}),
-      o("button",{onClick:()=>onView("cards"),className:"act98 trt",style:{display:"flex",flexDirection:"column",alignItems:"flex-start",gap:6,padding:"12px 14px",background:`linear-gradient(135deg,${c.sk}18 0%,${c.sf} 100%)`,border:`1px solid ${c.sk}40`,borderRadius:14,color:c.tx,textAlign:"left"},children:[
-        t("div",{style:{width:32,height:32,borderRadius:9,background:c.sk+"25",color:c.sk,display:"flex",alignItems:"center",justifyContent:"center"},children:t(CC,{size:15})}),
-        t("div",{style:{fontSize:13,fontWeight:500},children:"Cards"}),
-        t("div",{style:{fontSize:10.5,color:c.tm,lineHeight:1.3},children:`${(data.cards||[]).length} card${(data.cards||[]).length!==1?"s":""} · tap to manage`}),
+    o("div",{className:"g g2",style:{gap:12,marginTop:14},children:[
+      o("button",{onClick:()=>{window.__pm="paste";onView("add")},className:"act98 trt",style:{display:"flex",flexDirection:"column",alignItems:"flex-start",justifyContent:"space-between",gap:14,padding:"16px",minHeight:124,background:c.mt,border:"none",borderRadius:20,textAlign:"left"},children:[
+        t("div",{style:{width:38,height:38,borderRadius:11,background:"rgba(0,0,0,0.18)",display:"flex",alignItems:"center",justifyContent:"center",color:"#06251C"},children:t(Clp,{size:18})}),
+        o("div",{children:[t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:15.5,color:"#06251C"},children:"smart paste"}),t("div",{style:{fontSize:11.5,color:"rgba(6,37,28,0.72)",marginTop:3,lineHeight:1.3},children:"paste any SMS or note"})]}),
+      ]}),
+      o("button",{onClick:()=>onView("cards"),className:"act98 trt",style:{display:"flex",flexDirection:"column",alignItems:"flex-start",justifyContent:"space-between",gap:14,padding:"16px",minHeight:124,background:c.sk,border:"none",borderRadius:20,textAlign:"left"},children:[
+        t("div",{style:{width:38,height:38,borderRadius:11,background:"rgba(0,0,0,0.18)",display:"flex",alignItems:"center",justifyContent:"center",color:"#061640"},children:t(CC,{size:18})}),
+        o("div",{children:[t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:15.5,color:"#061640"},children:"cards"}),t("div",{style:{fontSize:11.5,color:"rgba(6,22,64,0.72)",marginTop:3,lineHeight:1.3},children:`${(data.cards||[]).length} card${(data.cards||[]).length!==1?"s":""} · manage`})]}),
       ]}),
     ]}),
     t("div",{style:{marginTop:20},children:t(BudgetBlock,{data})}),
     o("div",{style:{marginTop:16},children:[
       o("div",{className:"f ia jb",style:{marginBottom:10},children:[
         o("div",{children:[
-          t("div",{style:{fontFamily:c.hf,fontSize:18,fontStyle:"italic",color:c.tx,lineHeight:1},children:"Summary"}),
+          t("div",{style:{fontFamily:c.hf,fontSize:18,color:c.tx,lineHeight:1},children:"Summary"}),
           t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.ac,letterSpacing:.5,marginTop:2},children:periodLabel}),
         ]}),
         o("div",{className:"f ia",style:{gap:4,background:c.sfg,borderRadius:10,padding:3,border:`1px solid ${c.brs}`},children:[{id:"week",l:"Wk"},{id:"month",l:"Mo"},{id:"quarter",l:"Qtr"},{id:"year",l:"Yr"}].map(p=>t("button",{key:p.id,onClick:()=>sPr(p.id),className:"act95 tr",style:{padding:"5px 9px",background:pr===p.id?c.ac:"transparent",color:pr===p.id?"#0a0a0a":c.td,borderRadius:8,fontSize:11,fontFamily:F.mo,fontWeight:pr===p.id?600:400,border:"none"},children:p.l}))}),
@@ -974,7 +994,7 @@ return o("div",{style:{padding:"8px 24px 0"},className:"st",children:[
   o("div",{style:{marginTop:12},children:[t("div",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1.5,color:c.tm},children:"CALENDAR"}),o("div",{style:{fontFamily:c.hf,fontSize:38,lineHeight:1.1,marginTop:2},children:["Day-by-",t("em",{style:{color:c.ac},children:"day"})]})]}),
   o("div",{className:"f ia jb",style:{marginTop:20},children:[
     t(IB,{onClick:()=>{if(mo===0){sMo(11);sYr(yr-1)}else sMo(mo-1)},children:t(CL,{size:18,color:c.tx})}),
-    o("div",{className:"tc",children:[t("div",{style:{fontFamily:c.hf,fontSize:24,fontStyle:"italic",lineHeight:1},children:mn}),o("div",{className:"f jc ia",style:{fontFamily:F.mo,fontSize:10,color:c.td,marginTop:4,gap:10,letterSpacing:.5},children:[o("span",{style:{color:c.co},children:["−",fs(mst.total,currency)]}),mst.income>0&&o("span",{style:{color:c.mt},children:["+",fs(mst.income,currency)]}),o("span",{style:{color:c.tm},children:[mst.count," TXN"]})]})]}),
+    o("div",{className:"tc",children:[t("div",{style:{fontFamily:c.hf,fontSize:24,lineHeight:1},children:mn}),o("div",{className:"f jc ia",style:{fontFamily:F.mo,fontSize:10,color:c.td,marginTop:4,gap:10,letterSpacing:.5},children:[o("span",{style:{color:c.co},children:["−",fs(mst.total,currency)]}),mst.income>0&&o("span",{style:{color:c.mt},children:["+",fs(mst.income,currency)]}),o("span",{style:{color:c.tm},children:[mst.count," TXN"]})]})]}),
     t(IB,{onClick:()=>{if(mo===11){sMo(0);sYr(yr+1)}else sMo(mo+1)},children:t(CR,{size:18,color:c.tx})}),
   ]}),
   o("div",{className:"f",style:{gap:6,marginTop:16,flexWrap:"wrap"},children:[{id:"all",l:"All"},{id:"income",l:"💚 Income"},{id:"expense",l:"🔴 Expense"},{id:"cards",l:"💳 Cards"},{id:"accounts",l:"🏦 Accounts"}].map(f=>t("button",{key:f.id,onClick:()=>{sCf(f.id);sCSub(null)},className:"act95 tr",style:{padding:"6px 14px",background:cf===f.id?c.sf3:c.sf,border:`1px solid ${cf===f.id?c.ac:c.brs}`,borderRadius:999,fontSize:12,color:cf===f.id?c.tx:c.td,whiteSpace:"nowrap"},children:f.l}))}),
@@ -984,7 +1004,7 @@ return o("div",{style:{padding:"8px 24px 0"},className:"st",children:[
   t("div",{className:"g g7",style:{gap:6},children:days.map((d,i)=>{const k=d.date.toDateString(),x=fByD[k],iT=k===tod,iS=k===sel,inten=x&&mst.max>0?Math.min(1,x.total/mst.max):0,hI=x&&x.income>0;let bg="transparent";if(iS)bg=c.ac;else if(x&&!d.other&&x.total>0)bg=`rgba(219,255,77,${.05+inten*.18})`;else if(x&&!d.other&&hI)bg="rgba(168,230,207,0.08)";return o("button",{key:i,onClick:()=>sSel(k),className:"act90 tr",style:{aspectRatio:"1",background:bg,border:iT&&!iS?`1px solid ${c.ac}`:`1px solid ${iS?c.ac:"transparent"}`,borderRadius:10,opacity:d.other?.45:1,color:iS?"#0a0a0a":c.tx,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:1,padding:2,position:"relative"},children:[t("span",{style:{fontSize:13,fontWeight:iT||iS?600:400},children:d.date.getDate()}),x&&!d.other&&t("span",{style:{fontFamily:F.mo,fontSize:9,fontWeight:500,color:iS?"#0a0a0a":c.td},children:x.total>0?fs(x.total,currency):hI?"+"+fs(x.income,currency):""}),hI&&!d.other&&x.total>0&&t("span",{style:{position:"absolute",top:3,right:3,width:5,height:5,borderRadius:"50%",background:iS?"#0a0a0a":c.mt}})]})})}),
   o("div",{style:{marginTop:28},children:[
     o("div",{className:"f ib jb",style:{marginBottom:12},children:[
-      o("div",{children:[t("div",{style:{fontFamily:c.hf,fontSize:22,fontStyle:"italic",lineHeight:1.1},children:new Date(sel).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}),o("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,marginTop:4,letterSpacing:1},children:its.length+" "+(its.length===1?"TRANSACTION":"TRANSACTIONS")})]}),
+      o("div",{children:[t("div",{style:{fontFamily:c.hf,fontSize:22,lineHeight:1.1},children:new Date(sel).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}),o("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,marginTop:4,letterSpacing:1},children:its.length+" "+(its.length===1?"TRANSACTION":"TRANSACTIONS")})]}),
       o("div",{className:"trg",children:[sp>0&&o("div",{style:{fontFamily:F.mo,fontSize:16,fontWeight:500,color:c.co},children:["−",fm(sp,currency)]}),inc>0&&o("div",{style:{fontFamily:F.mo,fontSize:16,fontWeight:500,color:c.mt,marginTop:sp>0?2:0},children:["+",fm(inc,currency)]}),sp===0&&inc===0&&t("div",{style:{fontFamily:F.mo,fontSize:16,color:c.tm},children:fm(0,currency)})]}),
     ]}),
     o("div",{className:"g g2",style:{gap:8,marginBottom:12},children:[
@@ -1498,7 +1518,7 @@ return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
 ]})}
 
 function PaySht({card,cycle,data,onClose,onConfirm}){const[am,sAm]=useState(String(cycle.outstanding.toFixed(2)));const[aId,sAId]=useState(data.accounts[0].id);const v=parseFloat(am)>0;return t(Sht,{onClose,children:o(Fragment,{children:[
-  t("div",{style:{fontFamily:c.hf,fontSize:24,fontStyle:"italic",marginBottom:4},children:"Pay statement"}),
+  t("div",{style:{fontFamily:c.hf,fontSize:24,marginBottom:4},children:"Pay statement"}),
   t("div",{style:{fontSize:13,color:c.td,marginBottom:18},children:`${card.name} · Outstanding ${fm(cycle.outstanding,data.currency)}`}),
   o("div",{style:{marginBottom:16,textAlign:"center"},children:[t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,marginBottom:6},children:"AMOUNT"}),o("div",{className:"f ib jc",style:{gap:4},children:[t("span",{style:{fontFamily:F.mo,fontSize:20,color:c.td},children:data.currency}),t("input",{type:"text",inputMode:"decimal",value:am,onChange:e=>sAm(e.target.value.replace(/[^\d.]/g,"")),style:{fontFamily:'var(--nf)',fontSize:40,fontWeight:300,background:"transparent",border:"none",outline:"none",color:c.tx,textAlign:"center",width:"60%",letterSpacing:-1,caretColor:c.ac}})]})]}),
   o("div",{className:"g g3",style:{gap:6,marginBottom:16},children:[...[{l:"Minimum",v:Math.max(1,cycle.lastStmt*0.05).toFixed(2)},{l:"Full",v:cycle.outstanding.toFixed(2)}].map(b=>t("button",{key:b.l,onClick:()=>{sAm(b.v)},className:"act95 tr",style:{padding:"8px 0",background:am===b.v?c.sf3:c.sf2,border:`1px solid ${am===b.v?c.ac:c.brs}`,borderRadius:9,color:c.tx,fontSize:11},children:b.l})),t("button",{key:"custom",onClick:()=>{sAm("")},className:"act95 tr",style:{padding:"8px 0",background:am!==""&&am!==cycle.outstanding.toFixed(2)&&am!==Math.max(1,cycle.lastStmt*0.05).toFixed(2)?c.sf3:c.sf2,border:`1px solid ${am!==""&&am!==cycle.outstanding.toFixed(2)&&am!==Math.max(1,cycle.lastStmt*0.05).toFixed(2)?c.ac:c.brs}`,borderRadius:9,color:c.tx,fontSize:11},children:"Custom"})]}),
@@ -1584,7 +1604,7 @@ return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
     save.length>0&&o("div",{style:{marginBottom:24},children:[o("div",{className:"f ib jb",style:{marginBottom:12},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:"SAVINGS"}),t(Pl,{col:c.gd,children:`${save.length} ACTIVE`})]}),t("div",{style:{display:"flex",flexDirection:"column",gap:12},children:save.map(g=>t(GoalCard,{key:g.id,goal:g,currency,onContribute:()=>{sContrib(g);sCA("")},onEdit:()=>onEdit(g),onDelete:()=>sDelId(g.id)}))})]}),
     debt.length>0&&o("div",{children:[o("div",{className:"f ib jb",style:{marginBottom:12},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:"DEBT PAYOFF"}),t(Pl,{col:c.co,children:`${debt.length} ACTIVE`})]}),t("div",{style:{display:"flex",flexDirection:"column",gap:12},children:debt.map(g=>t(GoalCard,{key:g.id,goal:g,currency,onContribute:()=>{sContrib(g);sCA("")},onEdit:()=>onEdit(g),onDelete:()=>sDelId(g.id),debt:true}))})]}),
   ]}),
-  contrib&&t(Sht,{onClose:()=>sContrib(null),children:o(Fragment,{children:[t("div",{style:{fontFamily:c.hf,fontSize:22,fontStyle:"italic",marginBottom:4},children:contrib.kind==="debt"?"Make a payment":"Add to savings"}),t("div",{style:{fontSize:13,color:c.td,marginBottom:18},children:`${contrib.emoji||"🎯"} ${contrib.name}`}),o("div",{style:{marginBottom:16,textAlign:"center"},children:[t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,marginBottom:6},children:"AMOUNT"}),o("div",{className:"f ib jc",style:{gap:4},children:[t("span",{style:{fontFamily:F.mo,fontSize:20,color:c.td},children:currency}),t("input",{type:"text",inputMode:"decimal",value:contribAmt,onChange:e=>sCA(e.target.value.replace(/[^\d.]/g,"")),placeholder:"0.00",style:{fontFamily:'var(--nf)',fontSize:40,fontWeight:300,background:"transparent",border:"none",outline:"none",color:c.tx,textAlign:"center",width:"60%",letterSpacing:-1,caretColor:c.ac}})]})]}),t("button",{disabled:!parseFloat(contribAmt)||parseFloat(contribAmt)<=0,onClick:()=>{onContribute(contrib,parseFloat(contribAmt));sContrib(null)},className:"w100 act98 tr",style:{padding:"14px 0",background:parseFloat(contribAmt)?c.ac:c.sf2,color:parseFloat(contribAmt)?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:parseFloat(contribAmt)?`Add ${fm(parseFloat(contribAmt),currency)}`:"Enter an amount"})]})}),
+  contrib&&t(Sht,{onClose:()=>sContrib(null),children:o(Fragment,{children:[t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:4},children:contrib.kind==="debt"?"Make a payment":"Add to savings"}),t("div",{style:{fontSize:13,color:c.td,marginBottom:18},children:`${contrib.emoji||"🎯"} ${contrib.name}`}),o("div",{style:{marginBottom:16,textAlign:"center"},children:[t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,marginBottom:6},children:"AMOUNT"}),o("div",{className:"f ib jc",style:{gap:4},children:[t("span",{style:{fontFamily:F.mo,fontSize:20,color:c.td},children:currency}),t("input",{type:"text",inputMode:"decimal",value:contribAmt,onChange:e=>sCA(e.target.value.replace(/[^\d.]/g,"")),placeholder:"0.00",style:{fontFamily:'var(--nf)',fontSize:40,fontWeight:300,background:"transparent",border:"none",outline:"none",color:c.tx,textAlign:"center",width:"60%",letterSpacing:-1,caretColor:c.ac}})]})]}),t("button",{disabled:!parseFloat(contribAmt)||parseFloat(contribAmt)<=0,onClick:()=>{onContribute(contrib,parseFloat(contribAmt));sContrib(null)},className:"w100 act98 tr",style:{padding:"14px 0",background:parseFloat(contribAmt)?c.ac:c.sf2,color:parseFloat(contribAmt)?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:parseFloat(contribAmt)?`Add ${fm(parseFloat(contribAmt),currency)}`:"Enter an amount"})]})}),
   delId&&t(CSht,{onClose:()=>sDelId(null),title:"Delete goal?",subtitle:"All progress for this goal is removed.",onConfirm:()=>{onDelete(delId);sDelId(null)},confirmLabel:"Delete"}),
 ]})}
 
@@ -1647,7 +1667,7 @@ return o("div",{style:{padding:"8px 24px 32px"},className:"prpg",children:[
   o("div",{style:{padding:"24px 20px",background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`},className:"prcd",children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:2,textAlign:"center",marginBottom:6},className:"prdm",children:"EXPENSE TRACKER PRO — MONTHLY REPORT"}),
     t("div",{style:{height:1,background:c.br,marginBottom:14}}),
-    t("div",{style:{fontFamily:c.hf,fontSize:34,fontStyle:"italic",textAlign:"center",lineHeight:1},className:"prtx",children:monName}),
+    t("div",{style:{fontFamily:c.hf,fontSize:34,textAlign:"center",lineHeight:1},className:"prtx",children:monName}),
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,textAlign:"center",marginTop:6},className:"prdm",children:"FINANCIAL SUMMARY"}),
     t("div",{style:{height:1,background:c.br,marginTop:14,marginBottom:18}}),
     o("div",{className:"g g3",style:{gap:12,marginBottom:18},children:[
@@ -1733,7 +1753,7 @@ function UserMgr({users,activeUser,onSwitch,onAdd,onDelete,onUpdate,onClose}){
         ]}),
       ]}),
     ]}))})  ,
-    t("div",{style:{fontFamily:c.hf,fontSize:16,fontStyle:"italic",color:c.tx,marginBottom:10,marginTop:4},children:"Add new user"}),
+    t("div",{style:{fontFamily:c.hf,fontSize:16,color:c.tx,marginBottom:10,marginTop:4},children:"Add new user"}),
     o("div",{style:{background:c.sfg,borderRadius:14,padding:16,border:`1px solid ${c.brs}`},children:[
       t("div",{style:{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12},children:UE.map(e=>t("button",{key:e,onClick:()=>sEm(e),className:"act90 trt",style:{width:36,height:36,borderRadius:9,background:em===e?c.ac+"25":"transparent",border:em===e?`1px solid ${c.ac}`:`1px solid ${c.brs}`,fontSize:18},children:e}))}),
       t("input",{value:nm,onChange:e=>sNm(e.target.value),placeholder:"User name",style:{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${c.brs}`,background:c.sf2,color:c.tx,fontSize:14,fontFamily:'var(--tf)',boxSizing:"border-box",marginBottom:12,outline:"none"}}),
@@ -1770,7 +1790,7 @@ function UpcomingExp({data,onAdd,onDelete,onUpdate,onClose}){
       t("div",{style:{fontSize:10,color:c.tm,fontFamily:F.mo,letterSpacing:.3},children:threshold>0?"Expenses ≥ this amount are flagged BIG":"Set in Settings → Big Expense Alert"}),
     ]}),
     showForm&&o("div",{style:{background:c.sfg,borderRadius:14,padding:16,border:`1px solid ${c.brs}`,marginBottom:16},children:[
-      t("div",{style:{fontFamily:c.hf,fontSize:15,fontStyle:"italic",marginBottom:12},children:"Plan a future expense"}),
+      t("div",{style:{fontFamily:c.hf,fontSize:15,marginBottom:12},children:"Plan a future expense"}),
       t("input",{value:title,onChange:e=>sTitle(e.target.value),placeholder:"What is it? (e.g. MacBook, Vacation)",style:{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${c.brs}`,background:c.sf2,color:c.tx,fontSize:14,fontFamily:'var(--tf)',boxSizing:"border-box",marginBottom:8,outline:"none"}}),
       o("div",{className:"g g2",style:{gap:8,marginBottom:8},children:[
         t("input",{value:amt,onChange:e=>sAmt(e.target.value),placeholder:"Amount",type:"number",style:{padding:"10px 12px",borderRadius:10,border:`1px solid ${c.brs}`,background:c.sf2,color:c.tx,fontSize:14,fontFamily:F.mo,outline:"none",width:"100%",boxSizing:"border-box"}}),
@@ -2046,7 +2066,7 @@ function ExpPlanner({data,onSave,onDelete,onClose}){
   return o("div",{style:{padding:"8px 24px 32px"},children:[
     t(SH,{title:t("em",{children:"Expense Planner"}),onBack:onClose}),
     o("div",{style:{background:c.sfg,borderRadius:14,padding:16,border:`1px solid ${c.brs}`,marginBottom:16},children:[
-      t("div",{style:{fontFamily:c.hf,fontSize:15,fontStyle:"italic",marginBottom:12},children:"Can I afford this?"}),
+      t("div",{style:{fontFamily:c.hf,fontSize:15,marginBottom:12},children:"Can I afford this?"}),
       t("input",{value:name,onChange:e=>sName(e.target.value),placeholder:"Product name (e.g. MacBook, TV, Bike)",style:{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${c.brs}`,background:c.sf2,color:c.tx,fontSize:14,fontFamily:'var(--tf)',boxSizing:"border-box",marginBottom:8,outline:"none"}}),
       o("div",{className:"g g2",style:{gap:8,marginBottom:8},children:[
         t("input",{value:cost,onChange:e=>sCost(e.target.value),placeholder:`Total cost (${currency})`,type:"number",style:{padding:"10px 12px",borderRadius:10,border:`1px solid ${c.brs}`,background:c.sf2,color:c.tx,fontSize:14,fontFamily:F.mo,outline:"none",width:"100%",boxSizing:"border-box"}}),
@@ -2072,7 +2092,7 @@ function ExpPlanner({data,onSave,onDelete,onClose}){
     result&&o("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${VerdictColors[result.verdict]}50`,overflow:"hidden",marginBottom:16},children:[
       o("div",{style:{padding:"14px 16px",background:`linear-gradient(135deg,${VerdictColors[result.verdict]}15 0%,transparent 70%)`,borderBottom:`1px solid ${c.brs}`},children:[
         o("div",{className:"f ia jb",children:[
-          o("div",{children:[t("div",{style:{fontFamily:c.hf,fontSize:17,fontStyle:"italic"},children:result.name}),t("div",{style:{fontFamily:F.mo,fontSize:11,color:VerdictColors[result.verdict],fontWeight:700,marginTop:3,letterSpacing:.5},children:VerdictLabels[result.verdict]})]}),
+          o("div",{children:[t("div",{style:{fontFamily:c.hf,fontSize:17},children:result.name}),t("div",{style:{fontFamily:F.mo,fontSize:11,color:VerdictColors[result.verdict],fontWeight:700,marginTop:3,letterSpacing:.5},children:VerdictLabels[result.verdict]})]}),
           o("div",{className:"trc",children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:22,fontWeight:600,color:VerdictColors[result.verdict]},children:fm(result.cost,currency)}),t("div",{style:{fontSize:10,color:c.tm,fontFamily:F.mo},children:result.tenure===0?"Full payment":result.tenure+"mo EMI"})]}),
         ]}),
       ]}),
@@ -2095,7 +2115,7 @@ function ExpPlanner({data,onSave,onDelete,onClose}){
       ]}),
     ]}),
     expensePlans.length>0&&o("div",{children:[
-      t("div",{style:{fontFamily:c.hf,fontSize:16,fontStyle:"italic",color:c.tx,marginBottom:10},children:"Saved plans"}),
+      t("div",{style:{fontFamily:c.hf,fontSize:16,color:c.tx,marginBottom:10},children:"Saved plans"}),
       t("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,overflow:"hidden"},children:expensePlans.map((p,i)=>{const vc=VerdictColors[p.verdict]||c.td;return o("div",{key:p.id,className:"f ia jb",style:{padding:"13px 16px",borderBottom:i===expensePlans.length-1?"none":`1px solid ${c.brs}`},children:[
         o("div",{className:"f1",children:[
           o("div",{className:"f ia",style:{gap:8},children:[t("div",{style:{fontSize:14,fontWeight:500,color:c.tx},children:p.name}),t("span",{style:{fontSize:9,background:vc+"20",color:vc,borderRadius:4,padding:"1px 6px",fontFamily:F.mo,fontWeight:600},children:p.verdict?.toUpperCase()})]}),
