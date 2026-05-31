@@ -437,18 +437,22 @@ function ab(acc,exp){let b=acc.opening||0;for(const e of exp){if(e.accountId!==a
 
 // === CARD CYCLE LOGIC ===
 function cc(card,exp,today=Date.now()){
-  const sD=Math.min(28,Math.max(1,card.statementDay||1));
-  const dD=Math.min(28,Math.max(1,card.dueDay||15));
+  const sD=Math.min(31,Math.max(1,card.statementDay||1));
+  const dD=Math.min(31,Math.max(1,card.dueDay||15));
+  const _dim=(y,m)=>new Date(y,m+1,0).getDate();
+  const _set=(d2,day)=>{d2.setDate(1);d2.setDate(Math.min(day,_dim(d2.getFullYear(),d2.getMonth())));return d2};
+  const _addM=(d2,k,day)=>{d2.setDate(1);d2.setMonth(d2.getMonth()+k);d2.setDate(Math.min(day,_dim(d2.getFullYear(),d2.getMonth())));return d2};
   const n=new Date(today);
+  const effSD=Math.min(sD,_dim(n.getFullYear(),n.getMonth()));
   let lc=new Date(n);
-  if(n.getDate()>=sD)lc.setDate(sD);else{lc.setMonth(lc.getMonth()-1);lc.setDate(sD)}
+  if(n.getDate()>=effSD)_set(lc,sD);else _addM(lc,-1,sD);
   lc.setHours(0,0,0,0);
-  let nc=new Date(lc);nc.setMonth(nc.getMonth()+1);
-  let du=new Date(lc);du.setDate(dD);
-  if(du.getTime()<=lc.getTime())du.setMonth(du.getMonth()+1);
+  let nc=_addM(new Date(lc),1,sD);nc.setHours(0,0,0,0);
+  let du=new Date(lc);_set(du,dD);
+  if(du.getTime()<=lc.getTime())_addM(du,1,dD);
   du.setHours(0,0,0,0);
   const ce=exp.filter(e=>e.cardId===card.id);
-  const pc=new Date(lc);pc.setMonth(pc.getMonth()-1);
+  const pc=_addM(new Date(lc),-1,sD);
   const se=ce.filter(e=>e.type!=="card-payment"&&e.date>=pc.getTime()&&e.date<lc.getTime()).reduce((s,e)=>s+e.amount,0);
   const sp=ce.filter(e=>e.type==="card-payment"&&e.date>=pc.getTime()&&e.date<lc.getTime()).reduce((s,e)=>s+e.amount,0);
   const ls=Math.max(0,se-sp);
@@ -459,6 +463,26 @@ function cc(card,exp,today=Date.now()){
   const du2=Math.ceil((du.getTime()-today)/864e5);
   return{lastClose:lc.getTime(),nextClose:nc.getTime(),dueDate:du.getTime(),lastStmt:ls,paidSinceClose:pa,outstanding:ou,isPaid:ip,currentSpend:cs,daysUntilDue:du2,overdue:!ip&&ou>0&&today>du.getTime()}
 }
+
+// === STATEMENT PERIOD (for cross-verifying an uploaded statement) ===
+function ccPeriod(card,exp,closeTs){
+  const sD=Math.min(31,Math.max(1,card.statementDay||1));
+  const _dim=(y,m)=>new Date(y,m+1,0).getDate();
+  const c2=new Date(closeTs);c2.setHours(0,0,0,0);
+  const p0=new Date(c2);p0.setDate(1);p0.setMonth(p0.getMonth()-1);p0.setDate(Math.min(sD,_dim(p0.getFullYear(),p0.getMonth())));p0.setHours(0,0,0,0);
+  const ce=exp.filter(e=>e.cardId===card.id);
+  const spend=ce.filter(e=>e.type!=="card-payment"&&e.date>=p0.getTime()&&e.date<c2.getTime()).reduce((s,e)=>s+e.amount,0);
+  const pays=ce.filter(e=>e.type==="card-payment"&&e.date>=p0.getTime()&&e.date<c2.getTime()).reduce((s,e)=>s+e.amount,0);
+  return{start:p0.getTime(),end:c2.getTime(),spend,pays,computed:Math.max(0,spend-pays)};
+}
+
+// === STATEMENT FILE STORAGE (IndexedDB — keeps large PDFs out of localStorage) ===
+const _IDB="etp-files",_IST="stmtFiles";
+function _idb(){return new Promise((res,rej)=>{try{const r=indexedDB.open(_IDB,1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains(_IST))r.result.createObjectStore(_IST)};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}})}
+async function idbPutFile(k,blob){const db=await _idb();return new Promise((res,rej)=>{const tx=db.transaction(_IST,"readwrite");tx.objectStore(_IST).put(blob,k);tx.oncomplete=()=>res(k);tx.onerror=()=>rej(tx.error)})}
+async function idbGetFile(k){const db=await _idb();return new Promise((res,rej)=>{const tx=db.transaction(_IST,"readonly");const rq=tx.objectStore(_IST).get(k);rq.onsuccess=()=>res(rq.result);rq.onerror=()=>rej(rq.error)})}
+async function idbDelFile(k){try{const db=await _idb();return new Promise((res,rej)=>{const tx=db.transaction(_IST,"readwrite");tx.objectStore(_IST).delete(k);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)})}catch(e){}}
+async function idbOpenFile(k){try{const b=await idbGetFile(k);if(!b)return false;const u=URL.createObjectURL(b);window.open(u,"_blank");setTimeout(()=>URL.revokeObjectURL(u),60000);return true}catch(e){return false}}
 
 function bdue(bills,exp,days=30,today=Date.now()){return bills.map(b=>{const lp=b.lastPaidDate||0;const n=new Date(today);const dD=Math.min(28,Math.max(1,b.dueDay||1));let du=new Date(n);if(n.getDate()>dD)du.setMonth(du.getMonth()+1);du.setDate(dD);du.setHours(0,0,0,0);const cs=new Date(du);cs.setMonth(cs.getMonth()-1);if(lp>=cs.getTime())du.setMonth(du.getMonth()+1);const dl=Math.ceil((du.getTime()-today)/864e5);return{...b,nextDue:du.getTime(),daysLeft:dl}}).filter(b=>b.daysLeft<=days).sort((a,b)=>a.daysLeft-b.daysLeft)}
 
@@ -680,7 +704,7 @@ function App(){
   try{await window.storage.set(dk,JSON.stringify(strip(i)))}catch{}
 })()},[]);
 
-  const strip=x=>({expenses:x.expenses,recurring:x.recurring,accounts:x.accounts,profiles:x.profiles,cards:x.cards||[],bills:x.bills||[],goals:x.goals||[],categoryBudgets:x.categoryBudgets||{},monthlyRestrictionLogs:x.monthlyRestrictionLogs||[],customExpenseCategories:x.customExpenseCategories||[],customIncomeCategories:x.customIncomeCategories||[],categoryOverrides:x.categoryOverrides||{},categoryOrder:x.categoryOrder||{expense:[],income:[]},financeProfile:x.financeProfile||null,budget:x.budget,budgetPeriod:x.budgetPeriod,currency:x.currency,monthStartDay:x.monthStartDay,fontSize:x.fontSize||"medium",upcomingExpenses:x.upcomingExpenses||[],alertThreshold:x.alertThreshold??null,expensePlans:x.expensePlans||[],investmentPlans:x.investmentPlans||[],investments:x.investments||[],planThreshold:x.planThreshold??null,reminderEnabled:x.reminderEnabled||false,reminderTime:x.reminderTime||"21:00",backupFreq:x.backupFreq||"off",backupGDrive:x.backupGDrive||false,lastBackupAt:x.lastBackupAt||0});
+  const strip=x=>({expenses:x.expenses,recurring:x.recurring,accounts:x.accounts,profiles:x.profiles,cards:x.cards||[],cardStatements:x.cardStatements||[],bills:x.bills||[],goals:x.goals||[],categoryBudgets:x.categoryBudgets||{},monthlyRestrictionLogs:x.monthlyRestrictionLogs||[],customExpenseCategories:x.customExpenseCategories||[],customIncomeCategories:x.customIncomeCategories||[],categoryOverrides:x.categoryOverrides||{},categoryOrder:x.categoryOrder||{expense:[],income:[]},financeProfile:x.financeProfile||null,budget:x.budget,budgetPeriod:x.budgetPeriod,currency:x.currency,monthStartDay:x.monthStartDay,fontSize:x.fontSize||"medium",upcomingExpenses:x.upcomingExpenses||[],alertThreshold:x.alertThreshold??null,expensePlans:x.expensePlans||[],investmentPlans:x.investmentPlans||[],investments:x.investments||[],planThreshold:x.planThreshold??null,reminderEnabled:x.reminderEnabled||false,reminderTime:x.reminderTime||"21:00",backupFreq:x.backupFreq||"off",backupGDrive:x.backupGDrive||false,lastBackupAt:x.lastBackupAt||0});
 
   const pst=async(p)=>{const n={...d,...p};_custCE=n.customExpenseCategories||[];_custCI=n.customIncomeCategories||[];_catOv=n.categoryOverrides||{};_catOrder=n.categoryOrder||{expense:[],income:[]};sD(n);const dk=activeUser?"etp-data-"+activeUser.id:KS;try{await window.storage.set(dk,JSON.stringify(strip(n)))}catch(e){console.error(e)}};
 
@@ -698,7 +722,10 @@ function App(){
   const dA=(id)=>{if(d.accounts.length<=1){alert("Keep at least one account.");return}const re=d.accounts.filter(a=>a.id!==id),fb=re[0].id,rs=d.expenses.map(e=>e.accountId===id?{...e,accountId:fb}:e);pst({accounts:re,expenses:rs})};
   const aC=(c2)=>pst({cards:[...(d.cards||[]),{...c2,id:"card_"+uid()}]});
   const uC=(c2)=>pst({cards:(d.cards||[]).map(x=>x.id===c2.id?{...x,...c2}:x)});
-  const dC=(id)=>{const rs=d.expenses.map(e=>e.cardId===id?{...e,cardId:null}:e);pst({cards:(d.cards||[]).filter(c2=>c2.id!==id),expenses:rs})};
+  const dC=(id)=>{const rs=d.expenses.map(e=>e.cardId===id?{...e,cardId:null}:e);pst({cards:(d.cards||[]).filter(c2=>c2.id!==id),expenses:rs,cardStatements:(d.cardStatements||[]).filter(s2=>s2.cardId!==id)})};
+  const aSt=(st)=>pst({cardStatements:[...(d.cardStatements||[]),st]});
+  const uSt=(id,patch)=>pst({cardStatements:(d.cardStatements||[]).map(x=>x.id===id?{...x,...patch}:x)});
+  const dSt=(id)=>pst({cardStatements:(d.cardStatements||[]).filter(x=>x.id!==id)});
   const aR=(r)=>{const id=uid(),al=[{...r,id:"rec_"+id,createdAt:Date.now()},...d.recurring];const{newExpenses,updatedRecurring}=pr(al,d.expenses);pst({expenses:[...newExpenses,...d.expenses].sort((a,b)=>b.date-a.date),recurring:updatedRecurring})};
   const uR=(r)=>pst({recurring:d.recurring.map(x=>x.id===r.id?{...x,...r}:x)});
   const dR=(id)=>pst({recurring:d.recurring.filter(r=>r.id!==id)});
@@ -756,7 +783,7 @@ function App(){
         v==="editAccount"&&eAcc&&t(NewAcc,{onSave:a=>{uA({...eAcc,...a});sEAcc(null);sV("accounts")},onCancel:()=>{sEAcc(null);sV("accounts")},editing:eAcc}),
         v==="rules"&&t(Rules,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
         v==="cards"&&t(Cards,{data:d,onClose:()=>sV("home"),onAdd:()=>sV("newCard"),onSelect:cr=>{sCdId(cr.id);sV("cardDetail")},onFlt:sFlt,onReorder:(newCards)=>pst({cards:newCards})}),
-        v==="cardDetail"&&cdId&&t(CardDet,{data:d,cardId:cdId,onClose:()=>sV("cards"),onEdit:()=>{const cr=(d.cards||[]).find(x=>x.id===cdId);sECa(cr);sV("editCard")},onPay:({accountId,amount})=>aCP({cardId:cdId,accountId,amount,date:Date.now()}),onEditPay:(id,patch)=>uCP(id,patch),onDeletePay:(id)=>dCP(id),onDelete:()=>{dC(cdId);sCdId(null);sV("cards")},onTx:sAtx}),
+        v==="cardDetail"&&cdId&&t(CardDet,{data:d,cardId:cdId,onClose:()=>sV("cards"),onEdit:()=>{const cr=(d.cards||[]).find(x=>x.id===cdId);sECa(cr);sV("editCard")},onPay:({accountId,amount})=>aCP({cardId:cdId,accountId,amount,date:Date.now()}),onEditPay:(id,patch)=>uCP(id,patch),onDeletePay:(id)=>dCP(id),onDelete:()=>{dC(cdId);sCdId(null);sV("cards")},onTx:sAtx,onAddStmt:aSt,onUpdStmt:uSt,onDelStmt:dSt}),
         v==="newCard"&&t(NewCard,{onSave:cr=>{aC(cr);sV("cards")},onCancel:()=>sV("cards")}),
         v==="editCard"&&eCa&&t(NewCard,{onSave:cr=>{uC({...eCa,...cr});sECa(null);sV("cardDetail")},onCancel:()=>{sECa(null);sV("cardDetail")},editing:eCa}),
         v==="transfer"&&t(Xfer,{data:d,onSave:dT,onCancel:()=>sV(navFromRef.current)}),
@@ -1540,7 +1567,7 @@ function StackCard({card,cycle,monthSpent,currency,total,index,onClick}){const g
   ]}),
 ]})})}
 
-function CardDet({data,cardId,onClose,onEdit,onPay,onEditPay,onDeletePay,onDelete,onTx}){const card=(data.cards||[]).find(x=>x.id===cardId);const[pO,sPO]=useState(false);const[cD,sCD]=useState(false);if(!card)return null;
+function CardDet({data,cardId,onClose,onEdit,onPay,onEditPay,onDeletePay,onDelete,onTx,onAddStmt,onUpdStmt,onDelStmt}){const card=(data.cards||[]).find(x=>x.id===cardId);const[pO,sPO]=useState(false);const[cD,sCD]=useState(false);const[tab,sTab]=useState("overview");if(!card)return null;
   const cy=card.type==="credit"?cc(card,data.expenses):null;
   const cE=useMemo(()=>data.expenses.filter(e=>e.cardId===cardId).sort((a,b)=>b.date-a.date),[data.expenses,cardId]);
   const mE=cE.filter(e=>e.date>=ps(new Date(),data.monthStartDay)&&e.type!=="card-payment").reduce((s,e)=>s+e.amount,0);
@@ -1554,6 +1581,9 @@ return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
     t("div",{style:{fontFamily:F.mo,fontSize:18,letterSpacing:4,color:"#fff",position:"relative",marginBottom:24,fontWeight:500},children:card.last4?`•••• •••• •••• ${card.last4}`:"•••• •••• •••• ····"}),
     o("div",{className:"f ia jb",style:{position:"relative"},children:[o("div",{children:[t("div",{style:{fontSize:10,letterSpacing:1,color:"rgba(255,255,255,0.6)",fontFamily:F.mo},children:"CARDHOLDER"}),t("div",{style:{fontSize:13,color:"#fff",marginTop:3,textTransform:"uppercase",letterSpacing:1,fontWeight:600},children:(card.cardholderName||"YOU").toUpperCase()})]}),o("div",{className:"trg",children:[t("div",{style:{fontSize:10,letterSpacing:1,color:"rgba(255,255,255,0.6)",fontFamily:F.mo},children:"TYPE"}),t("div",{style:{fontSize:13,color:"#fff",marginTop:3,textTransform:"uppercase",fontWeight:600,letterSpacing:1},children:card.type})]})]}),
   ]}),
+  card.type==="credit"&&o("div",{className:"f ia",style:{gap:6,marginBottom:16,background:c.sf2,borderRadius:12,padding:4},children:[{k:"overview",l:"Overview"},{k:"stmts",l:"Statements"}].map(tb=>t("button",{key:tb.k,onClick:()=>sTab(tb.k),className:"act95 tr",style:{flex:1,padding:"9px 0",borderRadius:9,border:"none",fontSize:13,fontWeight:tab===tb.k?600:400,background:tab===tb.k?c.ac:"transparent",color:tab===tb.k?"#0a0a0a":c.td},children:tb.l}))}),
+  card.type==="credit"&&tab==="stmts"&&t(CardStmts,{card,data,onAddStmt,onUpdStmt,onDelStmt}),
+  (card.type!=="credit"||tab==="overview")&&o(Fragment,{children:[
   cy&&o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     o("div",{className:"f ia jb",style:{marginBottom:14},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:"CURRENT STATEMENT"}),cy.outstanding>0?t(Pl,{col:cy.overdue?c.ro:c.co,children:cy.overdue?"OVERDUE":`${cy.daysUntilDue}d LEFT`}):t(Pl,{col:c.mt,children:"PAID"})]}),
     o("div",{className:"g g2",style:{gap:16,marginBottom:14},children:[o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1},children:"OUTSTANDING"}),t("div",{style:{fontFamily:'var(--nf)',fontSize:28,fontWeight:300,color:cy.outstanding>0?(cy.overdue?c.ro:c.tx):c.mt,marginTop:4,lineHeight:1,letterSpacing:-1},children:fm(cy.outstanding,data.currency)})]}),o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1},children:"DUE BY"}),t("div",{style:{fontFamily:'var(--nf)',fontSize:18,color:c.tx,marginTop:6,fontWeight:500},children:new Date(cy.dueDate).toLocaleDateString("en-US",{month:"short",day:"numeric"})}),t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:.5,marginTop:2},children:cy.daysUntilDue>0?`in ${cy.daysUntilDue} days`:`${Math.abs(cy.daysUntilDue)} days overdue`})]})]}),
@@ -1565,9 +1595,93 @@ return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
   o("div",{className:"f ib jb",style:{marginBottom:12},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:"RECENT TRANSACTIONS"}),t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm},children:`${cE.length} TOTAL`})]}),
   cE.length===0?t("div",{style:{padding:"32px 16px",textAlign:"center",background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,color:c.tm,fontSize:13},children:"No transactions on this card yet"}):t("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`},children:cE.slice(0,20).map((e,i)=>t(TX,{key:e.id,expense:e,accounts:data.accounts,cards:data.cards||[],isLast:i===Math.min(cE.length,20)-1,onClick:()=>onTx(e)}))}),
   t("button",{onClick:()=>sCD(true),className:"w100 act98 tr",style:{marginTop:20,padding:"12px 0",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:12,color:c.ro,fontSize:13},children:"Delete this card"}),
+  ]}),
   pO&&t(PaySht,{card,cycle:cy,data,onClose:()=>sPO(false),onConfirm:({accountId,amount})=>{onPay({accountId,amount});sPO(false)},onEditPay,onDeletePay}),
   cD&&t(CSht,{onClose:()=>sCD(false),title:"Delete card?",subtitle:"Existing transactions stay; their card link is cleared.",onConfirm:onDelete,confirmLabel:"Delete"}),
 ]})}
+
+function CardStmts({card,data,onAddStmt,onUpdStmt,onDelStmt}){
+  const[add,sAdd]=useState(false);
+  const[ed,sEd]=useState(null);
+  const sts=(data.cardStatements||[]).filter(x=>x.cardId===card.id).sort((a,b)=>b.period-a.period);
+  return o(Fragment,{children:[
+    o("div",{className:"f ia jb",style:{marginBottom:12},children:[
+      t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:"STATEMENT HISTORY"}),
+      t("button",{onClick:()=>{sEd(null);sAdd(true)},className:"act95 tr f ia",style:{gap:5,padding:"7px 12px",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:10,fontSize:12,fontWeight:600},children:[t(Plus,{size:14}),t("span",{children:"Add"})]})
+    ]}),
+    t("div",{style:{fontSize:12,color:c.tm,marginBottom:14,lineHeight:1.5},children:"Log each month's statement from your bank PDF. The app cross-checks the amount against the spending it tracked for that billing period and flags any mismatch."}),
+    sts.length===0?t("div",{style:{padding:"32px 16px",textAlign:"center",background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,color:c.tm,fontSize:13},children:"No statements logged yet. Tap Add to record one and attach its PDF."}):o("div",{style:{display:"flex",flexDirection:"column",gap:10},children:sts.map(st=>{
+      const per=ccPeriod(card,data.expenses,st.period);
+      const diff=Number(st.total||0)-per.computed;
+      const match=Math.abs(diff)<1;
+      return o("div",{key:st.id,style:{background:c.sfg,borderRadius:16,border:`1px solid ${!match?c.ro+"55":c.brs}`,padding:16},children:[
+        o("div",{className:"f ia jb",style:{marginBottom:12},children:[
+          o("div",{children:[
+            t("div",{style:{fontSize:15,color:c.tx,fontWeight:600},children:new Date(st.period).toLocaleDateString("en-US",{month:"long",year:"numeric"})}),
+            t("div",{style:{fontFamily:F.mo,fontSize:11,color:c.tm,marginTop:2},children:`Due ${new Date(st.dueDate).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}`})
+          ]}),
+          t(Pl,{col:st.paid?c.mt:c.co,children:st.paid?"PAID":"UNPAID"})
+        ]}),
+        o("div",{className:"g g2",style:{gap:12,marginBottom:12},children:[
+          o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:.5},children:"STATEMENT (PDF)"}),t("div",{style:{fontFamily:'var(--nf)',fontSize:22,fontWeight:300,color:c.tx,marginTop:2},children:fm(st.total,data.currency)})]}),
+          o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:.5},children:"APP TRACKED"}),t("div",{style:{fontFamily:'var(--nf)',fontSize:22,fontWeight:300,color:c.td,marginTop:2},children:fm(per.computed,data.currency)})]})
+        ]}),
+        o("div",{className:"f ia",style:{gap:7,marginBottom:(st.minDue||st.notes||st.fileId)?12:0,padding:"8px 10px",borderRadius:10,background:(match?c.mt:c.ro)+"18"},children:[
+          t(match?Check:AlertCircle,{size:15,color:match?c.mt:c.ro}),
+          t("span",{style:{fontSize:12,color:match?c.mt:c.ro,fontWeight:500},children:match?"Matches tracked spend":`Off by ${fm(Math.abs(diff),data.currency)} ${diff>0?"· more on statement":"· more tracked in app"}`})
+        ]}),
+        st.minDue?t("div",{style:{fontFamily:F.mo,fontSize:11,color:c.tm,marginBottom:(st.notes||st.fileId)?10:0},children:`Min due ${fm(st.minDue,data.currency)}`}):null,
+        st.notes?t("div",{style:{fontSize:12,color:c.td,marginBottom:st.fileId?10:0},children:st.notes}):null,
+        o("div",{className:"f ia",style:{gap:8},children:[
+          st.fileId?t("button",{onClick:()=>idbOpenFile(st.fileId).then(ok=>{if(!ok)alert("This PDF isn't available on this device. Files are stored locally per device and aren't included in JSON backups.")}),className:"act95 tr f ia",style:{gap:5,padding:"8px 12px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,color:c.tx,fontSize:12,maxWidth:160,overflow:"hidden"},children:[t(Eye,{size:14}),t("span",{style:{whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"},children:st.fileName||"View PDF"})]}):t("span",{style:{fontSize:12,color:c.tm,fontStyle:"italic"},children:"No PDF attached"}),
+          t("div",{style:{flex:1}}),
+          t("button",{onClick:()=>onUpdStmt(st.id,{paid:!st.paid}),className:"act95 tr",style:{padding:"8px 12px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,color:c.td,fontSize:12},children:st.paid?"Unpay":"Mark paid"}),
+          t("button",{onClick:()=>{sEd(st);sAdd(true)},"aria-label":"edit statement",className:"act90 trt",style:{width:34,height:34,borderRadius:9,background:c.sf2,border:`1px solid ${c.brs}`,color:c.td,display:"flex",alignItems:"center",justifyContent:"center"},children:t(Pencil,{size:14})}),
+          t("button",{onClick:()=>{if(confirm("Delete this statement record? The attached PDF will also be removed.")){if(st.fileId)idbDelFile(st.fileId);onDelStmt(st.id)}},"aria-label":"delete statement",className:"act90 trt",style:{width:34,height:34,borderRadius:9,background:c.sf2,border:`1px solid ${c.ro}40`,color:c.ro,display:"flex",alignItems:"center",justifyContent:"center"},children:t(Trash2,{size:14})})
+        ]})
+      ]})
+    })}),
+    add&&t(NewStmt,{card,data,editing:ed,onClose:()=>{sAdd(false);sEd(null)},onSave:(rec)=>{if(ed)onUpdStmt(ed.id,rec);else onAddStmt(rec);sAdd(false);sEd(null)}})
+  ]})
+}
+
+function NewStmt({card,data,editing,onClose,onSave}){
+  const _ymd=ts=>{const d2=new Date(ts);return d2.getFullYear()+"-"+String(d2.getMonth()+1).padStart(2,"0")+"-"+String(d2.getDate()).padStart(2,"0")};
+  const cy=card.type==="credit"?cc(card,data.expenses):null;
+  const[per,sPer]=useState(_ymd(editing?editing.period:(cy?cy.lastClose:Date.now())));
+  const[due,sDue]=useState(_ymd(editing?editing.dueDate:(cy?cy.dueDate:Date.now())));
+  const[tot,sTot]=useState(editing?String(editing.total):"");
+  const[min,sMin]=useState(editing&&editing.minDue?String(editing.minDue):"");
+  const[paid,sPaid]=useState(editing?!!editing.paid:false);
+  const[note,sNote]=useState(editing&&editing.notes?editing.notes:"");
+  const[fileId,sFileId]=useState(editing?editing.fileId||null:null);
+  const[fileName,sFileName]=useState(editing?editing.fileName||"":"");
+  const[busy,sBusy]=useState(false);
+  const per2=useMemo(()=>{const ts=new Date(per+"T00:00:00").getTime();return ccPeriod(card,data.expenses,ts)},[per]);
+  const onFile=async e=>{const f=e.target.files&&e.target.files[0];if(!f)return;const isPdf=(f.type&&f.type.indexOf("pdf")>=0)||f.name.toLowerCase().endsWith(".pdf");if(!isPdf){alert("Please choose a PDF file.");return}if(f.size>15e6){alert(`"${f.name}" is over 15MB.`);return}sBusy(true);try{const id=fileId||("stmtf_"+uid());await idbPutFile(id,f);sFileId(id);sFileName(f.name)}catch(err){alert("Could not store the file: "+(err&&err.message||err))}sBusy(false)};
+  const dv=Math.abs((parseFloat(tot)||0)-per2.computed);
+  const valid=tot!==""&&parseFloat(tot)>=0&&per&&due;
+  const save=()=>{const rec={id:editing?editing.id:"st_"+uid(),cardId:card.id,period:new Date(per+"T00:00:00").getTime(),dueDate:new Date(due+"T00:00:00").getTime(),total:parseFloat(tot)||0,minDue:parseFloat(min)||null,paid,notes:note.trim()||null,fileId:fileId||null,fileName:fileName||null,createdAt:editing?editing.createdAt:Date.now()};onSave(rec)};
+  const Lbl=txt=>t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,marginBottom:8},children:txt});
+  const inp={width:"100%",padding:"12px 14px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:11,color:c.tx,fontSize:15,fontFamily:F.mo,outline:"none",boxSizing:"border-box"};
+  return t(Sht,{onClose,children:o(Fragment,{children:[
+    t("div",{style:{fontFamily:c.hf,fontSize:24,marginBottom:4},children:editing?"Edit statement":"Add statement"}),
+    t("div",{style:{fontSize:13,color:c.td,marginBottom:18},children:`${card.name} · enter the figures from your bank statement`}),
+    o("div",{className:"g g2",style:{gap:10,marginBottom:16},children:[
+      o("div",{children:[Lbl("CLOSING DATE"),t("input",{type:"date",value:per,onChange:e=>sPer(e.target.value),style:inp})]}),
+      o("div",{children:[Lbl("DUE DATE"),t("input",{type:"date",value:due,onChange:e=>sDue(e.target.value),style:inp})]})
+    ]}),
+    o("div",{className:"g g2",style:{gap:10,marginBottom:14},children:[
+      o("div",{children:[Lbl("STATEMENT TOTAL"),t("input",{type:"text",inputMode:"decimal",value:tot,onChange:e=>sTot(e.target.value.replace(/[^\d.]/g,"")),placeholder:"0.00",style:inp})]}),
+      o("div",{children:[Lbl("MIN DUE (OPT)"),t("input",{type:"text",inputMode:"decimal",value:min,onChange:e=>sMin(e.target.value.replace(/[^\d.]/g,"")),placeholder:"0.00",style:inp})]})
+    ]}),
+    o("div",{style:{marginBottom:16,padding:"10px 12px",background:c.sf2,borderRadius:11,border:`1px solid ${c.brs}`},children:[t("span",{style:{fontFamily:F.mo,fontSize:11,color:c.tm},children:"App tracked this period: "}),t("span",{style:{fontFamily:F.mo,fontSize:13,color:c.tx,fontWeight:600},children:fm(per2.computed,data.currency)}),tot!==""?t("span",{style:{fontFamily:F.mo,fontSize:12,color:dv<1?c.mt:c.ro,marginLeft:8},children:dv<1?"· matches":`· off by ${fm(dv,data.currency)}`}):null]}),
+    o("div",{style:{marginBottom:16},children:[Lbl("STATEMENT PDF (OPTIONAL)"),o("label",{className:"act95 tr f ia jc",style:{gap:8,padding:"14px 0",background:c.sf2,border:`1px dashed ${c.brs}`,borderRadius:11,color:c.td,fontSize:13,cursor:"pointer"},children:[t(Plus,{size:16}),t("span",{style:{whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"80%"},children:busy?"Storing…":(fileName||"Choose PDF (password-protected OK)")}),t("input",{type:"file",accept:"application/pdf,.pdf",onChange:onFile,style:{display:"none"}})]}),fileId&&!busy?t("button",{onClick:()=>{if(fileId&&(!editing||fileId!==editing.fileId))idbDelFile(fileId);sFileId(null);sFileName("")},className:"tr",style:{marginTop:8,background:"none",border:"none",color:c.ro,fontSize:12,padding:0,cursor:"pointer"},children:"Remove PDF"}):null]}),
+    o("div",{style:{marginBottom:16},children:[Lbl("NOTES (OPTIONAL)"),t("input",{type:"text",value:note,onChange:e=>sNote(e.target.value),placeholder:"e.g. disputed charge, EMI conversion…",style:inp})]}),
+    o("label",{className:"f ia",style:{gap:10,marginBottom:18,cursor:"pointer"},children:[t("input",{type:"checkbox",checked:paid,onChange:e=>sPaid(e.target.checked),style:{width:18,height:18,accentColor:c.ac}}),t("span",{style:{fontSize:14,color:c.tx},children:"Statement fully paid"})]}),
+    t("button",{disabled:!valid||busy,onClick:save,className:"w100 act98 tr",style:{padding:"14px 0",background:valid&&!busy?c.ac:c.sf2,color:valid&&!busy?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:editing?"Save changes":"Add statement"})
+  ]})})
+}
 
 function PaySht({card,cycle,data,onClose,onConfirm,onEditPay,onDeletePay}){const[am,sAm]=useState(String(cycle.outstanding.toFixed(2)));const[aId,sAId]=useState(data.accounts[0].id);const v=parseFloat(am)>0;const[edId,sEdId]=useState(null);const[eAm,sEAm]=useState("");const[eAcc,sEAcc]=useState(null);const pays=data.expenses.filter(e=>e.cardId===card.id&&e.type==="card-payment"&&e.date>=cycle.lastClose).sort((a,b)=>b.date-a.date);return t(Sht,{onClose,children:o(Fragment,{children:[
   t("div",{style:{fontFamily:c.hf,fontSize:24,marginBottom:4},children:"Pay statement"}),
@@ -1594,7 +1708,7 @@ return o("div",{style:{padding:"8px 0 32px"},className:"st",children:[
     o("div",{style:{marginTop:14},children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"NETWORK"}),t("div",{className:"f fw",style:{gap:6},children:NW.map(x=>t("button",{key:x.id,onClick:()=>sNw(x.id),className:"act95 tr",style:{padding:"8px 14px",background:nw===x.id?c.sf3:c.sf,border:`1px solid ${nw===x.id?c.ac:c.brs}`,borderRadius:999,fontSize:12,color:nw===x.id?c.tx:c.td},children:x.label}))})]}),
     o("div",{style:{marginTop:14},children:t(FI,{label:"Last 4 digits (optional)",value:l4,onChange:v=>sL4(v.replace(/\D/g,"").slice(0,4)),placeholder:"1234",mono:true,icon:t(CC,{size:14})})}),
     o("div",{style:{marginTop:14},children:t(FI,{label:"Cardholder name (optional)",value:ch,onChange:sCh,placeholder:"As printed on card"})}),
-    ty==="credit"&&o("div",{style:{marginTop:14},children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"BILLING CYCLE"}),o("div",{className:"g g2",style:{gap:8},children:[o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,marginBottom:4,letterSpacing:.5},children:"STATEMENT DAY"}),t("input",{type:"number",min:"1",max:"28",value:sD,onChange:e=>sSD(e.target.value),style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"10px 12px",color:c.tx,fontSize:14,outline:"none",fontFamily:F.mo,textAlign:"center"}})]}),o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,marginBottom:4,letterSpacing:.5},children:"DUE DAY"}),t("input",{type:"number",min:"1",max:"28",value:dD,onChange:e=>sDD(e.target.value),style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"10px 12px",color:c.tx,fontSize:14,outline:"none",fontFamily:F.mo,textAlign:"center"}})]})]})]}),
+    ty==="credit"&&o("div",{style:{marginTop:14},children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"BILLING CYCLE"}),o("div",{className:"g g2",style:{gap:8},children:[o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,marginBottom:4,letterSpacing:.5},children:"STATEMENT DAY"}),t("input",{type:"number",min:"1",max:"31",value:sD,onChange:e=>sSD(e.target.value),style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"10px 12px",color:c.tx,fontSize:14,outline:"none",fontFamily:F.mo,textAlign:"center"}})]}),o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,marginBottom:4,letterSpacing:.5},children:"DUE DAY"}),t("input",{type:"number",min:"1",max:"31",value:dD,onChange:e=>sDD(e.target.value),style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"10px 12px",color:c.tx,fontSize:14,outline:"none",fontFamily:F.mo,textAlign:"center"}})]})]})]}),
     o("div",{style:{marginTop:14},children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"COLOR"}),t("div",{className:"g g4",style:{gap:8},children:GR.map(x=>t("button",{key:x.id,onClick:()=>sGI(x.id),className:"act95 tr",style:{aspectRatio:"1.6",borderRadius:10,background:`linear-gradient(135deg,${x.from} 0%,${x.to} 100%)`,border:`2px solid ${gI===x.id?c.ac:"transparent"}`,padding:0}}))})]}),
     o("div",{style:{marginTop:14},children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"CARD DETAILS"}),o("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,padding:"12px 14px",display:"flex",flexDirection:"column",gap:12},children:[
       o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:.5,marginBottom:4},children:"CREDIT LIMIT (OPTIONAL)"}),o("div",{className:"f ia",style:{gap:6,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"8px 10px"},children:[t("span",{style:{fontFamily:F.mo,fontSize:12,color:c.tm},children:"₹"}),t("input",{type:"text",inputMode:"decimal",value:lim,onChange:e=>sLim(e.target.value.replace(/[^\d.]/g,"")),placeholder:"0",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:14,fontFamily:F.mo}})]})]}),
