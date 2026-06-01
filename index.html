@@ -104,7 +104,7 @@ body{background:#fff!important;color:#000!important}
 .nav-inner{
   width:100%;
   max-width:440px;
-  padding:0;
+  padding:0 12px;
 }
 body.sheet-open .nav-bar{display:none!important}
 /* === Synth-style neumorphic utilities === */
@@ -778,7 +778,7 @@ function App(){
     t(Gr,{}),
     t(AppHeader,{onMenu:()=>sSbar(true),onSearch:()=>sV("search"),onToggleTheme:toggleTheme,isDark,theme,onHome:()=>{sFlt(null);sAtx(null);if(scrollRef.current)scrollRef.current.scrollTop=0;sV("home")}}),
     o("div",{className:"r w100",style:{maxWidth:440,flex:1,minHeight:0,background:c.bg,borderLeft:`1px solid ${c.brs}`,borderRight:`1px solid ${c.brs}`,overflow:"hidden",display:"flex",flexDirection:"column"},children:[
-      o("div",{ref:scrollRef,style:{paddingBottom:16,paddingTop:"calc(52px + env(safe-area-inset-top))",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
+      o("div",{ref:scrollRef,style:{paddingBottom:"calc(34px + env(safe-area-inset-bottom))",paddingTop:"calc(52px + env(safe-area-inset-top))",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
         v==="home"&&t(Home,{data:d,onTx:sAtx,onView:sV,onSetBudget:b=>pst({budget:b}),onFlt:sFlt}),
         v==="calendar"&&t(Calend,{data:d,onTx:sAtx,presetAdd:(ts,k)=>{window.__pd=ts;window.__pt=k||"expense";sV("add")}}),
         v==="stats"&&t(Stats,{data:d,onTx:sAtx,onView:sV,onFlt:sFlt,persist:pst}),
@@ -833,9 +833,9 @@ function App(){
 
 // === BOTTOM NAV ===
 function Nav({view,setView}){const tabs=[{id:"home",icon:Hm,label:"home"},{id:"calendar",icon:Cal,label:"calendar"},{id:"add",icon:Plus,label:"add",main:true},{id:"stats",icon:BarChart3,label:"stats"},{id:"settings",icon:Gear,label:"settings"}];return t("div",{className:"nav-bar noprint",style:{background:c.bg},children:o("div",{className:"nav-inner",style:{position:"relative"},children:[
-  t("div",{style:{position:"absolute",top:-40,left:"50%",transform:"translateX(-50%)",width:120,height:120,borderRadius:999,background:`radial-gradient(circle,${c.cu}3d 0%,${c.cu}12 46%,transparent 70%)`,pointerEvents:"none",zIndex:0}}),
-  o("div",{className:"f ia jb",style:{position:"relative",zIndex:1,background:c.sfg,borderTop:`1px solid ${c.brs}`,borderRadius:"30px 30px 0 0",padding:"22px 20px calc(18px + env(safe-area-inset-bottom))",boxShadow:"0 -10px 30px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05)"},children:tabs.map(tb=>{if(tb.main)return t("div",{key:"sp",style:{width:84,flexShrink:0}});const a=view===tb.id,I=tb.icon;return o("button",{key:tb.id,onClick:()=>setView(tb.id),className:"act90 trt f fc ia",style:{background:"transparent",border:"none",gap:6,color:a?c.cu:c.cu+"73",flexShrink:0,padding:"2px 4px"},children:[t(I,{size:23,strokeWidth:a?2.4:1.7}),t("span",{style:{fontSize:10,fontFamily:F.mo,letterSpacing:.2,fontWeight:a?700:400},children:tb.label}),t("div",{style:{width:5,height:5,borderRadius:999,marginTop:3,background:a?c.cu:"transparent",transition:"background 180ms"}})]})})}),
-  t("button",{onClick:()=>setView("add"),"aria-label":"add",className:"neu-press act90 f ia jc",style:{position:"absolute",top:-30,left:"50%",transform:"translateX(-50%)",width:76,height:76,borderRadius:999,background:`radial-gradient(circle at 38% 30%,${c.sf3} 0%,${c.sfg} 72%)`,border:`1px solid ${c.cu}66`,color:c.cu,zIndex:2,boxShadow:`0 0 20px 2px ${c.cu}55,0 8px 20px rgba(0,0,0,.5)`},children:t(Plus,{size:30,strokeWidth:2.3})})
+  o("div",{className:"f ia jb",style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:24,padding:"7px 14px",boxShadow:"6px 6px 16px rgba(0,0,0,.6),-5px -5px 13px rgba(255,255,255,.06)"},children:tabs.map(tb=>{if(tb.main)return t("div",{key:"sp",style:{width:60,flexShrink:0}});const a=view===tb.id,I=tb.icon;return o("button",{key:tb.id,onClick:()=>setView(tb.id),className:"act90 trt f fc ia",style:{background:"transparent",border:"none",gap:3,color:a?c.cu:c.cu+"73",flexShrink:0,padding:"2px 4px"},children:[t(I,{size:20,strokeWidth:a?2.4:1.7}),t("span",{style:{fontSize:10,fontFamily:F.mo,letterSpacing:.2,fontWeight:a?700:400},children:tb.label}),t("div",{style:{width:4,height:4,borderRadius:999,marginTop:2,background:a?c.cu:"transparent",transition:"background 180ms"}})]})})}),
+  t("div",{style:{position:"absolute",top:-12,left:"50%",transform:"translateX(-50%)",width:74,height:74,borderRadius:999,background:c.bg,pointerEvents:"none"}}),
+  t("button",{onClick:()=>setView("add"),"aria-label":"add",className:"neu-circ neu-press act90 f ia jc",style:{position:"absolute",top:-16,left:"50%",transform:"translateX(-50%)",width:58,height:58,borderRadius:999,background:`radial-gradient(circle at 36% 28%,${c.sf3} 0%,${c.sfg} 70%)`,border:`1px solid ${c.cu}66`,color:c.cu},children:t(Plus,{size:26,strokeWidth:2.3})})
 ]})})}
 
 
