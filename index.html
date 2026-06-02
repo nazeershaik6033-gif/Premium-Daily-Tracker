@@ -587,8 +587,8 @@ function AppHeader({onMenu,onSearch,onToggleTheme,isDark,theme,onHome}){
   ]})})
 }
 const SB_ORDER_KEY="etp-sidebar-order";
-const DEFAULT_SB=["userMgr","upcomingExp","expPlanner","investCalc","sep","cards","rules","bills","goals","investments","wealth","monthlyReport","sep","accounts","transfer","recurring","profiles","categoryBudgets","categories","backup","tips","settings"];
-const SB_META={userMgr:{e:"👥",l:"Switch User",s:"Manage profiles"},rules:{e:"📋",l:"Rules & Learnings",s:"Track your financial rules"},upcomingExp:{e:"📅",l:"Upcoming Expenses",s:"Plan & get alerts"},expPlanner:{e:"🧮",l:"Expense Planner",s:"Can I afford this EMI?"},investCalc:{e:"📈",l:"Investment Calculator",s:"Compound growth & SIP planner"},cards:{e:"💳",l:"Cards",acc:true},bills:{e:"🔔",l:"Bills & Reminders",acc:true},goals:{e:"🎯",l:"Goals & Debt",acc:true},investments:{e:"💼",l:"My Investments",s:"NPS, Funds, FDs",acc:true},wealth:{e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},monthlyReport:{e:"📰",l:"Monthly Report",s:"Print or share PDF",acc:true},accounts:{e:"🏦",l:"Accounts"},transfer:{e:"↔️",l:"Transfer",s:"Move funds"},recurring:{e:"🔁",l:"Recurring"},profiles:{e:"⚡",l:"Quick profiles"},categoryBudgets:{e:"📏",l:"Category budgets",s:"Set spending limits"},categories:{e:"🏷️",l:"Categories",s:"Manage expense types"},backup:{e:"💾",l:"Backup & Restore",s:"Export or import data"},tips:{e:"💡",l:"Financial Health",s:"Tips & scores"},settings:{e:"⚙️",l:"Settings",s:"Currency, budget, backup"}};
+const DEFAULT_SB=["userMgr","upcomingExp","expPlanner","investCalc","sep","cards","rules","bills","goals","investments","wealth","monthlyReport","sep","accounts","transfer","recurring","profiles","categoryBudgets","categories","capture","backup","tips","settings"];
+const SB_META={userMgr:{e:"👥",l:"Switch User",s:"Manage profiles"},rules:{e:"📋",l:"Rules & Learnings",s:"Track your financial rules"},upcomingExp:{e:"📅",l:"Upcoming Expenses",s:"Plan & get alerts"},expPlanner:{e:"🧮",l:"Expense Planner",s:"Can I afford this EMI?"},investCalc:{e:"📈",l:"Investment Calculator",s:"Compound growth & SIP planner"},cards:{e:"💳",l:"Cards",acc:true},bills:{e:"🔔",l:"Bills & Reminders",acc:true},goals:{e:"🎯",l:"Goals & Debt",acc:true},investments:{e:"💼",l:"My Investments",s:"NPS, Funds, FDs",acc:true},wealth:{e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},monthlyReport:{e:"📰",l:"Monthly Report",s:"Print or share PDF",acc:true},accounts:{e:"🏦",l:"Accounts"},transfer:{e:"↔️",l:"Transfer",s:"Move funds"},recurring:{e:"🔁",l:"Recurring"},profiles:{e:"⚡",l:"Quick profiles"},categoryBudgets:{e:"📏",l:"Category budgets",s:"Set spending limits"},categories:{e:"🏷️",l:"Categories",s:"Manage expense types"},capture:{e:"📥",l:"Quick Capture",s:"Log from other apps (iOS)"},backup:{e:"💾",l:"Backup & Restore",s:"Export or import data"},tips:{e:"💡",l:"Financial Health",s:"Tips & scores"},settings:{e:"⚙️",l:"Settings",s:"Currency, budget, backup"}};
 function Sidebar({data,onClose,onView,activeUser,onUpdateUser}){
   const go=(id)=>{onView(id);onClose()};
   const msd=data.monthStartDay||1;const mst=ps(new Date(),msd);
@@ -683,6 +683,7 @@ function App(){
   const[cdId,sCdId]=useState(null);
   const[sbar,sSbar]=useState(false);
   const[flt,sFlt]=useState(null);
+  const[capWait,setCapWait]=useState(false);
   const[theme,setTheme]=useState(()=>{const t2=localStorage.getItem("etp-theme");return t2==="navy"?"navy":t2==="light"?"light":"dark"});
   const isDark=theme!=="light";
   const[users,setUsers]=useState([]);
@@ -770,7 +771,12 @@ function App(){
   useEffect(()=>{document.documentElement.style.zoom="1"},[]);
   useEffect(()=>{if(scrollRef.current)scrollRef.current.scrollTop=0},[v]);
   useEffect(()=>{const s=document.documentElement.style;s.setProperty('--nf',gNF(d));s.setProperty('--tf',gTF(d));s.setProperty('--ns',gNS(d)+'px')},[d.fontPrefs]);
-  useEffect(()=>{try{const p=new URLSearchParams(location.search);if(p.get('action')==='add'){history.replaceState(null,'','./');sV('add')}if(p.get('view')==='stats'){history.replaceState(null,'','./');sV('stats')}}catch{}},[]);
+  useEffect(()=>{try{const p=new URLSearchParams(location.search);if(p.get('action')==='add'){history.replaceState(null,'','./');sV('add')}if(p.get('view')==='stats'){history.replaceState(null,'','./');sV('stats')}
+    const pst2=p.get('paste'),pre=p.get('prefill'),cap=p.get('capture');
+    if(pre){try{const obj=JSON.parse(decodeURIComponent(escape(atob(pre.replace(/-/g,'+').replace(/_/g,'/')))));window.__prefill=obj;window.__pm="paste";history.replaceState(null,'','./');sV('add')}catch(e){}}
+    else if(pst2){window.__paste=pst2;window.__pm="paste";history.replaceState(null,'','./');sV('add')}
+    else if(cap){history.replaceState(null,'','./');setCapWait(true);sV('home')}
+  }catch{}},[]);
   useEffect(()=>{if(!d.reminderEnabled||!d.reminderTime||Notification.permission!=='granted')return;const[hh,mm]=d.reminderTime.split(':').map(Number);const now=new Date(),next=new Date();next.setHours(hh,mm,0,0);if(next<=now)next.setDate(next.getDate()+1);const tid=setTimeout(()=>{fireReminderNotif(dRef.current)},next-now);return()=>clearTimeout(tid)},[d.reminderEnabled,d.reminderTime]);
   useEffect(()=>{if(d.loading||d.backupFreq==="off")return;const interval=d.backupFreq==="weekly"?7*864e5:30*864e5;if(Date.now()-d.lastBackupAt<interval)return;const dd=dRef.current;(async()=>{const blob=new Blob([await buildBackupJSON(dd,true)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`expense-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url);pst({lastBackupAt:Date.now()})})()},[d.loading]);
   useEffect(()=>{const run=()=>{const dd=dRef.current;if(!dd||dd.loading||!dd.recurring||!dd.recurring.length)return;const{newExpenses,updatedRecurring}=pr(dd.recurring,dd.expenses);if(newExpenses.length>0)pst({expenses:[...newExpenses,...dd.expenses].sort((a,b)=>b.date-a.date),recurring:updatedRecurring})};const onVis=()=>{if(document.visibilityState==="visible")run()};window.addEventListener("focus",run);document.addEventListener("visibilitychange",onVis);const iv=setInterval(run,6e4);return()=>{window.removeEventListener("focus",run);document.removeEventListener("visibilitychange",onVis);clearInterval(iv)}},[]);
@@ -785,10 +791,11 @@ function App(){
     t(AppHeader,{onMenu:()=>sSbar(true),onSearch:()=>sV("search"),onToggleTheme:toggleTheme,isDark,theme,onHome:()=>{sFlt(null);sAtx(null);if(scrollRef.current)scrollRef.current.scrollTop=0;sV("home")}}),
     o("div",{className:"r w100",style:{maxWidth:440,flex:1,minHeight:0,background:c.bg,borderLeft:`1px solid ${c.brs}`,borderRight:`1px solid ${c.brs}`,overflow:"hidden",display:"flex",flexDirection:"column"},children:[
       o("div",{ref:scrollRef,style:{paddingBottom:"calc(34px + env(safe-area-inset-bottom))",paddingTop:"calc(52px + env(safe-area-inset-top))",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
+        capWait&&v==="home"&&o("div",{style:{margin:"0 16px 4px"},children:[o("div",{onClick:async()=>{try{const txt=await navigator.clipboard.readText();if(txt&&txt.trim().length>3){window.__paste=txt;window.__pm="paste";setCapWait(false);sV("add")}else alert("Clipboard looks empty. Copy the payment message first, then tap this again.")}catch(e){alert("Couldn't read the clipboard. On iOS tap 'Allow Paste' when prompted, or paste manually in Add → Smart Paste.")}},className:"act98 tr f ia",style:{gap:12,padding:"14px 16px",background:c.ac+"14",border:`1px solid ${c.ac}55`,borderRadius:14,cursor:"pointer"},children:[t("span",{style:{fontSize:22},children:"📥"}),o("div",{className:"f1 minw0",children:[t("div",{style:{fontSize:14,fontWeight:600,color:c.tx},children:"Review captured expense"}),t("div",{style:{fontSize:11.5,color:c.td,marginTop:1},children:"Tap to paste what you copied & pre-fill"})]}),t("button",{onClick:e=>{e.stopPropagation();setCapWait(false)},"aria-label":"dismiss",style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4,flexShrink:0},children:t(X,{size:16})})]})]}),
         v==="home"&&t(Home,{data:d,onTx:sAtx,onView:sV,onSetBudget:b=>pst({budget:b}),onFlt:sFlt}),
         v==="calendar"&&t(Calend,{data:d,onTx:sAtx,presetAdd:(ts,k)=>{window.__pd=ts;window.__pt=k||"expense";sV("add")}}),
         v==="stats"&&t(Stats,{data:d,onTx:sAtx,onView:sV,onFlt:sFlt,persist:pst}),
-        v==="add"&&t(Editor,{data:d,onSave:sFE,onCancel:()=>sV("home"),presetDate:window.__pd,presetType:window.__pt,presetMode:window.__pm,clearPreset:()=>{window.__pd=null;window.__pt=null;window.__pm=null}}),
+        v==="add"&&t(Editor,{data:d,onSave:sFE,onCancel:()=>sV("home"),presetDate:window.__pd,presetType:window.__pt,presetMode:window.__pm,presetPaste:window.__paste,presetPrefill:window.__prefill,clearPreset:()=>{window.__pd=null;window.__pt=null;window.__pm=null;window.__paste=null;window.__prefill=null}}),
         v==="edit"&&ed&&t(Editor,{data:d,onSave:({expense})=>uE({...ed,...expense}),onCancel:()=>{sEd(null);sV("home")},editing:ed}),
         v==="more"&&t(More,{data:d,onClose:()=>sV("home"),onView:(id)=>{navFromRef.current="more";sV(id)}}),
         v==="search"&&t(SrchS,{data:d,onClose:()=>sV("home"),onTx:sAtx,onView:sV}),
@@ -822,6 +829,7 @@ function App(){
         v==="backup"&&t(Backup,{data:d,persist:pst,onClose:()=>sV("home")}),
         v==="tips"&&t(Tips,{data:d,onClose:()=>sV(navFromRef.current)}),
         v==="categories"&&t(CatMgr,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
+        v==="capture"&&t(CaptureGuide,{data:d,onClose:()=>sV(navFromRef.current)}),
         v==="chat"&&t(Chat,{data:d,onAddExpense:aE,onView:sV,onClose:()=>sV("home")}),
         v==="billScan"&&t(BillScan,{data:d,onAddExpense:aE,onClose:()=>sV("home")}),
         v==="userMgr"&&t(UserMgr,{users,activeUser,onSwitch:async u=>{await switchUser(u);sV("home")},onAdd:addUserFn,onDelete:delUserFn,onUpdate:updateUserFn,onClose:()=>sV("home")}),
@@ -1306,12 +1314,13 @@ return o("div",{style:{padding:"8px 24px 0"},className:"st",children:[
 ]})}
 
 // === EDITOR ===
-function Editor({data,onSave,onCancel,presetDate,presetType,presetMode,clearPreset,editing}){const{accounts,currency,cards=[]}=data;const iE=!!editing;const[tp,sTp]=useState(iE?(editing.type==="income"?"income":"expense"):(presetType==="income"?"income":"expense"));const iI=tp==="income";const[md,sMd]=useState(presetMode||"manual");const[am,sAm]=useState(iE?String(editing.amount):"");const[ct,sCt]=useState(iE?editing.category:(presetType==="income"?"salary":"food"));const[sb,sSb]=useState(iE&&editing.subcategory||null);const[mc,sMc]=useState(iE&&editing.merchant||"");const[py,sPy]=useState(iE&&editing.payee||"");const[nt,sNt]=useState(iE&&editing.note||"");const[ph,sPh]=useState(iE?(editing.photos||[]):[]);const[aId,sAId]=useState(iE?editing.accountId:null);const[cId,sCId]=useState(iE&&editing.cardId||null);const[mop,sMop]=useState(iE?(editing.cardId?"card":"account"):"account");const[bk,sBk]=useState(iE&&editing.bank||"");const[ct2,sCt2]=useState(iE&&editing.cardType||"");const[c4,sC4]=useState(iE&&editing.cardLast4||"");const[dt,sDt]=useState(iE?editing.date:(presetDate||Date.now()));const[smsT,sSms]=useState("");const[ex,sEx]=useState(null);const[rc,sRc]=useState(false);const[fq,sFq]=useState("monthly");const[pf,sPf]=useState(false);const phR=useRef(null);
+function Editor({data,onSave,onCancel,presetDate,presetType,presetMode,presetPaste,presetPrefill,clearPreset,editing}){const{accounts,currency,cards=[]}=data;const iE=!!editing;const[tp,sTp]=useState(iE?(editing.type==="income"?"income":"expense"):(presetType==="income"?"income":"expense"));const iI=tp==="income";const[md,sMd]=useState(presetMode||"manual");const[am,sAm]=useState(iE?String(editing.amount):"");const[ct,sCt]=useState(iE?editing.category:(presetType==="income"?"salary":"food"));const[sb,sSb]=useState(iE&&editing.subcategory||null);const[mc,sMc]=useState(iE&&editing.merchant||"");const[py,sPy]=useState(iE&&editing.payee||"");const[nt,sNt]=useState(iE&&editing.note||"");const[ph,sPh]=useState(iE?(editing.photos||[]):[]);const[aId,sAId]=useState(iE?editing.accountId:null);const[cId,sCId]=useState(iE&&editing.cardId||null);const[mop,sMop]=useState(iE?(editing.cardId?"card":"account"):"account");const[bk,sBk]=useState(iE&&editing.bank||"");const[ct2,sCt2]=useState(iE&&editing.cardType||"");const[c4,sC4]=useState(iE&&editing.cardLast4||"");const[dt,sDt]=useState(iE?editing.date:(presetDate||Date.now()));const[smsT,sSms]=useState("");const[ex,sEx]=useState(null);const[rc,sRc]=useState(false);const[fq,sFq]=useState("monthly");const[pf,sPf]=useState(false);const phR=useRef(null);
 useEffect(()=>{if(presetDate&&clearPreset)clearPreset()},[]);
 const acc=accounts.find(a=>a.id===aId)||null,ev2=ev(am),iX=/[+\-*/×÷]/.test(am),va=ev2!=null&&ev2>0&&(mop==="card"?!!cId:!!aId);
 const dStr=ts=>{const d=new Date(ts);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
 const sDStr=s=>{if(!s)return;const[y,m,d]=s.split("-").map(Number);const dd=new Date(dt);dd.setFullYear(y,m-1,d);sDt(dd.getTime())};
 const tSms=s=>{sSms(s);if(s.trim().length>4){const e=sms(s);sEx(e);if(e){if(e.amount)sAm(String(e.amount));if(e.category)sCt(e.category);if(e.merchant)sMc(e.merchant);if(e.bank)sBk(e.bank);if(e.cardType)sCt2(e.cardType);if(e.cardLast4)sC4(e.cardLast4);if(e.date)sDt(e.date)}}else sEx(null)};
+useEffect(()=>{if(editing)return;if(presetPrefill){const p=presetPrefill;if(p.type==="income")sTp("income");if(p.amount!=null)sAm(String(p.amount));if(p.merchant)sMc(p.merchant);if(p.category)sCt(p.category);if(p.note)sNt(p.note);if(p.bank)sBk(p.bank);if(p.date)sDt(p.date)}else if(presetPaste){sMd("paste");tSms(presetPaste)}},[]);
 const pCl=async()=>{try{tSms(await navigator.clipboard.readText())}catch{alert("Clipboard blocked. Paste into the box.")}};
 const op=s=>{if(!am)return;const l=am.slice(-1);if("+-*/×÷".includes(l))sAm(am.slice(0,-1)+s);else sAm(am+s)};
 const oPh=async fs2=>{const ls=[];for(const f of fs2){if(!f.type.startsWith("image/"))continue;if(f.size>2.5e6){alert(`"${f.name}" is over 2.5MB.`);continue}const d2=await new Promise(r=>{const rd2=new FileReader();rd2.onload=()=>r(rd2.result);rd2.readAsDataURL(f)});ls.push({id:Date.now()+Math.random(),data:d2,name:f.name})}sPh([...ph,...ls])};
@@ -2925,6 +2934,45 @@ const suggestEmojis=(name)=>{
   }
   return out.slice(0,16);
 };
+function CaptureGuide({data,onClose}){
+  const[mode,setMode]=useState(()=>{try{return localStorage.getItem("etp-capture-handoff")||"clipboard"}catch{return"clipboard"}});
+  const setM=m=>{setMode(m);try{localStorage.setItem("etp-capture-handoff",m)}catch{}};
+  const base=location.origin+location.pathname;
+  const url=mode==="clipboard"?base+"?capture=1":base+"?paste=";
+  const[copied,setCopied]=useState(false);
+  const copy=txt=>{try{navigator.clipboard.writeText(txt).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),1600)})}catch{}};
+  const steps=mode==="clipboard"?[
+    "Open the Shortcuts app → tap + → New Shortcut.",
+    "Add the action “Open URLs” and paste the URL above into it.",
+    "Rename the shortcut to “Log Expense”.",
+    "Wire it to a trigger: Settings → Accessibility → Touch → Back Tap → Double Tap → Log Expense; and/or Action button → Shortcut → Log Expense; and/or add a Shortcuts widget to your Home/Lock screen.",
+  ]:[
+    "Open the Shortcuts app → tap + → New Shortcut.",
+    "Add action “Get Clipboard”.",
+    "Add action “URL Encode” with the Clipboard as its input.",
+    "Add action “Text” and type the URL above, then insert the URL-Encoded variable immediately after “paste=”.",
+    "Add action “Open URLs” with that Text as its input.",
+    "Rename to “Log Expense” and wire it to Back Tap / Action button / a widget.",
+  ];
+  const use=mode==="clipboard"
+    ?"Copy the bank SMS / UPI message, trigger the shortcut, then tap “Review captured expense” here — the Add screen opens pre-filled."
+    :"Copy the bank SMS / UPI message, trigger the shortcut, and the Add screen opens pre-filled, ready to confirm.";
+  const Lbl=tx=>t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,margin:"18px 0 8px"},children:tx});
+  return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
+    t(SH,{title:t("em",{children:"Quick Capture"}),onBack:onClose}),
+    t("div",{style:{fontSize:13,color:c.td,lineHeight:1.55,marginTop:4},children:"Log a payment from another app on iPhone with minimal typing. You copy the bank SMS / UPI message, fire an iOS Shortcut (Back Tap, Action button or a widget), and this app opens with the expense pre-filled for you to confirm."}),
+    t("div",{style:{fontSize:11.5,color:c.tm,lineHeight:1.5,marginTop:8},children:"Note: iOS can’t float over other apps, so capture is copy-then-trigger. Text parsing is fully on-device."}),
+    Lbl("HANDOFF METHOD"),
+    o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`},children:[{k:"clipboard",l:"Clipboard (robust)"},{k:"deeplink",l:"Deep link (fastest)"}].map(o2=>t("button",{key:o2.k,onClick:()=>setM(o2.k),className:"f1 tr",style:{padding:"9px 0",background:mode===o2.k?c.ac:"transparent",color:mode===o2.k?"#0a0a0a":c.td,borderRadius:9,fontSize:12,fontWeight:mode===o2.k?600:400,border:"none"},children:o2.l}))}),
+    t("div",{style:{fontSize:11.5,color:c.td,marginTop:8,lineHeight:1.5},children:mode==="clipboard"?"Shortcut just opens the app; it reads what you copied. Always reaches the app instance you actually use.":"Shortcut builds a link with the copied text and opens it. Fastest, but make sure it opens the same app instance you normally use (home-screen vs Safari) so it saves to the right place."}),
+    Lbl("SHORTCUT URL"),
+    o("div",{className:"f ia",style:{gap:8,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px"},children:[t("div",{className:"f1 minw0",style:{fontFamily:F.mo,fontSize:12,color:c.tx,wordBreak:"break-all"},children:url}),t("button",{onClick:()=>copy(url),className:"act90 trt",style:{flexShrink:0,padding:"7px 12px",background:copied?c.mt:c.ac,color:"#0a0a0a",border:"none",borderRadius:9,fontSize:12,fontWeight:600},children:copied?"Copied":"Copy"})]}),
+    Lbl("SET UP THE SHORTCUT"),
+    o("div",{style:{display:"flex",flexDirection:"column",gap:8},children:steps.map((s,i)=>o("div",{key:i,className:"f",style:{gap:10},children:[t("div",{style:{flexShrink:0,width:22,height:22,borderRadius:999,background:c.sf3,color:c.ac,fontFamily:F.mo,fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"},children:i+1}),t("div",{style:{fontSize:13,color:c.tx,lineHeight:1.5},children:s})]}))}),
+    Lbl("HOW TO USE IT"),
+    t("div",{style:{fontSize:13,color:c.td,lineHeight:1.55,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px"},children:use}),
+  ]})
+}
 function CatMgr({data,persist,onClose}){
   const{customExpenseCategories=[],customIncomeCategories=[],categoryOverrides={}}=data;
   const[tab,sTab]=useState("expense");
