@@ -2937,45 +2937,64 @@ const suggestEmojis=(name)=>{
   return out.slice(0,16);
 };
 function CaptureGuide({data,onClose,capEnabled,onCapEnabled}){
-  const[mode,setMode]=useState(()=>{try{return localStorage.getItem("etp-capture-handoff")||"openapp"}catch{return"openapp"}});
+  const[mode,setMode]=useState(()=>{try{return localStorage.getItem("etp-capture-handoff")||"manual"}catch{return"manual"}});
   const setM=m=>{setMode(m);try{localStorage.setItem("etp-capture-handoff",m)}catch{}};
   const base=location.origin+location.pathname;
   const url=base+"?paste=";
   const[copied,setCopied]=useState(false);
   const copy=txt=>{try{navigator.clipboard.writeText(txt).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),1600)})}catch{}};
-  const steps=mode==="openapp"?[
-    "Open the Shortcuts app → tap + → New Shortcut.",
-    "Add the action “Open App”.",
-    "Tap “App”, then tap the search box and type the name shown under your Home-Screen icon — by default that is “Expense Pro”. Select it.",
-    "Rename the shortcut to “Log Expense”.",
-    "Wire it to a trigger: Settings → Accessibility → Touch → Back Tap → Double Tap → Log Expense; and/or Action button → Shortcut → Log Expense; and/or add a Shortcuts widget to your Home/Lock screen.",
-    "Make sure “Show paste button on Home” below is ON.",
-  ]:[
-    "Open the Shortcuts app → tap + → New Shortcut.",
-    "Add action “Get Clipboard”.",
-    "Add action “URL Encode” with the Clipboard as its input.",
-    "Add action “Text” and type the URL above, then insert the URL-Encoded variable immediately after “paste=”.",
-    "Add action “Open URLs” with that Text as its input.",
-    "Rename to “Log Expense” and wire it to Back Tap / Action button / a widget.",
-  ];
-  const use=mode==="openapp"
-    ?"Copy the bank SMS / UPI message, fire the shortcut — the app opens — then tap “Paste a payment” on Home. The Add screen opens pre-filled, ready to confirm."
-    :"Copy the bank SMS / UPI message, trigger the shortcut, and the Add screen opens pre-filled, ready to confirm.";
   const Lbl=tx=>t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,margin:"18px 0 8px"},children:tx});
+  const Card=ch=>t("div",{style:{fontSize:13,color:c.td,lineHeight:1.55,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px"},children:ch});
+  const stepList=arr=>o("div",{style:{display:"flex",flexDirection:"column",gap:8},children:arr.map((s,i)=>o("div",{key:i,className:"f",style:{gap:10},children:[t("div",{style:{flexShrink:0,width:22,height:22,borderRadius:999,background:c.sf3,color:c.ac,fontFamily:F.mo,fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"},children:i+1}),t("div",{style:{fontSize:13,color:c.tx,lineHeight:1.5},children:s})]}))});
+  const toggle=o("div",{className:"f ia jb",style:{gap:12,marginTop:12,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px"},children:[o("div",{className:"f1 minw0",children:[t("div",{style:{fontSize:13.5,fontWeight:600,color:c.tx},children:"Show “Paste a payment” on Home"}),t("div",{style:{fontSize:11.5,color:c.td,marginTop:2,lineHeight:1.45},children:"The one-tap card that reads your copied message and pre-fills the expense."})]}),t("button",{onClick:()=>onCapEnabled(!capEnabled),"aria-label":"toggle home paste button",style:{flexShrink:0,width:46,height:28,borderRadius:999,border:"none",background:capEnabled?c.ac:c.sf3,position:"relative",cursor:"pointer",transition:"background .15s"},children:t("div",{style:{position:"absolute",top:3,left:capEnabled?21:3,width:22,height:22,borderRadius:999,background:"#fff",transition:"left .15s"}})})]});
+  const body=mode==="manual"?[
+    t("div",{key:"d",style:{fontSize:13,color:c.td,lineHeight:1.55,marginTop:4},children:"The reliable way on every iPhone. No Shortcut, no setup that depends on iOS quirks — your copied bank message hands off through the system clipboard."}),
+    Lbl("STEPS"),
+    stepList([
+      "Turn on “Show ‘Paste a payment’ on Home” below (leave it on).",
+      "When a payment SMS / UPI message arrives, long-press it → Copy.",
+      "Tap this app’s icon on your Home Screen to open it.",
+      "Tap “Paste a payment” on Home — the Add screen opens pre-filled. Confirm and save.",
+    ]),
+    toggle,
+    Lbl("MAKE IT FASTER (OPTIONAL)"),
+    Card([t("div",{children:"To skip opening the app by hand, add an iOS Shortcut that opens it — see the “Open App shortcut” tab. It only works on iOS 16.4+ and only if Shortcuts lists this web app; if it doesn’t on your phone, the manual steps above always work."})]),
+  ]:mode==="openapp"?[
+    o("div",{key:"w",style:{fontSize:12.5,color:c.td,lineHeight:1.5,marginTop:4,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px"},children:[t("b",{style:{color:c.tx},children:"Heads up: "}),"iOS only lists Home-Screen web apps in the Shortcuts “Open App” action on 16.4+, and even then not on every device. If it isn’t listed for you, use the Manual tab — it always works."]}),
+    Lbl("SET UP THE SHORTCUT"),
+    stepList([
+      "Open the Shortcuts app → tap + → New Shortcut.",
+      "Add the action “Open App”.",
+      "Tap “App”, tap the search box, and type “Expense Pro” (the name under your Home-Screen icon). Select it if it appears.",
+      "Rename the shortcut to “Log Expense”.",
+      "Wire it to a trigger: Settings → Accessibility → Touch → Back Tap; and/or the Action button; and/or a Shortcuts widget.",
+      "Keep “Show ‘Paste a payment’ on Home” below ON.",
+    ]),
+    toggle,
+    Lbl("HOW TO USE IT"),
+    Card("Copy the message, fire the shortcut — the app opens — then tap “Paste a payment” on Home. The Add screen opens pre-filled."),
+  ]:[
+    o("div",{key:"w",style:{fontSize:12.5,color:c.td,lineHeight:1.5,marginTop:4,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px"},children:[t("b",{style:{color:c.tx},children:"Only for Safari users: "}),"this opens the tracker in Safari, which keeps a separate database from the app on your Home Screen. Use it only if you run the tracker inside Safari, not as a Home-Screen app — otherwise it saves to the wrong place."]}),
+    Lbl("SHORTCUT URL"),
+    o("div",{key:"u",className:"f ia",style:{gap:8,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px"},children:[t("div",{className:"f1 minw0",style:{fontFamily:F.mo,fontSize:12,color:c.tx,wordBreak:"break-all"},children:url}),t("button",{onClick:()=>copy(url),className:"act90 trt",style:{flexShrink:0,padding:"7px 12px",background:copied?c.mt:c.ac,color:"#0a0a0a",border:"none",borderRadius:9,fontSize:12,fontWeight:600},children:copied?"Copied":"Copy"})]}),
+    Lbl("SET UP THE SHORTCUT"),
+    stepList([
+      "Open the Shortcuts app → tap + → New Shortcut.",
+      "Add action “Get Clipboard”.",
+      "Add action “URL Encode” with the Clipboard as its input.",
+      "Add action “Text”: type the URL above, then insert the URL-Encoded variable right after “paste=”.",
+      "Add action “Open URLs” with that Text as its input.",
+      "Rename to “Log Expense” and wire it to Back Tap / Action button / a widget.",
+    ]),
+    Lbl("HOW TO USE IT"),
+    Card("Copy the message, trigger the shortcut, and the Add screen opens pre-filled in Safari."),
+  ];
   return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
     t(SH,{title:t("em",{children:"Quick Capture"}),onBack:onClose}),
-    t("div",{style:{fontSize:13,color:c.td,lineHeight:1.55,marginTop:4},children:"Log a payment from another app on iPhone with minimal typing. You copy the bank SMS / UPI message, fire an iOS Shortcut (Back Tap, Action button or a widget), and this app opens with the expense ready to confirm."}),
-    o("div",{style:{fontSize:11.5,color:c.tm,lineHeight:1.5,marginTop:8,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px"},children:[t("b",{style:{color:c.td},children:"Why “Open App”? "}),"On iPhone, a Shortcut that opens a web URL launches Safari — and Safari keeps a separate database from the app you added to your Home Screen, so it looks empty. The “Open App” method opens the real Home-Screen app where your data lives."]}),
-    Lbl("HANDOFF METHOD"),
-    o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`},children:[{k:"openapp",l:"Open App (recommended)"},{k:"deeplink",l:"Deep link (Safari)"}].map(o2=>t("button",{key:o2.k,onClick:()=>setM(o2.k),className:"f1 tr",style:{padding:"9px 0",background:mode===o2.k?c.ac:"transparent",color:mode===o2.k?"#0a0a0a":c.td,borderRadius:9,fontSize:12,fontWeight:mode===o2.k?600:400,border:"none"},children:o2.l}))}),
-    t("div",{style:{fontSize:11.5,color:c.td,marginTop:8,lineHeight:1.5},children:mode==="openapp"?"Opens the Home-Screen app reliably, then reads what you copied when you tap the Home paste button. Recommended for iPhone.":"Builds a link with the copied text and opens it in Safari. Only use this if you run the tracker inside Safari (not added to your Home Screen) — otherwise it saves to the wrong place."}),
-    mode==="openapp"&&o("div",{className:"f ia jb",style:{gap:12,marginTop:12,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px"},children:[o("div",{className:"f1 minw0",children:[t("div",{style:{fontSize:13.5,fontWeight:600,color:c.tx},children:"Show paste button on Home"}),t("div",{style:{fontSize:11.5,color:c.td,marginTop:2,lineHeight:1.45},children:"Adds a “Paste a payment” card to Home so you can pull in the copied message in one tap."})]}),t("button",{onClick:()=>onCapEnabled(!capEnabled),"aria-label":"toggle home paste button",style:{flexShrink:0,width:46,height:28,borderRadius:999,border:"none",background:capEnabled?c.ac:c.sf3,position:"relative",cursor:"pointer",transition:"background .15s"},children:t("div",{style:{position:"absolute",top:3,left:capEnabled?21:3,width:22,height:22,borderRadius:999,background:"#fff",transition:"left .15s"}})})]}),
-    mode==="deeplink"&&[Lbl("SHORTCUT URL"),o("div",{key:"u",className:"f ia",style:{gap:8,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px"},children:[t("div",{className:"f1 minw0",style:{fontFamily:F.mo,fontSize:12,color:c.tx,wordBreak:"break-all"},children:url}),t("button",{onClick:()=>copy(url),className:"act90 trt",style:{flexShrink:0,padding:"7px 12px",background:copied?c.mt:c.ac,color:"#0a0a0a",border:"none",borderRadius:9,fontSize:12,fontWeight:600},children:copied?"Copied":"Copy"})]})],
-    Lbl("SET UP THE SHORTCUT"),
-    o("div",{style:{display:"flex",flexDirection:"column",gap:8},children:steps.map((s,i)=>o("div",{key:i,className:"f",style:{gap:10},children:[t("div",{style:{flexShrink:0,width:22,height:22,borderRadius:999,background:c.sf3,color:c.ac,fontFamily:F.mo,fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"},children:i+1}),t("div",{style:{fontSize:13,color:c.tx,lineHeight:1.5},children:s})]}))}),
-    Lbl("HOW TO USE IT"),
-    t("div",{style:{fontSize:13,color:c.td,lineHeight:1.55,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px"},children:use}),
-    mode==="openapp"&&[Lbl("IF “OPEN APP” DOESN’T LIST IT"),o("div",{key:"tb",style:{fontSize:12.5,color:c.td,lineHeight:1.55,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px"},children:[t("div",{children:"Home-Screen web apps only appear in “Open App” on iOS 16.4+, and only after you’ve opened the app at least once. In the picker, tap the search field and type “Expense Pro”. If it still doesn’t show, that’s an iOS limitation — use the no-shortcut fallback below, which always works:"}),o("ol",{style:{margin:"8px 0 0",paddingLeft:18},children:[t("li",{style:{marginBottom:4},children:"Copy the bank SMS / UPI message."}),t("li",{style:{marginBottom:4},children:"Tap the app’s icon on your Home Screen to open it (one tap)."}),t("li",{children:"Tap “Paste a payment” on Home — the Add screen opens pre-filled."})]})]})],
+    t("div",{style:{fontSize:13,color:c.td,lineHeight:1.55,marginTop:4},children:"Log a payment from another app with minimal typing: copy the bank SMS / UPI message, open this app, and it pre-fills the expense from the copied text. Parsing is fully on-device."}),
+    Lbl("METHOD"),
+    o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`},children:[{k:"manual",l:"Manual (works)"},{k:"openapp",l:"Open App"},{k:"deeplink",l:"Safari"}].map(o2=>t("button",{key:o2.k,onClick:()=>setM(o2.k),className:"f1 tr",style:{padding:"9px 0",background:mode===o2.k?c.ac:"transparent",color:mode===o2.k?"#0a0a0a":c.td,borderRadius:9,fontSize:12,fontWeight:mode===o2.k?600:400,border:"none"},children:o2.l}))}),
+    ...body,
   ]})
 }
 function CatMgr({data,persist,onClose}){
