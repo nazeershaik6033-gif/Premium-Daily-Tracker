@@ -684,6 +684,8 @@ function App(){
   const[sbar,sSbar]=useState(false);
   const[flt,sFlt]=useState(null);
   const[capWait,setCapWait]=useState(false);
+  const[capEnabled,setCapEnabled]=useState(()=>{try{return localStorage.getItem("etp-capture-enabled")==="1"}catch{return false}});
+  const setCapEn=(val)=>{setCapEnabled(val);try{localStorage.setItem("etp-capture-enabled",val?"1":"0")}catch{}};
   const[theme,setTheme]=useState(()=>{const t2=localStorage.getItem("etp-theme");return t2==="navy"?"navy":t2==="light"?"light":"dark"});
   const isDark=theme!=="light";
   const[users,setUsers]=useState([]);
@@ -791,7 +793,7 @@ function App(){
     t(AppHeader,{onMenu:()=>sSbar(true),onSearch:()=>sV("search"),onToggleTheme:toggleTheme,isDark,theme,onHome:()=>{sFlt(null);sAtx(null);if(scrollRef.current)scrollRef.current.scrollTop=0;sV("home")}}),
     o("div",{className:"r w100",style:{maxWidth:440,flex:1,minHeight:0,background:c.bg,borderLeft:`1px solid ${c.brs}`,borderRight:`1px solid ${c.brs}`,overflow:"hidden",display:"flex",flexDirection:"column"},children:[
       o("div",{ref:scrollRef,style:{paddingBottom:"calc(34px + env(safe-area-inset-bottom))",paddingTop:"calc(52px + env(safe-area-inset-top))",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
-        capWait&&v==="home"&&o("div",{style:{margin:"0 16px 4px"},children:[o("div",{onClick:async()=>{try{const txt=await navigator.clipboard.readText();if(txt&&txt.trim().length>3){window.__paste=txt;window.__pm="paste";setCapWait(false);sV("add")}else alert("Clipboard looks empty. Copy the payment message first, then tap this again.")}catch(e){alert("Couldn't read the clipboard. On iOS tap 'Allow Paste' when prompted, or paste manually in Add → Smart Paste.")}},className:"act98 tr f ia",style:{gap:12,padding:"14px 16px",background:c.ac+"14",border:`1px solid ${c.ac}55`,borderRadius:14,cursor:"pointer"},children:[t("span",{style:{fontSize:22},children:"📥"}),o("div",{className:"f1 minw0",children:[t("div",{style:{fontSize:14,fontWeight:600,color:c.tx},children:"Review captured expense"}),t("div",{style:{fontSize:11.5,color:c.td,marginTop:1},children:"Tap to paste what you copied & pre-fill"})]}),t("button",{onClick:e=>{e.stopPropagation();setCapWait(false)},"aria-label":"dismiss",style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4,flexShrink:0},children:t(X,{size:16})})]})]}),
+        (capWait||capEnabled)&&v==="home"&&o("div",{style:{margin:"0 16px 4px"},children:[o("div",{onClick:async()=>{try{const txt=await navigator.clipboard.readText();if(txt&&txt.trim().length>3){window.__paste=txt;window.__pm="paste";setCapWait(false);sV("add")}else alert("Clipboard looks empty. Copy the payment message first, then tap this again.")}catch(e){alert("Couldn't read the clipboard. On iOS tap 'Allow Paste' when prompted, or paste manually in Add → Smart Paste.")}},className:"act98 tr f ia",style:{gap:12,padding:"14px 16px",background:c.ac+"14",border:`1px solid ${c.ac}55`,borderRadius:14,cursor:"pointer"},children:[t("span",{style:{fontSize:22},children:"📥"}),o("div",{className:"f1 minw0",children:[t("div",{style:{fontSize:14,fontWeight:600,color:c.tx},children:capWait?"Review captured expense":"Paste a payment"}),t("div",{style:{fontSize:11.5,color:c.td,marginTop:1},children:"Tap to paste a copied bank message & pre-fill"})]}),t("button",{onClick:e=>{e.stopPropagation();if(capWait)setCapWait(false);else setCapEn(false)},"aria-label":"dismiss",style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4,flexShrink:0},children:t(X,{size:16})})]})]}),
         v==="home"&&t(Home,{data:d,onTx:sAtx,onView:sV,onSetBudget:b=>pst({budget:b}),onFlt:sFlt}),
         v==="calendar"&&t(Calend,{data:d,onTx:sAtx,presetAdd:(ts,k)=>{window.__pd=ts;window.__pt=k||"expense";sV("add")}}),
         v==="stats"&&t(Stats,{data:d,onTx:sAtx,onView:sV,onFlt:sFlt,persist:pst}),
@@ -829,7 +831,7 @@ function App(){
         v==="backup"&&t(Backup,{data:d,persist:pst,onClose:()=>sV("home")}),
         v==="tips"&&t(Tips,{data:d,onClose:()=>sV(navFromRef.current)}),
         v==="categories"&&t(CatMgr,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
-        v==="capture"&&t(CaptureGuide,{data:d,onClose:()=>sV(navFromRef.current)}),
+        v==="capture"&&t(CaptureGuide,{data:d,onClose:()=>sV(navFromRef.current),capEnabled,onCapEnabled:setCapEn}),
         v==="chat"&&t(Chat,{data:d,onAddExpense:aE,onView:sV,onClose:()=>sV("home")}),
         v==="billScan"&&t(BillScan,{data:d,onAddExpense:aE,onClose:()=>sV("home")}),
         v==="userMgr"&&t(UserMgr,{users,activeUser,onSwitch:async u=>{await switchUser(u);sV("home")},onAdd:addUserFn,onDelete:delUserFn,onUpdate:updateUserFn,onClose:()=>sV("home")}),
@@ -2934,18 +2936,20 @@ const suggestEmojis=(name)=>{
   }
   return out.slice(0,16);
 };
-function CaptureGuide({data,onClose}){
-  const[mode,setMode]=useState(()=>{try{return localStorage.getItem("etp-capture-handoff")||"clipboard"}catch{return"clipboard"}});
+function CaptureGuide({data,onClose,capEnabled,onCapEnabled}){
+  const[mode,setMode]=useState(()=>{try{return localStorage.getItem("etp-capture-handoff")||"openapp"}catch{return"openapp"}});
   const setM=m=>{setMode(m);try{localStorage.setItem("etp-capture-handoff",m)}catch{}};
   const base=location.origin+location.pathname;
-  const url=mode==="clipboard"?base+"?capture=1":base+"?paste=";
+  const url=base+"?paste=";
   const[copied,setCopied]=useState(false);
   const copy=txt=>{try{navigator.clipboard.writeText(txt).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),1600)})}catch{}};
-  const steps=mode==="clipboard"?[
+  const steps=mode==="openapp"?[
     "Open the Shortcuts app → tap + → New Shortcut.",
-    "Add the action “Open URLs” and paste the URL above into it.",
+    "Add the action “Open App”.",
+    "Tap “App” and choose this app — pick the icon you added to your Home Screen (its name, e.g. “Premium Daily Tracker”).",
     "Rename the shortcut to “Log Expense”.",
     "Wire it to a trigger: Settings → Accessibility → Touch → Back Tap → Double Tap → Log Expense; and/or Action button → Shortcut → Log Expense; and/or add a Shortcuts widget to your Home/Lock screen.",
+    "Make sure “Show paste button on Home” below is ON.",
   ]:[
     "Open the Shortcuts app → tap + → New Shortcut.",
     "Add action “Get Clipboard”.",
@@ -2954,19 +2958,19 @@ function CaptureGuide({data,onClose}){
     "Add action “Open URLs” with that Text as its input.",
     "Rename to “Log Expense” and wire it to Back Tap / Action button / a widget.",
   ];
-  const use=mode==="clipboard"
-    ?"Copy the bank SMS / UPI message, trigger the shortcut, then tap “Review captured expense” here — the Add screen opens pre-filled."
+  const use=mode==="openapp"
+    ?"Copy the bank SMS / UPI message, fire the shortcut — the app opens — then tap “Paste a payment” on Home. The Add screen opens pre-filled, ready to confirm."
     :"Copy the bank SMS / UPI message, trigger the shortcut, and the Add screen opens pre-filled, ready to confirm.";
   const Lbl=tx=>t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,margin:"18px 0 8px"},children:tx});
   return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
     t(SH,{title:t("em",{children:"Quick Capture"}),onBack:onClose}),
-    t("div",{style:{fontSize:13,color:c.td,lineHeight:1.55,marginTop:4},children:"Log a payment from another app on iPhone with minimal typing. You copy the bank SMS / UPI message, fire an iOS Shortcut (Back Tap, Action button or a widget), and this app opens with the expense pre-filled for you to confirm."}),
-    t("div",{style:{fontSize:11.5,color:c.tm,lineHeight:1.5,marginTop:8},children:"Note: iOS can’t float over other apps, so capture is copy-then-trigger. Text parsing is fully on-device."}),
+    t("div",{style:{fontSize:13,color:c.td,lineHeight:1.55,marginTop:4},children:"Log a payment from another app on iPhone with minimal typing. You copy the bank SMS / UPI message, fire an iOS Shortcut (Back Tap, Action button or a widget), and this app opens with the expense ready to confirm."}),
+    o("div",{style:{fontSize:11.5,color:c.tm,lineHeight:1.5,marginTop:8,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px"},children:[t("b",{style:{color:c.td},children:"Why “Open App”? "}),"On iPhone, a Shortcut that opens a web URL launches Safari — and Safari keeps a separate database from the app you added to your Home Screen, so it looks empty. The “Open App” method opens the real Home-Screen app where your data lives."]}),
     Lbl("HANDOFF METHOD"),
-    o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`},children:[{k:"clipboard",l:"Clipboard (robust)"},{k:"deeplink",l:"Deep link (fastest)"}].map(o2=>t("button",{key:o2.k,onClick:()=>setM(o2.k),className:"f1 tr",style:{padding:"9px 0",background:mode===o2.k?c.ac:"transparent",color:mode===o2.k?"#0a0a0a":c.td,borderRadius:9,fontSize:12,fontWeight:mode===o2.k?600:400,border:"none"},children:o2.l}))}),
-    t("div",{style:{fontSize:11.5,color:c.td,marginTop:8,lineHeight:1.5},children:mode==="clipboard"?"Shortcut just opens the app; it reads what you copied. Always reaches the app instance you actually use.":"Shortcut builds a link with the copied text and opens it. Fastest, but make sure it opens the same app instance you normally use (home-screen vs Safari) so it saves to the right place."}),
-    Lbl("SHORTCUT URL"),
-    o("div",{className:"f ia",style:{gap:8,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px"},children:[t("div",{className:"f1 minw0",style:{fontFamily:F.mo,fontSize:12,color:c.tx,wordBreak:"break-all"},children:url}),t("button",{onClick:()=>copy(url),className:"act90 trt",style:{flexShrink:0,padding:"7px 12px",background:copied?c.mt:c.ac,color:"#0a0a0a",border:"none",borderRadius:9,fontSize:12,fontWeight:600},children:copied?"Copied":"Copy"})]}),
+    o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`},children:[{k:"openapp",l:"Open App (recommended)"},{k:"deeplink",l:"Deep link (Safari)"}].map(o2=>t("button",{key:o2.k,onClick:()=>setM(o2.k),className:"f1 tr",style:{padding:"9px 0",background:mode===o2.k?c.ac:"transparent",color:mode===o2.k?"#0a0a0a":c.td,borderRadius:9,fontSize:12,fontWeight:mode===o2.k?600:400,border:"none"},children:o2.l}))}),
+    t("div",{style:{fontSize:11.5,color:c.td,marginTop:8,lineHeight:1.5},children:mode==="openapp"?"Opens the Home-Screen app reliably, then reads what you copied when you tap the Home paste button. Recommended for iPhone.":"Builds a link with the copied text and opens it in Safari. Only use this if you run the tracker inside Safari (not added to your Home Screen) — otherwise it saves to the wrong place."}),
+    mode==="openapp"&&o("div",{className:"f ia jb",style:{gap:12,marginTop:12,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px"},children:[o("div",{className:"f1 minw0",children:[t("div",{style:{fontSize:13.5,fontWeight:600,color:c.tx},children:"Show paste button on Home"}),t("div",{style:{fontSize:11.5,color:c.td,marginTop:2,lineHeight:1.45},children:"Adds a “Paste a payment” card to Home so you can pull in the copied message in one tap."})]}),t("button",{onClick:()=>onCapEnabled(!capEnabled),"aria-label":"toggle home paste button",style:{flexShrink:0,width:46,height:28,borderRadius:999,border:"none",background:capEnabled?c.ac:c.sf3,position:"relative",cursor:"pointer",transition:"background .15s"},children:t("div",{style:{position:"absolute",top:3,left:capEnabled?21:3,width:22,height:22,borderRadius:999,background:"#fff",transition:"left .15s"}})})]}),
+    mode==="deeplink"&&[Lbl("SHORTCUT URL"),o("div",{key:"u",className:"f ia",style:{gap:8,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px"},children:[t("div",{className:"f1 minw0",style:{fontFamily:F.mo,fontSize:12,color:c.tx,wordBreak:"break-all"},children:url}),t("button",{onClick:()=>copy(url),className:"act90 trt",style:{flexShrink:0,padding:"7px 12px",background:copied?c.mt:c.ac,color:"#0a0a0a",border:"none",borderRadius:9,fontSize:12,fontWeight:600},children:copied?"Copied":"Copy"})]})],
     Lbl("SET UP THE SHORTCUT"),
     o("div",{style:{display:"flex",flexDirection:"column",gap:8},children:steps.map((s,i)=>o("div",{key:i,className:"f",style:{gap:10},children:[t("div",{style:{flexShrink:0,width:22,height:22,borderRadius:999,background:c.sf3,color:c.ac,fontFamily:F.mo,fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"},children:i+1}),t("div",{style:{fontSize:13,color:c.tx,lineHeight:1.5},children:s})]}))}),
     Lbl("HOW TO USE IT"),
