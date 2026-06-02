@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#26262B"/>
+      <stop offset="0.55" stop-color="#1A1A1D"/>
+      <stop offset="1" stop-color="#101012"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.42" r="0.62">
+      <stop offset="0" stop-color="#34E27A" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#34E27A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5BF08C"/>
+      <stop offset="0.5" stop-color="#33D26E"/>
+      <stop offset="1" stop-color="#1FAE57"/>
+    </linearGradient>
+    <filter id="sh" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="14" stdDeviation="22" flood-color="#0B3E1F" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#glow)"/>
+  <g filter="url(#sh)">
+    <text x="512" y="726" font-family="DejaVu Sans" font-weight="bold" font-size="700"
+          fill="url(#rg)" text-anchor="middle">&#8377;</text>
+  </g>
+</svg>
