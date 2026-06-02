@@ -2946,7 +2946,7 @@ function CaptureGuide({data,onClose,capEnabled,onCapEnabled}){
   const steps=mode==="openapp"?[
     "Open the Shortcuts app → tap + → New Shortcut.",
     "Add the action “Open App”.",
-    "Tap “App” and choose this app — pick the icon you added to your Home Screen (its name, e.g. “Premium Daily Tracker”).",
+    "Tap “App”, then tap the search box and type the name shown under your Home-Screen icon — by default that is “Expense Pro”. Select it.",
     "Rename the shortcut to “Log Expense”.",
     "Wire it to a trigger: Settings → Accessibility → Touch → Back Tap → Double Tap → Log Expense; and/or Action button → Shortcut → Log Expense; and/or add a Shortcuts widget to your Home/Lock screen.",
     "Make sure “Show paste button on Home” below is ON.",
@@ -2975,6 +2975,7 @@ function CaptureGuide({data,onClose,capEnabled,onCapEnabled}){
     o("div",{style:{display:"flex",flexDirection:"column",gap:8},children:steps.map((s,i)=>o("div",{key:i,className:"f",style:{gap:10},children:[t("div",{style:{flexShrink:0,width:22,height:22,borderRadius:999,background:c.sf3,color:c.ac,fontFamily:F.mo,fontSize:11,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"},children:i+1}),t("div",{style:{fontSize:13,color:c.tx,lineHeight:1.5},children:s})]}))}),
     Lbl("HOW TO USE IT"),
     t("div",{style:{fontSize:13,color:c.td,lineHeight:1.55,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px"},children:use}),
+    mode==="openapp"&&[Lbl("IF “OPEN APP” DOESN’T LIST IT"),o("div",{key:"tb",style:{fontSize:12.5,color:c.td,lineHeight:1.55,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px"},children:[t("div",{children:"Home-Screen web apps only appear in “Open App” on iOS 16.4+, and only after you’ve opened the app at least once. In the picker, tap the search field and type “Expense Pro”. If it still doesn’t show, that’s an iOS limitation — use the no-shortcut fallback below, which always works:"}),o("ol",{style:{margin:"8px 0 0",paddingLeft:18},children:[t("li",{style:{marginBottom:4},children:"Copy the bank SMS / UPI message."}),t("li",{style:{marginBottom:4},children:"Tap the app’s icon on your Home Screen to open it (one tap)."}),t("li",{children:"Tap “Paste a payment” on Home — the Add screen opens pre-filled."})]})]})],
   ]})
 }
 function CatMgr({data,persist,onClose}){
