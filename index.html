@@ -611,8 +611,8 @@ function AppHeader({onMenu,onSearch,onToggleTheme,isDark,theme,onHome}){
   ]})})
 }
 const SB_ORDER_KEY="etp-sidebar-order";
-const DEFAULT_SB=["h:Money","accounts","cards","transfer","investments","wealth","h:Plan & Track","bills","goals","recurring","upcomingExp","categoryBudgets","h:Insights","monthlyReport","tips","rules","h:Tools","expPlanner","investCalc","cardPayFix","profiles","h:Settings & Data","categories","backup","userMgr","settings"];
-const SB_META={userMgr:{e:"👥",l:"Switch User",s:"Manage profiles"},rules:{e:"📋",l:"Rules & Learnings",s:"Track your financial rules"},upcomingExp:{e:"📅",l:"Upcoming Expenses",s:"Plan & get alerts"},expPlanner:{e:"🧮",l:"Expense Planner",s:"Can I afford this EMI?"},investCalc:{e:"📈",l:"Investment Calculator",s:"Compound growth & SIP planner"},cards:{e:"💳",l:"Cards",acc:true},cardPayFix:{e:"🪙",l:"Fix card bill payments",s:"Remove double-counted bills",acc:true},bills:{e:"🔔",l:"Bills & Reminders",acc:true},goals:{e:"🎯",l:"Goals & Debt",acc:true},investments:{e:"💼",l:"My Investments",s:"NPS, Funds, FDs",acc:true},wealth:{e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},monthlyReport:{e:"📰",l:"Monthly Report",s:"Print or share PDF"},accounts:{e:"🏦",l:"Accounts",acc:true},transfer:{e:"↔️",l:"Transfer",s:"Move funds",acc:true},recurring:{e:"🔁",l:"Recurring"},profiles:{e:"⚡",l:"Quick profiles"},categoryBudgets:{e:"📏",l:"Category budgets",s:"Set spending limits"},categories:{e:"🏷️",l:"Categories",s:"Manage expense types"},backup:{e:"💾",l:"Backup & Restore",s:"Export or import data"},tips:{e:"💡",l:"Financial Health",s:"Tips & scores"},settings:{e:"⚙️",l:"Settings",s:"Currency, budget, backup"}};
+const DEFAULT_SB=["h:Money","accounts","cards","transfer","investments","wealth","h:Plan & Track","bills","goals","recurring","upcomingExp","categoryBudgets","h:Insights","budgetTrack","monthlyReport","tips","rules","h:Tools","expPlanner","investCalc","cardPayFix","profiles","h:Settings & Data","categories","backup","userMgr","settings"];
+const SB_META={userMgr:{e:"👥",l:"Switch User",s:"Manage profiles"},rules:{e:"📋",l:"Rules & Learnings",s:"Track your financial rules"},upcomingExp:{e:"📅",l:"Upcoming Expenses",s:"Plan & get alerts"},expPlanner:{e:"🧮",l:"Expense Planner",s:"Can I afford this EMI?"},investCalc:{e:"📈",l:"Investment Calculator",s:"Compound growth & SIP planner"},cards:{e:"💳",l:"Cards",acc:true},cardPayFix:{e:"🪙",l:"Fix card bill payments",s:"Remove double-counted bills",acc:true},bills:{e:"🔔",l:"Bills & Reminders",acc:true},goals:{e:"🎯",l:"Goals & Debt",acc:true},investments:{e:"💼",l:"My Investments",s:"NPS, Funds, FDs",acc:true},wealth:{e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},monthlyReport:{e:"📰",l:"Monthly Report",s:"Print or share PDF"},budgetTrack:{e:"📉",l:"Budget Tracker",s:"Monthly over/under record"},accounts:{e:"🏦",l:"Accounts",acc:true},transfer:{e:"↔️",l:"Transfer",s:"Move funds",acc:true},recurring:{e:"🔁",l:"Recurring"},profiles:{e:"⚡",l:"Quick profiles"},categoryBudgets:{e:"📏",l:"Category budgets",s:"Set spending limits"},categories:{e:"🏷️",l:"Categories",s:"Manage expense types"},backup:{e:"💾",l:"Backup & Restore",s:"Export or import data"},tips:{e:"💡",l:"Financial Health",s:"Tips & scores"},settings:{e:"⚙️",l:"Settings",s:"Currency, budget, backup"}};
 function Sidebar({data,onClose,onView,activeUser,onUpdateUser}){
   const go=(id)=>{onView(id);onClose()};
   const msd=data.monthStartDay||1;const mst=ps(new Date(),msd);
@@ -891,6 +891,7 @@ function App(){
         v==="settings"&&t(Settings,{data:d,persist:pst,onClose:()=>sV("home"),onBackup:()=>sV("backup"),onCategories:()=>{navFromRef.current="settings";sV("categories")},onView:sV,theme,onSetTheme:applyTheme}),
         v==="backup"&&t(Backup,{data:d,persist:pst,onClose:()=>sV("home")}),
         v==="tips"&&t(Tips,{data:d,onClose:()=>sV(navFromRef.current)}),
+        v==="budgetTrack"&&t(BudgetTrack,{data:d,onClose:()=>sV(navFromRef.current)}),
         v==="categories"&&t(CatMgr,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
         v==="chat"&&t(Chat,{data:d,onAddExpense:aE,onView:sV,onClose:()=>sV("home")}),
         v==="billScan"&&t(BillScan,{data:d,onAddExpense:aE,onClose:()=>sV("home")}),
@@ -1129,6 +1130,42 @@ return o("div",{style:{background:c.sfg,borderRadius:16,border:`1px solid ${ov?c
     t("div",{style:{fontFamily:F.mo,fontSize:12,fontWeight:600,color:nw<0?c.co:c.gd},children:fs(nw,currency)}),
   ]})}),
 ]})}
+
+// === BUDGET TRACKER (standalone over/under record — does NOT affect any budget elsewhere) ===
+function BudgetTrack({data,onClose}){const{expenses,budget,budgetPeriod,currency,monthStartDay=1}=data;
+  const monthly=budgetPeriod==="monthly"&&!!budget;
+  const series=useMemo(()=>{
+    if(!monthly)return{months:[],cum:0,overCount:0,underCount:0};
+    const exps=expenses.filter(e=>e.type==="expense");
+    if(!exps.length)return{months:[],cum:0,overCount:0,underCount:0};
+    const starts=[];let g=ps(new Date(Math.min(...exps.map(e=>e.date))),monthStartDay);const curStart=ps(new Date(),monthStartDay);let guard=0;
+    while(g<=curStart&&guard++<600){starts.push(g);const d=new Date(g);d.setMonth(d.getMonth()+1);g=ps(d,monthStartDay)}
+    let cum=0,overCount=0,underCount=0;const months=starts.map((s,i)=>{const e=i+1<starts.length?starts[i+1]:mse(new Date(s).getFullYear(),new Date(s).getMonth(),monthStartDay);const spent=exps.filter(x=>x.date>=s&&x.date<e).reduce((a,b)=>a+b.amount,0);const isCurrent=i===starts.length-1;const delta=budget-spent;if(!isCurrent){cum+=delta;if(delta<0)overCount++;else underCount++}return{start:s,spent,delta,isCurrent,cum:isCurrent?null:cum}});
+    return{months,cum,overCount,underCount};
+  },[expenses,budget,budgetPeriod,monthStartDay,monthly]);
+  const rows=[...series.months].reverse();
+  return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
+    t(SH,{title:t("em",{children:"Budget Tracker"}),onBack:onClose}),
+    !monthly?t("div",{style:{padding:"40px 8px",textAlign:"center",color:c.tm,fontSize:13,lineHeight:1.6},children:budget?"This tracker works with a monthly budget. Switch your budget period to Monthly in Settings.":"Set a monthly budget in Settings to start tracking each month's over/under here."}):o(Fragment,{children:[
+      o("div",{style:{background:`linear-gradient(135deg,${(series.cum<0?c.co:c.mt)}1f 0%,${c.sfg} 58%)`,borderRadius:20,border:`1px solid ${c.brs}`,padding:18,marginBottom:14},children:[
+        t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:"CUMULATIVE OVER / UNDER"}),
+        t("div",{style:{fontFamily:"var(--nf)",fontSize:34,fontWeight:300,marginTop:4,color:series.cum<0?c.co:c.mt,letterSpacing:-1,lineHeight:1},children:(series.cum<0?"−":"+")+fm(Math.abs(series.cum),currency)}),
+        o("div",{className:"f ia",style:{gap:14,marginTop:12},children:[
+          o("div",{className:"f ia",style:{gap:6},children:[t("span",{style:{width:8,height:8,borderRadius:2,background:c.co,display:"inline-block"}}),t("span",{style:{fontFamily:F.mo,fontSize:11,color:c.td},children:`${series.overCount} over`})]}),
+          o("div",{className:"f ia",style:{gap:6},children:[t("span",{style:{width:8,height:8,borderRadius:2,background:c.mt,display:"inline-block"}}),t("span",{style:{fontFamily:F.mo,fontSize:11,color:c.td},children:`${series.underCount} under`})]}),
+        ]}),
+      ]}),
+      t("div",{style:{fontSize:11,color:c.tm,marginBottom:12,lineHeight:1.5},children:"A record only — this does not change your budget anywhere else in the app."}),
+      t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:"BY MONTH"}),
+      rows.length===0?t("div",{style:{padding:"32px 0",textAlign:"center",color:c.tm,fontSize:13},children:"No months tracked yet."}):t("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden"},children:rows.map((m,i)=>{const over=m.delta<0;const pct=budget?Math.min(100,Math.round((m.spent/budget)*100)):0;const lbl=new Date(m.start).toLocaleDateString("en-US",{month:"short",year:"numeric"});return o("div",{key:m.start,style:{padding:"13px 16px",borderBottom:i===rows.length-1?"none":`1px solid ${c.brs}`},children:[
+        o("div",{className:"f ia jb",style:{gap:12,marginBottom:8},children:[
+          o("div",{className:"minw0",children:[t("div",{style:{fontSize:14,fontWeight:600,color:c.tx},children:lbl+(m.isCurrent?" · now":"")}),t("div",{style:{fontFamily:F.mo,fontSize:11,color:c.tm,marginTop:2},children:`${fm(m.spent,currency)} / ${fm(budget,currency)}`})]}),
+          m.isCurrent?t("div",{style:{fontFamily:F.mo,fontSize:11,color:c.td,flexShrink:0},children:"in progress"}):o("div",{className:"trg",style:{flexShrink:0},children:[t("div",{style:{fontFamily:F.mo,fontSize:14,fontWeight:600,color:over?c.co:c.mt},children:(over?"−":"+")+fm(Math.abs(m.delta),currency)}),t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginTop:2},children:over?"OVER":"UNDER"})]}),
+        ]}),
+        t("div",{style:{height:5,background:c.sf2,borderRadius:999,overflow:"hidden"},children:t("div",{style:{width:pct+"%",height:"100%",background:over?c.co:c.ac,borderRadius:999}})}),
+      ]})})}),
+    ]})
+  ]})}
 
 // === CALENDAR ===
 function Calend({data,onTx,presetAdd}){const{expenses,currency}=data;const[yr,sYr]=useState(new Date().getFullYear()),[mo,sMo]=useState(new Date().getMonth()),[sel,sSel]=useState(new Date().toDateString());const[cf,sCf]=useState("all");const[cSub,sCSub]=useState(null);
