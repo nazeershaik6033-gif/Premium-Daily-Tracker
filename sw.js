@@ -32,9 +32,9 @@ self.addEventListener('notificationclick', e => {
 self.addEventListener('message', e => {
   if(e.data?.type==='SKIP_WAITING') self.skipWaiting();
   if(e.data?.type==='SHOW_REMINDER'){
-    self.registration.showNotification('💰 Expense Reminder',{
+    self.registration.showNotification(e.data.title||'💰 Expense Reminder',{
       body:e.data.body||"Time to log today's expenses!",
-      tag:'daily-reminder',
+      tag:e.data.tag||'daily-reminder',
       requireInteraction:false,
       actions:[{action:'open',title:'Open App'}]
     });
