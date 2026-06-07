@@ -524,6 +524,19 @@ async function buildBackupJSON(dd,withFiles=true){const j=buildBackupObj(dd);if(
 // === CSV EXPORT (card transactions) ===
 function _csvEsc(v){v=v==null?"":String(v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
 function dlCSV(filename,rows){const csv=rows.map(r=>r.map(_csvEsc).join(",")).join("\r\n");const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+function dlTxt(filename,text){const blob=new Blob([text],{type:"text/plain;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+function cpTxt(text){try{navigator.clipboard.writeText(text)}catch(e){try{const ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta)}catch(e2){}}}
+// Copy / download actions shown under an AI response
+function MsgActions({text}){
+  const[done,sDone]=useState(false);
+  const copy=()=>{cpTxt(text);sDone(true);setTimeout(()=>sDone(false),1400)};
+  const dl=()=>dlTxt("ai-response-"+new Date().toISOString().slice(0,19).replace(/[:T]/g,"-")+".txt",text);
+  const bs={background:"transparent",border:"none",color:c.tm,display:"flex",alignItems:"center",gap:4,padding:"2px 4px",fontSize:10.5,fontFamily:F.mo,letterSpacing:.3,cursor:"pointer"};
+  return o("div",{className:"f ia",style:{gap:10,marginTop:2,marginLeft:2},children:[
+    t("button",{onClick:copy,style:{...bs,color:done?c.mt:c.tm},children:done?"✓ COPIED":"COPY"}),
+    t("button",{onClick:dl,style:bs,children:"DOWNLOAD"})
+  ]})
+}
 function exportCardTxns(card,txns,currency,label){const header=["Date","Merchant / Payee","Category","Type","Amount","Currency","Note"];const rows=[header];let spend=0,pay=0;for(const e of txns){const cat=co(e.category);const isPay=e.type==="card-payment";if(isPay)pay+=e.amount;else spend+=e.amount;rows.push([new Date(e.date).toLocaleDateString("en-CA"),e.merchant||e.payee||cat.label||"",cat.label||e.category||"",isPay?"payment":(e.type||"expense"),(isPay?-e.amount:e.amount).toFixed(2),e.currency||currency,e.note||""])}rows.push([]);rows.push(["","","","Total spend",spend.toFixed(2),currency,""]);rows.push(["","","","Total payments",(-pay).toFixed(2),currency,""]);const safe=(card.name||"card").replace(/[^a-zA-Z0-9]+/g,"_")+(label?"_"+label.replace(/[^a-zA-Z0-9]+/g,"_"):"");dlCSV(safe+".csv",rows)}
 
 function bdue(bills,exp,days=30,today=Date.now()){return bills.map(b=>{const lp=b.lastPaidDate||0;const n=new Date(today);const dD=Math.min(28,Math.max(1,b.dueDay||1));let du=new Date(n);if(n.getDate()>dD)du.setMonth(du.getMonth()+1);du.setDate(dD);du.setHours(0,0,0,0);const cs=new Date(du);cs.setMonth(cs.getMonth()-1);if(lp>=cs.getTime())du.setMonth(du.getMonth()+1);const dl=Math.ceil((du.getTime()-today)/864e5);return{...b,nextDue:du.getTime(),daysLeft:dl}}).filter(b=>b.daysLeft<=days).sort((a,b)=>a.daysLeft-b.daysLeft)}
@@ -1482,7 +1495,10 @@ function AiChatBox({getContext,intro,suggestions,label,maxTok}){
   };
   return o("div",{style:{marginTop:8},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:label||"ASK THE AI"}),
-    o("div",{ref,style:{maxHeight:300,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,marginBottom:10},children:msgs.length===0?[t("div",{key:"h",style:{fontSize:12,color:c.tm,lineHeight:1.5,background:c.sfg,borderRadius:12,padding:"12px 14px",border:`1px solid ${c.brs}`},children:intro||"Ask the AI anything about your finances."})]:msgs.map((m,i)=>t("div",{key:i,style:{alignSelf:m.role==="user"?"flex-end":"flex-start",maxWidth:"85%",padding:"10px 13px",background:m.role==="user"?c.ac:c.sfg,color:m.role==="user"?"#0a0a0a":c.tx,borderRadius:14,fontSize:13.5,whiteSpace:"pre-wrap",lineHeight:1.5,border:m.role==="user"?"none":`1px solid ${c.brs}`},children:m.content}))}),
+    o("div",{ref,style:{maxHeight:300,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,marginBottom:10},children:msgs.length===0?[t("div",{key:"h",style:{fontSize:12,color:c.tm,lineHeight:1.5,background:c.sfg,borderRadius:12,padding:"12px 14px",border:`1px solid ${c.brs}`},children:intro||"Ask the AI anything about your finances."})]:msgs.map((m,i)=>o("div",{key:i,style:{alignSelf:m.role==="user"?"flex-end":"flex-start",maxWidth:"85%",display:"flex",flexDirection:"column",gap:4,alignItems:m.role==="user"?"flex-end":"flex-start"},children:[
+      t("div",{style:{padding:"10px 13px",background:m.role==="user"?c.ac:c.sfg,color:m.role==="user"?"#0a0a0a":c.tx,borderRadius:14,fontSize:13.5,whiteSpace:"pre-wrap",lineHeight:1.5,border:m.role==="user"?"none":`1px solid ${c.brs}`},children:m.content}),
+      m.role==="assistant"?t(MsgActions,{text:m.content}):null
+    ]}))}),
     (suggestions&&suggestions.length&&msgs.length===0)?o("div",{className:"f",style:{gap:6,flexWrap:"wrap",marginBottom:10},children:suggestions.map((s,i)=>t("button",{key:i,onClick:()=>send(s),className:"act95 tr",style:{padding:"6px 12px",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:999,fontSize:11.5},children:s}))}):null,
     o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:"8px 10px"},children:[
       t("input",{value:inp,onChange:e=>sInp(e.target.value),onKeyDown:e=>{if(e.key==="Enter")send()},placeholder:busy?"Thinking…":"Ask a question…",disabled:busy,style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:14,fontFamily:'var(--tf)'}}),
@@ -3421,14 +3437,65 @@ function CardFixRow({e,cards,currency,onConvert,onIgnore}){const guess=cardBillG
 ]})}
 
 // === AI CHAT (simplified) ===
-function Chat({data,onAddExpense,onView,onClose}){const[ms,sMs]=useState([{role:"assistant",content:"Hi! Tell me about an expense or income and I'll save it for you.\n\nTry:\n• \"Spent 450 at Swiggy yesterday\"\n• \"Got 50k salary today\""}]);const[inp,sInp]=useState("");const[busy,sBusy]=useState(false);const ref=useRef(null);useEffect(()=>{ref.current?.scrollTo(0,ref.current.scrollHeight)},[ms]);
-const send=async()=>{if(!inp.trim()||busy)return;const u=inp.trim();sMs([...ms,{role:"user",content:u}]);sInp("");sBusy(true);
-  if(!gAK()){sMs(m=>[...m,{role:"assistant",content:"I need an AI API key first. Go to Settings and add one — Anthropic, DeepSeek, OpenAI, or OpenRouter all work. Keys live only on your device."}]);sBusy(false);return}
-  try{const sys=`You help log expenses/income. Today: ${new Date().toISOString()}. Categories: ${CE.map(c=>c.id).join(",")} or income: ${CI.map(c=>c.id).join(",")}. Accounts: ${data.accounts.map(a=>`${a.id}=${a.name}`).join("; ")}. Reply ONLY with JSON: {"type":"add","kind":"expense"|"income","amount":N,"category":"id","accountId":"id","merchant":"name","note":"opt","date":"ISO"} OR {"type":"clarify","question":"text"} OR {"type":"chat","message":"text"}`;
-    const r=await cAPI({model:"claude-sonnet-4-20250514",max_tokens:500,system:sys,messages:[{role:"user",content:u}]});const txt=r.content?.map(c=>c.text||"").join("")||"";const m=txt.match(/\{[\s\S]*\}/);if(!m){sMs(M=>[...M,{role:"assistant",content:txt}]);sBusy(false);return}const j=JSON.parse(m[0]);
-    if(j.type==="add"){const d=j.date?new Date(j.date).getTime():Date.now();onAddExpense({type:j.kind==="income"?"income":"expense",amount:Number(j.amount),accountId:j.accountId||data.accounts[0].id,category:j.category||(j.kind==="income"?"income_other":"other"),merchant:j.merchant||null,note:j.note||null,date:d,currency:data.currency,source:"chat"});sMs(M=>[...M,{role:"assistant",content:`✓ Added ${j.kind} of ${fm(j.amount,data.currency)} — ${j.merchant||""}`}])}else if(j.type==="clarify")sMs(M=>[...M,{role:"assistant",content:j.question}]);else sMs(M=>[...M,{role:"assistant",content:j.message||txt}]);
-  }catch(e){sMs(M=>[...M,{role:"assistant",content:`Error: ${e.message}`+(e.code==="NO_API_KEY"||e.code==="INVALID_KEY"?" — fix in Settings.":"")}])}sBusy(false)};
-return o("div",{style:{display:"flex",flexDirection:"column",height:"100%",minHeight:"60vh"},children:[t(SH,{title:t("em",{children:"AI Assistant"}),onBack:onClose}),t("div",{ref,className:"f1 oy",style:{padding:"0 24px",overflowY:"auto"},children:t("div",{style:{display:"flex",flexDirection:"column",gap:10,paddingBottom:16},children:ms.map((m,i)=>t("div",{key:i,style:{alignSelf:m.role==="user"?"flex-end":"flex-start",maxWidth:"82%",padding:"10px 14px",background:m.role==="user"?c.ac:c.sf,color:m.role==="user"?"#0a0a0a":c.tx,borderRadius:14,fontSize:14,whiteSpace:"pre-wrap",border:m.role==="user"?"none":`1px solid ${c.brs}`},children:m.content}))})}),o("div",{style:{padding:"12px 24px 24px",borderTop:`1px solid ${c.brs}`,background:c.bg},children:[o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:"10px 12px"},children:[t("input",{value:inp,onChange:e=>sInp(e.target.value),onKeyDown:e=>{if(e.key==="Enter")send()},placeholder:"Tell me about it…",disabled:busy,style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:15,fontFamily:'var(--tf)'}}),t("button",{onClick:send,disabled:!inp.trim()||busy,className:"act95 trt",style:{width:36,height:36,borderRadius:10,background:inp.trim()&&!busy?c.ac:c.sf2,color:inp.trim()&&!busy?"#0a0a0a":c.tm,display:"flex",alignItems:"center",justifyContent:"center",border:"none"},children:busy?"…":t(Send,{size:15})})]})]})]})}
+function Chat({data,onAddExpense,onView,onClose}){
+  const[ms,sMs]=useState([{role:"assistant",content:"Hi! Tell me about an expense or income and I'll save it for you.\n\nTry:\n• \"Spent 450 at Swiggy yesterday\"\n• \"Got 50k salary today\"\n\nYou can also attach a receipt photo 📷 or a statement file 📎."}]);
+  const[inp,sInp]=useState("");const[busy,sBusy]=useState(false);const[att,sAtt]=useState(null);
+  const ref=useRef(null),imgRef=useRef(null),fileRef=useRef(null);
+  useEffect(()=>{ref.current?.scrollTo(0,ref.current.scrollHeight)},[ms]);
+  const pickImage=async f=>{if(!f)return;if(f.size>4.5e6){sMs(M=>[...M,{role:"assistant",content:"That image is too large (max 4.5MB)."}]);return}const b64=await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(f)});sAtt({kind:"image",name:f.name||"photo",b64,mediaType:f.type})};
+  const pickFile=async f=>{if(!f)return;try{const lower=(f.name||"").toLowerCase();let text="";if(lower.endsWith(".xlsx")||lower.endsWith(".xls")){const buf=await f.arrayBuffer();const XLSXLib=window.XLSX||XLSX;const wb=XLSXLib.read(buf);const ws=wb.Sheets[wb.SheetNames[0]];text=XLSXLib.utils.sheet_to_csv(ws)}else{text=await f.text()}if(!text.trim()){sMs(M=>[...M,{role:"assistant",content:"That file appears to be empty or unreadable."}]);return}sAtt({kind:"text",name:f.name||"file",text:text.slice(0,6000)})}catch(e){sMs(M=>[...M,{role:"assistant",content:"Couldn't read that file: "+e.message}])}};
+  const send=async()=>{
+    if((!inp.trim()&&!att)||busy)return;
+    const u=inp.trim();
+    if(att&&att.kind==="image"&&!(AI_PROVIDERS[gProv()]||AI_PROVIDERS.anthropic).vision){sMs(M=>[...M,{role:"assistant",content:`Image attachments need a vision-capable provider. Switch to Anthropic or OpenAI in Settings (currently ${(AI_PROVIDERS[gProv()]||AI_PROVIDERS.anthropic).name}).`}]);return}
+    const myAtt=att;
+    sMs(M=>[...M,{role:"user",content:u||(myAtt?("📎 "+myAtt.name):""),img:myAtt&&myAtt.kind==="image"?myAtt.b64:null,file:myAtt&&myAtt.kind==="text"?myAtt.name:null}]);
+    sInp("");sAtt(null);sBusy(true);
+    if(!gAK()){sMs(m=>[...m,{role:"assistant",content:"I need an AI API key first. Go to Settings and add one — Anthropic, DeepSeek, OpenAI, or OpenRouter all work. Keys live only on your device."}]);sBusy(false);return}
+    try{
+      const sys=`You help log expenses/income and answer finance questions. Today: ${new Date().toISOString()}. Categories: ${CE.map(c=>c.id).join(",")} or income: ${CI.map(c=>c.id).join(",")}. Accounts: ${data.accounts.map(a=>`${a.id}=${a.name}`).join("; ")}. To log a single transaction reply ONLY with JSON: {"type":"add","kind":"expense"|"income","amount":N,"category":"id","accountId":"id","merchant":"name","note":"opt","date":"ISO"}. To ask for a missing detail: {"type":"clarify","question":"text"}. Otherwise answer normally as plain text.`;
+      let content;
+      if(myAtt&&myAtt.kind==="image")content=[{type:"image",source:{type:"base64",media_type:myAtt.mediaType,data:myAtt.b64.split(",")[1]}},{type:"text",text:u||"Extract the expense from this receipt and log it."}];
+      else if(myAtt&&myAtt.kind==="text")content=`${u||"Here is a file — help me with it."}\n\n[Attached file: ${myAtt.name}]\n${myAtt.text}`;
+      else content=u;
+      const r=await cAPI({max_tokens:900,system:sys,messages:[{role:"user",content}]});
+      const txt=r.content?.map(c=>c.text||"").join("")||"";
+      const m=txt.match(/\{[\s\S]*\}/);
+      if(!m){sMs(M=>[...M,{role:"assistant",content:txt||"(no response)"}]);sBusy(false);return}
+      let j;try{j=JSON.parse(m[0])}catch{sMs(M=>[...M,{role:"assistant",content:txt}]);sBusy(false);return}
+      if(j.type==="add"){const d=j.date?new Date(j.date).getTime():Date.now();onAddExpense({type:j.kind==="income"?"income":"expense",amount:Number(j.amount),accountId:j.accountId||data.accounts[0].id,category:j.category||(j.kind==="income"?"income_other":"other"),merchant:j.merchant||null,note:j.note||null,date:d,currency:data.currency,source:"chat"});sMs(M=>[...M,{role:"assistant",content:`✓ Added ${j.kind} of ${fm(j.amount,data.currency)} — ${j.merchant||""}`}])}
+      else if(j.type==="clarify")sMs(M=>[...M,{role:"assistant",content:j.question}]);
+      else sMs(M=>[...M,{role:"assistant",content:j.message||txt}]);
+    }catch(e){sMs(M=>[...M,{role:"assistant",content:`Error: ${e.message}`+(e.code==="NO_API_KEY"||e.code==="INVALID_KEY"?" — fix in Settings.":"")}])}
+    sBusy(false);
+  };
+  return o("div",{style:{display:"flex",flexDirection:"column",height:"100%",minHeight:"60vh"},children:[
+    t(SH,{title:t("em",{children:"AI Assistant"}),onBack:onClose}),
+    t("input",{ref:imgRef,type:"file",accept:"image/*",style:{display:"none"},onChange:e=>{pickImage(e.target.files?.[0]);e.target.value=""}}),
+    t("input",{ref:fileRef,type:"file",accept:".csv,.tsv,.txt,.xlsx,.xls",style:{display:"none"},onChange:e=>{pickFile(e.target.files?.[0]);e.target.value=""}}),
+    t("div",{ref,className:"f1 oy",style:{padding:"0 24px",overflowY:"auto"},children:t("div",{style:{display:"flex",flexDirection:"column",gap:10,paddingBottom:16},children:ms.map((m,i)=>o("div",{key:i,style:{alignSelf:m.role==="user"?"flex-end":"flex-start",maxWidth:"82%",display:"flex",flexDirection:"column",gap:5,alignItems:m.role==="user"?"flex-end":"flex-start"},children:[
+      m.img&&t("img",{src:m.img,alt:"",style:{maxWidth:180,borderRadius:12,border:`1px solid ${c.brs}`}}),
+      m.file&&t("div",{style:{fontFamily:F.mo,fontSize:11,color:c.tm},children:"📎 "+m.file}),
+      m.content?t("div",{style:{padding:"10px 14px",background:m.role==="user"?c.ac:c.sf,color:m.role==="user"?"#0a0a0a":c.tx,borderRadius:14,fontSize:14,whiteSpace:"pre-wrap",border:m.role==="user"?"none":`1px solid ${c.brs}`},children:m.content}):null,
+      m.role==="assistant"&&i>0&&m.content?t(MsgActions,{text:m.content}):null
+    ]}))})}),
+    o("div",{style:{padding:"12px 24px 24px",borderTop:`1px solid ${c.brs}`,background:c.bg},children:[
+      att&&o("div",{className:"f ia jb",style:{gap:8,marginBottom:8,padding:"8px 10px",background:c.sf2,borderRadius:10,border:`1px solid ${c.brs}`},children:[
+        o("div",{className:"f ia",style:{gap:8,minWidth:0},children:[
+          att.kind==="image"?t("img",{src:att.b64,alt:"",style:{width:32,height:32,borderRadius:6,objectFit:"cover",flexShrink:0}}):t("span",{style:{fontSize:18,flexShrink:0},children:"📎"}),
+          t("div",{className:"tru",style:{fontSize:12,color:c.tx},children:att.name})
+        ]}),
+        t("button",{onClick:()=>sAtt(null),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4,flexShrink:0},children:t(X,{size:15})})
+      ]}),
+      o("div",{className:"f ia",style:{gap:6,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:"8px 10px"},children:[
+        t("button",{onClick:()=>imgRef.current?.click(),disabled:busy,title:"Attach photo",className:"act90 trt",style:{width:34,height:34,borderRadius:9,background:c.sf2,color:c.td,display:"flex",alignItems:"center",justifyContent:"center",border:"none",flexShrink:0},children:t(Camera,{size:16})}),
+        t("button",{onClick:()=>fileRef.current?.click(),disabled:busy,title:"Attach file",className:"act90 trt",style:{width:34,height:34,borderRadius:9,background:c.sf2,color:c.td,display:"flex",alignItems:"center",justifyContent:"center",border:"none",flexShrink:0},children:t(Paperclip,{size:16})}),
+        t("input",{value:inp,onChange:e=>sInp(e.target.value),onKeyDown:e=>{if(e.key==="Enter")send()},placeholder:att?"Add a note (optional)…":"Tell me about it…",disabled:busy,style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:15,fontFamily:'var(--tf)'}}),
+        t("button",{onClick:send,disabled:(!inp.trim()&&!att)||busy,className:"act95 trt",style:{width:36,height:36,borderRadius:10,background:(inp.trim()||att)&&!busy?c.ac:c.sf2,color:(inp.trim()||att)&&!busy?"#0a0a0a":c.tm,display:"flex",alignItems:"center",justifyContent:"center",border:"none",flexShrink:0},children:busy?"…":t(Send,{size:15})})
+      ]})
+    ]})
+  ]})
+}
 
 // === BILL SCAN (simplified) ===
 // === BILL SCAN ===
