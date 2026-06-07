@@ -828,6 +828,7 @@ function App(){
   const pst=async(p)=>{const n={...d,...p};_custCE=n.customExpenseCategories||[];_custCI=n.customIncomeCategories||[];_catOv=n.categoryOverrides||{};_catOrder=n.categoryOrder||{expense:[],income:[]};sD(n);const dk=activeUser?"etp-data-"+activeUser.id:KS;try{await window.storage.set(dk,JSON.stringify(strip(n)))}catch(e){console.error(e)}};
 
   const aE=(e)=>{const id=uid(),L=[{...e,id,type:e.type||"expense"},...d.expenses].sort((a,b)=>b.date-a.date);pst({expenses:L})};
+  const aEMany=(arr)=>{if(!arr||!arr.length)return;const add=arr.map(e=>({...e,id:uid(),type:e.type||"expense"}));const L=[...add,...d.expenses].sort((a,b)=>b.date-a.date);pst({expenses:L})};
   const sFE=({expense:e,makeRecurring:r,frequency:f,makeProfile:mp})=>{const id=uid();let exp,rec=d.recurring,pf=d.profiles;if(r&&f){const nr=[{id:"rec_"+id,amount:e.amount,currency:e.currency,accountId:e.accountId,cardId:e.cardId||null,category:e.category,subcategory:e.subcategory,merchant:e.merchant,payee:e.payee,note:e.note,bank:e.bank,cardType:e.cardType,cardLast4:e.cardLast4,frequency:f,nextDate:e.date,createdAt:Date.now()},...d.recurring];const{newExpenses,updatedRecurring}=pr(nr,d.expenses);exp=[...newExpenses,...d.expenses].sort((a,b)=>b.date-a.date);rec=updatedRecurring}else exp=[{...e,id,type:e.type||"expense"},...d.expenses].sort((a,b)=>b.date-a.date);if(mp)pf=[{id:"prof_"+id,amount:e.amount,currency:e.currency,accountId:e.accountId,category:e.category,subcategory:e.subcategory,merchant:e.merchant,payee:e.payee,note:e.note},...d.profiles];pst({expenses:exp,recurring:rec,profiles:pf});sV("home")};
   const uE=(e)=>{const L=d.expenses.map(x=>x.id===e.id?{...x,...e}:x).sort((a,b)=>b.date-a.date);pst({expenses:L});sAtx(null);sEd(null);sV("home")};
   const dE=(id)=>{const e=d.expenses.find(x=>x.id===id);let L;if(e?.transferId)L=d.expenses.filter(x=>x.transferId!==e.transferId);else L=d.expenses.filter(x=>x.id!==id);pst({expenses:L});sAtx(null);sV("home")};
@@ -947,7 +948,7 @@ function App(){
         v==="categories"&&t(CatMgr,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
         v==="chat"&&t(Chat,{data:d,onAddExpense:aE,onView:sV,onClose:()=>sV("home")}),
         v==="billScan"&&t(BillScan,{data:d,onAddExpense:aE,onClose:()=>sV("home")}),
-        v==="stmtAnalyze"&&t(StmtAnalyze,{data:d,onClose:()=>sV(navFromRef.current)}),
+        v==="stmtAnalyze"&&t(StmtAnalyze,{data:d,onClose:()=>sV(navFromRef.current),onAddExpenses:aEMany}),
         v==="aiInsights"&&t(AiInsights,{data:d,onClose:()=>sV(navFromRef.current)}),
         v==="cardPayFix"&&t(CardPayFix,{data:d,onConvert:convertToCardPayment,onIgnore:ignoreCardFix,onClose:()=>sV(navFromRef.current)}),
         v==="userMgr"&&t(UserMgr,{users,activeUser,onSwitch:async u=>{await switchUser(u);sV("home")},onAdd:addUserFn,onDelete:delUserFn,onUpdate:updateUserFn,onClose:()=>sV("home")}),
@@ -1461,17 +1462,22 @@ function BudgetLoans({data,onClose,onPay,onDelete,onDeletePay,onEditPay,onUpdate
 }
 
 // === STATEMENT ANALYZER ===
-function StmtAnalyze({data,onClose}){
-  const{expenses,currency}=data;
+function StmtAnalyze({data,onClose,onAddExpenses}){
+  const{expenses,currency,accounts}=data;
   const[file,sFile]=useState(null);
   const[parsed,sParsed]=useState(null);
   const[analyzing,sAnalyzing]=useState(false);
   const[result,sResult]=useState(null);
   const[err,sErr]=useState(null);
   const[period,sPeriod]=useState(3);
-  const fileRef=useRef(null);
+  const[filter,sFilter]=useState("unlogged");
+  const[chatMsgs,sChatMsgs]=useState([]);
+  const[chatInp,sChatInp]=useState("");
+  const[chatBusy,sChatBusy]=useState(false);
+  const fileRef=useRef(null);const chatRef=useRef(null);
+  useEffect(()=>{chatRef.current?.scrollTo(0,chatRef.current.scrollHeight)},[chatMsgs]);
   const parseFile=async(f)=>{
-    sErr(null);sResult(null);
+    sErr(null);sResult(null);sChatMsgs([]);
     try{
       const buf=await f.arrayBuffer();
       const XLSXLib=window.XLSX||XLSX;
@@ -1500,26 +1506,59 @@ function StmtAnalyze({data,onClose}){
       txns.sort((a,b)=>b.date-a.date);sParsed(txns);sFile(f);
     }catch(e2){sErr("Parse error: "+e2.message)}
   };
+  // Local deterministic reconciliation: match statement txns to app expenses by amount + date
+  const recon=useMemo(()=>{
+    if(!parsed)return[];
+    const cutoff=Date.now()-period*30*864e5;
+    const txns=parsed.filter(x=>x.date>=cutoff);
+    const pool=expenses.filter(e=>(e.type==="expense"||e.type==="card-payment")&&e.date>=cutoff-7*864e5).map(e=>({e,used:false}));
+    return txns.map(tx=>{
+      let match=null;
+      for(const p of pool){
+        if(p.used)continue;
+        const amtOk=Math.abs(p.e.amount-tx.amount)<=Math.max(1,tx.amount*0.01);
+        const dayOk=Math.abs(p.e.date-tx.date)<=5*864e5;
+        if(amtOk&&dayOk){p.used=true;match=p.e;break}
+      }
+      return{tx,match};
+    });
+  },[parsed,expenses,period]);
+  const logged=recon.filter(r=>r.match);
+  const unlogged=recon.filter(r=>!r.match);
+  const mkExp=(tx)=>({type:"expense",amount:tx.amount,currency,accountId:(accounts&&accounts[0]&&accounts[0].id)||null,category:"other",merchant:tx.merchant||null,note:"From statement",date:tx.date,source:"statement"});
+  const logOne=(tx)=>onAddExpenses&&onAddExpenses([mkExp(tx)]);
+  const logAll=()=>{if(unlogged.length&&onAddExpenses)onAddExpenses(unlogged.map(r=>mkExp(r.tx)))};
   const analyze=async()=>{
-    if(!parsed||!parsed.length)return;
+    if(!recon.length){sErr("Upload a statement first.");return}
     if(!gAK()){sErr("Add an AI API key in Settings first.");return}
     sAnalyzing(true);sErr(null);
     try{
-      const cutoff=Date.now()-period*30*864e5;
-      const appExps=expenses.filter(e=>e.type==="expense"&&e.date>=cutoff).map(e=>({date:new Date(e.date).toLocaleDateString("en-CA"),amount:e.amount,merchant:e.merchant||e.payee||(co(e.category)||{}).label||"Unknown"}));
-      const stmtTxns=parsed.filter(x=>x.date>=cutoff).map(x=>({date:new Date(x.date).toLocaleDateString("en-CA"),amount:x.amount,merchant:x.merchant}));
-      const sys="You are a financial analyst. Compare a bank/credit card statement with expense tracker records. Be concise and actionable.";
-      const u=`Statement: ${stmtTxns.length} transactions (${period}mo). App: ${appExps.length} expenses.\n\nSTATEMENT (up to 60):\n${JSON.stringify(stmtTxns.slice(0,60))}\n\nAPP EXPENSES (up to 60):\n${JSON.stringify(appExps.slice(0,60))}\n\nFind transactions in the statement that are NOT recorded in the app (match by amount ±2% and date ±4 days). Also give observations.\n\nReturn JSON only:\n{"missing":[{"date":"YYYY-MM-DD","amount":N,"merchant":"name","note":"brief reason"}],"observations":["insight 1","insight 2","insight 3"],"summary":"2-sentence overall assessment"}`;
-      const r=await cAPI({max_tokens:1500,system:sys,messages:[{role:"user",content:u}]});
+      const sys="You are a financial analyst. Give concise, actionable observations about spending shown in a statement. No preamble.";
+      const u=`A statement was reconciled against the user's expense tracker.\nTotal: ${recon.length} statement transactions over ${period} month(s).\nAlready logged in app: ${logged.length}. NOT logged: ${unlogged.length}.\n\nUnlogged transactions:\n${JSON.stringify(unlogged.slice(0,50).map(r=>({date:new Date(r.tx.date).toLocaleDateString("en-CA"),amount:r.tx.amount,merchant:r.tx.merchant})))}\n\nReturn JSON only:\n{"observations":["insight 1","insight 2","insight 3"],"summary":"2-sentence overall assessment of spending and reconciliation"}`;
+      const r=await cAPI({max_tokens:1200,system:sys,messages:[{role:"user",content:u}]});
       const txt=r.content?.map(x=>x.text||"").join("")||"";
       const m=txt.match(/\{[\s\S]*\}/);if(!m)throw new Error("Could not parse AI response");
       sResult(JSON.parse(m[0]));
     }catch(e2){sErr("Analysis failed: "+e2.message)}
     sAnalyzing(false);
   };
+  const chatSend=async()=>{
+    const q=chatInp.trim();if(!q||chatBusy)return;
+    if(!gAK()){sChatMsgs(M=>[...M,{role:"assistant",content:"Add an AI API key in Settings first."}]);return}
+    const next=[...chatMsgs,{role:"user",content:q}];sChatMsgs(next);sChatInp("");sChatBusy(true);
+    try{
+      const ctx=recon.slice(0,80).map(r=>({date:new Date(r.tx.date).toLocaleDateString("en-CA"),amount:r.tx.amount,merchant:r.tx.merchant,logged:!!r.match}));
+      const sys=`You are a financial assistant. The user uploaded a statement (currency ${currency}) reconciled against their expense app. ${logged.length} of ${recon.length} transactions are already logged; ${unlogged.length} are not. Transactions: ${JSON.stringify(ctx)}. Answer the user's questions concisely and helpfully.`;
+      const r=await cAPI({max_tokens:1200,system:sys,messages:next.map(m=>({role:m.role,content:m.content}))});
+      const txt=r.content?.map(x=>x.text||"").join("")||"";
+      sChatMsgs(M=>[...M,{role:"assistant",content:txt||"(no response)"}]);
+    }catch(e2){sChatMsgs(M=>[...M,{role:"assistant",content:"Error: "+e2.message}])}
+    sChatBusy(false);
+  };
+  const shown=filter==="logged"?logged:filter==="unlogged"?unlogged:recon;
   return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
     t(SH,{title:t("em",{children:"Statement Analyzer"}),onBack:onClose}),
-    t("div",{style:{fontSize:13,color:c.td,marginBottom:20,lineHeight:1.5},children:"Upload your bank or credit card statement (CSV/Excel) to find transactions not recorded in the app."}),
+    t("div",{style:{fontSize:13,color:c.td,marginBottom:20,lineHeight:1.5},children:"Upload your bank or credit card statement (CSV/Excel). Each transaction is matched against your logged expenses — log any that are missing, then ask the AI follow-up questions."}),
     o("div",{style:{background:c.sfg,borderRadius:16,border:`2px dashed ${file?c.mt:c.brs}`,padding:20,textAlign:"center",marginBottom:16,cursor:"pointer"},onClick:()=>fileRef.current?.click(),children:[
       t("div",{style:{fontSize:28,marginBottom:8},children:file?"✅":"📄"}),
       t("div",{style:{fontSize:14,color:c.tx,fontWeight:500},children:file?file.name:"Tap to upload bank statement"}),
@@ -1531,30 +1570,51 @@ function StmtAnalyze({data,onClose}){
       o("div",{className:"f ia",style:{gap:6},children:[1,3,6,12].map(mo=>t("button",{key:mo,onClick:()=>sPeriod(mo),className:"act95 tr",style:{padding:"7px 14px",background:period===mo?c.ac:c.sf2,color:period===mo?"#0a0a0a":c.td,border:`1px solid ${period===mo?c.ac:c.brs}`,borderRadius:999,fontSize:12,fontFamily:F.mo},children:mo===1?"1 month":mo+" months"}))})
     ]}),
     err&&t("div",{style:{background:c.co+"20",border:`1px solid ${c.co}40`,borderRadius:12,padding:"10px 14px",marginBottom:16,fontSize:13,color:c.co,lineHeight:1.5},children:err}),
-    parsed&&!result&&t("button",{disabled:analyzing||!gAK(),onClick:analyze,className:"w100 act98 tr",style:{padding:"14px 0",background:analyzing||!gAK()?c.sf2:c.ac,color:analyzing||!gAK()?c.tm:"#0a0a0a",borderRadius:12,fontWeight:600,fontSize:15,border:"none",marginBottom:20},children:analyzing?"Analyzing…":!gAK()?"Add API key in Settings":"Analyze & find discrepancies"}),
-    result&&o(Fragment,{children:[
-      o("div",{style:{background:`linear-gradient(135deg,${c.ac}15 0%,${c.sfg} 70%)`,borderRadius:16,border:`1px solid ${c.brs}`,padding:16,marginBottom:14},children:[
-        t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:8},children:"SUMMARY"}),
-        t("div",{style:{fontSize:14,color:c.tx,lineHeight:1.6},children:result.summary||""})
-      ]}),
-      (result.missing||[]).length>0&&o("div",{style:{marginBottom:16},children:[
-        o("div",{className:"f ia jb",style:{marginBottom:10},children:[
-          t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:"NOT RECORDED IN APP"}),
-          t(Pl,{col:c.co,children:String((result.missing||[]).length)})
+    recon.length>0&&o(Fragment,{children:[
+      o("div",{className:"g g2",style:{gap:10,marginBottom:14},children:[
+        o("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.mt}40`,padding:"12px 14px"},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.mt,letterSpacing:1,marginBottom:4},children:"ALREADY LOGGED"}),
+          t("div",{style:{fontFamily:"var(--nf)",fontSize:26,fontWeight:400,color:c.mt,lineHeight:1},children:String(logged.length)})
         ]}),
-        t("div",{style:{display:"flex",flexDirection:"column",gap:8},children:(result.missing||[]).map((mx,i)=>o("div",{key:i,style:{background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,padding:"12px 14px"},children:[
-          o("div",{className:"f ia jb",children:[
-            t("div",{style:{fontSize:14,color:c.tx,fontWeight:500},children:mx.merchant||"Unknown"}),
-            t("div",{style:{fontFamily:F.mo,fontSize:14,color:c.co},children:"−"+fm(mx.amount,currency)})
+        o("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.co}40`,padding:"12px 14px"},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.co,letterSpacing:1,marginBottom:4},children:"NOT LOGGED"}),
+          t("div",{style:{fontFamily:"var(--nf)",fontSize:26,fontWeight:400,color:c.co,lineHeight:1},children:String(unlogged.length)})
+        ]})
+      ]}),
+      unlogged.length>0&&t("button",{onClick:logAll,className:"w100 act98 tr",style:{padding:"13px 0",background:c.ac,color:"#0a0a0a",borderRadius:12,fontWeight:600,fontSize:14,border:"none",marginBottom:14},children:`Log all ${unlogged.length} unlogged expense${unlogged.length===1?"":"s"}`}),
+      o("div",{className:"f ia",style:{gap:6,marginBottom:10},children:[{id:"unlogged",l:"Not logged"},{id:"logged",l:"Logged"},{id:"all",l:"All"}].map(f=>t("button",{key:f.id,onClick:()=>sFilter(f.id),className:"act95 tr",style:{padding:"6px 13px",background:filter===f.id?c.ac:c.sf2,color:filter===f.id?"#0a0a0a":c.td,border:`1px solid ${filter===f.id?c.ac:c.brs}`,borderRadius:999,fontSize:11.5,fontFamily:F.mo},children:f.l+(f.id==="unlogged"?` (${unlogged.length})`:f.id==="logged"?` (${logged.length})`:` (${recon.length})`)}))}),
+      t("div",{style:{display:"flex",flexDirection:"column",gap:8,marginBottom:18},children:shown.length===0?[t("div",{key:"e",style:{fontSize:12,color:c.tm,textAlign:"center",padding:"16px 0"},children:"Nothing here."})]:shown.map((r,i)=>o("div",{key:i,style:{background:c.sfg,borderRadius:12,border:`1px solid ${r.match?c.brs:c.co+"40"}`,padding:"12px 14px"},children:[
+        o("div",{className:"f ia jb",style:{gap:8},children:[
+          o("div",{className:"f1 minw0",children:[
+            t("div",{className:"tru",style:{fontSize:14,color:c.tx,fontWeight:500},children:r.tx.merchant||"Unknown"}),
+            t("div",{style:{fontSize:11,color:c.tm,marginTop:3},children:new Date(r.tx.date).toLocaleDateString("en-US",{day:"numeric",month:"short",year:"numeric"})})
           ]}),
-          t("div",{style:{fontSize:11,color:c.tm,marginTop:4},children:mx.date+(mx.note?" · "+mx.note:"")})
-        ]}))})
+          o("div",{style:{textAlign:"right",flexShrink:0},children:[
+            t("div",{style:{fontFamily:F.mo,fontSize:14,color:r.match?c.tx:c.co},children:"−"+fm(r.tx.amount,currency)}),
+            r.match?t("div",{style:{fontSize:10,color:c.mt,marginTop:3,fontFamily:F.mo,letterSpacing:.3},children:"✓ LOGGED"}):t("button",{onClick:()=>logOne(r.tx),className:"act95 tr",style:{marginTop:6,padding:"5px 12px",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:999,fontSize:11,fontWeight:600},children:"+ Log"})
+          ]})
+        ]})
+      ]}))}),
+      !result&&t("button",{disabled:analyzing||!gAK(),onClick:analyze,className:"w100 act98 tr",style:{padding:"13px 0",background:analyzing||!gAK()?c.sf2:c.sf3,color:analyzing||!gAK()?c.tm:c.tx,borderRadius:12,fontWeight:600,fontSize:14,border:`1px solid ${c.brs}`,marginBottom:18},children:analyzing?"Analyzing…":!gAK()?"Add API key in Settings for AI analysis":"✨ Analyze with AI"}),
+      result&&o(Fragment,{children:[
+        result.summary&&o("div",{style:{background:`linear-gradient(135deg,${c.ac}15 0%,${c.sfg} 70%)`,borderRadius:16,border:`1px solid ${c.brs}`,padding:16,marginBottom:14},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:8},children:"AI SUMMARY"}),
+          t("div",{style:{fontSize:14,color:c.tx,lineHeight:1.6},children:result.summary})
+        ]}),
+        (result.observations||[]).length>0&&o("div",{style:{marginBottom:16},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:"OBSERVATIONS"}),
+          t("div",{style:{display:"flex",flexDirection:"column",gap:8},children:(result.observations||[]).map((obs,i)=>o("div",{key:i,style:{background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,padding:"12px 14px",fontSize:13,color:c.tx,lineHeight:1.5},children:[t("span",{style:{color:c.ac,marginRight:8},children:"→"}),obs]}))})
+        ]})
       ]}),
-      (result.observations||[]).length>0&&o("div",{style:{marginBottom:16},children:[
-        t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:"OBSERVATIONS"}),
-        t("div",{style:{display:"flex",flexDirection:"column",gap:8},children:(result.observations||[]).map((obs,i)=>o("div",{key:i,style:{background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,padding:"12px 14px",fontSize:13,color:c.tx,lineHeight:1.5},children:[t("span",{style:{color:c.ac,marginRight:8},children:"→"}),obs]}))})
+      o("div",{style:{marginTop:4,marginBottom:8},children:[
+        t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:"ASK ABOUT THIS STATEMENT"}),
+        o("div",{ref:chatRef,style:{maxHeight:280,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,marginBottom:10},children:chatMsgs.length===0?[t("div",{key:"h",style:{fontSize:12,color:c.tm,lineHeight:1.5,background:c.sfg,borderRadius:12,padding:"12px 14px",border:`1px solid ${c.brs}`},children:"Ask anything about these transactions — e.g. \"What's my biggest unlogged expense?\", \"Group the unlogged ones by merchant\", or \"Any subscriptions I forgot?\""})]:chatMsgs.map((m,i)=>t("div",{key:i,style:{alignSelf:m.role==="user"?"flex-end":"flex-start",maxWidth:"85%",padding:"10px 13px",background:m.role==="user"?c.ac:c.sfg,color:m.role==="user"?"#0a0a0a":c.tx,borderRadius:14,fontSize:13.5,whiteSpace:"pre-wrap",lineHeight:1.5,border:m.role==="user"?"none":`1px solid ${c.brs}`},children:m.content}))}),
+        o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:"8px 10px"},children:[
+          t("input",{value:chatInp,onChange:e=>sChatInp(e.target.value),onKeyDown:e=>{if(e.key==="Enter")chatSend()},placeholder:chatBusy?"Thinking…":"Ask a follow-up…",disabled:chatBusy,style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:14,fontFamily:'var(--tf)'}}),
+          t("button",{onClick:chatSend,disabled:!chatInp.trim()||chatBusy,className:"act95 trt",style:{width:34,height:34,borderRadius:10,background:chatInp.trim()&&!chatBusy?c.ac:c.sf2,color:chatInp.trim()&&!chatBusy?"#0a0a0a":c.tm,display:"flex",alignItems:"center",justifyContent:"center",border:"none",flexShrink:0},children:chatBusy?"…":t(Send,{size:15})})
+        ]})
       ]}),
-      t("button",{onClick:()=>{sResult(null);sParsed(null);sFile(null)},className:"w100 act98 tr",style:{padding:"12px 0",background:c.sf2,color:c.td,borderRadius:12,border:`1px solid ${c.brs}`,fontSize:13,marginTop:4},children:"Upload another statement"})
+      t("button",{onClick:()=>{sResult(null);sParsed(null);sFile(null);sChatMsgs([])},className:"w100 act98 tr",style:{padding:"12px 0",background:c.sf2,color:c.td,borderRadius:12,border:`1px solid ${c.brs}`,fontSize:13,marginTop:10},children:"Upload another statement"})
     ]})
   ]})
 }
