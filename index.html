@@ -1519,36 +1519,70 @@ function StmtAnalyze({data,onClose,onAddExpenses}){
   const[err,sErr]=useState(null);
   const[period,sPeriod]=useState(3);
   const[filter,sFilter]=useState("unlogged");
-  const fileRef=useRef(null);
+  const[mode,sMode]=useState("file");
+  const[csvText,sCsvText]=useState("");
+  const[photoPrompt,sPhotoPrompt]=useState("");
+  const fileRef=useRef(null);const photoRef=useRef(null);
+  const rowsToTxns=(rows)=>{
+    if(!rows||rows.length<2)return{err:"No data found."};
+    const headers=rows[0].map(h=>String(h||"").toLowerCase().trim());
+    const fi=names=>names.map(n=>headers.findIndex(h=>h.includes(n))).find(i=>i>=0)??-1;
+    const aI=fi(["amount","amt","debit","credit","dr","cr"]);
+    const dI=fi(["date","txn date","transaction date","value date","posting date"]);
+    const mI=fi(["merchant","description","desc","narration","particulars","details","name","transaction","remarks"]);
+    if(aI<0||dI<0)return{err:"Could not detect Date or Amount columns. Found headers: "+headers.join(", ")};
+    const txns=[];
+    for(let i=1;i<rows.length;i++){
+      const row=rows[i];if(!row||row.every(x=>!x))continue;
+      const rawAmt=String(row[aI]||"").replace(/[^0-9.]/g,"");
+      const amt=parseFloat(rawAmt);if(!amt||isNaN(amt)||amt<=0)continue;
+      const rawDate=String(row[dI]||"");let ts=0;
+      if(rawDate){const pd=new Date(rawDate);if(!isNaN(pd.getTime()))ts=pd.getTime()}
+      if(!ts)continue;
+      const merchant=mI>=0?String(row[mI]||"").trim().slice(0,60):"";
+      txns.push({date:ts,amount:amt,merchant:merchant||"Unknown"});
+    }
+    if(!txns.length)return{err:"No valid transactions found. Check that Date and Amount columns have data."};
+    txns.sort((a,b)=>b.date-a.date);return{txns};
+  };
   const parseFile=async(f)=>{
     sErr(null);sResult(null);
     try{
-      const buf=await f.arrayBuffer();
-      const XLSXLib=window.XLSX||XLSX;
-      const wb=XLSXLib.read(buf);
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSXLib.utils.sheet_to_json(ws,{header:1,raw:false,defval:""});
-      if(rows.length<2){sErr("No data found in file");return}
-      const headers=rows[0].map(h=>String(h||"").toLowerCase().trim());
-      const fi=names=>names.map(n=>headers.findIndex(h=>h.includes(n))).find(i=>i>=0)??-1;
-      const aI=fi(["amount","amt","debit","credit","dr","cr"]);
-      const dI=fi(["date","txn date","transaction date","value date","posting date"]);
-      const mI=fi(["merchant","description","desc","narration","particulars","details","name","transaction","remarks"]);
-      if(aI<0||dI<0){sErr("Could not detect Date or Amount columns. Found headers: "+headers.join(", "));return}
-      const txns=[];
-      for(let i=1;i<rows.length;i++){
-        const row=rows[i];if(!row||row.every(x=>!x))continue;
-        const rawAmt=String(row[aI]||"").replace(/[^0-9.]/g,"");
-        const amt=parseFloat(rawAmt);if(!amt||isNaN(amt)||amt<=0)continue;
-        const rawDate=String(row[dI]||"");let ts=0;
-        if(rawDate){const pd=new Date(rawDate);if(!isNaN(pd.getTime()))ts=pd.getTime()}
-        if(!ts)continue;
-        const merchant=mI>=0?String(row[mI]||"").trim().slice(0,60):"";
-        txns.push({date:ts,amount:amt,merchant:merchant||"Unknown"});
-      }
-      if(!txns.length){sErr("No valid transactions found. Check that Date and Amount columns have data.");return}
-      txns.sort((a,b)=>b.date-a.date);sParsed(txns);sFile(f);
+      const buf=await f.arrayBuffer();const X=window.XLSX||XLSX;const wb=X.read(buf);const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=X.utils.sheet_to_json(ws,{header:1,raw:false,defval:""});
+      const{txns,err}=rowsToTxns(rows);if(err){sErr(err);return}
+      sParsed(txns);sFile(f);
     }catch(e2){sErr("Parse error: "+e2.message)}
+  };
+  const parsePaste=()=>{
+    sErr(null);sResult(null);
+    try{
+      const txt=csvText.trim();if(!txt){sErr("Paste some CSV text first.");return}
+      const X=window.XLSX||XLSX;const wb=X.read(txt,{type:"string"});const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=X.utils.sheet_to_json(ws,{header:1,raw:false,defval:""});
+      const{txns,err}=rowsToTxns(rows);if(err){sErr(err);return}
+      sParsed(txns);sFile({name:`Pasted CSV · ${txns.length} rows`});
+    }catch(e2){sErr("Parse error: "+e2.message)}
+  };
+  const extractPhoto=async(f)=>{
+    if(!f)return;sErr(null);sResult(null);
+    if(f.size>4.5e6){sErr("Image too large (max 4.5MB).");return}
+    if(!gAK()){sErr("Add an AI API key in Settings first.");return}
+    sAnalyzing(true);
+    try{
+      const b64=await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(f)});
+      const sys="You extract transactions from a bank or credit card statement image. Be thorough and accurate.";
+      const u=[{type:"image",source:{type:"base64",media_type:f.type,data:b64.split(",")[1]}},{type:"text",text:(photoPrompt.trim()?photoPrompt.trim()+"\n\n":"")+'Extract ALL spending transactions visible. Return JSON only: {"transactions":[{"date":"YYYY-MM-DD","amount":N,"merchant":"name"}]}. Amounts as positive numbers.'}];
+      const r=await cAPI({max_tokens:3000,system:sys,messages:[{role:"user",content:u}]});
+      const txt=r.content?.map(x=>x.text||"").join("")||"";
+      const m=txt.match(/\{[\s\S]*\}/);if(!m)throw new Error("Could not read transactions from the image");
+      const arr=(JSON.parse(m[0]).transactions)||[];
+      const txns=[];
+      for(const it of arr){const amt=parseFloat(String(it.amount).replace(/[^0-9.]/g,""));if(!amt||isNaN(amt)||amt<=0)continue;const pd=new Date(it.date);const ts=isNaN(pd.getTime())?Date.now():pd.getTime();txns.push({date:ts,amount:amt,merchant:String(it.merchant||"Unknown").slice(0,60)})}
+      if(!txns.length)throw new Error("No transactions found in the image");
+      txns.sort((a,b)=>b.date-a.date);sParsed(txns);sFile({name:`Photo · ${txns.length} txns`});
+    }catch(e2){sErr("Photo extract failed: "+e2.message)}
+    sAnalyzing(false);
   };
   // Local deterministic reconciliation: match statement txns to app expenses by amount + date
   const recon=useMemo(()=>{
@@ -1593,12 +1627,27 @@ function StmtAnalyze({data,onClose,onAddExpenses}){
   const shown=filter==="logged"?logged:filter==="unlogged"?unlogged:recon;
   return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
     t(SH,{title:t("em",{children:"Statement Analyzer"}),onBack:onClose}),
-    t("div",{style:{fontSize:13,color:c.td,marginBottom:20,lineHeight:1.5},children:"Upload your bank or credit card statement (CSV/Excel). Each transaction is matched against your logged expenses — log any that are missing, then ask the AI follow-up questions."}),
-    o("div",{style:{background:c.sfg,borderRadius:16,border:`2px dashed ${file?c.mt:c.brs}`,padding:20,textAlign:"center",marginBottom:16,cursor:"pointer"},onClick:()=>fileRef.current?.click(),children:[
+    t("div",{style:{fontSize:13,color:c.td,marginBottom:16,lineHeight:1.5},children:"Bring in your bank or credit card statement — upload a CSV/Excel file, paste CSV text, or snap a photo. Each transaction is matched against your logged expenses; log any that are missing, then ask the AI follow-up questions."}),
+    o("div",{className:"f ia",style:{gap:6,marginBottom:14},children:[{id:"file",l:"📄 File"},{id:"paste",l:"📋 Paste CSV"},{id:"photo",l:"📷 Photo"}].map(mm=>t("button",{key:mm.id,onClick:()=>{sMode(mm.id);sErr(null)},className:"act95 tr",style:{flex:1,padding:"9px 0",background:mode===mm.id?c.ac:c.sf2,color:mode===mm.id?"#0a0a0a":c.td,border:`1px solid ${mode===mm.id?c.ac:c.brs}`,borderRadius:10,fontSize:12,fontFamily:F.mo},children:mm.l}))}),
+    mode==="file"&&o("div",{style:{background:c.sfg,borderRadius:16,border:`2px dashed ${file?c.mt:c.brs}`,padding:20,textAlign:"center",marginBottom:16,cursor:"pointer"},onClick:()=>fileRef.current?.click(),children:[
       t("div",{style:{fontSize:28,marginBottom:8},children:file?"✅":"📄"}),
       t("div",{style:{fontSize:14,color:c.tx,fontWeight:500},children:file?file.name:"Tap to upload bank statement"}),
       t("div",{style:{fontSize:11,color:c.tm,marginTop:4},children:file?`${parsed?.length||0} transactions detected`:"CSV or Excel · exported from your bank or credit card app"}),
       t("input",{ref:fileRef,type:"file",accept:".csv,.xlsx,.xls",style:{display:"none"},onChange:async e=>{const f=e.target.files?.[0];if(f)await parseFile(f);e.target.value=""}})
+    ]}),
+    mode==="paste"&&o("div",{style:{marginBottom:16},children:[
+      t("textarea",{value:csvText,onChange:e=>sCsvText(e.target.value),placeholder:"Date,Description,Amount\n2026-06-01,Swiggy,450\n2026-06-02,Amazon,1299",rows:6,style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px",color:c.tx,fontSize:13,fontFamily:F.mo,outline:"none",boxSizing:"border-box",resize:"vertical",lineHeight:1.5}}),
+      t("div",{style:{fontSize:11,color:c.tm,margin:"6px 2px 10px"},children:"Paste rows with a header line — needs a Date column and an Amount column (a Description/Merchant column is optional)."}),
+      t("button",{onClick:parsePaste,disabled:!csvText.trim(),className:"w100 act98 tr",style:{padding:"12px 0",background:csvText.trim()?c.ac:c.sf2,color:csvText.trim()?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:14,border:"none"},children:"Parse CSV text"})
+    ]}),
+    mode==="photo"&&o("div",{style:{marginBottom:16},children:[
+      t("input",{value:photoPrompt,onChange:e=>sPhotoPrompt(e.target.value),placeholder:"Optional instructions — e.g. only debit transactions",style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 14px",color:c.tx,fontSize:13,fontFamily:'var(--tf)',outline:"none",boxSizing:"border-box",marginBottom:10}}),
+      o("div",{style:{background:c.sfg,borderRadius:16,border:`2px dashed ${file&&parsed?c.mt:c.brs}`,padding:20,textAlign:"center",cursor:analyzing?"default":"pointer"},onClick:()=>{if(!analyzing)photoRef.current?.click()},children:[
+        t("div",{style:{fontSize:28,marginBottom:8},children:analyzing?"⏳":file&&parsed?"✅":"📷"}),
+        t("div",{style:{fontSize:14,color:c.tx,fontWeight:500},children:analyzing?"Reading the statement…":file&&parsed?file.name:"Tap to snap or upload a statement photo"}),
+        t("div",{style:{fontSize:11,color:c.tm,marginTop:4},children:analyzing?"Extracting transactions with AI":"AI reads the image and extracts transactions"}),
+        t("input",{ref:photoRef,type:"file",accept:"image/*",capture:"environment",style:{display:"none"},onChange:async e=>{const f=e.target.files?.[0];if(f)await extractPhoto(f);e.target.value=""}})
+      ]})
     ]}),
     parsed&&o("div",{style:{marginBottom:16},children:[
       t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:8},children:"COMPARE PERIOD"}),
