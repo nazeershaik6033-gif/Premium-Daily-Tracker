@@ -1646,7 +1646,7 @@ function StmtAnalyze({data,onClose,onAddExpenses}){
         t("div",{style:{fontSize:28,marginBottom:8},children:analyzing?"⏳":file&&parsed?"✅":"📷"}),
         t("div",{style:{fontSize:14,color:c.tx,fontWeight:500},children:analyzing?"Reading the statement…":file&&parsed?file.name:"Tap to snap or upload a statement photo"}),
         t("div",{style:{fontSize:11,color:c.tm,marginTop:4},children:analyzing?"Extracting transactions with AI":"AI reads the image and extracts transactions"}),
-        t("input",{ref:photoRef,type:"file",accept:"image/*",capture:"environment",style:{display:"none"},onChange:async e=>{const f=e.target.files?.[0];if(f)await extractPhoto(f);e.target.value=""}})
+        t("input",{ref:photoRef,type:"file",accept:"image/*",style:{display:"none"},onChange:async e=>{const f=e.target.files?.[0];if(f)await extractPhoto(f);e.target.value=""}})
       ]})
     ]}),
     parsed&&o("div",{style:{marginBottom:16},children:[
