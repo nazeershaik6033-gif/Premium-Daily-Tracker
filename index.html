@@ -545,7 +545,7 @@ const AI_PROVIDERS={
   anthropic:{name:"Anthropic",ph:"sk-ant-…",url:"https://api.anthropic.com/v1/messages",def:"claude-haiku-4-5-20251001",fmt:"anthropic",vision:true},
   deepseek:{name:"DeepSeek",ph:"sk-…",url:"https://api.deepseek.com/v1/chat/completions",def:"deepseek-chat",fmt:"openai",vision:false},
   openai:{name:"OpenAI",ph:"sk-…",url:"https://api.openai.com/v1/chat/completions",def:"gpt-4o-mini",fmt:"openai",vision:true},
-  openrouter:{name:"OpenRouter",ph:"sk-or-…",url:"https://openrouter.ai/api/v1/chat/completions",def:"meta-llama/llama-3.3-70b-instruct",fmt:"openai",vision:false}
+  openrouter:{name:"OpenRouter",ph:"sk-or-…",url:"https://openrouter.ai/api/v1/chat/completions",def:"deepseek/deepseek-r1-0528",fmt:"openai",vision:false}
 };
 function gAK(){try{return localStorage.getItem("etp-ai-apikey")||localStorage.getItem(KK)||null}catch{return null}}
 function sAK(k){try{if(k){localStorage.setItem("etp-ai-apikey",k);localStorage.removeItem(KK)}else{localStorage.removeItem("etp-ai-apikey");localStorage.removeItem(KK)}}catch{}}
@@ -570,7 +570,9 @@ async function cAPI(p){
   }
   const hdrs={"Content-Type":"application/json","Authorization":`Bearer ${k}`};
   if(prov==="openrouter"){hdrs["HTTP-Referer"]=location.origin;hdrs["X-Title"]="Expense Tracker Pro";}
-  const r=await fetch(pc.url,{method:"POST",headers:hdrs,body:JSON.stringify({model,max_tokens:p.max_tokens,messages:msgs})});
+  const isReasoner=/(^|\/)deepseek-r|r1|reason|o[134]-|qwq/i.test(model);
+  const maxTok=isReasoner?Math.max(p.max_tokens||1024,6000):p.max_tokens;
+  const r=await fetch(pc.url,{method:"POST",headers:hdrs,body:JSON.stringify({model,max_tokens:maxTok,messages:msgs})});
   if(!r.ok){const tx=await r.text();let m=`API error ${r.status}`;try{const j=JSON.parse(tx);if(j?.error?.message)m=j.error.message}catch{m+=": "+tx.slice(0,200)}if(/no endpoints|not a valid model|does not exist|model_not_found|no allowed providers/i.test(m))m+=` — set a different model for ${pc.name} in Settings → AI Assistant.`;const e=new Error(m);e.status=r.status;if(r.status===401)e.code="INVALID_KEY";throw e}
   const j=await r.json();
   return{content:[{type:"text",text:j.choices?.[0]?.message?.content||""}]};
