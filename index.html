@@ -1461,6 +1461,36 @@ function BudgetLoans({data,onClose,onPay,onDelete,onDeletePay,onEditPay,onUpdate
   ]})
 }
 
+// === REUSABLE AI CHAT BOX (prompt window for AI subsections) ===
+function AiChatBox({getContext,intro,suggestions,label,maxTok}){
+  const[msgs,sMsgs]=useState([]);
+  const[inp,sInp]=useState("");
+  const[busy,sBusy]=useState(false);
+  const ref=useRef(null);
+  useEffect(()=>{ref.current?.scrollTo(0,ref.current.scrollHeight)},[msgs]);
+  const send=async(text)=>{
+    const q=(typeof text==="string"?text:inp).trim();if(!q||busy)return;
+    if(!gAK()){sMsgs(M=>[...M,{role:"assistant",content:"Add an AI API key in Settings first."}]);return}
+    const next=[...msgs,{role:"user",content:q}];sMsgs(next);sInp("");sBusy(true);
+    try{
+      const sys=getContext?getContext():"You are a helpful personal finance assistant.";
+      const r=await cAPI({max_tokens:maxTok||1200,system:sys,messages:next.map(m=>({role:m.role,content:m.content}))});
+      const txt=r.content?.map(x=>x.text||"").join("")||"";
+      sMsgs(M=>[...M,{role:"assistant",content:txt||"(no response)"}]);
+    }catch(e2){sMsgs(M=>[...M,{role:"assistant",content:"Error: "+e2.message}])}
+    sBusy(false);
+  };
+  return o("div",{style:{marginTop:8},children:[
+    t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:label||"ASK THE AI"}),
+    o("div",{ref,style:{maxHeight:300,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,marginBottom:10},children:msgs.length===0?[t("div",{key:"h",style:{fontSize:12,color:c.tm,lineHeight:1.5,background:c.sfg,borderRadius:12,padding:"12px 14px",border:`1px solid ${c.brs}`},children:intro||"Ask the AI anything about your finances."})]:msgs.map((m,i)=>t("div",{key:i,style:{alignSelf:m.role==="user"?"flex-end":"flex-start",maxWidth:"85%",padding:"10px 13px",background:m.role==="user"?c.ac:c.sfg,color:m.role==="user"?"#0a0a0a":c.tx,borderRadius:14,fontSize:13.5,whiteSpace:"pre-wrap",lineHeight:1.5,border:m.role==="user"?"none":`1px solid ${c.brs}`},children:m.content}))}),
+    (suggestions&&suggestions.length&&msgs.length===0)?o("div",{className:"f",style:{gap:6,flexWrap:"wrap",marginBottom:10},children:suggestions.map((s,i)=>t("button",{key:i,onClick:()=>send(s),className:"act95 tr",style:{padding:"6px 12px",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:999,fontSize:11.5},children:s}))}):null,
+    o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:"8px 10px"},children:[
+      t("input",{value:inp,onChange:e=>sInp(e.target.value),onKeyDown:e=>{if(e.key==="Enter")send()},placeholder:busy?"Thinking…":"Ask a question…",disabled:busy,style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:14,fontFamily:'var(--tf)'}}),
+      t("button",{onClick:()=>send(),disabled:!inp.trim()||busy,className:"act95 trt",style:{width:34,height:34,borderRadius:10,background:inp.trim()&&!busy?c.ac:c.sf2,color:inp.trim()&&!busy?"#0a0a0a":c.tm,display:"flex",alignItems:"center",justifyContent:"center",border:"none",flexShrink:0},children:busy?"…":t(Send,{size:15})})
+    ]})
+  ]})
+}
+
 // === STATEMENT ANALYZER ===
 function StmtAnalyze({data,onClose,onAddExpenses}){
   const{expenses,currency,accounts}=data;
@@ -1471,13 +1501,9 @@ function StmtAnalyze({data,onClose,onAddExpenses}){
   const[err,sErr]=useState(null);
   const[period,sPeriod]=useState(3);
   const[filter,sFilter]=useState("unlogged");
-  const[chatMsgs,sChatMsgs]=useState([]);
-  const[chatInp,sChatInp]=useState("");
-  const[chatBusy,sChatBusy]=useState(false);
-  const fileRef=useRef(null);const chatRef=useRef(null);
-  useEffect(()=>{chatRef.current?.scrollTo(0,chatRef.current.scrollHeight)},[chatMsgs]);
+  const fileRef=useRef(null);
   const parseFile=async(f)=>{
-    sErr(null);sResult(null);sChatMsgs([]);
+    sErr(null);sResult(null);
     try{
       const buf=await f.arrayBuffer();
       const XLSXLib=window.XLSX||XLSX;
@@ -1542,18 +1568,9 @@ function StmtAnalyze({data,onClose,onAddExpenses}){
     }catch(e2){sErr("Analysis failed: "+e2.message)}
     sAnalyzing(false);
   };
-  const chatSend=async()=>{
-    const q=chatInp.trim();if(!q||chatBusy)return;
-    if(!gAK()){sChatMsgs(M=>[...M,{role:"assistant",content:"Add an AI API key in Settings first."}]);return}
-    const next=[...chatMsgs,{role:"user",content:q}];sChatMsgs(next);sChatInp("");sChatBusy(true);
-    try{
-      const ctx=recon.slice(0,80).map(r=>({date:new Date(r.tx.date).toLocaleDateString("en-CA"),amount:r.tx.amount,merchant:r.tx.merchant,logged:!!r.match}));
-      const sys=`You are a financial assistant. The user uploaded a statement (currency ${currency}) reconciled against their expense app. ${logged.length} of ${recon.length} transactions are already logged; ${unlogged.length} are not. Transactions: ${JSON.stringify(ctx)}. Answer the user's questions concisely and helpfully.`;
-      const r=await cAPI({max_tokens:1200,system:sys,messages:next.map(m=>({role:m.role,content:m.content}))});
-      const txt=r.content?.map(x=>x.text||"").join("")||"";
-      sChatMsgs(M=>[...M,{role:"assistant",content:txt||"(no response)"}]);
-    }catch(e2){sChatMsgs(M=>[...M,{role:"assistant",content:"Error: "+e2.message}])}
-    sChatBusy(false);
+  const stmtCtx=()=>{
+    const ctx=recon.slice(0,80).map(r=>({date:new Date(r.tx.date).toLocaleDateString("en-CA"),amount:r.tx.amount,merchant:r.tx.merchant,logged:!!r.match}));
+    return `You are a financial assistant. The user uploaded a statement (currency ${currency}) reconciled against their expense app. ${logged.length} of ${recon.length} transactions are already logged; ${unlogged.length} are not. Transactions: ${JSON.stringify(ctx)}. Answer the user's questions concisely and helpfully.`;
   };
   const shown=filter==="logged"?logged:filter==="unlogged"?unlogged:recon;
   return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
@@ -1606,15 +1623,8 @@ function StmtAnalyze({data,onClose,onAddExpenses}){
           t("div",{style:{display:"flex",flexDirection:"column",gap:8},children:(result.observations||[]).map((obs,i)=>o("div",{key:i,style:{background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,padding:"12px 14px",fontSize:13,color:c.tx,lineHeight:1.5},children:[t("span",{style:{color:c.ac,marginRight:8},children:"→"}),obs]}))})
         ]})
       ]}),
-      o("div",{style:{marginTop:4,marginBottom:8},children:[
-        t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:"ASK ABOUT THIS STATEMENT"}),
-        o("div",{ref:chatRef,style:{maxHeight:280,overflowY:"auto",display:"flex",flexDirection:"column",gap:8,marginBottom:10},children:chatMsgs.length===0?[t("div",{key:"h",style:{fontSize:12,color:c.tm,lineHeight:1.5,background:c.sfg,borderRadius:12,padding:"12px 14px",border:`1px solid ${c.brs}`},children:"Ask anything about these transactions — e.g. \"What's my biggest unlogged expense?\", \"Group the unlogged ones by merchant\", or \"Any subscriptions I forgot?\""})]:chatMsgs.map((m,i)=>t("div",{key:i,style:{alignSelf:m.role==="user"?"flex-end":"flex-start",maxWidth:"85%",padding:"10px 13px",background:m.role==="user"?c.ac:c.sfg,color:m.role==="user"?"#0a0a0a":c.tx,borderRadius:14,fontSize:13.5,whiteSpace:"pre-wrap",lineHeight:1.5,border:m.role==="user"?"none":`1px solid ${c.brs}`},children:m.content}))}),
-        o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:"8px 10px"},children:[
-          t("input",{value:chatInp,onChange:e=>sChatInp(e.target.value),onKeyDown:e=>{if(e.key==="Enter")chatSend()},placeholder:chatBusy?"Thinking…":"Ask a follow-up…",disabled:chatBusy,style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:14,fontFamily:'var(--tf)'}}),
-          t("button",{onClick:chatSend,disabled:!chatInp.trim()||chatBusy,className:"act95 trt",style:{width:34,height:34,borderRadius:10,background:chatInp.trim()&&!chatBusy?c.ac:c.sf2,color:chatInp.trim()&&!chatBusy?"#0a0a0a":c.tm,display:"flex",alignItems:"center",justifyContent:"center",border:"none",flexShrink:0},children:chatBusy?"…":t(Send,{size:15})})
-        ]})
-      ]}),
-      t("button",{onClick:()=>{sResult(null);sParsed(null);sFile(null);sChatMsgs([])},className:"w100 act98 tr",style:{padding:"12px 0",background:c.sf2,color:c.td,borderRadius:12,border:`1px solid ${c.brs}`,fontSize:13,marginTop:10},children:"Upload another statement"})
+      t(AiChatBox,{getContext:stmtCtx,label:"ASK ABOUT THIS STATEMENT",intro:"Ask anything about these transactions — e.g. \"What's my biggest unlogged expense?\", \"Group the unlogged ones by merchant\", or \"Any subscriptions I forgot?\"",suggestions:["Biggest unlogged?","Group by merchant","Spot subscriptions"]}),
+      t("button",{onClick:()=>{sResult(null);sParsed(null);sFile(null)},className:"w100 act98 tr",style:{padding:"12px 0",background:c.sf2,color:c.td,borderRadius:12,border:`1px solid ${c.brs}`,fontSize:13,marginTop:10},children:"Upload another statement"})
     ]})
   ]})
 }
@@ -1648,6 +1658,13 @@ function AiInsights({data,onClose}){
     }catch(e2){sErr("Failed: "+e2.message)}
     sLoading(false);
   };
+  const spendCtx=()=>{
+    const cutoff=Date.now()-period*30*864e5;
+    const cur=expenses.filter(e=>e.type==="expense"&&e.date>=cutoff);
+    const byCat={};for(const e of cur){const l=(co(e.category)||{}).label||e.category;byCat[l]=(byCat[l]||0)+e.amount}
+    const total=cur.reduce((s,e)=>s+e.amount,0);
+    return `You are a personal finance advisor. The user's spending over the last ${period} month(s), currency ${currency}: total ${total.toFixed(0)} across ${cur.length} expenses. By category: ${Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>k+": "+v.toFixed(0)).join(", ")||"none"}. Answer the user's questions concisely and give specific, actionable advice.`;
+  };
   return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
     t(SH,{title:t("em",{children:"AI Insights"}),onBack:onClose}),
     t("div",{style:{fontSize:13,color:c.td,marginBottom:20,lineHeight:1.5},children:"AI-powered analysis of your spending patterns, trends, and savings opportunities."}),
@@ -1676,7 +1693,8 @@ function AiInsights({data,onClose}){
         t("div",{style:{fontSize:13,color:c.tx,lineHeight:1.5},children:result.forecast})
       ]}),
       t("button",{onClick:generate,disabled:loading,className:"w100 act98 tr",style:{padding:"12px 0",background:c.sf2,color:c.td,borderRadius:12,border:`1px solid ${c.brs}`,fontSize:13},children:"Refresh"})
-    ]})
+    ]}),
+    t(AiChatBox,{getContext:spendCtx,label:"ASK ABOUT YOUR SPENDING",intro:"Ask the AI anything about your spending — e.g. \"Where can I cut back?\", \"Why did food go up?\", or \"How much do subscriptions cost me?\"",suggestions:["Where can I cut back?","Biggest category?","How to save more?"]})
   ]})
 }
 
@@ -3483,11 +3501,13 @@ function BillScan({data,onAddExpense,onClose}){
     t("img",{src:img,alt:"",style:{width:"100%",borderRadius:16,marginBottom:16}}),
     busy?t("div",{style:{padding:24,textAlign:"center",color:c.td},children:"Extracting…"}):extractedView
   ]});
+  const billCtx=()=>`You are a helpful assistant inside an expense tracker's bill-scan feature (currency ${data.currency}). ${res?("The user just scanned a receipt with these extracted details: "+JSON.stringify(res)+"."):"The user has not scanned a receipt yet."} Help with questions about the receipt, how to categorize it, splitting bills, or logging the expense. Be concise.`;
   return o("div",{style:{padding:"8px 24px 32px"},children:o(Fragment,{children:[
     t(SH,{title:t("em",{children:"Bill scan"}),onBack:onClose}),
     err?t("div",{style:{padding:"10px 14px",background:c.ro+"20",border:`1px solid ${c.ro}40`,borderRadius:11,fontSize:13,color:c.ro,marginBottom:16},children:err}):null,
     t("input",{type:"file",accept:"image/*",capture:"environment",ref:fileRef,onChange:e=>pick(e.target.files?.[0]),style:{display:"none"}}),
-    img?imageView:pickerArea
+    img?imageView:pickerArea,
+    t(AiChatBox,{getContext:billCtx,label:"ASK ABOUT THIS BILL",intro:"Snap a receipt above, then ask about it — e.g. \"What category should this be?\", \"Split this 3 ways\", or \"Is this a subscription?\"",suggestions:["What category?","Split this bill","Itemize it"]})
   ]})});
 }
 
