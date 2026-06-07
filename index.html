@@ -556,7 +556,7 @@ function sMdl(m){try{m?localStorage.setItem(AI_MDL_K,m):localStorage.removeItem(
 async function cAPI(p){
   const k=gAK();if(!k){const e=new Error("NO_API_KEY");e.code="NO_API_KEY";throw e}
   const prov=gProv(),pc=AI_PROVIDERS[prov]||AI_PROVIDERS.anthropic;
-  const model=gMdl()||p.model||pc.def;
+  const model=gMdl()||pc.def||p.model;
   if(pc.fmt==="anthropic"){
     const r=await fetch(pc.url,{method:"POST",headers:{"Content-Type":"application/json","x-api-key":k,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({...p,model})});
     if(!r.ok){const tx=await r.text();let m=`API error ${r.status}`;try{const j=JSON.parse(tx);if(j?.error?.message)m=j.error.message}catch{m+=": "+tx.slice(0,200)}const e=new Error(m);e.status=r.status;if(r.status===401)e.code="INVALID_KEY";throw e}
