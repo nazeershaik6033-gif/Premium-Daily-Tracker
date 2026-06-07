@@ -540,9 +540,41 @@ const xirr=inv=>{const iv=Number(inv.invested)||0,cv=invCurrent(inv);if(iv<=0||!
 const fdDaysLeft=inv=>{if(inv.type!=="fd"||!inv.maturityDate)return null;return Math.ceil((inv.maturityDate-Date.now())/864e5)};
 function psip(investments){const n=Date.now();let any=false;const up=(investments||[]).map(inv=>{if(!inv.sip||!inv.sip.enabled||!inv.sip.amount)return inv;let invested=Number(inv.invested)||0,current=(inv.current!=null&&inv.current!=="")?Number(inv.current)||0:null,last=inv.sip.lastPosted||inv.createdAt||n,st=0,local=false,nx=new Date(last);nx.setMonth(nx.getMonth()+1);while(nx.getTime()<=n&&st<200){invested+=Number(inv.sip.amount)||0;if(current!=null)current+=Number(inv.sip.amount)||0;last=nx.getTime();nx=new Date(last);nx.setMonth(nx.getMonth()+1);st++;local=true}if(!local)return inv;any=true;return{...inv,invested,...(current!=null?{current}:{}),sip:{...inv.sip,lastPosted:last}}});return{changed:any,investments:up}}
 
-function gAK(){try{return localStorage.getItem(KK)||null}catch{return null}}
-function sAK(k){try{k?localStorage.setItem(KK,k):localStorage.removeItem(KK)}catch{}}
-async function cAPI(p){const k=gAK();if(!k){const e=new Error("NO_API_KEY");e.code="NO_API_KEY";throw e}const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":k,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify(p)});if(!r.ok){const tx=await r.text();let m=`API error ${r.status}`;try{const j=JSON.parse(tx);if(j?.error?.message)m=j.error.message}catch{m+=": "+tx.slice(0,200)}const e=new Error(m);e.status=r.status;if(r.status===401)e.code="INVALID_KEY";throw e}return r.json()}
+const AI_PROV_K="etp-ai-provider",AI_MDL_K="etp-ai-model";
+const AI_PROVIDERS={
+  anthropic:{name:"Anthropic",ph:"sk-ant-…",url:"https://api.anthropic.com/v1/messages",def:"claude-haiku-4-5-20251001",fmt:"anthropic",vision:true},
+  deepseek:{name:"DeepSeek",ph:"sk-…",url:"https://api.deepseek.com/v1/chat/completions",def:"deepseek-chat",fmt:"openai",vision:false},
+  openai:{name:"OpenAI",ph:"sk-…",url:"https://api.openai.com/v1/chat/completions",def:"gpt-4o-mini",fmt:"openai",vision:true},
+  openrouter:{name:"OpenRouter",ph:"sk-or-…",url:"https://openrouter.ai/api/v1/chat/completions",def:"meta-llama/llama-3.1-8b-instruct:free",fmt:"openai",vision:false}
+};
+function gAK(){try{return localStorage.getItem("etp-ai-apikey")||localStorage.getItem(KK)||null}catch{return null}}
+function sAK(k){try{if(k){localStorage.setItem("etp-ai-apikey",k);localStorage.removeItem(KK)}else{localStorage.removeItem("etp-ai-apikey");localStorage.removeItem(KK)}}catch{}}
+function gProv(){try{return localStorage.getItem(AI_PROV_K)||"anthropic"}catch{return"anthropic"}}
+function sProv(p){try{p?localStorage.setItem(AI_PROV_K,p):localStorage.removeItem(AI_PROV_K)}catch{}}
+function gMdl(){try{return localStorage.getItem(AI_MDL_K)||null}catch{return null}}
+function sMdl(m){try{m?localStorage.setItem(AI_MDL_K,m):localStorage.removeItem(AI_MDL_K)}catch{}}
+async function cAPI(p){
+  const k=gAK();if(!k){const e=new Error("NO_API_KEY");e.code="NO_API_KEY";throw e}
+  const prov=gProv(),pc=AI_PROVIDERS[prov]||AI_PROVIDERS.anthropic;
+  const model=gMdl()||p.model||pc.def;
+  if(pc.fmt==="anthropic"){
+    const r=await fetch(pc.url,{method:"POST",headers:{"Content-Type":"application/json","x-api-key":k,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({...p,model})});
+    if(!r.ok){const tx=await r.text();let m=`API error ${r.status}`;try{const j=JSON.parse(tx);if(j?.error?.message)m=j.error.message}catch{m+=": "+tx.slice(0,200)}const e=new Error(m);e.status=r.status;if(r.status===401)e.code="INVALID_KEY";throw e}
+    return r.json();
+  }
+  const msgs=[];
+  if(p.system)msgs.push({role:"system",content:p.system});
+  for(const m2 of p.messages||[]){
+    if(Array.isArray(m2.content)){msgs.push({role:m2.role,content:m2.content.map(c=>c.type==="image"?{type:"image_url",image_url:{url:`data:${c.source.media_type};base64,${c.source.data}`}}:{type:"text",text:c.text||""})});}
+    else{msgs.push({role:m2.role,content:m2.content});}
+  }
+  const hdrs={"Content-Type":"application/json","Authorization":`Bearer ${k}`};
+  if(prov==="openrouter"){hdrs["HTTP-Referer"]=location.origin;hdrs["X-Title"]="Expense Tracker Pro";}
+  const r=await fetch(pc.url,{method:"POST",headers:hdrs,body:JSON.stringify({model,max_tokens:p.max_tokens,messages:msgs})});
+  if(!r.ok){const tx=await r.text();let m=`API error ${r.status}`;try{const j=JSON.parse(tx);if(j?.error?.message)m=j.error.message}catch{m+=": "+tx.slice(0,200)}const e=new Error(m);e.status=r.status;if(r.status===401)e.code="INVALID_KEY";throw e}
+  const j=await r.json();
+  return{content:[{type:"text",text:j.choices?.[0]?.message?.content||""}]};
+}
 
 // === ATOMS ===
 const Gr=()=>t("div",{className:"grain"});
@@ -2925,13 +2957,13 @@ return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
       ]}),
 ]});
 }
-function Settings({data,persist,onClose,onBackup,onCategories,onView,theme,onSetTheme}){const{budget,budgetPeriod,currency,monthStartDay,financeProfile}=data;const fp=financeProfile||{};const[b,sB]=useState(budget==null?"":String(budget));const[bp,sBp]=useState(budgetPeriod||"monthly");const[cu,sCu]=useState(currency||"₹");const[ms,sMs]=useState(monthStartDay||1);const[ak,sAk]=useState(gAK()||"");const[show,sShow]=useState(false);const[fz,sFz]=useState(data.fontSize||"medium");const[at,sAt]=useState(data.alertThreshold!=null?String(data.alertThreshold):"");
+function Settings({data,persist,onClose,onBackup,onCategories,onView,theme,onSetTheme}){const{budget,budgetPeriod,currency,monthStartDay,financeProfile}=data;const fp=financeProfile||{};const[b,sB]=useState(budget==null?"":String(budget));const[bp,sBp]=useState(budgetPeriod||"monthly");const[cu,sCu]=useState(currency||"₹");const[ms,sMs]=useState(monthStartDay||1);const[ak,sAk]=useState(gAK()||"");const[show,sShow]=useState(false);const[prov,sPr]=useState(gProv());const[mdl2,sMdl2]=useState(gMdl()||"");const[fz,sFz]=useState(data.fontSize||"medium");const[at,sAt]=useState(data.alertThreshold!=null?String(data.alertThreshold):"");
 const[showResetCur,sShowResetCur]=useState(false);
 const[mEn,sMEn]=useState(data.morningEnabled||false);const[mTime,sMTime]=useState(data.morningTime||"08:00");const[eEn,sEEn]=useState(data.eveningEnabled??(data.reminderEnabled||false));const[eTime,sETime]=useState(data.eveningTime||data.reminderTime||"21:00");const[notifPerm,sNotifPerm]=useState(typeof Notification!=='undefined'?Notification.permission:'unsupported');
 const fpx=data.fontPrefs||{};
 const[numFont,sNumFont]=useState(fpx.numFont||'sfmono');
 const[numSize,sNumSize]=useState(fpx.numSize||14);
-const[txtFont,sTxtFont]=useState(fpx.txtFont||'system');const[inc,sInc]=useState(String(fp.monthlyIncome||""));const[fxE,sFxE]=useState(String(fp.fixedExpenses||""));const[spg,sSpg]=useState(String(fp.savingsGoalPct||"20"));const[efm,sEfm]=useState(String(fp.emergencyFundMonths||"6"));const[dbt,sDbt]=useState(String(fp.totalDebt||""));const save=()=>{persist({budget:parseFloat(b)||null,budgetPeriod:bp,currency:cu,monthStartDay:parseInt(ms)||1,fontSize:fz,alertThreshold:parseFloat(at)||null,fontPrefs:{numFont,numSize,txtFont},morningEnabled:mEn,morningTime:mTime,eveningEnabled:eEn,eveningTime:eTime,reminderEnabled:eEn,reminderTime:eTime,financeProfile:{monthlyIncome:parseFloat(inc)||null,fixedExpenses:parseFloat(fxE)||null,savingsGoalPct:parseFloat(spg)||20,emergencyFundMonths:parseFloat(efm)||6,totalDebt:parseFloat(dbt)||null}});sAK(ak.trim()||null);if((mEn||eEn)&&notifPerm==='granted'){try{navigator.serviceWorker?.ready.then(reg=>reg.periodicSync?.register('expense-reminder',{minInterval:86400000}).catch(()=>{}))}catch{}}onClose()};
+const[txtFont,sTxtFont]=useState(fpx.txtFont||'system');const[inc,sInc]=useState(String(fp.monthlyIncome||""));const[fxE,sFxE]=useState(String(fp.fixedExpenses||""));const[spg,sSpg]=useState(String(fp.savingsGoalPct||"20"));const[efm,sEfm]=useState(String(fp.emergencyFundMonths||"6"));const[dbt,sDbt]=useState(String(fp.totalDebt||""));const save=()=>{persist({budget:parseFloat(b)||null,budgetPeriod:bp,currency:cu,monthStartDay:parseInt(ms)||1,fontSize:fz,alertThreshold:parseFloat(at)||null,fontPrefs:{numFont,numSize,txtFont},morningEnabled:mEn,morningTime:mTime,eveningEnabled:eEn,eveningTime:eTime,reminderEnabled:eEn,reminderTime:eTime,financeProfile:{monthlyIncome:parseFloat(inc)||null,fixedExpenses:parseFloat(fxE)||null,savingsGoalPct:parseFloat(spg)||20,emergencyFundMonths:parseFloat(efm)||6,totalDebt:parseFloat(dbt)||null}});sAK(ak.trim()||null);sProv(prov);sMdl(mdl2.trim()||null);if((mEn||eEn)&&notifPerm==='granted'){try{navigator.serviceWorker?.ready.then(reg=>reg.periodicSync?.register('expense-reminder',{minInterval:86400000}).catch(()=>{}))}catch{}}onClose()};
 if(showResetCur)return t(ResetCurrencies,{data,persist,onClose:()=>sShowResetCur(false)});
 return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
   t(SH,{title:t("em",{children:"Settings"}),onBack:onClose,right:t("button",{onClick:save,className:"act95 trt",style:{padding:"8px 14px",background:c.ac,color:"#0a0a0a",borderRadius:10,fontSize:12,fontWeight:600,border:"none"},children:"Save"})}),
@@ -3028,7 +3060,18 @@ return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
     ]}),
   ]})})(),
   o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
-    t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:12},children:"ANTHROPIC API KEY"}),o("div",{className:"f ia",style:{gap:8,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:11,padding:"10px 12px"},children:[t(KeyI,{size:14,color:c.tm}),t("input",{type:show?"text":"password",value:ak,onChange:e=>sAk(e.target.value),placeholder:"sk-ant-…",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:13,fontFamily:F.mo}}),t("button",{onClick:()=>sShow(!show),style:{background:"transparent",border:"none",color:c.tm},children:show?t(EyeOff,{size:14}):t(Eye,{size:14})})]}),t("div",{style:{fontSize:11,color:c.tm,marginTop:6},children:"Needed for AI chat & bill scan. Stored locally only."}),
+    t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:12},children:"AI ASSISTANT"}),
+    t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:8},children:"PROVIDER"}),
+    t("div",{className:"g g2",style:{gap:6,marginBottom:14},children:Object.entries(AI_PROVIDERS).map(([id,pc])=>t("button",{key:id,onClick:()=>sPr(id),className:"act95 tr",style:{padding:"9px 6px",background:prov===id?c.sf3:c.sf2,border:`1px solid ${prov===id?c.ac:c.brs}`,borderRadius:9,fontSize:11,fontWeight:prov===id?600:400,color:prov===id?c.ac:c.td},children:pc.name}))}),
+    t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:"API KEY"}),
+    o("div",{className:"f ia",style:{gap:8,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:11,padding:"10px 12px",marginBottom:10},children:[
+      t(KeyI,{size:14,color:c.tm}),
+      t("input",{type:show?"text":"password",value:ak,onChange:e=>sAk(e.target.value),placeholder:(AI_PROVIDERS[prov]||AI_PROVIDERS.anthropic).ph,style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:13,fontFamily:F.mo}}),
+      t("button",{onClick:()=>sShow(!show),style:{background:"transparent",border:"none",color:c.tm},children:show?t(EyeOff,{size:14}):t(Eye,{size:14})})
+    ]}),
+    t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:"MODEL (BLANK = DEFAULT)"}),
+    t("input",{value:mdl2,onChange:e=>sMdl2(e.target.value),placeholder:(AI_PROVIDERS[prov]||AI_PROVIDERS.anthropic).def,style:{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${c.brs}`,background:c.sf2,color:c.tx,fontSize:13,fontFamily:F.mo,boxSizing:"border-box",outline:"none",marginBottom:8}}),
+    t("div",{style:{fontSize:11,color:c.tm,lineHeight:1.5},children:"Key stored locally only · Bill scan (vision) needs Anthropic or OpenAI"})
   ]}),
   o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:14},children:"FINANCE PROFILE"}),
@@ -3136,7 +3179,7 @@ function CardFixRow({e,cards,currency,onConvert,onIgnore}){const guess=cardBillG
 // === AI CHAT (simplified) ===
 function Chat({data,onAddExpense,onView,onClose}){const[ms,sMs]=useState([{role:"assistant",content:"Hi! Tell me about an expense or income and I'll save it for you.\n\nTry:\n• \"Spent 450 at Swiggy yesterday\"\n• \"Got 50k salary today\""}]);const[inp,sInp]=useState("");const[busy,sBusy]=useState(false);const ref=useRef(null);useEffect(()=>{ref.current?.scrollTo(0,ref.current.scrollHeight)},[ms]);
 const send=async()=>{if(!inp.trim()||busy)return;const u=inp.trim();sMs([...ms,{role:"user",content:u}]);sInp("");sBusy(true);
-  if(!gAK()){sMs(m=>[...m,{role:"assistant",content:"I need an Anthropic API key first. Tap More → Settings to add one. Keys live only on your device."}]);sBusy(false);return}
+  if(!gAK()){sMs(m=>[...m,{role:"assistant",content:"I need an AI API key first. Go to Settings and add one — Anthropic, DeepSeek, OpenAI, or OpenRouter all work. Keys live only on your device."}]);sBusy(false);return}
   try{const sys=`You help log expenses/income. Today: ${new Date().toISOString()}. Categories: ${CE.map(c=>c.id).join(",")} or income: ${CI.map(c=>c.id).join(",")}. Accounts: ${data.accounts.map(a=>`${a.id}=${a.name}`).join("; ")}. Reply ONLY with JSON: {"type":"add","kind":"expense"|"income","amount":N,"category":"id","accountId":"id","merchant":"name","note":"opt","date":"ISO"} OR {"type":"clarify","question":"text"} OR {"type":"chat","message":"text"}`;
     const r=await cAPI({model:"claude-sonnet-4-20250514",max_tokens:500,system:sys,messages:[{role:"user",content:u}]});const txt=r.content?.map(c=>c.text||"").join("")||"";const m=txt.match(/\{[\s\S]*\}/);if(!m){sMs(M=>[...M,{role:"assistant",content:txt}]);sBusy(false);return}const j=JSON.parse(m[0]);
     if(j.type==="add"){const d=j.date?new Date(j.date).getTime():Date.now();onAddExpense({type:j.kind==="income"?"income":"expense",amount:Number(j.amount),accountId:j.accountId||data.accounts[0].id,category:j.category||(j.kind==="income"?"income_other":"other"),merchant:j.merchant||null,note:j.note||null,date:d,currency:data.currency,source:"chat"});sMs(M=>[...M,{role:"assistant",content:`✓ Added ${j.kind} of ${fm(j.amount,data.currency)} — ${j.merchant||""}`}])}else if(j.type==="clarify")sMs(M=>[...M,{role:"assistant",content:j.question}]);else sMs(M=>[...M,{role:"assistant",content:j.message||txt}]);
@@ -3158,7 +3201,8 @@ function BillScan({data,onAddExpense,onClose}){
     const b64=await new Promise(r=>{const rd2=new FileReader();rd2.onload=()=>r(rd2.result);rd2.readAsDataURL(f)});
     sImg(b64);
     sBusy(true);
-    if(!gAK()){sErr("Add an Anthropic API key in Settings first.");sBusy(false);return}
+    if(!gAK()){sErr("Add an AI API key in Settings first.");sBusy(false);return}
+    if(!(AI_PROVIDERS[gProv()]||AI_PROVIDERS.anthropic).vision){sErr(`Bill scan needs a vision-capable provider. Switch to Anthropic or OpenAI in Settings (currently ${(AI_PROVIDERS[gProv()]||AI_PROVIDERS.anthropic).name}).`);sBusy(false);return}
     try{
       const r=await cAPI({
         model:"claude-sonnet-4-20250514",
