@@ -825,9 +825,9 @@ function App(){
   const blPaid=(l)=>(l.payments||[]).reduce((s,p)=>s+(p.amount||0),0);
   const blStatus=(l,payments)=>(payments.reduce((s,p)=>s+(p.amount||0),0)>=(l.principal||0)-0.005?"paid":"active");
   const repayMonth=(m)=>{const ex=(d.budgetLoans||[]).find(l=>l.sourceMonth===m.start);if(!ex)pst({budgetLoans:[...(d.budgetLoans||[]),{id:"bl_"+uid(),sourceMonth:m.start,monthLabel:new Date(m.start).toLocaleDateString("en-US",{month:"short",year:"numeric"}),principal:Math.abs(m.delta),budgetAt:d.budget,spentAt:m.spent,createdAt:Date.now(),status:"active",dueDate:null,note:"",payments:[]}]});navFromRef.current="budgetTrack";sV("budgetLoans")};
-  const uBL=(loan)=>pst({budgetLoans:(d.budgetLoans||[]).map(x=>x.id===loan.id?{...x,...loan}:x)});
+  const uBL=(loan)=>pst({budgetLoans:(d.budgetLoans||[]).map(x=>{if(x.id!==loan.id)return x;const m={...x,...loan};const paid=(m.payments||[]).reduce((s,p)=>s+(p.amount||0),0);return{...m,status:paid>=(m.principal||0)-0.005?"paid":"active"}})});
   const dBL=(id)=>pst({budgetLoans:(d.budgetLoans||[]).filter(l=>l.id!==id)});
-  const payBL=(id,amount,note)=>pst({budgetLoans:(d.budgetLoans||[]).map(l=>{if(l.id!==id)return l;const payments=[...(l.payments||[]),{id:"p_"+uid(),amount,date:Date.now(),note:(note||"").trim()}];return{...l,payments,status:blStatus(l,payments)}})});
+  const payBL=(id,amount,note,date)=>pst({budgetLoans:(d.budgetLoans||[]).map(l=>{if(l.id!==id)return l;const payments=[...(l.payments||[]),{id:"p_"+uid(),amount,date:date||Date.now(),note:(note||"").trim()}];return{...l,payments,status:blStatus(l,payments)}})});
   const delPayBL=(id,pid)=>pst({budgetLoans:(d.budgetLoans||[]).map(l=>{if(l.id!==id)return l;const payments=(l.payments||[]).filter(p=>p.id!==pid);return{...l,payments,status:blStatus(l,payments)}})});
   const aInv=(inv)=>pst({investments:[...(d.investments||[]),{...inv,id:"inv_"+uid(),createdAt:Date.now()}]});
   const uInv=(inv)=>pst({investments:(d.investments||[]).map(x=>x.id===inv.id?{...x,...inv}:x)});
@@ -915,7 +915,7 @@ function App(){
         v==="expPlanner"&&t(ExpPlanner,{data:d,onSave:aEP,onDelete:dEP,onClose:()=>sV("home")}),
         v==="investCalc"&&t(InvCalc,{data:d,onSave:aIP,onDelete:dIP,onClose:()=>sV("home")}),
       ]}),
-      nav&&t(Nav,{view:v,setView:sV}),
+      nav&&t(Nav,{view:v,setView:(id)=>{if(id===v){if(scrollRef.current)scrollRef.current.scrollTo({top:0,behavior:"smooth"})}else sV(id)}}),
     ]}),
     atx&&t(TxSht,{expense:atx,accounts:d.accounts,cards:d.cards||[],onClose:()=>sAtx(null),onDelete:()=>dE(atx.id),onEdit:()=>{navFromRef.current="home";sFlt(null);sEd(atx);sAtx(null);sV("edit")}}),
     sbar&&t(Sidebar,{data:d,onClose:()=>sSbar(false),onView:(id)=>{navFromRef.current=v;sV(id)},activeUser,onUpdateUser:updateUserFn}),
@@ -1266,9 +1266,11 @@ function BudgetTrack({data,onClose,onRepay,onOpenLoans}){const{expenses,budget,b
 // === BUDGET LOANS (repay past overspends, interest-free, record-only) ===
 function BudgetLoans({data,onClose,onPay,onDelete,onDeletePay,onUpdate,onOpenTracker}){
   const{budgetLoans=[],currency}=data;
-  const[payT,sPayT]=useState(null);const[payAmt,sPayAmt]=useState("");const[payNote,sPayNote]=useState("");
+  const[payT,sPayT]=useState(null);const[payAmt,sPayAmt]=useState("");const[payNote,sPayNote]=useState("");const[payDate,sPayDate]=useState("");
   const[exp,sExp]=useState(null);const[delId,sDelId]=useState(null);
-  const[planT,sPlanT]=useState(null);const[planDue,sPlanDue]=useState("");
+  const[edT,sEdT]=useState(null);const[edName,sEdName]=useState("");const[edAmt,sEdAmt]=useState("");const[edDue,sEdDue]=useState("");
+  const today=()=>new Date().toISOString().slice(0,10);
+  const loanName=l=>l.name||l.monthLabel+" overspend";
   const paidOf=l=>(l.payments||[]).reduce((s,p)=>s+(p.amount||0),0);
   const loans=[...budgetLoans].sort((a,b)=>b.sourceMonth-a.sourceMonth);
   const active=loans.filter(l=>l.status!=="paid"),settled=loans.filter(l=>l.status==="paid");
@@ -1281,19 +1283,19 @@ function BudgetLoans({data,onClose,onPay,onDelete,onDeletePay,onUpdate,onOpenTra
       o("div",{className:"f ia jb",style:{gap:10,marginBottom:10},children:[
         o("div",{className:"f ia",style:{gap:10,minWidth:0},children:[
           t("div",{style:{width:40,height:40,borderRadius:11,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0},children:done?"✅":"🧾"}),
-          o("div",{className:"minw0",children:[t("div",{style:{fontSize:15,fontWeight:600,color:c.tx},children:l.monthLabel+" overspend"}),t("div",{style:{fontFamily:F.mo,fontSize:10.5,color:c.tm,marginTop:2,letterSpacing:.3},children:done?"FULLY REPAID":`${fm(remain,currency)} left of ${fm(l.principal,currency)}`})]})
+          o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:15,fontWeight:600,color:c.tx},children:loanName(l)}),t("div",{style:{fontFamily:F.mo,fontSize:10.5,color:c.tm,marginTop:2,letterSpacing:.3},children:done?"FULLY REPAID":`${fm(remain,currency)} left of ${fm(l.principal,currency)}`})]})
         ]}),
         t(Pl,{col:ac,children:done?"PAID":pct+"%"})
       ]}),
       t("div",{style:{height:6,background:c.sf2,borderRadius:999,overflow:"hidden",marginBottom:planLine?8:12},children:t("div",{style:{width:pct+"%",height:"100%",background:ac,borderRadius:999}})}),
       planLine&&t("div",{style:{fontFamily:F.mo,fontSize:10.5,color:c.td,letterSpacing:.3,marginBottom:12},children:planLine.toUpperCase()}),
-      !done&&o("div",{className:"f",style:{gap:8},children:[
-        t("button",{onClick:()=>{sPayT(l);sPayAmt("");sPayNote("")},className:"f1 act98 tr",style:{padding:"10px 0",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:10,fontSize:13,fontWeight:600},children:"Log payment"}),
-        t("button",{onClick:()=>{sPlanT(l);sPlanDue(l.dueDate?new Date(l.dueDate).toISOString().slice(0,10):"")},className:"act98 tr",style:{padding:"10px 14px",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:10,fontSize:13},children:l.dueDate?"Edit date":"Set date"})
-      ]}),
+      !done&&t("button",{onClick:()=>{sPayT(l);sPayAmt("");sPayNote("");sPayDate(today())},className:"w100 act98 tr",style:{padding:"10px 0",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:10,fontSize:13,fontWeight:600},children:"Log payment"}),
       o("div",{className:"f ia jb",style:{marginTop:12},children:[
         t("button",{onClick:()=>sExp(isExp?null:l.id),style:{background:"transparent",border:"none",color:c.tm,fontFamily:F.mo,fontSize:10.5,letterSpacing:.5,padding:0},children:`${(l.payments||[]).length} payment${(l.payments||[]).length===1?"":"s"} ${isExp?"▴":"▾"}`}),
-        t("button",{onClick:()=>sDelId(l.id),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(Trash2,{size:14})})
+        o("div",{className:"f ia",style:{gap:4},children:[
+          t("button",{onClick:()=>{sEdT(l);sEdName(l.name||"");sEdAmt(String(l.principal||""));sEdDue(l.dueDate?new Date(l.dueDate).toISOString().slice(0,10):"")},style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(Pencil,{size:13})}),
+          t("button",{onClick:()=>sDelId(l.id),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(Trash2,{size:14})})
+        ]})
       ]}),
       isExp&&((l.payments||[]).length?t("div",{style:{marginTop:10,borderTop:`1px solid ${c.brs}`,paddingTop:10,display:"flex",flexDirection:"column",gap:8},children:[...(l.payments||[])].sort((a,b)=>b.date-a.date).map(p=>o("div",{key:p.id,className:"f ia jb",style:{gap:8},children:[
         o("div",{className:"minw0",children:[t("div",{style:{fontFamily:F.mo,fontSize:13,color:c.tx},children:fm(p.amount,currency)}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:new Date(p.date).toLocaleDateString("en-US",{day:"numeric",month:"short",year:"numeric"})+(p.note?" · "+p.note:"")})]}),
@@ -1314,7 +1316,7 @@ function BudgetLoans({data,onClose,onPay,onDelete,onDeletePay,onUpdate,onOpenTra
     ]}),
     payT&&t(Sht,{onClose:()=>sPayT(null),children:o(Fragment,{children:[
       t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:4},children:"Log a payment"}),
-      t("div",{style:{fontSize:13,color:c.td,marginBottom:18},children:`🧾 ${payT.monthLabel} overspend · ${fm(Math.max(0,(payT.principal||0)-paidOf(payT)),currency)} left`}),
+      t("div",{style:{fontSize:13,color:c.td,marginBottom:18},children:`🧾 ${loanName(payT)} · ${fm(Math.max(0,(payT.principal||0)-paidOf(payT)),currency)} left`}),
       o("div",{style:{marginBottom:16,textAlign:"center"},children:[
         t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,marginBottom:6},children:"AMOUNT"}),
         o("div",{className:"f ib jc",style:{gap:4},children:[
@@ -1322,18 +1324,20 @@ function BudgetLoans({data,onClose,onPay,onDelete,onDeletePay,onUpdate,onOpenTra
           t("input",{type:"text",inputMode:"decimal",value:payAmt,onChange:e=>sPayAmt(e.target.value.replace(/[^\d.]/g,"")),placeholder:"0.00",style:{fontFamily:'var(--nf)',fontSize:40,fontWeight:300,background:"transparent",border:"none",outline:"none",color:c.tx,textAlign:"center",width:"60%",letterSpacing:-1,caretColor:c.ac}})
         ]})
       ]}),
-      o("div",{className:"f ia jc",style:{gap:8,marginBottom:16,flexWrap:"wrap"},children:[25,50,100].map(p=>{const rem=Math.max(0,(payT.principal||0)-paidOf(payT));const amt=p===100?rem:Math.round(rem*p)/100;return t("button",{key:p,onClick:()=>sPayAmt(String(amt)),className:"act95 tr",style:{padding:"7px 16px",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:999,fontSize:12,fontFamily:F.mo,letterSpacing:.3},children:p===100?"Pay it off":p+"%"})})}),
+      o("div",{className:"f ia jc",style:{gap:8,marginBottom:8,flexWrap:"wrap"},children:(()=>{const rem=Math.max(0,(payT.principal||0)-paidOf(payT));const chips=[10,25,50,75].map(p=>({k:p+"%",v:Math.round(rem*p/100)}));chips.push({k:"Remaining",v:Math.round(rem*100)/100});return chips.map(ch=>t("button",{key:ch.k,onClick:()=>sPayAmt(String(ch.v)),className:"act95 tr",style:{padding:"7px 14px",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:999,fontSize:12,fontFamily:F.mo,letterSpacing:.3},children:ch.k}))})()}),
+      (parseFloat(payAmt)>Math.max(0,(payT.principal||0)-paidOf(payT)))&&t("div",{style:{fontSize:11,color:c.gd,textAlign:"center",marginBottom:10},children:`Will be capped to the ${fm(Math.max(0,(payT.principal||0)-paidOf(payT)),currency)} remaining.`}),
       o("div",{style:{marginBottom:14},children:t(FI,{label:"Note (optional)",value:payNote,onChange:sPayNote,placeholder:"e.g., bonus, spare cash"})}),
-      t("button",{disabled:!parseFloat(payAmt)||parseFloat(payAmt)<=0,onClick:()=>{onPay(payT.id,parseFloat(payAmt),payNote);sPayT(null)},className:"w100 act98 tr",style:{padding:"14px 0",background:parseFloat(payAmt)?c.ac:c.sf2,color:parseFloat(payAmt)?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:parseFloat(payAmt)?`Log ${fm(parseFloat(payAmt),currency)}`:"Enter an amount"})
+      o("div",{style:{marginBottom:16},children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"PAYMENT DATE"}),t("input",{type:"date",value:payDate,max:today(),onChange:e=>sPayDate(e.target.value),style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px",color:c.tx,fontSize:14,outline:"none",fontFamily:'var(--tf)',colorScheme:"dark"}})]}),
+      t("button",{disabled:!parseFloat(payAmt)||parseFloat(payAmt)<=0,onClick:()=>{const rem=Math.max(0,(payT.principal||0)-paidOf(payT));const amt=Math.min(parseFloat(payAmt),rem);onPay(payT.id,amt,payNote,payDate?new Date(payDate).getTime():Date.now());sPayT(null)},className:"w100 act98 tr",style:{padding:"14px 0",background:parseFloat(payAmt)?c.ac:c.sf2,color:parseFloat(payAmt)?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:parseFloat(payAmt)?`Log ${fm(Math.min(parseFloat(payAmt),Math.max(0,(payT.principal||0)-paidOf(payT))),currency)}`:"Enter an amount"})
     ]})}),
-    planT&&t(Sht,{onClose:()=>sPlanT(null),children:o(Fragment,{children:[
-      t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:4},children:"Target payoff date"}),
-      t("div",{style:{fontSize:13,color:c.td,marginBottom:18,lineHeight:1.5},children:`🧾 ${planT.monthLabel} overspend — optional. Pay any amount, any time; this is just a goal date, never a fixed monthly charge.`}),
-      o("div",{children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"PAY OFF BY (OPTIONAL)"}),t("input",{type:"date",value:planDue,onChange:e=>sPlanDue(e.target.value),style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px",color:c.tx,fontSize:14,outline:"none",fontFamily:'var(--tf)',colorScheme:"dark"}})]}),
-      o("div",{className:"f",style:{gap:10,marginTop:24},children:[
-        planT.dueDate&&t("button",{onClick:()=>{onUpdate({id:planT.id,dueDate:null});sPlanT(null)},className:"act98 tr",style:{padding:"14px 18px",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:12,fontSize:14,fontWeight:500},children:"Clear"}),
-        t("button",{onClick:()=>{onUpdate({id:planT.id,dueDate:planDue?new Date(planDue).getTime():null});sPlanT(null)},className:"f1 act98 tr",style:{padding:"14px 0",background:c.ac,color:"#0a0a0a",borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:"Save"})
-      ]})
+    edT&&t(Sht,{onClose:()=>sEdT(null),children:o(Fragment,{children:[
+      t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:4},children:"Edit loan"}),
+      t("div",{style:{fontSize:13,color:c.td,marginBottom:18,lineHeight:1.5},children:`From ${edT.monthLabel} · ${(edT.payments||[]).length} payment${(edT.payments||[]).length===1?"":"s"} logged. Everything here is yours to adjust.`}),
+      o("div",{style:{marginBottom:14},children:t(FI,{label:"Name",value:edName,onChange:sEdName,placeholder:edT.monthLabel+" overspend"})}),
+      o("div",{children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"AMOUNT OWED"}),o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px"},children:[t("span",{style:{color:c.td,fontFamily:F.mo,fontSize:18},children:currency}),t("input",{type:"text",inputMode:"decimal",value:edAmt,onChange:e=>sEdAmt(e.target.value.replace(/[^\d.]/g,"")),placeholder:"0",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:18,fontFamily:F.mo,fontWeight:500}})]})]}),
+      t("div",{style:{fontSize:11,color:c.tm,margin:"8px 2px 0",lineHeight:1.5},children:`Originally ${fm(edT.principal||0,currency)} from the Budget Tracker. ${fm(paidOf(edT),currency)} repaid so far.`}),
+      o("div",{style:{marginTop:14},children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"PAY OFF BY (OPTIONAL)"}),t("input",{type:"date",value:edDue,onChange:e=>sEdDue(e.target.value),style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px",color:c.tx,fontSize:14,outline:"none",fontFamily:'var(--tf)',colorScheme:"dark"}})]}),
+      t("button",{disabled:!parseFloat(edAmt)||parseFloat(edAmt)<=0,onClick:()=>{onUpdate({id:edT.id,name:edName.trim()||null,principal:parseFloat(edAmt),dueDate:edDue?new Date(edDue).getTime():null});sEdT(null)},className:"w100 act98 tr",style:{marginTop:24,padding:"14px 0",background:parseFloat(edAmt)?c.ac:c.sf2,color:parseFloat(edAmt)?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:parseFloat(edAmt)?"Save changes":"Enter the amount owed"})
     ]})}),
     delId&&t(Sht,{onClose:()=>sDelId(null),children:o(Fragment,{children:[
       t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:8},children:"Delete this loan?"}),
