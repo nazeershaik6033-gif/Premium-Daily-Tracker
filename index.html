@@ -896,7 +896,7 @@ function App(){
         v==="settings"&&t(Settings,{data:d,persist:pst,onClose:()=>sV("home"),onBackup:()=>sV("backup"),onCategories:()=>{navFromRef.current="settings";sV("categories")},onView:sV,theme,onSetTheme:applyTheme}),
         v==="backup"&&t(Backup,{data:d,persist:pst,onClose:()=>sV("home")}),
         v==="tips"&&t(Tips,{data:d,onClose:()=>sV(navFromRef.current)}),
-        v==="breakdown"&&t(Breakdown,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
+        v==="breakdown"&&t(Breakdown,{data:d,persist:pst,onClose:()=>sV(navFromRef.current),onTx:sAtx}),
         v==="budgetTrack"&&t(BudgetTrack,{data:d,onClose:()=>sV(navFromRef.current)}),
         v==="categories"&&t(CatMgr,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
         v==="chat"&&t(Chat,{data:d,onAddExpense:aE,onView:sV,onClose:()=>sV("home")}),
@@ -1138,18 +1138,60 @@ return o("div",{style:{background:c.sfg,borderRadius:16,border:`1px solid ${ov?c
 ]})}
 
 // === SPENDING BREAKDOWN (Needs vs Wants · 50/30/20) — standalone, no app-wide effect ===
-function Breakdown({data,onClose}){const{expenses,currency,monthStartDay=1,financeProfile}=data;
+function Breakdown({data,persist,onClose,onTx}){const{expenses,currency,monthStartDay=1,financeProfile}=data;
   const st=ps(new Date(),monthStartDay),en=mse(new Date().getFullYear(),new Date().getMonth(),monthStartDay);
   const mE=useMemo(()=>expenses.filter(e=>e.type==="expense"&&e.date>=st&&e.date<en),[expenses,st,en]);
   const incTx=useMemo(()=>expenses.filter(e=>e.type==="income"&&e.date>=st&&e.date<en).reduce((s,e)=>s+e.amount,0),[expenses,st,en]);
   const income=incTx>0?incTx:((financeProfile&&financeProfile.monthlyIncome)||0);
-  const needs=mE.filter(e=>nwOf(e)==="need").reduce((s,e)=>s+e.amount,0);
-  const wants=mE.filter(e=>nwOf(e)==="want").reduce((s,e)=>s+e.amount,0);
+  const needsItems=useMemo(()=>mE.filter(e=>nwOf(e)==="need").sort((a,b)=>b.date-a.date),[mE]);
+  const wantsItems=useMemo(()=>mE.filter(e=>nwOf(e)==="want").sort((a,b)=>b.date-a.date),[mE]);
+  const savingsItems=useMemo(()=>expenses.filter(e=>e.type==="income"&&e.date>=st&&e.date<en).sort((a,b)=>b.date-a.date),[expenses,st,en]);
+  const needs=needsItems.reduce((s,e)=>s+e.amount,0);
+  const wants=wantsItems.reduce((s,e)=>s+e.amount,0);
   const spent=needs+wants,savings=Math.max(0,income-spent),pctOf=v=>income>0?Math.round(v/income*100):0;
   const monLbl=new Date(st).toLocaleDateString("en-US",{month:"long",year:"numeric"});
-  const row=(label,amt,target,col)=>o("div",{style:{marginBottom:14},children:[
-    o("div",{className:"f ib jb",style:{marginBottom:6},children:[o("span",{style:{fontSize:13,color:c.tx,fontWeight:500},children:[label,"  ",t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm},children:`target ${target}%`})]}),o("span",{style:{fontFamily:F.mo,fontSize:13,color:c.tx},children:fm(amt,currency)+(income>0?`  ·  ${pctOf(amt)}%`:"")})]}),
-    o("div",{style:{height:8,background:c.sf2,borderRadius:999,overflow:"hidden",position:"relative"},children:[t("div",{style:{width:Math.min(100,income>0?pctOf(amt):0)+"%",height:"100%",background:col,borderRadius:999}}),income>0&&t("div",{style:{position:"absolute",top:-2,left:target+"%",width:2,height:12,background:c.tx,opacity:.6}})]}),
+  const[sub,sSub]=useState(null);
+  const toggleNW=e=>{const next=nwOf(e)==="need"?"want":"need";persist({expenses:data.expenses.map(x=>x.id===e.id?{...x,needWant:next}:x)});};
+  if(sub){
+    const isSav=sub==="savings";
+    const subItems=sub==="needs"?needsItems:sub==="wants"?wantsItems:savingsItems;
+    const subCol=sub==="needs"?NW_META.need.color:sub==="wants"?NW_META.want.color:c.gd;
+    const subAmt=sub==="needs"?needs:sub==="wants"?wants:savings;
+    const subLbl=sub==="needs"?"Needs":sub==="wants"?"Wants":"Income · Savings";
+    return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
+      t(SH,{title:t("em",{children:subLbl}),onBack:()=>sSub(null)}),
+      t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:12},children:monLbl.toUpperCase()}),
+      o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:"12px 16px",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between"},children:[
+        o("div",{className:"f ia",style:{gap:8},children:[t("span",{style:{width:10,height:10,borderRadius:3,background:subCol,display:"inline-block"}}),t("span",{style:{fontFamily:F.mo,fontSize:11,color:c.tm,letterSpacing:1},children:sub.toUpperCase()})]}),
+        o("div",{className:"trg",children:[t("div",{style:{fontFamily:F.mo,fontSize:15,fontWeight:600,color:c.tx},children:fm(subAmt,currency)}),income>0&&t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm},children:pctOf(subAmt)+"% of income"})]})
+      ]}),
+      subItems.length===0
+        ?t(ES,{title:t("em",{children:"nothing here"}),subtitle:`No ${sub} transactions this month`})
+        :t("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden"},children:subItems.map((e,i)=>{
+          const acc=data.accounts.find(a=>a.id===e.accountId);const cat=co(e.category);const nw=nwOf(e);
+          return o("div",{key:e.id,style:{borderBottom:i===subItems.length-1?"none":`1px solid ${c.brs}`,padding:"12px 16px"},children:[
+            o("div",{className:"f ia jb",style:{gap:8},children:[
+              o("div",{style:{flex:1,minWidth:0},children:[
+                t("div",{style:{fontSize:13,fontWeight:500,color:c.tx,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"},children:e.merchant||e.payee||cat.label}),
+                o("div",{className:"f ia",style:{gap:6,marginTop:3},children:[
+                  t("span",{style:{fontSize:11,color:c.tm},children:new Date(e.date).toLocaleDateString("en-US",{month:"short",day:"numeric"})}),
+                  acc&&t("span",{style:{fontSize:10,color:c.td,fontFamily:F.mo},children:"· "+acc.name}),
+                ]}),
+              ]}),
+              o("div",{className:"f ia",style:{gap:8,flexShrink:0},children:[
+                t("div",{style:{fontFamily:F.mo,fontSize:13,fontWeight:600,color:isSav?c.mt:c.co},children:(isSav?"+":"−")+fm(e.amount,currency)}),
+                !isSav&&t("button",{onClick:()=>toggleNW(e),title:"Tap to flip Need/Want",className:"act90 trt",style:{padding:"4px 9px",background:nw==="need"?NW_META.need.color+"25":NW_META.want.color+"25",border:`1px solid ${nw==="need"?NW_META.need.color:NW_META.want.color}50`,borderRadius:999,fontSize:9,fontFamily:F.mo,color:nw==="need"?NW_META.need.color:NW_META.want.color,letterSpacing:.5},children:nw==="need"?"NEED":"WANT"}),
+                onTx&&t("button",{onClick:()=>onTx(e),title:"View / edit",className:"act90 trt",style:{width:30,height:30,borderRadius:9,background:c.sf2,border:`1px solid ${c.brs}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(Pencil,{size:12,color:c.td})}),
+              ]})
+            ]}),
+          ]})
+        })})
+    ]})}
+  const row=(label,amt,target,col,tag)=>o("div",{style:{marginBottom:14},children:[
+    o("button",{onClick:()=>sSub(tag),className:"act95 trt",style:{width:"100%",background:"transparent",border:"none",padding:0,textAlign:"left",cursor:"pointer",display:"block"},children:[
+      o("div",{className:"f ib jb",style:{marginBottom:6},children:[o("span",{style:{fontSize:13,color:c.tx,fontWeight:500},children:[label,"  ",t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm},children:`target ${target}%`})]}),o("span",{className:"f ia",style:{gap:4},children:[t("span",{style:{fontFamily:F.mo,fontSize:13,color:c.tx},children:fm(amt,currency)+(income>0?`  ·  ${pctOf(amt)}%`:"")}),t(CR,{size:14,color:c.tm})]})]}),
+      t("div",{style:{height:8,background:c.sf2,borderRadius:999,overflow:"hidden",position:"relative"},children:[t("div",{style:{width:Math.min(100,income>0?pctOf(amt):0)+"%",height:"100%",background:col,borderRadius:999}}),income>0&&t("div",{style:{position:"absolute",top:-2,left:target+"%",width:2,height:12,background:c.tx,opacity:.6}})]}),
+    ]}),
   ]});
   return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
     t(SH,{title:t("em",{children:"Spending Breakdown"}),onBack:onClose}),
@@ -1157,9 +1199,9 @@ function Breakdown({data,onClose}){const{expenses,currency,monthStartDay=1,finan
     o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
       o("div",{className:"f ib jb",style:{marginBottom:14},children:[t("span",{style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx},children:"50 / 30 / 20"}),t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm},children:income>0?("income "+fm(income,currency)):"income not set"})]}),
       income<=0?t("div",{style:{fontSize:12,color:c.tm,lineHeight:1.5},children:"Log this month's income, or set a monthly income in Settings → Financial Profile, to see the 50/30/20 split."}):o(Fragment,{children:[
-        row("Needs",needs,50,NW_META.need.color),
-        row("Wants",wants,30,NW_META.want.color),
-        row("Savings",savings,20,c.gd),
+        row("Needs",needs,50,NW_META.need.color,"needs"),
+        row("Wants",wants,30,NW_META.want.color,"wants"),
+        row("Savings",savings,20,c.gd,"savings"),
       ]}),
     ]}),
     o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
@@ -1172,7 +1214,7 @@ function Breakdown({data,onClose}){const{expenses,currency,monthStartDay=1,finan
         ]}),
       ]}),
     ]}),
-    t("div",{style:{fontSize:11,color:c.tm,lineHeight:1.5},children:"Each expense is tagged Need or Want when you add/edit it (pre-filled from its category). This is a record only — it doesn't change your budgets."}),
+    t("div",{style:{fontSize:11,color:c.tm,lineHeight:1.5},children:"Tap a row to see transactions. Tap the NEED / WANT tag to flip it without leaving the screen."}),
   ]})}
 
 // === BUDGET TRACKER (standalone over/under record — does NOT affect any budget elsewhere) ===
