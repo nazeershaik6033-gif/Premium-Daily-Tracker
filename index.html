@@ -518,7 +518,7 @@ function _blobToDataUrl(b){return new Promise((res,rej)=>{const r=new FileReader
 function _dataUrlToBlob(u){const i=u.indexOf(",");const head=u.slice(0,i),b64=u.slice(i+1);const mime=(head.match(/:(.*?);/)||[])[1]||"application/pdf";const bin=atob(b64),arr=new Uint8Array(bin.length);for(let j=0;j<bin.length;j++)arr[j]=bin.charCodeAt(j);return new Blob([arr],{type:mime})}
 async function collectStmtFiles(stmts){const out={};for(const s of (stmts||[])){if(s&&s.fileId&&!out[s.fileId]){try{const b=await idbGetFile(s.fileId);if(b)out[s.fileId]={name:s.fileName||"statement.pdf",type:b.type||"application/pdf",dataUrl:await _blobToDataUrl(b)}}catch(e){}}}return out}
 async function restoreStmtFiles(map){if(!map)return;for(const k of Object.keys(map)){try{const f=map[k];if(f&&f.dataUrl)await idbPutFile(k,_dataUrlToBlob(f.dataUrl))}catch(e){}}}
-function buildBackupObj(dd){let sidebarOrder=null;try{const s=localStorage.getItem(SB_ORDER_KEY);if(s)sidebarOrder=JSON.parse(s)}catch(e){}return{version:"v3.2",exportedAt:new Date().toISOString(),expenses:dd.expenses,recurring:dd.recurring,accounts:dd.accounts,profiles:dd.profiles,cards:dd.cards||[],cardStatements:dd.cardStatements||[],bills:dd.bills||[],goals:dd.goals||[],categoryBudgets:dd.categoryBudgets||{},monthlyRestrictionLogs:dd.monthlyRestrictionLogs||[],investments:dd.investments||[],planThreshold:dd.planThreshold??null,customExpenseCategories:dd.customExpenseCategories||[],customIncomeCategories:dd.customIncomeCategories||[],categoryOverrides:dd.categoryOverrides||{},categoryOrder:dd.categoryOrder||{expense:[],income:[]},sidebarOrder,budget:dd.budget,budgetPeriod:dd.budgetPeriod,currency:dd.currency,monthStartDay:dd.monthStartDay}}
+function buildBackupObj(dd){let sidebarOrder=null;try{const s=localStorage.getItem(SB_ORDER_KEY);if(s)sidebarOrder=JSON.parse(s)}catch(e){}return{version:"v3.2",exportedAt:new Date().toISOString(),expenses:dd.expenses,recurring:dd.recurring,accounts:dd.accounts,profiles:dd.profiles,cards:dd.cards||[],cardStatements:dd.cardStatements||[],bills:dd.bills||[],goals:dd.goals||[],categoryBudgets:dd.categoryBudgets||{},monthlyRestrictionLogs:dd.monthlyRestrictionLogs||[],investments:dd.investments||[],planThreshold:dd.planThreshold??null,customExpenseCategories:dd.customExpenseCategories||[],customIncomeCategories:dd.customIncomeCategories||[],categoryOverrides:dd.categoryOverrides||{},categoryOrder:dd.categoryOrder||{expense:[],income:[]},sidebarOrder,budget:dd.budget,budgetPeriod:dd.budgetPeriod,morningEnabled:dd.morningEnabled||false,morningTime:dd.morningTime||"08:00",eveningEnabled:dd.eveningEnabled||false,eveningTime:dd.eveningTime||"21:00",currency:dd.currency,monthStartDay:dd.monthStartDay}}
 async function buildBackupJSON(dd,withFiles=true){const j=buildBackupObj(dd);if(withFiles){try{j.statementFiles=await collectStmtFiles(j.cardStatements)}catch(e){j.statementFiles={}}}return JSON.stringify(j,null,2)}
 
 // === CSV EXPORT (card transactions) ===
@@ -616,8 +616,8 @@ function AppHeader({onMenu,onSearch,onToggleTheme,isDark,theme,onHome}){
   ]})})
 }
 const SB_ORDER_KEY="etp-sidebar-order";
-const DEFAULT_SB=["h:Money","accounts","cards","transfer","investments","wealth","h:Plan & Track","bills","goals","recurring","upcomingExp","categoryBudgets","h:Insights","breakdown","monthlyReport","tips","rules","h:Tools","expPlanner","investCalc","cardPayFix","profiles","h:Settings & Data","categories","backup","userMgr","settings"];
-const SB_META={userMgr:{e:"👥",l:"Switch User",s:"Manage profiles"},rules:{e:"📋",l:"Rules & Learnings",s:"Track your financial rules"},upcomingExp:{e:"📅",l:"Upcoming Expenses",s:"Plan & get alerts"},expPlanner:{e:"🧮",l:"Expense Planner",s:"Can I afford this EMI?"},investCalc:{e:"📈",l:"Investment Calculator",s:"Compound growth & SIP planner"},cards:{e:"💳",l:"Cards",acc:true},cardPayFix:{e:"🪙",l:"Fix card bill payments",s:"Remove double-counted bills",acc:true},bills:{e:"🔔",l:"Bills & Reminders",acc:true},goals:{e:"🎯",l:"Goals & Debt",acc:true},investments:{e:"💼",l:"My Investments",s:"NPS, Funds, FDs",acc:true},wealth:{e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},monthlyReport:{e:"📰",l:"Monthly Report",s:"Print or share PDF"},breakdown:{e:"⚖️",l:"Spending Breakdown",s:"Needs/Wants · 50-30-20"},accounts:{e:"🏦",l:"Accounts",acc:true},transfer:{e:"↔️",l:"Transfer",s:"Move funds",acc:true},recurring:{e:"🔁",l:"Recurring"},profiles:{e:"⚡",l:"Quick profiles"},categoryBudgets:{e:"📏",l:"Category budgets",s:"Set spending limits"},categories:{e:"🏷️",l:"Categories",s:"Manage expense types"},backup:{e:"💾",l:"Backup & Restore",s:"Export or import data"},tips:{e:"💡",l:"Financial Health",s:"Tips & scores"},settings:{e:"⚙️",l:"Settings",s:"Currency, budget, backup"}};
+const DEFAULT_SB=["h:Money","accounts","cards","transfer","investments","wealth","h:Plan & Track","bills","goals","recurring","upcomingExp","categoryBudgets","h:Insights","budgetTrack","breakdown","monthlyReport","tips","rules","h:Tools","expPlanner","investCalc","cardPayFix","profiles","h:Settings & Data","categories","backup","userMgr","settings"];
+const SB_META={userMgr:{e:"👥",l:"Switch User",s:"Manage profiles"},rules:{e:"📋",l:"Rules & Learnings",s:"Track your financial rules"},upcomingExp:{e:"📅",l:"Upcoming Expenses",s:"Plan & get alerts"},expPlanner:{e:"🧮",l:"Expense Planner",s:"Can I afford this EMI?"},investCalc:{e:"📈",l:"Investment Calculator",s:"Compound growth & SIP planner"},cards:{e:"💳",l:"Cards",acc:true},cardPayFix:{e:"🪙",l:"Fix card bill payments",s:"Remove double-counted bills",acc:true},bills:{e:"🔔",l:"Bills & Reminders",acc:true},goals:{e:"🎯",l:"Goals & Debt",acc:true},investments:{e:"💼",l:"My Investments",s:"NPS, Funds, FDs",acc:true},wealth:{e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},monthlyReport:{e:"📰",l:"Monthly Report",s:"Print or share PDF"},budgetTrack:{e:"📉",l:"Budget Tracker",s:"Monthly over/under record"},breakdown:{e:"⚖️",l:"Spending Breakdown",s:"Needs/Wants · 50-30-20"},accounts:{e:"🏦",l:"Accounts",acc:true},transfer:{e:"↔️",l:"Transfer",s:"Move funds",acc:true},recurring:{e:"🔁",l:"Recurring"},profiles:{e:"⚡",l:"Quick profiles"},categoryBudgets:{e:"📏",l:"Category budgets",s:"Set spending limits"},categories:{e:"🏷️",l:"Categories",s:"Manage expense types"},backup:{e:"💾",l:"Backup & Restore",s:"Export or import data"},tips:{e:"💡",l:"Financial Health",s:"Tips & scores"},settings:{e:"⚙️",l:"Settings",s:"Currency, budget, backup"}};
 function Sidebar({data,onClose,onView,activeUser,onUpdateUser}){
   const go=(id)=>{onView(id);onClose()};
   const msd=data.monthStartDay||1;const mst=ps(new Date(),msd);
@@ -639,19 +639,57 @@ function Sidebar({data,onClose,onView,activeUser,onUpdateUser}){
   ]}),
   editing&&t("div",{"data-grip-idx":i,style:{paddingRight:12,paddingLeft:4,color:c.td,cursor:"grab",display:"flex",alignItems:"center",userSelect:"none",touchAction:"none"},children:t(GripV,{size:18})}),
 ]})})})]})]})}
-function fireReminderNotif(d){
+const QUOTES=[
+"A budget is telling your money where to go instead of wondering where it went.",
+"Do not save what is left after spending; spend what is left after saving. — Warren Buffett",
+"Beware of little expenses; a small leak will sink a great ship. — Benjamin Franklin",
+"It's not your salary that makes you rich, it's your spending habits.",
+"The art is not in making money, but in keeping it.",
+"Every rupee you don't spend today is a rupee that works for you tomorrow.",
+"Wealth consists not in having great possessions, but in having few wants.",
+"Small daily savings add up to big yearly wins.",
+"Spend on what you value, cut ruthlessly on what you don't.",
+"A penny saved is a penny earned. — Benjamin Franklin",
+"Financial freedom is built one mindful purchase at a time.",
+"The habit of saving is itself an education. — T.T. Munger",
+"Don't go broke trying to look rich.",
+"Budgeting isn't restriction — it's permission to spend without guilt.",
+"Track every rupee; awareness is the first step to control.",
+"Live below your means, invest the difference, repeat.",
+"Money looks better in the bank than on your feet.",
+"Discipline today is freedom tomorrow.",
+"You must gain control over your money or the lack of it will forever control you. — Dave Ramsey",
+"Save a little, often. Consistency beats intensity.",
+"Needs are few; wants are endless. Know the difference.",
+"An investment in knowledge pays the best interest. — Benjamin Franklin",
+"What gets measured gets managed.",
+"Compound interest is the eighth wonder of the world. — Albert Einstein",
+"Rich is what you spend; wealthy is what you keep.",
+"Make saving automatic and spending intentional.",
+"The goal isn't more money — it's living life on your own terms.",
+"Patience and consistency turn small savings into fortunes.",
+"The quickest way to double your money is to fold it and put it in your pocket. — Will Rogers",
+"Today's restraint is tomorrow's reward."
+];
+function quoteOfDay(){return QUOTES[Math.floor(Date.now()/864e5)%QUOTES.length]}
+function eveningBody(d){
   const today=d.expenses.filter(e=>{const ed=new Date(e.date),n=new Date();return ed.toDateString()===n.toDateString()&&e.type==='expense'});
   const total=today.reduce((s,e)=>s+e.amount,0);
-  let body=today.length>0?`You logged ${today.length} expense${today.length>1?'s':''} today (${d.currency||''}${total.toLocaleString('en-IN')}). Keep it up!`:"Don't forget to log today's expenses!";
+  let body=today.length>0?`You logged ${today.length} expense${today.length>1?'s':''} today (${d.currency||''}${total.toLocaleString('en-IN')}). Anything missing?`:"Don't forget to log today's expenses!";
   const inv=d.investments||[];
   const fdSoonN=inv.filter(iv=>{const dl=fdDaysLeft(iv);return dl!=null&&dl>=0&&dl<=30}).length;
   const dom=new Date().getDate(),sipDueN=inv.filter(iv=>iv.sip&&iv.sip.enabled&&iv.sip.day&&iv.sip.day>=dom&&iv.sip.day<=dom+7).length;
   if(fdSoonN>0)body+=` 🏦 ${fdSoonN} FD${fdSoonN>1?'s':''} maturing within 30 days.`;
   if(sipDueN>0)body+=` 🔁 ${sipDueN} SIP${sipDueN>1?'s':''} due this week.`;
-  if(Notification.permission==='granted'){
-    if(navigator.serviceWorker?.controller){navigator.serviceWorker.controller.postMessage({type:'SHOW_REMINDER',body})}
-    else{try{new Notification('💰 Expense Reminder',{body,tag:'daily-reminder',icon:'./manifest.json'})}catch{}}
-  }
+  return body;
+}
+function fireNotif(d,kind){
+  if(typeof Notification==='undefined'||Notification.permission!=='granted')return;
+  const title=kind==='morning'?'🌅 Daily Money Wisdom':'💰 Expense Reminder';
+  const body=kind==='morning'?quoteOfDay():eveningBody(d);
+  const tag=kind==='morning'?'daily-quote':'daily-reminder';
+  if(navigator.serviceWorker?.controller){navigator.serviceWorker.controller.postMessage({type:'SHOW_REMINDER',title,body,tag})}
+  else{try{new Notification(title,{body,tag,icon:'./manifest.json'})}catch{}}
 }
 const RULE_TAGS=[{id:"Saving",color:"#A8E6CF",bg:"#A8E6CF22"},{id:"Investing",color:"#7FDBFF",bg:"#7FDBFF22"},{id:"Spending",color:"#FFB7B2",bg:"#FFB7B222"},{id:"General",color:"#D4B996",bg:"#D4B99622"}];
 function Rules({data,persist,onClose}){
@@ -711,6 +749,7 @@ function App(){
   const[eRec,sERec]=useState(null);
   const[cdId,sCdId]=useState(null);
   const[adId,sAdId]=useState(null);
+  const[notice,sNotice]=useState(null);
   const[sbar,sSbar]=useState(false);
   const[flt,sFlt]=useState(null);
   const[theme,setTheme]=useState(()=>{const t2=localStorage.getItem("etp-theme");return t2==="navy"?"navy":t2==="light"?"light":"dark"});
@@ -738,7 +777,7 @@ function App(){
   setUsers(usrs);setActiveUser(cu);
   const dk="etp-data-"+cu.id;
   let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],cardStatements:[],bills:[],goals:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},categoryOrder:{expense:[],income:[]},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,expensePlans:[],investmentPlans:[],investments:[],planThreshold:null,monthlyRestrictionLogs:[],reminderEnabled:false,reminderTime:"21:00",rules:[],backupFreq:"off",backupGDrive:false,lastBackupAt:0};
-  try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,expenses:p.expenses||[],recurring:p.recurring||[],accounts:p.accounts&&p.accounts.length?p.accounts:[DA],profiles:p.profiles||[],cards:p.cards||[],cardStatements:p.cardStatements||[],bills:p.bills||[],goals:p.goals||[],categoryBudgets:p.categoryBudgets||{},customExpenseCategories:p.customExpenseCategories||[],customIncomeCategories:p.customIncomeCategories||[],categoryOverrides:p.categoryOverrides||{},categoryOrder:p.categoryOrder||{expense:[],income:[]},financeProfile:p.financeProfile||null,budget:p.budget??null,budgetPeriod:p.budgetPeriod||"monthly",currency:p.currency||"₹",monthStartDay:p.monthStartDay||1,fontSize:p.fontSize||"medium",upcomingExpenses:p.upcomingExpenses||[],alertThreshold:p.alertThreshold??null,expensePlans:p.expensePlans||[],investmentPlans:p.investmentPlans||[],investments:p.investments||[],planThreshold:p.planThreshold??null,monthlyRestrictionLogs:p.monthlyRestrictionLogs||[],reminderEnabled:p.reminderEnabled||false,reminderTime:p.reminderTime||"21:00",rules:p.rules||[],backupFreq:p.backupFreq||"off",backupGDrive:p.backupGDrive||false,lastBackupAt:p.lastBackupAt||0};_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[];
+  try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,expenses:p.expenses||[],recurring:p.recurring||[],accounts:p.accounts&&p.accounts.length?p.accounts:[DA],profiles:p.profiles||[],cards:p.cards||[],cardStatements:p.cardStatements||[],bills:p.bills||[],goals:p.goals||[],categoryBudgets:p.categoryBudgets||{},customExpenseCategories:p.customExpenseCategories||[],customIncomeCategories:p.customIncomeCategories||[],categoryOverrides:p.categoryOverrides||{},categoryOrder:p.categoryOrder||{expense:[],income:[]},financeProfile:p.financeProfile||null,budget:p.budget??null,budgetPeriod:p.budgetPeriod||"monthly",currency:p.currency||"₹",monthStartDay:p.monthStartDay||1,fontSize:p.fontSize||"medium",upcomingExpenses:p.upcomingExpenses||[],alertThreshold:p.alertThreshold??null,expensePlans:p.expensePlans||[],investmentPlans:p.investmentPlans||[],investments:p.investments||[],planThreshold:p.planThreshold??null,monthlyRestrictionLogs:p.monthlyRestrictionLogs||[],reminderEnabled:p.reminderEnabled||false,reminderTime:p.reminderTime||"21:00",morningEnabled:p.morningEnabled||false,morningTime:p.morningTime||"08:00",eveningEnabled:p.eveningEnabled??(p.reminderEnabled||false),eveningTime:p.eveningTime||p.reminderTime||"21:00",rules:p.rules||[],backupFreq:p.backupFreq||"off",backupGDrive:p.backupGDrive||false,lastBackupAt:p.lastBackupAt||0};_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[];
   if(i.currency==="₹"){i.accounts=i.accounts.map(a=>a.currency==="$"?{...a,currency:"₹"}:a);const accMap=Object.fromEntries(i.accounts.map(a=>[a.id,a]));i.expenses=i.expenses.map(e=>e.currency==="$"?{...e,currency:accMap[e.accountId]?.currency||i.currency}:e)}
   if(!localStorage.getItem("etp-cash-unlinked")){const cashIds=new Set(i.accounts.filter(a=>a.id==="acc_default"||a.name==="Cash").map(a=>a.id));i.expenses=i.expenses.map(e=>cashIds.has(e.accountId)?{...e,accountId:null}:e);localStorage.setItem("etp-cash-unlinked","1")}}}catch(e){console.error("load",e)}
   if(i.recurring.length>0){const{newExpenses,updatedRecurring}=pr(i.recurring,i.expenses);if(newExpenses.length>0){i.expenses=[...newExpenses,...i.expenses].sort((a,b)=>b.date-a.date);i.recurring=updatedRecurring}}
@@ -747,7 +786,7 @@ function App(){
   try{await window.storage.set(dk,JSON.stringify(strip(i)))}catch{}
 })()},[]);
 
-  const strip=x=>({expenses:x.expenses,recurring:x.recurring,accounts:x.accounts,profiles:x.profiles,cards:x.cards||[],cardStatements:x.cardStatements||[],bills:x.bills||[],goals:x.goals||[],categoryBudgets:x.categoryBudgets||{},monthlyRestrictionLogs:x.monthlyRestrictionLogs||[],customExpenseCategories:x.customExpenseCategories||[],customIncomeCategories:x.customIncomeCategories||[],categoryOverrides:x.categoryOverrides||{},categoryOrder:x.categoryOrder||{expense:[],income:[]},financeProfile:x.financeProfile||null,budget:x.budget,budgetPeriod:x.budgetPeriod,currency:x.currency,monthStartDay:x.monthStartDay,fontSize:x.fontSize||"medium",upcomingExpenses:x.upcomingExpenses||[],alertThreshold:x.alertThreshold??null,expensePlans:x.expensePlans||[],investmentPlans:x.investmentPlans||[],investments:x.investments||[],planThreshold:x.planThreshold??null,reminderEnabled:x.reminderEnabled||false,reminderTime:x.reminderTime||"21:00",backupFreq:x.backupFreq||"off",backupGDrive:x.backupGDrive||false,lastBackupAt:x.lastBackupAt||0});
+  const strip=x=>({expenses:x.expenses,recurring:x.recurring,accounts:x.accounts,profiles:x.profiles,cards:x.cards||[],cardStatements:x.cardStatements||[],bills:x.bills||[],goals:x.goals||[],categoryBudgets:x.categoryBudgets||{},monthlyRestrictionLogs:x.monthlyRestrictionLogs||[],customExpenseCategories:x.customExpenseCategories||[],customIncomeCategories:x.customIncomeCategories||[],categoryOverrides:x.categoryOverrides||{},categoryOrder:x.categoryOrder||{expense:[],income:[]},financeProfile:x.financeProfile||null,budget:x.budget,budgetPeriod:x.budgetPeriod,currency:x.currency,monthStartDay:x.monthStartDay,fontSize:x.fontSize||"medium",upcomingExpenses:x.upcomingExpenses||[],alertThreshold:x.alertThreshold??null,expensePlans:x.expensePlans||[],investmentPlans:x.investmentPlans||[],investments:x.investments||[],planThreshold:x.planThreshold??null,reminderEnabled:x.reminderEnabled||false,reminderTime:x.reminderTime||"21:00",morningEnabled:x.morningEnabled||false,morningTime:x.morningTime||"08:00",eveningEnabled:x.eveningEnabled||false,eveningTime:x.eveningTime||"21:00",backupFreq:x.backupFreq||"off",backupGDrive:x.backupGDrive||false,lastBackupAt:x.lastBackupAt||0});
 
   const pst=async(p)=>{const n={...d,...p};_custCE=n.customExpenseCategories||[];_custCI=n.customIncomeCategories||[];_catOv=n.categoryOverrides||{};_catOrder=n.categoryOrder||{expense:[],income:[]};sD(n);const dk=activeUser?"etp-data-"+activeUser.id:KS;try{await window.storage.set(dk,JSON.stringify(strip(n)))}catch(e){console.error(e)}};
 
@@ -803,7 +842,9 @@ function App(){
   useEffect(()=>{if(scrollRef.current)scrollRef.current.scrollTop=0},[v]);
   useEffect(()=>{const s=document.documentElement.style;s.setProperty('--nf',gNF(d));s.setProperty('--tf',gTF(d));s.setProperty('--ns',gNS(d)+'px')},[d.fontPrefs]);
   useEffect(()=>{try{const p=new URLSearchParams(location.search);if(p.get('action')==='add'){history.replaceState(null,'','./');sV('add')}if(p.get('view')==='stats'){history.replaceState(null,'','./');sV('stats')}}catch{}},[]);
-  useEffect(()=>{if(!d.reminderEnabled||!d.reminderTime||Notification.permission!=='granted')return;const[hh,mm]=d.reminderTime.split(':').map(Number);const now=new Date(),next=new Date();next.setHours(hh,mm,0,0);if(next<=now)next.setDate(next.getDate()+1);const tid=setTimeout(()=>{fireReminderNotif(dRef.current)},next-now);return()=>clearTimeout(tid)},[d.reminderEnabled,d.reminderTime]);
+  useEffect(()=>{if(typeof Notification==='undefined'||Notification.permission!=='granted')return;const timers=[];const sched=(time,kind,enabled)=>{if(!enabled||!time)return;const[hh,mm]=time.split(':').map(Number);const now=new Date(),next=new Date();next.setHours(hh,mm,0,0);if(next<=now)next.setDate(next.getDate()+1);timers.push(setTimeout(()=>fireNotif(dRef.current,kind),next-now))};sched(d.morningTime,'morning',d.morningEnabled);sched(d.eveningTime,'evening',d.eveningEnabled);return()=>timers.forEach(clearTimeout)},[d.morningEnabled,d.morningTime,d.eveningEnabled,d.eveningTime]);
+  // In-app catch-up (the reliable path on iOS, where closed-app scheduled push isn't possible)
+  useEffect(()=>{if(d.loading)return;const todayK=new Date().toDateString();const due=[];const chk=(kind,enabled,time)=>{if(!enabled||!time)return;const[hh,mm]=time.split(':').map(Number);const tt=new Date();tt.setHours(hh,mm,0,0);if(Date.now()<tt.getTime())return;const key='etp-notice-'+kind+'-'+(activeUser?.id||'');if(localStorage.getItem(key)===todayK)return;due.push({kind,key})};chk('morning',d.morningEnabled,d.morningTime);chk('evening',d.eveningEnabled,d.eveningTime);if(due.length){const it=due[due.length-1];try{localStorage.setItem(it.key,todayK)}catch{}sNotice(it.kind==='morning'?{title:'🌅 Daily Money Wisdom',body:quoteOfDay()}:{title:"💰 Log today's expenses",body:eveningBody(dRef.current)})}},[d.loading]);
   useEffect(()=>{if(d.loading||d.backupFreq==="off")return;const interval=d.backupFreq==="weekly"?7*864e5:30*864e5;if(Date.now()-d.lastBackupAt<interval)return;const dd=dRef.current;(async()=>{const blob=new Blob([await buildBackupJSON(dd,true)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`expense-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url);pst({lastBackupAt:Date.now()})})()},[d.loading]);
   useEffect(()=>{const run=()=>{const dd=dRef.current;if(!dd||dd.loading||!dd.recurring||!dd.recurring.length)return;const{newExpenses,updatedRecurring}=pr(dd.recurring,dd.expenses);if(newExpenses.length>0)pst({expenses:[...newExpenses,...dd.expenses].sort((a,b)=>b.date-a.date),recurring:updatedRecurring})};const onVis=()=>{if(document.visibilityState==="visible")run()};window.addEventListener("focus",run);document.addEventListener("visibilitychange",onVis);const iv=setInterval(run,6e4);return()=>{window.removeEventListener("focus",run);document.removeEventListener("visibilitychange",onVis);clearInterval(iv)}},[]);
 
@@ -815,6 +856,7 @@ function App(){
   return o("div",{style:{background:c.bgg,color:c.tx,fontFamily:'var(--tf)',height:fzH,maxHeight:fzH,width:"100%",overflow:"hidden",display:"flex",flexDirection:"column",alignItems:"center",zoom:fzScale,transformOrigin:"top left"},className:"",children:[
     t(Gr,{}),
     t(AppHeader,{onMenu:()=>sSbar(true),onSearch:()=>sV("search"),onToggleTheme:toggleTheme,isDark,theme,onHome:()=>{sFlt(null);sAtx(null);if(scrollRef.current)scrollRef.current.scrollTop=0;sV("home")}}),
+    notice&&o("div",{onClick:()=>{if(notice.title.includes("Log"))sV("add");sNotice(null)},style:{margin:"10px 16px 0",padding:"13px 14px",background:`linear-gradient(135deg,${c.ac}1f 0%,${c.sfg} 60%)`,border:`1px solid ${c.ac}40`,borderRadius:14,display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer"},children:[o("div",{className:"f1 minw0",children:[t("div",{style:{fontSize:13,fontWeight:600,color:c.tx,marginBottom:2},children:notice.title}),t("div",{style:{fontSize:12,color:c.td,lineHeight:1.45},children:notice.body})]}),t("button",{onClick:e=>{e.stopPropagation();sNotice(null)},style:{background:"transparent",border:"none",color:c.tm,flexShrink:0,padding:2,display:"flex"},children:t(X,{size:15})})]}),
     o("div",{className:"r w100",style:{maxWidth:440,flex:1,minHeight:0,background:c.bg,borderLeft:`1px solid ${c.brs}`,borderRight:`1px solid ${c.brs}`,overflow:"hidden",display:"flex",flexDirection:"column"},children:[
       o("div",{ref:scrollRef,style:{paddingBottom:"calc(34px + env(safe-area-inset-bottom))",paddingTop:"calc(52px + env(safe-area-inset-top))",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
         v==="home"&&t(Home,{data:d,onTx:sAtx,onView:sV,onSetBudget:b=>pst({budget:b}),onFlt:sFlt}),
@@ -855,6 +897,7 @@ function App(){
         v==="backup"&&t(Backup,{data:d,persist:pst,onClose:()=>sV("home")}),
         v==="tips"&&t(Tips,{data:d,onClose:()=>sV(navFromRef.current)}),
         v==="breakdown"&&t(Breakdown,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
+        v==="budgetTrack"&&t(BudgetTrack,{data:d,onClose:()=>sV(navFromRef.current)}),
         v==="categories"&&t(CatMgr,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
         v==="chat"&&t(Chat,{data:d,onAddExpense:aE,onView:sV,onClose:()=>sV("home")}),
         v==="billScan"&&t(BillScan,{data:d,onAddExpense:aE,onClose:()=>sV("home")}),
@@ -1130,6 +1173,42 @@ function Breakdown({data,onClose}){const{expenses,currency,monthStartDay=1,finan
       ]}),
     ]}),
     t("div",{style:{fontSize:11,color:c.tm,lineHeight:1.5},children:"Each expense is tagged Need or Want when you add/edit it (pre-filled from its category). This is a record only — it doesn't change your budgets."}),
+  ]})}
+
+// === BUDGET TRACKER (standalone over/under record — does NOT affect any budget elsewhere) ===
+function BudgetTrack({data,onClose}){const{expenses,budget,budgetPeriod,currency,monthStartDay=1}=data;
+  const monthly=budgetPeriod==="monthly"&&!!budget;
+  const series=useMemo(()=>{
+    if(!monthly)return{months:[],cum:0,overCount:0,underCount:0};
+    const exps=expenses.filter(e=>e.type==="expense");
+    if(!exps.length)return{months:[],cum:0,overCount:0,underCount:0};
+    const starts=[];let g=ps(new Date(Math.min(...exps.map(e=>e.date))),monthStartDay);const curStart=ps(new Date(),monthStartDay);let guard=0;
+    while(g<=curStart&&guard++<600){starts.push(g);const d=new Date(g);d.setMonth(d.getMonth()+1);g=ps(d,monthStartDay)}
+    let cum=0,overCount=0,underCount=0;const months=starts.map((s,i)=>{const e=i+1<starts.length?starts[i+1]:mse(new Date(s).getFullYear(),new Date(s).getMonth(),monthStartDay);const spent=exps.filter(x=>x.date>=s&&x.date<e).reduce((a,b)=>a+b.amount,0);const isCurrent=i===starts.length-1;const delta=budget-spent;if(!isCurrent){cum+=delta;if(delta<0)overCount++;else underCount++}return{start:s,spent,delta,isCurrent,cum:isCurrent?null:cum}});
+    return{months,cum,overCount,underCount};
+  },[expenses,budget,budgetPeriod,monthStartDay,monthly]);
+  const rows=[...series.months].reverse();
+  return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
+    t(SH,{title:t("em",{children:"Budget Tracker"}),onBack:onClose}),
+    !monthly?t("div",{style:{padding:"40px 8px",textAlign:"center",color:c.tm,fontSize:13,lineHeight:1.6},children:budget?"This tracker works with a monthly budget. Switch your budget period to Monthly in Settings.":"Set a monthly budget in Settings to start tracking each month's over/under here."}):o(Fragment,{children:[
+      o("div",{style:{background:`linear-gradient(135deg,${(series.cum<0?c.co:c.mt)}1f 0%,${c.sfg} 58%)`,borderRadius:20,border:`1px solid ${c.brs}`,padding:18,marginBottom:14},children:[
+        t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:"CUMULATIVE OVER / UNDER"}),
+        t("div",{style:{fontFamily:"var(--nf)",fontSize:34,fontWeight:300,marginTop:4,color:series.cum<0?c.co:c.mt,letterSpacing:-1,lineHeight:1},children:(series.cum<0?"−":"+")+fm(Math.abs(series.cum),currency)}),
+        o("div",{className:"f ia",style:{gap:14,marginTop:12},children:[
+          o("div",{className:"f ia",style:{gap:6},children:[t("span",{style:{width:8,height:8,borderRadius:2,background:c.co,display:"inline-block"}}),t("span",{style:{fontFamily:F.mo,fontSize:11,color:c.td},children:`${series.overCount} over`})]}),
+          o("div",{className:"f ia",style:{gap:6},children:[t("span",{style:{width:8,height:8,borderRadius:2,background:c.mt,display:"inline-block"}}),t("span",{style:{fontFamily:F.mo,fontSize:11,color:c.td},children:`${series.underCount} under`})]}),
+        ]}),
+      ]}),
+      t("div",{style:{fontSize:11,color:c.tm,marginBottom:12,lineHeight:1.5},children:"A record only — this does not change your budget anywhere else in the app."}),
+      t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:"BY MONTH"}),
+      rows.length===0?t("div",{style:{padding:"32px 0",textAlign:"center",color:c.tm,fontSize:13},children:"No months tracked yet."}):t("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden"},children:rows.map((m,i)=>{const over=m.delta<0;const pct=budget?Math.min(100,Math.round((m.spent/budget)*100)):0;const lbl=new Date(m.start).toLocaleDateString("en-US",{month:"short",year:"numeric"});return o("div",{key:m.start,style:{padding:"13px 16px",borderBottom:i===rows.length-1?"none":`1px solid ${c.brs}`},children:[
+        o("div",{className:"f ia jb",style:{gap:12,marginBottom:8},children:[
+          o("div",{className:"minw0",children:[t("div",{style:{fontSize:14,fontWeight:600,color:c.tx},children:lbl+(m.isCurrent?" · now":"")}),t("div",{style:{fontFamily:F.mo,fontSize:11,color:c.tm,marginTop:2},children:`${fm(m.spent,currency)} / ${fm(budget,currency)}`})]}),
+          m.isCurrent?t("div",{style:{fontFamily:F.mo,fontSize:11,color:c.td,flexShrink:0},children:"in progress"}):o("div",{className:"trg",style:{flexShrink:0},children:[t("div",{style:{fontFamily:F.mo,fontSize:14,fontWeight:600,color:over?c.co:c.mt},children:(over?"−":"+")+fm(Math.abs(m.delta),currency)}),t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginTop:2},children:over?"OVER":"UNDER"})]}),
+        ]}),
+        t("div",{style:{height:5,background:c.sf2,borderRadius:999,overflow:"hidden"},children:t("div",{style:{width:pct+"%",height:"100%",background:over?c.co:c.ac,borderRadius:999}})}),
+      ]})})}),
+    ]})
   ]})}
 
 // === CALENDAR ===
@@ -2637,11 +2716,11 @@ return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
 }
 function Settings({data,persist,onClose,onBackup,onCategories,onView,theme,onSetTheme}){const{budget,budgetPeriod,currency,monthStartDay,financeProfile}=data;const fp=financeProfile||{};const[b,sB]=useState(budget==null?"":String(budget));const[bp,sBp]=useState(budgetPeriod||"monthly");const[cu,sCu]=useState(currency||"₹");const[ms,sMs]=useState(monthStartDay||1);const[ak,sAk]=useState(gAK()||"");const[show,sShow]=useState(false);const[fz,sFz]=useState(data.fontSize||"medium");const[at,sAt]=useState(data.alertThreshold!=null?String(data.alertThreshold):"");
 const[showResetCur,sShowResetCur]=useState(false);
-const[remEn,sRemEn]=useState(data.reminderEnabled||false);const[remTime,sRemTime]=useState(data.reminderTime||"21:00");const[notifPerm,sNotifPerm]=useState(typeof Notification!=='undefined'?Notification.permission:'unsupported');
+const[mEn,sMEn]=useState(data.morningEnabled||false);const[mTime,sMTime]=useState(data.morningTime||"08:00");const[eEn,sEEn]=useState(data.eveningEnabled??(data.reminderEnabled||false));const[eTime,sETime]=useState(data.eveningTime||data.reminderTime||"21:00");const[notifPerm,sNotifPerm]=useState(typeof Notification!=='undefined'?Notification.permission:'unsupported');
 const fpx=data.fontPrefs||{};
 const[numFont,sNumFont]=useState(fpx.numFont||'sfmono');
 const[numSize,sNumSize]=useState(fpx.numSize||14);
-const[txtFont,sTxtFont]=useState(fpx.txtFont||'system');const[inc,sInc]=useState(String(fp.monthlyIncome||""));const[fxE,sFxE]=useState(String(fp.fixedExpenses||""));const[spg,sSpg]=useState(String(fp.savingsGoalPct||"20"));const[efm,sEfm]=useState(String(fp.emergencyFundMonths||"6"));const[dbt,sDbt]=useState(String(fp.totalDebt||""));const save=()=>{persist({budget:parseFloat(b)||null,budgetPeriod:bp,currency:cu,monthStartDay:parseInt(ms)||1,fontSize:fz,alertThreshold:parseFloat(at)||null,fontPrefs:{numFont,numSize,txtFont},reminderEnabled:remEn,reminderTime:remTime,financeProfile:{monthlyIncome:parseFloat(inc)||null,fixedExpenses:parseFloat(fxE)||null,savingsGoalPct:parseFloat(spg)||20,emergencyFundMonths:parseFloat(efm)||6,totalDebt:parseFloat(dbt)||null}});sAK(ak.trim()||null);if(remEn&&notifPerm==='granted'){try{navigator.serviceWorker?.ready.then(reg=>reg.periodicSync?.register('expense-reminder',{minInterval:86400000}).catch(()=>{}))}catch{}}onClose()};
+const[txtFont,sTxtFont]=useState(fpx.txtFont||'system');const[inc,sInc]=useState(String(fp.monthlyIncome||""));const[fxE,sFxE]=useState(String(fp.fixedExpenses||""));const[spg,sSpg]=useState(String(fp.savingsGoalPct||"20"));const[efm,sEfm]=useState(String(fp.emergencyFundMonths||"6"));const[dbt,sDbt]=useState(String(fp.totalDebt||""));const save=()=>{persist({budget:parseFloat(b)||null,budgetPeriod:bp,currency:cu,monthStartDay:parseInt(ms)||1,fontSize:fz,alertThreshold:parseFloat(at)||null,fontPrefs:{numFont,numSize,txtFont},morningEnabled:mEn,morningTime:mTime,eveningEnabled:eEn,eveningTime:eTime,reminderEnabled:eEn,reminderTime:eTime,financeProfile:{monthlyIncome:parseFloat(inc)||null,fixedExpenses:parseFloat(fxE)||null,savingsGoalPct:parseFloat(spg)||20,emergencyFundMonths:parseFloat(efm)||6,totalDebt:parseFloat(dbt)||null}});sAK(ak.trim()||null);if((mEn||eEn)&&notifPerm==='granted'){try{navigator.serviceWorker?.ready.then(reg=>reg.periodicSync?.register('expense-reminder',{minInterval:86400000}).catch(()=>{}))}catch{}}onClose()};
 if(showResetCur)return t(ResetCurrencies,{data,persist,onClose:()=>sShowResetCur(false)});
 return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
   t(SH,{title:t("em",{children:"Settings"}),onBack:onClose,right:t("button",{onClick:save,className:"act95 trt",style:{padding:"8px 14px",background:c.ac,color:"#0a0a0a",borderRadius:10,fontSize:12,fontWeight:600,border:"none"},children:"Save"})}),
@@ -2710,16 +2789,18 @@ return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
     notifPerm==='denied'&&t("div",{style:{fontSize:12,color:c.ro,marginBottom:12,padding:"10px 12px",background:c.ro+"15",borderRadius:10,border:`1px solid ${c.ro}30`},children:"Notifications are blocked. Enable in browser/OS settings."}),
     notifPerm!=='granted'&&notifPerm!=='denied'&&notifPerm!=='unsupported'&&t("button",{onClick:async()=>{const r=await Notification.requestPermission();sNotifPerm(r)},className:"act90 trt w100",style:{padding:"11px",background:c.ac,color:"#0a0a0a",borderRadius:10,fontSize:13,fontWeight:600,border:"none",marginBottom:12},children:"Allow Notifications"}),
     notifPerm==='granted'&&t("div",{style:{padding:"8px 12px",background:c.mt+"15",border:`1px solid ${c.mt}30`,borderRadius:10,marginBottom:12,fontSize:11,color:c.mt,fontFamily:F.mo},children:"✓ Notifications enabled"}),
-    o("div",{className:"f ia jb",style:{marginBottom:remEn?12:0},children:[
-      o("div",{children:[t("div",{style:{fontSize:13,color:c.tx},children:"Daily expense reminder"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:remEn?"Fires at "+remTime+" each day":"Install as PWA for background reminders"})]}),
-      t("button",{onClick:()=>sRemEn(e=>!e),style:{width:40,height:24,borderRadius:999,background:remEn?c.ac:c.sf2,position:"relative",border:"none",flexShrink:0,transition:"background 200ms"},children:t("div",{style:{position:"absolute",top:3,left:remEn?18:3,width:18,height:18,borderRadius:999,background:remEn?"#0a0a0a":c.tm,transition:"left 200ms"}})}),
+    o("div",{className:"f ia jb",style:{marginBottom:mEn?10:0},children:[
+      o("div",{children:[t("div",{style:{fontSize:13,color:c.tx},children:"🌅 Morning quote"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:mEn?"A daily money-wisdom quote at "+mTime:"Start your day with a money tip"})]}),
+      t("button",{onClick:()=>sMEn(e=>!e),style:{width:40,height:24,borderRadius:999,background:mEn?c.ac:c.sf2,position:"relative",border:"none",flexShrink:0,transition:"background 200ms"},children:t("div",{style:{position:"absolute",top:3,left:mEn?18:3,width:18,height:18,borderRadius:999,background:mEn?"#0a0a0a":c.tm,transition:"left 200ms"}})}),
     ]}),
-    remEn&&o("div",{style:{marginBottom:8},children:[
-      t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:"REMINDER TIME"}),
-      t("input",{type:"time",value:remTime,onChange:e=>sRemTime(e.target.value),style:{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${c.brs}`,background:c.sf2,color:c.tx,fontSize:14,fontFamily:F.mo,outline:"none",boxSizing:"border-box"}}),
-      notifPerm==='granted'&&t("button",{onClick:()=>fireReminderNotif({expenses:data.expenses,currency:data.currency}),className:"act95 tr",style:{width:"100%",marginTop:8,padding:"9px",background:c.sf3,color:c.tx,borderRadius:9,fontSize:11,fontFamily:F.mo,letterSpacing:.5,border:`1px solid ${c.brs}`},children:"📬 Send test notification"}),
+    mEn&&t("input",{type:"time",value:mTime,onChange:e=>sMTime(e.target.value),style:{width:"100%",marginBottom:14,padding:"10px 12px",borderRadius:10,border:`1px solid ${c.brs}`,background:c.sf2,color:c.tx,fontSize:14,fontFamily:F.mo,outline:"none",boxSizing:"border-box"}}),
+    o("div",{className:"f ia jb",style:{marginBottom:eEn?10:0,marginTop:mEn?2:14,paddingTop:14,borderTop:`1px solid ${c.brs}`},children:[
+      o("div",{children:[t("div",{style:{fontSize:13,color:c.tx},children:"🌙 Evening log reminder"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:eEn?"Nudge to log expenses at "+eTime:"Don't forget to log the day's spending"})]}),
+      t("button",{onClick:()=>sEEn(e=>!e),style:{width:40,height:24,borderRadius:999,background:eEn?c.ac:c.sf2,position:"relative",border:"none",flexShrink:0,transition:"background 200ms"},children:t("div",{style:{position:"absolute",top:3,left:eEn?18:3,width:18,height:18,borderRadius:999,background:eEn?"#0a0a0a":c.tm,transition:"left 200ms"}})}),
     ]}),
-    t("div",{style:{fontSize:10,color:c.tm,marginTop:4,lineHeight:1.5},children:"Works when app is open · Install as PWA for background (Android Chrome)"}),
+    eEn&&t("input",{type:"time",value:eTime,onChange:e=>sETime(e.target.value),style:{width:"100%",marginBottom:8,padding:"10px 12px",borderRadius:10,border:`1px solid ${c.brs}`,background:c.sf2,color:c.tx,fontSize:14,fontFamily:F.mo,outline:"none",boxSizing:"border-box"}}),
+    notifPerm==='granted'&&(mEn||eEn)&&o("div",{className:"g g2",style:{gap:6,marginTop:4},children:[mEn&&t("button",{onClick:()=>fireNotif(data,'morning'),className:"act95 tr",style:{padding:"9px",background:c.sf3,color:c.tx,borderRadius:9,fontSize:11,fontFamily:F.mo,border:`1px solid ${c.brs}`},children:"🌅 Test"}),eEn&&t("button",{onClick:()=>fireNotif(data,'evening'),className:"act95 tr",style:{padding:"9px",background:c.sf3,color:c.tx,borderRadius:9,fontSize:11,fontFamily:F.mo,border:`1px solid ${c.brs}`},children:"🌙 Test"})]}),
+    t("div",{style:{fontSize:10,color:c.tm,marginTop:10,lineHeight:1.5},children:"On iPhone, scheduled alerts can't fire while the app is closed — these show when you open the app, or as live notifications when it's open. Install as a PWA for the best chance of background delivery on Android."}),
   ]}),
   (()=>{const[bkFreq,sBkFreq]=useState(data.backupFreq||"off");const[bkGD,setBkGD]=useState(data.backupGDrive||false);const gdConnected=!!sessionStorage.getItem("gd_token");const saveBackupSettings=()=>persist({backupFreq:bkFreq,backupGDrive:bkGD});const doManualBackup=async()=>{const blob=new Blob([await buildBackupJSON(data,true)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`expense-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url);persist({lastBackupAt:Date.now()});alert("Backup downloaded (incl. statement PDFs)!")};const connectGD=()=>{const CLIENT_ID=localStorage.getItem("gd_client_id")||"";if(!CLIENT_ID){const id=prompt("Enter your Google OAuth2 Client ID (from Google Cloud Console):");if(!id)return;localStorage.setItem("gd_client_id",id.trim())}const cid=localStorage.getItem("gd_client_id");const w=window.open(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${cid}&redirect_uri=${encodeURIComponent(location.origin+location.pathname)}&response_type=token&scope=https://www.googleapis.com/auth/drive.file&prompt=consent`,"_blank","width=500,height=600");const poll=setInterval(()=>{try{if(w&&w.closed){clearInterval(poll);const h=sessionStorage.getItem("gd_token");if(h)alert("Google Drive connected!")}else if(w){const p=new URLSearchParams(w.location.hash.slice(1));const tk=p.get("access_token");if(tk){sessionStorage.setItem("gd_token",tk);w.close();clearInterval(poll);persist({backupGDrive:true});alert("Google Drive connected!")}}}catch{}},500)};
   return o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
@@ -2758,7 +2839,7 @@ const dl=async()=>{sMsg("Preparing backup (embedding statement PDFs)…");try{co
 const cp=async()=>{try{await navigator.clipboard.writeText(await exp());sMsg("Copied to clipboard (incl. statement PDFs)")}catch{alert("Clipboard blocked")}};
 const onFile=async e=>{const f=e.target.files?.[0];if(!f)return;const text=await f.text();sTxt(text)};
 const tryRestore=()=>{try{const o2=JSON.parse(txt);if(!o2.expenses||!Array.isArray(o2.expenses))throw new Error("Invalid format — missing expenses array");sConf(o2)}catch(err){sMsg("Error: "+err.message)}};
-const doRestore=async()=>{const o2=conf;try{await restoreStmtFiles(o2.statementFiles)}catch(e){}if(Array.isArray(o2.sidebarOrder)){try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2.sidebarOrder))}catch(e){}}persist({expenses:o2.expenses||[],recurring:o2.recurring||[],accounts:o2.accounts&&o2.accounts.length?o2.accounts:[DA],profiles:o2.profiles||[],cards:o2.cards||[],cardStatements:o2.cardStatements||[],bills:o2.bills||[],goals:o2.goals||[],categoryBudgets:o2.categoryBudgets||{},monthlyRestrictionLogs:o2.monthlyRestrictionLogs||[],investments:o2.investments||[],planThreshold:o2.planThreshold??null,customExpenseCategories:o2.customExpenseCategories||[],customIncomeCategories:o2.customIncomeCategories||[],categoryOverrides:o2.categoryOverrides||{},categoryOrder:o2.categoryOrder||{expense:[],income:[]},budget:o2.budget??null,budgetPeriod:o2.budgetPeriod||"monthly",currency:o2.currency||"$",monthStartDay:o2.monthStartDay||1});sConf(null);sMsg("✓ Restored successfully"+(o2.statementFiles?" (statement PDFs included)":""));sTxt("")};
+const doRestore=async()=>{const o2=conf;try{await restoreStmtFiles(o2.statementFiles)}catch(e){}if(Array.isArray(o2.sidebarOrder)){try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2.sidebarOrder))}catch(e){}}persist({expenses:o2.expenses||[],recurring:o2.recurring||[],accounts:o2.accounts&&o2.accounts.length?o2.accounts:[DA],profiles:o2.profiles||[],cards:o2.cards||[],cardStatements:o2.cardStatements||[],bills:o2.bills||[],goals:o2.goals||[],categoryBudgets:o2.categoryBudgets||{},monthlyRestrictionLogs:o2.monthlyRestrictionLogs||[],investments:o2.investments||[],planThreshold:o2.planThreshold??null,customExpenseCategories:o2.customExpenseCategories||[],customIncomeCategories:o2.customIncomeCategories||[],categoryOverrides:o2.categoryOverrides||{},categoryOrder:o2.categoryOrder||{expense:[],income:[]},budget:o2.budget??null,budgetPeriod:o2.budgetPeriod||"monthly",...(o2.morningEnabled!=null?{morningEnabled:o2.morningEnabled,morningTime:o2.morningTime||"08:00",eveningEnabled:o2.eveningEnabled||false,eveningTime:o2.eveningTime||"21:00"}:{}),currency:o2.currency||"$",monthStartDay:o2.monthStartDay||1});sConf(null);sMsg("✓ Restored successfully"+(o2.statementFiles?" (statement PDFs included)":""));sTxt("")};
 const prebuild=async()=>{try{const s=await window.storage.get(KB);if(!s){alert("No prebuild snapshot found");return}sTxt(s.value);sMsg("Loaded prebuild backup — review then tap Restore")}catch{alert("Error loading snapshot")}};
 return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
   t(SH,{title:t("em",{children:"Backup & Restore"}),onBack:onClose}),
