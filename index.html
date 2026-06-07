@@ -827,8 +827,9 @@ function App(){
   const repayMonth=(m)=>{const ex=(d.budgetLoans||[]).find(l=>l.sourceMonth===m.start);if(!ex)pst({budgetLoans:[...(d.budgetLoans||[]),{id:"bl_"+uid(),sourceMonth:m.start,monthLabel:new Date(m.start).toLocaleDateString("en-US",{month:"short",year:"numeric"}),principal:Math.abs(m.delta),budgetAt:d.budget,spentAt:m.spent,createdAt:Date.now(),status:"active",dueDate:null,note:"",payments:[]}]});navFromRef.current="budgetTrack";sV("budgetLoans")};
   const uBL=(loan)=>pst({budgetLoans:(d.budgetLoans||[]).map(x=>{if(x.id!==loan.id)return x;const m={...x,...loan};const paid=(m.payments||[]).reduce((s,p)=>s+(p.amount||0),0);return{...m,status:paid>=(m.principal||0)-0.005?"paid":"active"}})});
   const dBL=(id)=>pst({budgetLoans:(d.budgetLoans||[]).filter(l=>l.id!==id)});
-  const payBL=(id,amount,note,date)=>pst({budgetLoans:(d.budgetLoans||[]).map(l=>{if(l.id!==id)return l;const payments=[...(l.payments||[]),{id:"p_"+uid(),amount,date:date||Date.now(),note:(note||"").trim()}];return{...l,payments,status:blStatus(l,payments)}})});
+  const payBL=(id,amount,note,date,linkedExpenseId)=>pst({budgetLoans:(d.budgetLoans||[]).map(l=>{if(l.id!==id)return l;const payments=[...(l.payments||[]),{id:"p_"+uid(),amount,date:date||Date.now(),note:(note||"").trim(),linkedExpenseId:linkedExpenseId||null}];return{...l,payments,status:blStatus(l,payments)}})});
   const delPayBL=(id,pid)=>pst({budgetLoans:(d.budgetLoans||[]).map(l=>{if(l.id!==id)return l;const payments=(l.payments||[]).filter(p=>p.id!==pid);return{...l,payments,status:blStatus(l,payments)}})});
+  const editPayBL=(id,pid,patch)=>pst({budgetLoans:(d.budgetLoans||[]).map(l=>{if(l.id!==id)return l;const payments=(l.payments||[]).map(p=>p.id===pid?{...p,...patch}:p);return{...l,payments}})});
   const aInv=(inv)=>pst({investments:[...(d.investments||[]),{...inv,id:"inv_"+uid(),createdAt:Date.now()}]});
   const uInv=(inv)=>pst({investments:(d.investments||[]).map(x=>x.id===inv.id?{...x,...inv}:x)});
   const dInv=(id)=>pst({investments:(d.investments||[]).filter(x=>x.id!==id)});
@@ -905,7 +906,7 @@ function App(){
         v==="tips"&&t(Tips,{data:d,onClose:()=>sV(navFromRef.current)}),
         v==="breakdown"&&t(Breakdown,{data:d,persist:pst,onClose:()=>sV(navFromRef.current),onTx:sAtx}),
         v==="budgetTrack"&&t(BudgetTrack,{data:d,onClose:()=>sV(navFromRef.current),onRepay:repayMonth,onOpenLoans:()=>{navFromRef.current="budgetTrack";sV("budgetLoans")}}),
-        v==="budgetLoans"&&t(BudgetLoans,{data:d,onClose:()=>sV(navFromRef.current),onPay:payBL,onDelete:dBL,onDeletePay:delPayBL,onUpdate:uBL,onOpenTracker:()=>{navFromRef.current="budgetLoans";sV("budgetTrack")}}),
+        v==="budgetLoans"&&t(BudgetLoans,{data:d,onClose:()=>sV(navFromRef.current),onPay:payBL,onDelete:dBL,onDeletePay:delPayBL,onEditPay:editPayBL,onUpdate:uBL,onOpenTracker:()=>{navFromRef.current="budgetLoans";sV("budgetTrack")}}),
         v==="categories"&&t(CatMgr,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
         v==="chat"&&t(Chat,{data:d,onAddExpense:aE,onView:sV,onClose:()=>sV("home")}),
         v==="billScan"&&t(BillScan,{data:d,onAddExpense:aE,onClose:()=>sV("home")}),
@@ -1264,14 +1265,17 @@ function BudgetTrack({data,onClose,onRepay,onOpenLoans}){const{expenses,budget,b
   ]})}
 
 // === BUDGET LOANS (repay past overspends, interest-free, record-only) ===
-function BudgetLoans({data,onClose,onPay,onDelete,onDeletePay,onUpdate,onOpenTracker}){
-  const{budgetLoans=[],currency}=data;
+function BudgetLoans({data,onClose,onPay,onDelete,onDeletePay,onEditPay,onUpdate,onOpenTracker}){
+  const{budgetLoans=[],currency,expenses=[]}=data;
   const[payT,sPayT]=useState(null);const[payAmt,sPayAmt]=useState("");const[payNote,sPayNote]=useState("");const[payDate,sPayDate]=useState("");
+  const[linkedExpId,sLinkedExpId]=useState(null);const[lnkSrch,sLnkSrch]=useState("");
+  const[editPay,sEditPay]=useState(null);const[editLnk,sEditLnk]=useState(null);const[editLnkSrch,sEditLnkSrch]=useState("");const[editNote,sEditNote]=useState("");
   const[exp,sExp]=useState(null);const[delId,sDelId]=useState(null);
   const[edT,sEdT]=useState(null);const[edName,sEdName]=useState("");const[edAmt,sEdAmt]=useState("");const[edDue,sEdDue]=useState("");
   const today=()=>new Date().toISOString().slice(0,10);
   const loanName=l=>l.name||l.monthLabel+" overspend";
   const paidOf=l=>(l.payments||[]).reduce((s,p)=>s+(p.amount||0),0);
+  const closePaySheet=()=>{sPayT(null);sLinkedExpId(null);sLnkSrch("")};
   const loans=[...budgetLoans].sort((a,b)=>b.sourceMonth-a.sourceMonth);
   const active=loans.filter(l=>l.status!=="paid"),settled=loans.filter(l=>l.status==="paid");
   const totRemain=active.reduce((s,l)=>s+Math.max(0,(l.principal||0)-paidOf(l)),0);
@@ -1289,7 +1293,7 @@ function BudgetLoans({data,onClose,onPay,onDelete,onDeletePay,onUpdate,onOpenTra
       ]}),
       t("div",{style:{height:6,background:c.sf2,borderRadius:999,overflow:"hidden",marginBottom:planLine?8:12},children:t("div",{style:{width:pct+"%",height:"100%",background:ac,borderRadius:999}})}),
       planLine&&t("div",{style:{fontFamily:F.mo,fontSize:10.5,color:c.td,letterSpacing:.3,marginBottom:12},children:planLine.toUpperCase()}),
-      !done&&t("button",{onClick:()=>{sPayT(l);sPayAmt("");sPayNote("");sPayDate(today())},className:"w100 act98 tr",style:{padding:"10px 0",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:10,fontSize:13,fontWeight:600},children:"Log payment"}),
+      !done&&t("button",{onClick:()=>{sPayT(l);sPayAmt("");sPayNote("");sPayDate(today());sLinkedExpId(null);sLnkSrch("")},className:"w100 act98 tr",style:{padding:"10px 0",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:10,fontSize:13,fontWeight:600},children:"Log payment"}),
       o("div",{className:"f ia jb",style:{marginTop:12},children:[
         t("button",{onClick:()=>sExp(isExp?null:l.id),style:{background:"transparent",border:"none",color:c.tm,fontFamily:F.mo,fontSize:10.5,letterSpacing:.5,padding:0},children:`${(l.payments||[]).length} payment${(l.payments||[]).length===1?"":"s"} ${isExp?"▴":"▾"}`}),
         o("div",{className:"f ia",style:{gap:4},children:[
@@ -1297,9 +1301,12 @@ function BudgetLoans({data,onClose,onPay,onDelete,onDeletePay,onUpdate,onOpenTra
           t("button",{onClick:()=>sDelId(l.id),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(Trash2,{size:14})})
         ]})
       ]}),
-      isExp&&((l.payments||[]).length?t("div",{style:{marginTop:10,borderTop:`1px solid ${c.brs}`,paddingTop:10,display:"flex",flexDirection:"column",gap:8},children:[...(l.payments||[])].sort((a,b)=>b.date-a.date).map(p=>o("div",{key:p.id,className:"f ia jb",style:{gap:8},children:[
-        o("div",{className:"minw0",children:[t("div",{style:{fontFamily:F.mo,fontSize:13,color:c.tx},children:fm(p.amount,currency)}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:new Date(p.date).toLocaleDateString("en-US",{day:"numeric",month:"short",year:"numeric"})+(p.note?" · "+p.note:"")})]}),
-        t("button",{onClick:()=>onDeletePay(l.id,p.id),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(X,{size:13})})
+      isExp&&((l.payments||[]).length?t("div",{style:{marginTop:10,borderTop:`1px solid ${c.brs}`,paddingTop:10,display:"flex",flexDirection:"column",gap:8},children:[...(l.payments||[])].sort((a,b)=>b.date-a.date).map(p=>o("div",{key:p.id,className:"f ia jb",style:{gap:8,alignItems:"flex-start"},children:[
+        o("div",{className:"f1 minw0",children:[t("div",{style:{fontFamily:F.mo,fontSize:13,color:c.tx},children:fm(p.amount,currency)}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:new Date(p.date).toLocaleDateString("en-US",{day:"numeric",month:"short",year:"numeric"})+(p.note?" · "+p.note:"")}),p.linkedExpenseId&&t("div",{style:{fontSize:10,color:c.ac,marginTop:3,fontFamily:F.mo,letterSpacing:.2},children:"↩ "+(()=>{const ex=expenses.find(x=>x.id===p.linkedExpenseId);return ex?ex.merchant||ex.payee||ex.note||(co(ex.category)||{}).label||"expense":"expense"})()})]}),
+        o("div",{className:"f ia",style:{gap:2,flexShrink:0},children:[
+          t("button",{onClick:()=>{sEditPay({loanId:l.id,payment:p});sEditLnk(p.linkedExpenseId||null);sEditNote(p.note||"");sEditLnkSrch("")},style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(Pencil,{size:12})}),
+          t("button",{onClick:()=>onDeletePay(l.id,p.id),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(X,{size:13})})
+        ]})
       ]}))}):t("div",{style:{marginTop:10,fontSize:12,color:c.tm,textAlign:"center",padding:"8px 0"},children:"No payments logged yet."}))
     ]})};
   return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
@@ -1314,7 +1321,7 @@ function BudgetLoans({data,onClose,onPay,onDelete,onDeletePay,onUpdate,onOpenTra
       active.length>0&&o(Fragment,{children:[t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:"ACTIVE"}),...active.map(card)]}),
       settled.length>0&&o(Fragment,{children:[t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,margin:"6px 0 10px"},children:"REPAID"}),...settled.map(card)]})
     ]}),
-    payT&&t(Sht,{onClose:()=>sPayT(null),children:o(Fragment,{children:[
+    payT&&t(Sht,{onClose:closePaySheet,children:o(Fragment,{children:[
       t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:4},children:"Log a payment"}),
       t("div",{style:{fontSize:13,color:c.td,marginBottom:18},children:`🧾 ${loanName(payT)} · ${fm(Math.max(0,(payT.principal||0)-paidOf(payT)),currency)} left`}),
       o("div",{style:{marginBottom:16,textAlign:"center"},children:[
@@ -1328,7 +1335,72 @@ function BudgetLoans({data,onClose,onPay,onDelete,onDeletePay,onUpdate,onOpenTra
       (parseFloat(payAmt)>Math.max(0,(payT.principal||0)-paidOf(payT)))&&t("div",{style:{fontSize:11,color:c.gd,textAlign:"center",marginBottom:10},children:`Will be capped to the ${fm(Math.max(0,(payT.principal||0)-paidOf(payT)),currency)} remaining.`}),
       o("div",{style:{marginBottom:14},children:t(FI,{label:"Note (optional)",value:payNote,onChange:sPayNote,placeholder:"e.g., bonus, spare cash"})}),
       o("div",{style:{marginBottom:16},children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"PAYMENT DATE"}),t("input",{type:"date",value:payDate,max:today(),onChange:e=>sPayDate(e.target.value),style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px",color:c.tx,fontSize:14,outline:"none",fontFamily:'var(--tf)',colorScheme:"dark"}})]}),
-      t("button",{disabled:!parseFloat(payAmt)||parseFloat(payAmt)<=0,onClick:()=>{const rem=Math.max(0,(payT.principal||0)-paidOf(payT));const amt=Math.min(parseFloat(payAmt),rem);onPay(payT.id,amt,payNote,payDate?new Date(payDate).getTime():Date.now());sPayT(null)},className:"w100 act98 tr",style:{padding:"14px 0",background:parseFloat(payAmt)?c.ac:c.sf2,color:parseFloat(payAmt)?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:parseFloat(payAmt)?`Log ${fm(Math.min(parseFloat(payAmt),Math.max(0,(payT.principal||0)-paidOf(payT))),currency)}`:"Enter an amount"})
+      o("div",{style:{marginBottom:16},children:[
+        t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"LINK TO EXPENSE (OPTIONAL)"}),
+        linkedExpId
+          ?o("div",{className:"f ia jb",style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"10px 12px"},children:[
+              o("div",{className:"f1 minw0",children:[
+                t("div",{className:"tru",style:{fontSize:13,color:c.tx,fontWeight:500},children:(()=>{const ex=expenses.find(x=>x.id===linkedExpId);return ex?ex.merchant||ex.payee||ex.note||(co(ex.category)||{}).label||"Expense":"Unknown"})()}),
+                t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:(()=>{const ex=expenses.find(x=>x.id===linkedExpId);return ex?fm(ex.amount,ex.currency||currency)+" · "+new Date(ex.date).toLocaleDateString("en-US",{day:"numeric",month:"short",year:"numeric"}):""})()})
+              ]}),
+              t("button",{onClick:()=>sLinkedExpId(null),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4,flexShrink:0},children:t(X,{size:14})})
+            ]})
+          :o("div",{children:[
+              t("input",{type:"search",value:lnkSrch,onChange:e=>sLnkSrch(e.target.value),placeholder:"Search recent expenses…",style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:10,padding:"9px 12px",color:c.tx,fontSize:13,outline:"none",fontFamily:'var(--tf)',boxSizing:"border-box"}}),
+              o("div",{style:{maxHeight:150,overflowY:"auto",marginTop:6,display:"flex",flexDirection:"column",gap:3},children:(()=>{
+                const q=lnkSrch.toLowerCase();
+                const allLinked=new Set(budgetLoans.flatMap(l=>(l.payments||[]).map(p=>p.linkedExpenseId).filter(Boolean)));
+                const list=expenses.filter(e=>(e.type==="expense"||e.type==="card-payment")&&!allLinked.has(e.id)&&(!q||(e.merchant||e.payee||e.note||"").toLowerCase().includes(q))).sort((a,b)=>b.date-a.date).slice(0,15);
+                if(!list.length)return[t("div",{style:{fontSize:12,color:c.tm,padding:"8px 0",textAlign:"center"},children:q?"No matches":"No recent expenses"})];
+                return list.map(e=>o("button",{key:e.id,onClick:()=>{sLinkedExpId(e.id);sLnkSrch("");if(!parseFloat(payAmt))sPayAmt(String(e.amount))},className:"w100 f ia act95 trc",style:{padding:"8px 10px",background:c.sf2,borderRadius:10,border:`1px solid ${c.brs}`,gap:8,textAlign:"left"},children:[
+                  t("div",{style:{width:28,height:28,borderRadius:7,background:c.sfg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0},children:(co(e.category)||{}).emoji||"💳"}),
+                  o("div",{className:"f1 minw0",children:[
+                    t("div",{className:"tru",style:{fontSize:12,color:c.tx},children:e.merchant||e.payee||e.note||(co(e.category)||{}).label||"Expense"}),
+                    t("div",{style:{fontSize:10,color:c.tm},children:new Date(e.date).toLocaleDateString("en-US",{day:"numeric",month:"short"})})
+                  ]}),
+                  t("div",{style:{fontFamily:F.mo,fontSize:11,color:c.td,flexShrink:0},children:fm(e.amount,e.currency||currency)})
+                ]}));
+              })()})
+            ]})
+      ]}),
+      t("button",{disabled:!parseFloat(payAmt)||parseFloat(payAmt)<=0,onClick:()=>{const rem=Math.max(0,(payT.principal||0)-paidOf(payT));const amt=Math.min(parseFloat(payAmt),rem);onPay(payT.id,amt,payNote,payDate?new Date(payDate).getTime():Date.now(),linkedExpId);closePaySheet()},className:"w100 act98 tr",style:{padding:"14px 0",background:parseFloat(payAmt)?c.ac:c.sf2,color:parseFloat(payAmt)?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:parseFloat(payAmt)?`Log ${fm(Math.min(parseFloat(payAmt),Math.max(0,(payT.principal||0)-paidOf(payT))),currency)}`:"Enter an amount"})
+    ]})}),
+    editPay&&t(Sht,{onClose:()=>{sEditPay(null);sEditLnkSrch("")},children:o(Fragment,{children:[
+      t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:4},children:"Edit payment"}),
+      t("div",{style:{fontSize:13,color:c.td,marginBottom:18},children:editPay?fm(editPay.payment.amount,currency)+" · "+new Date(editPay.payment.date).toLocaleDateString("en-US",{day:"numeric",month:"short",year:"numeric"}):""}),
+      o("div",{style:{marginBottom:16},children:t(FI,{label:"Note",value:editNote,onChange:sEditNote,placeholder:"e.g., credit card bill"})}),
+      o("div",{style:{marginBottom:20},children:[
+        t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"LINK TO EXPENSE"}),
+        editLnk
+          ?o("div",{className:"f ia jb",style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"10px 12px"},children:[
+              o("div",{className:"f1 minw0",children:[
+                t("div",{className:"tru",style:{fontSize:13,color:c.tx,fontWeight:500},children:(()=>{const ex=expenses.find(x=>x.id===editLnk);return ex?ex.merchant||ex.payee||ex.note||(co(ex.category)||{}).label||"Expense":"Unknown"})()}),
+                t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:(()=>{const ex=expenses.find(x=>x.id===editLnk);return ex?fm(ex.amount,ex.currency||currency)+" · "+new Date(ex.date).toLocaleDateString("en-US",{day:"numeric",month:"short",year:"numeric"}):""})()})
+              ]}),
+              t("button",{onClick:()=>sEditLnk(null),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4,flexShrink:0},children:t(X,{size:14})})
+            ]})
+          :o("div",{children:[
+              t("input",{type:"search",value:editLnkSrch,onChange:e=>sEditLnkSrch(e.target.value),placeholder:"Search expenses…",style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:10,padding:"9px 12px",color:c.tx,fontSize:13,outline:"none",fontFamily:'var(--tf)',boxSizing:"border-box"}}),
+              o("div",{style:{maxHeight:150,overflowY:"auto",marginTop:6,display:"flex",flexDirection:"column",gap:3},children:(()=>{
+                const q=editLnkSrch.toLowerCase();
+                const allLinked=new Set(budgetLoans.flatMap(l=>(l.payments||[]).filter(p=>p.id!==editPay?.payment?.id).map(p=>p.linkedExpenseId).filter(Boolean)));
+                const list=expenses.filter(e=>(e.type==="expense"||e.type==="card-payment")&&!allLinked.has(e.id)&&(!q||(e.merchant||e.payee||e.note||"").toLowerCase().includes(q))).sort((a,b)=>b.date-a.date).slice(0,15);
+                if(!list.length)return[t("div",{style:{fontSize:12,color:c.tm,padding:"8px 0",textAlign:"center"},children:q?"No matches":"No recent expenses"})];
+                return list.map(e=>o("button",{key:e.id,onClick:()=>{sEditLnk(e.id);sEditLnkSrch("")},className:"w100 f ia act95 trc",style:{padding:"8px 10px",background:c.sf2,borderRadius:10,border:`1px solid ${c.brs}`,gap:8,textAlign:"left"},children:[
+                  t("div",{style:{width:28,height:28,borderRadius:7,background:c.sfg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0},children:(co(e.category)||{}).emoji||"💳"}),
+                  o("div",{className:"f1 minw0",children:[
+                    t("div",{className:"tru",style:{fontSize:12,color:c.tx},children:e.merchant||e.payee||e.note||(co(e.category)||{}).label||"Expense"}),
+                    t("div",{style:{fontSize:10,color:c.tm},children:new Date(e.date).toLocaleDateString("en-US",{day:"numeric",month:"short"})})
+                  ]}),
+                  t("div",{style:{fontFamily:F.mo,fontSize:11,color:c.td,flexShrink:0},children:fm(e.amount,e.currency||currency)})
+                ]}));
+              })()})
+            ]})
+      ]}),
+      o("div",{className:"f",style:{gap:10},children:[
+        t("button",{onClick:()=>{sEditPay(null);sEditLnkSrch("")},className:"f1 act98 tr",style:{padding:"13px 0",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:12,fontSize:14,fontWeight:500},children:"Cancel"}),
+        t("button",{onClick:()=>{onEditPay(editPay.loanId,editPay.payment.id,{linkedExpenseId:editLnk||null,note:editNote.trim()||""});sEditPay(null);sEditLnkSrch("")},className:"f1 act98 tr",style:{padding:"13px 0",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:12,fontSize:14,fontWeight:600},children:"Save"})
+      ]})
     ]})}),
     edT&&t(Sht,{onClose:()=>sEdT(null),children:o(Fragment,{children:[
       t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:4},children:"Edit loan"}),
