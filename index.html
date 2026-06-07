@@ -555,10 +555,10 @@ function psip(investments){const n=Date.now();let any=false;const up=(investment
 
 const AI_PROV_K="etp-ai-provider",AI_MDL_K="etp-ai-model";
 const AI_PROVIDERS={
-  anthropic:{name:"Anthropic",ph:"sk-ant-…",url:"https://api.anthropic.com/v1/messages",def:"claude-haiku-4-5-20251001",fmt:"anthropic",vision:true},
-  deepseek:{name:"DeepSeek",ph:"sk-…",url:"https://api.deepseek.com/v1/chat/completions",def:"deepseek-chat",fmt:"openai",vision:false},
-  openai:{name:"OpenAI",ph:"sk-…",url:"https://api.openai.com/v1/chat/completions",def:"gpt-4o-mini",fmt:"openai",vision:true},
-  openrouter:{name:"OpenRouter",ph:"sk-or-…",url:"https://openrouter.ai/api/v1/chat/completions",def:"deepseek/deepseek-r1-0528",fmt:"openai",vision:false}
+  anthropic:{name:"Anthropic",ph:"sk-ant-…",url:"https://api.anthropic.com/v1/messages",def:"claude-haiku-4-5-20251001",fmt:"anthropic",vision:true,visionModel:"claude-haiku-4-5-20251001"},
+  deepseek:{name:"DeepSeek",ph:"sk-…",url:"https://api.deepseek.com/v1/chat/completions",def:"deepseek-chat",fmt:"openai",vision:false,visionModel:null},
+  openai:{name:"OpenAI",ph:"sk-…",url:"https://api.openai.com/v1/chat/completions",def:"gpt-4o-mini",fmt:"openai",vision:true,visionModel:"gpt-4o-mini"},
+  openrouter:{name:"OpenRouter",ph:"sk-or-…",url:"https://openrouter.ai/api/v1/chat/completions",def:"deepseek/deepseek-r1-0528",fmt:"openai",vision:true,visionModel:"openai/gpt-4o-mini"}
 };
 function gAK(){try{return localStorage.getItem("etp-ai-apikey")||localStorage.getItem(KK)||null}catch{return null}}
 function sAK(k){try{if(k){localStorage.setItem("etp-ai-apikey",k);localStorage.removeItem(KK)}else{localStorage.removeItem("etp-ai-apikey");localStorage.removeItem(KK)}}catch{}}
@@ -569,7 +569,9 @@ function sMdl(m){try{m?localStorage.setItem(AI_MDL_K,m):localStorage.removeItem(
 async function cAPI(p){
   const k=gAK();if(!k){const e=new Error("NO_API_KEY");e.code="NO_API_KEY";throw e}
   const prov=gProv(),pc=AI_PROVIDERS[prov]||AI_PROVIDERS.anthropic;
-  const model=gMdl()||pc.def||p.model;
+  const hasImage=(p.messages||[]).some(m=>Array.isArray(m.content)&&m.content.some(x=>x&&x.type==="image"));
+  // Image requests need a vision-capable model; the configured text model (e.g. DeepSeek R1) may not support vision.
+  const model=hasImage?(gMdl()||pc.visionModel||pc.def||p.model):(gMdl()||pc.def||p.model);
   if(pc.fmt==="anthropic"){
     const r=await fetch(pc.url,{method:"POST",headers:{"Content-Type":"application/json","x-api-key":k,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({...p,model})});
     if(!r.ok){const tx=await r.text();let m=`API error ${r.status}`;try{const j=JSON.parse(tx);if(j?.error?.message)m=j.error.message}catch{m+=": "+tx.slice(0,200)}const e=new Error(m);e.status=r.status;if(r.status===401)e.code="INVALID_KEY";throw e}
@@ -3331,7 +3333,7 @@ return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
     ]}),
     t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:"MODEL (BLANK = DEFAULT)"}),
     t("input",{value:mdl2,onChange:e=>sMdl2(e.target.value),placeholder:(AI_PROVIDERS[prov]||AI_PROVIDERS.anthropic).def,style:{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${c.brs}`,background:c.sf2,color:c.tx,fontSize:13,fontFamily:F.mo,boxSizing:"border-box",outline:"none",marginBottom:8}}),
-    t("div",{style:{fontSize:11,color:c.tm,lineHeight:1.5},children:"Key stored locally only · Bill scan (vision) needs Anthropic or OpenAI"})
+    t("div",{style:{fontSize:11,color:c.tm,lineHeight:1.5},children:"Key stored locally only · Photo/bill scan works on Anthropic, OpenAI & OpenRouter (auto-routes images to a vision model); DeepSeek is text-only"})
   ]}),
   o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:14},children:"FINANCE PROFILE"}),
