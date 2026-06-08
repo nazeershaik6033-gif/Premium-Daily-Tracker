@@ -1838,8 +1838,8 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
         ]})
       ]}),
       o("div",{className:"g g2",style:{gap:10,marginBottom:16},children:[
-        t("button",{onClick:()=>openEntry(selP.id,"gave"),className:"act98 tr",style:{padding:"13px 0",background:c.mt+"22",color:c.mt,border:`1px solid ${c.mt}55`,borderRadius:12,fontWeight:600,fontSize:13},children:"+ Lent"}),
-        t("button",{onClick:()=>openEntry(selP.id,"got"),className:"act98 tr",style:{padding:"13px 0",background:c.co+"22",color:c.co,border:`1px solid ${c.co}55`,borderRadius:12,fontWeight:600,fontSize:13},children:"− Received"})
+        t("button",{onClick:()=>openEntry(selP.id,"gave"),className:"act98 tr",style:{padding:"13px 0",background:c.co+"22",color:c.co,border:`1px solid ${c.co}55`,borderRadius:12,fontWeight:600,fontSize:13},children:"− Lent"}),
+        t("button",{onClick:()=>openEntry(selP.id,"got"),className:"act98 tr",style:{padding:"13px 0",background:c.mt+"22",color:c.mt,border:`1px solid ${c.mt}55`,borderRadius:12,fontWeight:600,fontSize:13},children:"+ Received"})
       ]}),
       t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:"HISTORY"}),
       (selP.entries||[]).length===0?t("div",{style:{fontSize:13,color:c.tm,textAlign:"center",padding:"24px 0",background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`},children:"No entries yet. Use the buttons above."}):t("div",{style:{display:"flex",flexDirection:"column",gap:8},children:[...(selP.entries||[])].sort((a,b2)=>b2.date-a.date).map(en=>o("div",{key:en.id,className:"f ia jb",style:{background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,padding:"12px 14px",gap:8},children:[
@@ -1848,7 +1848,7 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
           t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:new Date(en.date).toLocaleDateString("en-US",{day:"numeric",month:"short",year:"numeric"})+(en.note?" · "+en.note:"")})
         ]}),
         o("div",{className:"f ia",style:{gap:4,flexShrink:0},children:[
-          t("div",{style:{fontFamily:F.mo,fontSize:14,color:en.kind==="gave"?c.mt:c.co,marginRight:2},children:(en.kind==="gave"?"+":"−")+fm(en.amount,currency)}),
+          t("div",{style:{fontFamily:F.mo,fontSize:14,color:en.kind==="gave"?c.co:c.mt,marginRight:2},children:(en.kind==="gave"?"−":"+")+fm(en.amount,currency)}),
           t("button",{onClick:()=>openEditEntry(selP.id,en),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(Pencil,{size:13})}),
           t("button",{onClick:()=>onDeleteEntry(selP.id,en.id),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(X,{size:13})})
         ]})
@@ -1856,8 +1856,8 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
       entryFor&&t(Sht,{onClose:()=>{sEntryFor(null);sEditEntryId(null)},children:o(Fragment,{children:[
         t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:14},children:editEntryId?"Edit entry":"Add entry"}),
         o("div",{className:"g g2",style:{gap:8,marginBottom:16},children:[
-          t("button",{onClick:()=>sEKind("gave"),className:"act95 tr",style:{padding:"11px 0",background:eKind==="gave"?c.mt+"22":c.sf2,color:eKind==="gave"?c.mt:c.td,border:`1px solid ${eKind==="gave"?c.mt:c.brs}`,borderRadius:10,fontSize:13,fontWeight:600},children:"Lent (+)"}),
-          t("button",{onClick:()=>sEKind("got"),className:"act95 tr",style:{padding:"11px 0",background:eKind==="got"?c.co+"22":c.sf2,color:eKind==="got"?c.co:c.td,border:`1px solid ${eKind==="got"?c.co:c.brs}`,borderRadius:10,fontSize:13,fontWeight:600},children:"Received (−)"})
+          t("button",{onClick:()=>sEKind("gave"),className:"act95 tr",style:{padding:"11px 0",background:eKind==="gave"?c.co+"22":c.sf2,color:eKind==="gave"?c.co:c.td,border:`1px solid ${eKind==="gave"?c.co:c.brs}`,borderRadius:10,fontSize:13,fontWeight:600},children:"Lent (−)"}),
+          t("button",{onClick:()=>sEKind("got"),className:"act95 tr",style:{padding:"11px 0",background:eKind==="got"?c.mt+"22":c.sf2,color:eKind==="got"?c.mt:c.td,border:`1px solid ${eKind==="got"?c.mt:c.brs}`,borderRadius:10,fontSize:13,fontWeight:600},children:"Received (+)"})
         ]}),
         t("div",{style:{fontSize:11,color:c.tm,textAlign:"center",marginBottom:14},children:eKind==="gave"?"Money you lent / paid them → increases what they owe you":"Money they paid / lent you → decreases what they owe you"}),
         o("div",{style:{marginBottom:14,textAlign:"center"},children:[
@@ -1869,7 +1869,7 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
         ]}),
         o("div",{style:{marginBottom:14},children:t(FI,{label:"Note (optional)",value:eNote,onChange:sENote,placeholder:"e.g., lunch, cash"})}),
         o("div",{style:{marginBottom:16},children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"DATE"}),t("input",{type:"date",value:eDate,max:today(),onChange:e=>sEDate(e.target.value),style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px",color:c.tx,fontSize:14,outline:"none",fontFamily:'var(--tf)',colorScheme:"dark"}})]}),
-        t("button",{disabled:!parseFloat(eAmt)||parseFloat(eAmt)<=0,onClick:()=>{const payload={kind:eKind,amount:parseFloat(eAmt),note:eNote,date:eDate?new Date(eDate).getTime():Date.now()};if(editEntryId)onEditEntry(entryFor,editEntryId,payload);else onAddEntry(entryFor,payload);sEntryFor(null);sEditEntryId(null)},className:"w100 act98 tr",style:{padding:"14px 0",background:parseFloat(eAmt)?c.ac:c.sf2,color:parseFloat(eAmt)?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:parseFloat(eAmt)?`${editEntryId?"Save":"Add"} ${eKind==="gave"?"+":"−"}${fm(parseFloat(eAmt),currency)}`:"Enter an amount"})
+        t("button",{disabled:!parseFloat(eAmt)||parseFloat(eAmt)<=0,onClick:()=>{const payload={kind:eKind,amount:parseFloat(eAmt),note:eNote,date:eDate?new Date(eDate).getTime():Date.now()};if(editEntryId)onEditEntry(entryFor,editEntryId,payload);else onAddEntry(entryFor,payload);sEntryFor(null);sEditEntryId(null)},className:"w100 act98 tr",style:{padding:"14px 0",background:parseFloat(eAmt)?c.ac:c.sf2,color:parseFloat(eAmt)?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:parseFloat(eAmt)?`${editEntryId?"Save":"Add"} ${eKind==="gave"?"−":"+"}${fm(parseFloat(eAmt),currency)}`:"Enter an amount"})
       ]})}),
       editP&&t(Sht,{onClose:()=>sEditP(null),children:o(Fragment,{children:[
         t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:14},children:"Edit person"}),
