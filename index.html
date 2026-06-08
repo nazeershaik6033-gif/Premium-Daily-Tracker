@@ -1551,6 +1551,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
   const[cmpCardId,sCmpCardId]=useState(null);
   const[man,sMan]=useState(null);
   const[quick,sQuick]=useState(null);
+  const[photoFile,sPhotoFile]=useState(null);const[photoPreview,sPhotoPreview]=useState(null);
   const[file,sFile]=useState(null);
   const[parsed,sParsed]=useState(null);
   const[analyzing,sAnalyzing]=useState(false);
@@ -1603,13 +1604,13 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
       sParsed(txns);sFile({name:`Pasted CSV · ${txns.length} rows`});
     }catch(e2){sErr("Parse error: "+e2.message)}
   };
-  const extractPhoto=async(f)=>{
-    if(!f)return;sErr(null);sResult(null);
-    if(f.size>4.5e6){sErr("Image too large (max 4.5MB).");return}
+  const pickPhoto=async(f)=>{if(!f)return;sErr(null);if(f.size>4.5e6){sErr("Image too large (max 4.5MB).");return}sPhotoFile(f);try{const b64=await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(f)});sPhotoPreview(b64)}catch(e2){}};
+  const extractPhoto=async()=>{
+    const f=photoFile;if(!f){sErr("Pick a statement photo first.");return}sErr(null);sResult(null);
     if(!gAK()){sErr("Add an AI API key in Settings first.");return}
     sAnalyzing(true);
     try{
-      const b64=await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(f)});
+      const b64=photoPreview||await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(f)});
       const sys="You extract transactions from a bank or credit card statement image. Be thorough and accurate.";
       const u=[{type:"image",source:{type:"base64",media_type:f.type,data:b64.split(",")[1]}},{type:"text",text:(photoPrompt.trim()?photoPrompt.trim()+"\n\n":"")+'Extract ALL spending transactions visible. Return JSON only: {"transactions":[{"date":"YYYY-MM-DD","amount":N,"merchant":"name"}]}. Amounts as positive numbers.'}];
       const r=await cAPI({max_tokens:3000,system:sys,messages:[{role:"user",content:u}]});
@@ -1682,13 +1683,17 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
       t("button",{onClick:parsePaste,disabled:!csvText.trim(),className:"w100 act98 tr",style:{padding:"12px 0",background:csvText.trim()?c.ac:c.sf2,color:csvText.trim()?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:14,border:"none"},children:"Parse CSV text"})
     ]}),
     mode==="photo"&&o("div",{style:{marginBottom:16},children:[
+      o("div",{style:{background:c.sfg,borderRadius:16,border:`2px dashed ${photoPreview?c.mt:c.brs}`,padding:photoPreview?14:20,textAlign:"center",cursor:analyzing?"default":"pointer",marginBottom:12},onClick:()=>{if(!analyzing)photoRef.current?.click()},children:photoPreview?[
+        t("img",{key:"img",src:photoPreview,alt:"",style:{maxWidth:"100%",maxHeight:200,borderRadius:10,marginBottom:8}}),
+        t("div",{key:"t",style:{fontSize:12,color:c.tm},children:analyzing?"Reading the statement…":"Tap to choose a different photo"})
+      ]:[
+        t("div",{key:"e",style:{fontSize:28,marginBottom:8},children:"📷"}),
+        t("div",{key:"t",style:{fontSize:14,color:c.tx,fontWeight:500},children:"Tap to snap or upload a statement photo"}),
+        t("div",{key:"s",style:{fontSize:11,color:c.tm,marginTop:4},children:"Choose from gallery or camera"})
+      ]}),
+      t("input",{ref:photoRef,type:"file",accept:"image/*",style:{display:"none"},onChange:async e=>{const f=e.target.files?.[0];if(f)await pickPhoto(f);e.target.value=""}}),
       t("input",{value:photoPrompt,onChange:e=>sPhotoPrompt(e.target.value),placeholder:"Optional instructions — e.g. only debit transactions",style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 14px",color:c.tx,fontSize:13,fontFamily:'var(--tf)',outline:"none",boxSizing:"border-box",marginBottom:10}}),
-      o("div",{style:{background:c.sfg,borderRadius:16,border:`2px dashed ${file&&parsed?c.mt:c.brs}`,padding:20,textAlign:"center",cursor:analyzing?"default":"pointer"},onClick:()=>{if(!analyzing)photoRef.current?.click()},children:[
-        t("div",{style:{fontSize:28,marginBottom:8},children:analyzing?"⏳":file&&parsed?"✅":"📷"}),
-        t("div",{style:{fontSize:14,color:c.tx,fontWeight:500},children:analyzing?"Reading the statement…":file&&parsed?file.name:"Tap to snap or upload a statement photo"}),
-        t("div",{style:{fontSize:11,color:c.tm,marginTop:4},children:analyzing?"Extracting transactions with AI":"AI reads the image and extracts transactions"}),
-        t("input",{ref:photoRef,type:"file",accept:"image/*",style:{display:"none"},onChange:async e=>{const f=e.target.files?.[0];if(f)await extractPhoto(f);e.target.value=""}})
-      ]})
+      t("button",{disabled:!photoFile||analyzing,onClick:extractPhoto,className:"w100 act98 tr f ia jc",style:{gap:8,padding:"14px 0",background:photoFile&&!analyzing?c.ac:c.sf2,color:photoFile&&!analyzing?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:analyzing?"Reading the statement…":[t(Send,{key:"i",size:16}),"Extract transactions"]})
     ]}),
     parsed&&o("div",{style:{marginBottom:16},children:[
       t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:8},children:"COMPARE PERIOD"}),
@@ -1743,7 +1748,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
           t("div",{style:{display:"flex",flexDirection:"column",gap:8},children:(result.observations||[]).map((obs,i)=>o("div",{key:i,style:{background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,padding:"12px 14px",fontSize:13,color:c.tx,lineHeight:1.5},children:[t("span",{style:{color:c.ac,marginRight:8},children:"→"}),obs]}))})
         ]})
       ]}),
-      t("button",{onClick:()=>{sResult(null);sParsed(null);sFile(null)},className:"w100 act98 tr",style:{padding:"12px 0",background:c.sf2,color:c.td,borderRadius:12,border:`1px solid ${c.brs}`,fontSize:13,marginTop:10},children:"Upload another statement"})
+      t("button",{onClick:()=>{sResult(null);sParsed(null);sFile(null);sPhotoFile(null);sPhotoPreview(null)},className:"w100 act98 tr",style:{padding:"12px 0",background:c.sf2,color:c.td,borderRadius:12,border:`1px solid ${c.brs}`,fontSize:13,marginTop:10},children:"Upload another statement"})
     ]}),
     quick&&t(Sht,{onClose:()=>sQuick(null),children:o(Fragment,{children:[
       t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:6},children:"Log this transaction?"}),
