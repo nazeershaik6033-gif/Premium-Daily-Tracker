@@ -847,8 +847,8 @@ function App(){
   const aE=(e)=>{const id=uid(),L=[{...e,id,type:e.type||"expense"},...d.expenses].sort((a,b)=>b.date-a.date);pst({expenses:L})};
   const aEMany=(arr)=>{if(!arr||!arr.length)return;const add=arr.map(e=>({...e,id:uid(),type:e.type||"expense"}));const L=[...add,...d.expenses].sort((a,b)=>b.date-a.date);pst({expenses:L})};
   const sFE=({expense:e,makeRecurring:r,frequency:f,makeProfile:mp})=>{const id=uid();let exp,rec=d.recurring,pf=d.profiles;if(r&&f){const nr=[{id:"rec_"+id,amount:e.amount,currency:e.currency,accountId:e.accountId,cardId:e.cardId||null,category:e.category,subcategory:e.subcategory,merchant:e.merchant,payee:e.payee,note:e.note,bank:e.bank,cardType:e.cardType,cardLast4:e.cardLast4,frequency:f,nextDate:e.date,createdAt:Date.now()},...d.recurring];const{newExpenses,updatedRecurring}=pr(nr,d.expenses);exp=[...newExpenses,...d.expenses].sort((a,b)=>b.date-a.date);rec=updatedRecurring}else exp=[{...e,id,type:e.type||"expense"},...d.expenses].sort((a,b)=>b.date-a.date);if(mp)pf=[{id:"prof_"+id,amount:e.amount,currency:e.currency,accountId:e.accountId,category:e.category,subcategory:e.subcategory,merchant:e.merchant,payee:e.payee,note:e.note},...d.profiles];pst({expenses:exp,recurring:rec,profiles:pf});sV("home")};
-  const uE=(e)=>{const L=d.expenses.map(x=>x.id===e.id?{...x,...e}:x).sort((a,b)=>b.date-a.date);pst({expenses:L});sAtx(null);sEd(null);sV("home")};
-  const dE=(id)=>{const e=d.expenses.find(x=>x.id===id);let L;if(e?.transferId)L=d.expenses.filter(x=>x.transferId!==e.transferId);else L=d.expenses.filter(x=>x.id!==id);pst({expenses:L});sAtx(null);sV("home")};
+  const uE=(e)=>{const L=d.expenses.map(x=>x.id===e.id?{...x,...e}:x).sort((a,b)=>b.date-a.date);pst({expenses:L});sAtx(null);sEd(null);sV(navFromRef.current||"home")};
+  const dE=(id)=>{const e=d.expenses.find(x=>x.id===id);let L;if(e?.transferId)L=d.expenses.filter(x=>x.transferId!==e.transferId);else L=d.expenses.filter(x=>x.id!==id);pst({expenses:L});sAtx(null);sV(v)};
   const dT=({fromId,toId,amount,currency,date,note})=>{const id=uid(),tid="xfer_"+id;const out={id:"xo_"+id,type:"transfer-out",amount,currency,accountId:fromId,category:"other",merchant:"Transfer",note:note||null,date,source:"transfer",transferId:tid};const inE={id:"xi_"+id,type:"transfer-in",amount,currency,accountId:toId,category:"other",merchant:"Transfer",note:note||null,date,source:"transfer",transferId:tid};pst({expenses:[out,inE,...d.expenses].sort((a,b)=>b.date-a.date)});sV("accounts")};
   const aCP=({cardId,accountId,amount,date})=>{const cr=(d.cards||[]).find(x=>x.id===cardId),id=uid();const p={id:"cp_"+id,type:"card-payment",amount,currency:d.currency,accountId,cardId,category:"other",merchant:`${cr?.name||"Card"} payment`,note:"Credit card bill payment",date,source:"card-payment"};pst({expenses:[p,...d.expenses].sort((a,b)=>b.date-a.date)})};
   const uCP=(id,patch)=>pst({expenses:d.expenses.map(x=>x.id===id?{...x,...patch}:x).sort((a,b)=>b.date-a.date)});
@@ -932,7 +932,7 @@ function App(){
         v==="calendar"&&t(Calend,{data:d,onTx:sAtx,presetAdd:(ts,k)=>{window.__pd=ts;window.__pt=k||"expense";sV("add")}}),
         v==="stats"&&t(Stats,{data:d,onTx:sAtx,onView:sV,onFlt:sFlt,persist:pst}),
         v==="add"&&t(Editor,{data:d,onSave:sFE,onCancel:()=>sV("home"),onCardPayment:({cardId,accountId,amount,date})=>{aCP({cardId,accountId,amount,date});sV("home")},presetDate:window.__pd,presetType:window.__pt,presetMode:window.__pm,clearPreset:()=>{window.__pd=null;window.__pt=null;window.__pm=null}}),
-        v==="edit"&&ed&&t(Editor,{data:d,onSave:({expense})=>uE({...ed,...expense}),onCancel:()=>{sEd(null);sV("home")},editing:ed}),
+        v==="edit"&&ed&&t(Editor,{data:d,onSave:({expense})=>uE({...ed,...expense}),onCancel:()=>{sEd(null);sV(navFromRef.current||"home")},editing:ed}),
         v==="more"&&t(More,{data:d,onClose:()=>sV("home"),onView:(id)=>{navFromRef.current="more";sV(id)}}),
         v==="search"&&t(SrchS,{data:d,onClose:()=>sV("home"),onTx:sAtx,onView:sV}),
         v==="accounts"&&t(Accts,{data:d,onClose:()=>sV(navFromRef.current),onAdd:()=>sV("newAccount"),onDelete:dA,onEdit:a=>{sEAcc(a);sV("editAccount")},onSelect:a=>{sAdId(a.id);sV("acctDetail")}}),
@@ -983,7 +983,7 @@ function App(){
       ]}),
       nav&&t(Nav,{view:v,setView:(id)=>{if(id===v){if(scrollRef.current)scrollRef.current.scrollTo({top:0,behavior:"smooth"})}else sV(id)}}),
     ]}),
-    atx&&t(TxSht,{expense:atx,accounts:d.accounts,cards:d.cards||[],onClose:()=>sAtx(null),onDelete:()=>dE(atx.id),onEdit:()=>{navFromRef.current="home";sFlt(null);sEd(atx);sAtx(null);sV("edit")}}),
+    atx&&t(TxSht,{expense:atx,accounts:d.accounts,cards:d.cards||[],onClose:()=>sAtx(null),onDelete:()=>dE(atx.id),onEdit:()=>{navFromRef.current=v;sFlt(null);sEd(atx);sAtx(null);sV("edit")}}),
     sbar&&t(Sidebar,{data:d,onClose:()=>{sSbar(false);sSbFocus(null)},onView:(id)=>{navFromRef.current=v;sV(id)},activeUser,onUpdateUser:updateUserFn,focusSection:sbFocus}),
     flt&&t(FilteredTxSheet,{title:flt.title,items:flt.items,accounts:d.accounts,cards:d.cards||[],currency:d.currency,onClose:()=>sFlt(null),onHome:()=>{sFlt(null);sV("home")},onTx:sAtx}),
   ]})
@@ -1291,8 +1291,10 @@ function Breakdown({data,persist,onClose,onTx}){const{expenses,currency,monthSta
   ]})}
 
 // === BUDGET TRACKER (standalone over/under record — does NOT affect any budget elsewhere) ===
-function BudgetTrack({data,onClose,onRepay,onOpenLoans}){const{expenses,budget,budgetPeriod,currency,monthStartDay=1,budgetLoans=[]}=data;
+function BudgetTrack({data,onClose,onRepay,onOpenLoans}){const{expenses,budget,budgetPeriod,currency,monthStartDay=1,budgetLoans=[],accounts=[],cards=[]}=data;
   const loanByMonth=useMemo(()=>{const m={};for(const l of budgetLoans)m[l.sourceMonth]=l;return m},[budgetLoans]);
+  const accName=id=>{const a=accounts.find(x=>x.id===id);return a?((a.emoji?a.emoji+" ":"")+a.name):"Unassigned"};
+  const cardName=id=>{const cd=cards.find(x=>x.id===id);return cd?("💳 "+cd.name+(cd.last4?" ··"+cd.last4:"")):"💳 Card"};
   const monthly=budgetPeriod==="monthly"&&!!budget;
   const series=useMemo(()=>{
     if(!monthly)return{months:[],cum:0,overCount:0,underCount:0};
@@ -1300,7 +1302,7 @@ function BudgetTrack({data,onClose,onRepay,onOpenLoans}){const{expenses,budget,b
     if(!exps.length)return{months:[],cum:0,overCount:0,underCount:0};
     const starts=[];let g=ps(new Date(Math.min(...exps.map(e=>e.date))),monthStartDay);const curStart=ps(new Date(),monthStartDay);let guard=0;
     while(g<=curStart&&guard++<600){starts.push(g);const d=new Date(g);d.setMonth(d.getMonth()+1);g=ps(d,monthStartDay)}
-    let cum=0,overCount=0,underCount=0;const months=starts.map((s,i)=>{const e=i+1<starts.length?starts[i+1]:mse(new Date(s).getFullYear(),new Date(s).getMonth(),monthStartDay);const spent=exps.filter(x=>x.date>=s&&x.date<e).reduce((a,b)=>a+b.amount,0);const isCurrent=i===starts.length-1;const delta=budget-spent;if(!isCurrent){cum+=delta;if(delta<0)overCount++;else underCount++}return{start:s,spent,delta,isCurrent,cum:isCurrent?null:cum}});
+    let cum=0,overCount=0,underCount=0;const months=starts.map((s,i)=>{const e=i+1<starts.length?starts[i+1]:mse(new Date(s).getFullYear(),new Date(s).getMonth(),monthStartDay);const me2=exps.filter(x=>x.date>=s&&x.date<e);const spent=me2.reduce((a,b)=>a+b.amount,0);const accMap={},cardMap={};for(const x of me2){if(x.cardId)cardMap[x.cardId]=(cardMap[x.cardId]||0)+x.amount;else{const k=x.accountId||"";accMap[k]=(accMap[k]||0)+x.amount}}const isCurrent=i===starts.length-1;const delta=budget-spent;if(!isCurrent){cum+=delta;if(delta<0)overCount++;else underCount++}return{start:s,spent,delta,isCurrent,cum:isCurrent?null:cum,accMap,cardMap}});
     return{months,cum,overCount,underCount};
   },[expenses,budget,budgetPeriod,monthStartDay,monthly]);
   const rows=[...series.months].reverse();
@@ -1323,6 +1325,7 @@ function BudgetTrack({data,onClose,onRepay,onOpenLoans}){const{expenses,budget,b
           m.isCurrent?t("div",{style:{fontFamily:F.mo,fontSize:11,color:c.td,flexShrink:0},children:"in progress"}):o("div",{className:"trg",style:{flexShrink:0},children:[t("div",{style:{fontFamily:F.mo,fontSize:14,fontWeight:600,color:over?c.co:c.mt},children:(over?"−":"+")+fm(Math.abs(m.delta),currency)}),t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginTop:2},children:over?"OVER":"UNDER"})]}),
         ]}),
         t("div",{style:{height:5,background:c.sf2,borderRadius:999,overflow:"hidden"},children:t("div",{style:{width:pct+"%",height:"100%",background:over?c.co:c.ac,borderRadius:999}})}),
+        over&&(()=>{const items=[...Object.entries(m.cardMap||{}).map(([id,v])=>({label:cardName(id),v})),...Object.entries(m.accMap||{}).map(([id,v])=>({label:accName(id),v}))].filter(x=>x.v>0).sort((a,b)=>b.v-a.v);if(!items.length)return null;return o("div",{style:{marginTop:10,background:c.sf2,borderRadius:10,padding:"10px 12px"},children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1.2,marginBottom:8},children:"SPENT VIA"}),...items.map((it,k)=>o("div",{key:k,className:"f ia jb",style:{gap:8,marginTop:k?6:0},children:[t("div",{className:"tru",style:{fontSize:12.5,color:c.td,minWidth:0},children:it.label}),t("div",{style:{fontFamily:F.mo,fontSize:12.5,color:c.tx,flexShrink:0},children:fm(it.v,currency)})]}))]})})(),
         over&&!m.isCurrent&&(()=>{const ln=loanByMonth[m.start];if(ln){const paid=(ln.payments||[]).reduce((s,p)=>s+(p.amount||0),0);const done=ln.status==="paid";return t("button",{onClick:onOpenLoans,className:"w100 act98 tr",style:{marginTop:10,padding:"8px 0",background:"transparent",color:done?c.mt:c.gd,border:`1px solid ${(done?c.mt:c.gd)}40`,borderRadius:9,fontSize:11.5,fontFamily:F.mo,letterSpacing:.3},children:done?"✓ Repaid · view loan":`In repayment · ${fm(paid,currency)} of ${fm(ln.principal,currency)} →`})}return t("button",{onClick:()=>onRepay&&onRepay(m),className:"w100 act98 tr",style:{marginTop:10,padding:"8px 0",background:c.sf2,color:c.co,border:`1px solid ${c.co}40`,borderRadius:9,fontSize:12,fontWeight:500},children:"Repay this overspend"})})(),
       ]})})}),
     ]})
@@ -1634,8 +1637,8 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
       let match=null;
       for(const p of pool){
         if(p.used)continue;
-        const amtOk=Math.abs(p.e.amount-tx.amount)<=Math.max(1,tx.amount*0.01);
-        const dayOk=Math.abs(p.e.date-tx.date)<=5*864e5;
+        const amtOk=Math.abs(p.e.amount-tx.amount)<=0.01;
+        const dayOk=Math.abs(p.e.date-tx.date)<=2*864e5;
         if(amtOk&&dayOk){p.used=true;match=p.e;break}
       }
       return{tx,match};
@@ -2001,12 +2004,15 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
 }
 
 // === CALENDAR ===
-function Calend({data,onTx,presetAdd}){const{expenses,currency}=data;const[yr,sYr]=useState(new Date().getFullYear()),[mo,sMo]=useState(new Date().getMonth()),[sel,sSel]=useState(new Date().toDateString());const[cf,sCf]=useState("all");const[cSub,sCSub]=useState(null);
+let _calState={};
+function Calend({data,onTx,presetAdd}){const{expenses,currency}=data;const[yr,sYr]=useState(()=>_calState.yr??new Date().getFullYear()),[mo,sMo]=useState(()=>_calState.mo??new Date().getMonth()),[sel,sSel]=useState(()=>_calState.sel||new Date().toDateString());const[cf,sCf]=useState(()=>_calState.cf||"all");const[cSub,sCSub]=useState(()=>_calState.cSub??null);
+  useEffect(()=>{_calState={yr,mo,sel,cf,cSub}},[yr,mo,sel,cf,cSub]);
   const days=useMemo(()=>{const fd=new Date(yr,mo,1).getDay(),la=new Date(yr,mo+1,0).getDate(),x=[];for(let i=fd-1;i>=0;i--)x.push({date:new Date(yr,mo,-i),other:true});for(let d=1;d<=la;d++)x.push({date:new Date(yr,mo,d),other:false});while(x.length<42){const l=x[x.length-1].date,n=new Date(l);n.setDate(l.getDate()+1);x.push({date:n,other:true})}return x},[yr,mo]);
   const byD=useMemo(()=>{const pairs=txPairs(expenses);const m={};for(const e of expenses){if(e.type==="transfer-in")continue;const k=new Date(e.date).toDateString();if(!m[k])m[k]={total:0,income:0,items:[]};if(e.type==="expense"||e.type==="card-payment")m[k].total+=e.amount;else if(e.type==="income")m[k].income+=e.amount;m[k].items.push(enrichTx(e,pairs))}return m},[expenses]);
   const fByD=useMemo(()=>{if(cf==="all")return byD;const fn=cf==="income"?e=>e.type==="income":cf==="expense"?e=>e.type==="expense":cf==="cards"?(cSub?e=>e.cardId===cSub:e=>!!e.cardId):(cSub?e=>e.accountId===cSub&&e.type==="expense"&&!e.cardId:e=>e.type==="expense"&&!e.cardId);const m={};for(const[k,v]of Object.entries(byD)){const fi=v.items.filter(fn);if(fi.length>0){const ft=fi.filter(e=>e.type==="expense"||e.type==="card-payment").reduce((s,e)=>s+e.amount,0),fin=fi.filter(e=>e.type==="income").reduce((s,e)=>s+e.amount,0);m[k]={total:ft,income:fin,items:fi}}}return m},[byD,cf,cSub]);
   const mst=useMemo(()=>{let to=0,ic=0,co2=0,mx=0;for(const cl of days){if(cl.other)continue;const x=fByD[cl.date.toDateString()];if(x){to+=x.total;ic+=x.income;co2+=x.items.length;if(x.total>mx)mx=x.total}}return{total:to,income:ic,max:mx,count:co2}},[days,fByD]);
   const tod=new Date().toDateString(),cl=fByD[sel],its=cl?.items||[],sp=cl?.total||0,inc=cl?.income||0,mn=new Date(yr,mo).toLocaleDateString("en-US",{month:"long",year:"numeric"}),selTs=useMemo(()=>{const d=new Date(sel);d.setHours(12,0,0,0);return d.getTime()},[sel]);
+  const filterLabel=cf==="all"?"All":cf==="income"?"Income":cf==="expense"?"Expense":cf==="cards"?(cSub?(((data.cards||[]).find(x=>x.id===cSub)||{}).name||"Card"):"All cards"):cf==="accounts"?(cSub?(((data.accounts||[]).find(x=>x.id===cSub)||{}).name||"Account"):"All accounts"):"All";
 return o("div",{style:{padding:"8px 24px 0"},className:"st",children:[
   o("div",{style:{marginTop:12},children:[t("div",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1.5,color:c.tm},children:"CALENDAR"}),o("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:38,lineHeight:1.1,marginTop:2},children:["day-by-",t("span",{style:{color:c.mt},children:"day"})]})]}),
   o("div",{className:"f ia jb",style:{marginTop:20},children:[
@@ -2017,6 +2023,10 @@ return o("div",{style:{padding:"8px 24px 0"},className:"st",children:[
   o("div",{className:"f",style:{gap:6,marginTop:16,flexWrap:"wrap"},children:[{id:"all",l:"All"},{id:"income",l:"💚 Income"},{id:"expense",l:"🔴 Expense"},{id:"cards",l:"💳 Cards"},{id:"accounts",l:"🏦 Accounts"}].map(f=>t("button",{key:f.id,onClick:()=>{sCf(f.id);sCSub(null)},className:"act95 tr",style:{padding:"6px 14px",background:cf===f.id?c.ac:c.sf,border:"none",borderRadius:999,fontSize:12,fontWeight:cf===f.id?600:400,color:cf===f.id?"#0a0a0a":c.td,whiteSpace:"nowrap"},children:f.l}))}),
   cf==="cards"&&(data.cards||[]).length>0&&o("div",{className:"f",style:{gap:6,marginTop:8,flexWrap:"wrap"},children:[(data.cards||[]).map(cd=>t("button",{key:cd.id,onClick:()=>sCSub(cSub===cd.id?null:cd.id),className:"act95 tr",style:{padding:"5px 12px",background:cSub===cd.id?c.gd+"30":c.sf2,border:`1px solid ${cSub===cd.id?c.gd:c.brs}`,borderRadius:999,fontSize:11,color:cSub===cd.id?c.gd:c.td,whiteSpace:"nowrap"},children:cd.name+(cd.last4?" ····"+cd.last4:"")}))]})  ,
   cf==="accounts"&&data.accounts.length>0&&o("div",{className:"f",style:{gap:6,marginTop:8,flexWrap:"wrap"},children:[data.accounts.map(ac=>t("button",{key:ac.id,onClick:()=>sCSub(cSub===ac.id?null:ac.id),className:"act95 tr",style:{padding:"5px 12px",background:cSub===ac.id?c.ac+"25":c.sf2,border:`1px solid ${cSub===ac.id?c.ac:c.brs}`,borderRadius:999,fontSize:11,color:cSub===ac.id?c.ac:c.td,whiteSpace:"nowrap"},children:ac.emoji+" "+ac.name}))]})  ,
+  o("div",{style:{marginTop:14,background:`linear-gradient(135deg,${c.ac}12 0%,${c.sfg} 70%)`,border:`1px solid ${c.brs}`,borderRadius:14,padding:"12px 14px"},children:o("div",{className:"f ia jb",style:{gap:10},children:[
+    o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1.2},children:"MONTH TOTAL · "+filterLabel.toUpperCase()}),t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,marginTop:3},children:mst.count+" txn"+(mst.count===1?"":"s")})]}),
+    o("div",{className:"trg",style:{flexShrink:0},children:[mst.total>0&&t("div",{style:{fontFamily:F.mo,fontSize:15,fontWeight:600,color:c.co},children:"−"+fm(mst.total,currency)}),mst.income>0&&t("div",{style:{fontFamily:F.mo,fontSize:15,fontWeight:600,color:c.mt,marginTop:mst.total>0?2:0},children:"+"+fm(mst.income,currency)}),mst.total===0&&mst.income===0&&t("div",{style:{fontFamily:F.mo,fontSize:15,color:c.tm},children:fm(0,currency)})]})
+  ]})}),
   t("div",{className:"g g7",style:{gap:6,marginTop:12},children:["S","M","T","W","T","F","S"].map((d,i)=>t("div",{key:i,className:"tc",style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,paddingBottom:6},children:d}))}),
   t("div",{className:"g g7",style:{gap:6},children:days.map((d,i)=>{const k=d.date.toDateString(),x=fByD[k],iT=k===tod,iS=k===sel,inten=x&&mst.max>0?Math.min(1,x.total/mst.max):0,hI=x&&x.income>0;let bg="transparent";if(iS)bg=c.ac;else if(x&&!d.other&&x.total>0)bg=`rgba(219,255,77,${.05+inten*.18})`;else if(x&&!d.other&&hI)bg="rgba(168,230,207,0.08)";return o("button",{key:i,onClick:()=>sSel(k),className:"act90 tr",style:{aspectRatio:"1",background:bg,border:iT&&!iS?`1px solid ${c.ac}`:`1px solid ${iS?c.ac:"transparent"}`,borderRadius:10,opacity:d.other?.45:1,color:iS?"#0a0a0a":c.tx,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:1,padding:2,position:"relative"},children:[t("span",{style:{fontSize:13,fontWeight:iT||iS?600:400},children:d.date.getDate()}),x&&!d.other&&t("span",{style:{fontFamily:F.mo,fontSize:9,fontWeight:500,color:iS?"#0a0a0a":c.td},children:x.total>0?fs(x.total,currency):hI?"+"+fs(x.income,currency):""}),hI&&!d.other&&x.total>0&&t("span",{style:{position:"absolute",top:3,right:3,width:5,height:5,borderRadius:"50%",background:iS?"#0a0a0a":c.mt}})]})})}),
   o("div",{style:{marginTop:28},children:[
