@@ -668,8 +668,8 @@ function AppHeader({onMenu,onSearch,onToggleTheme,isDark,theme,onHome,onAI,onDia
   ]})})
 }
 const SB_ORDER_KEY="etp-sidebar-order";
-const DEFAULT_SB=["h:Money","accounts","cards","transfer","investments","wealth","h:Plan & Track","bills","goals","diary","recurring","upcomingExp","categoryBudgets","h:Insights","budgetTrack","budgetLoans","breakdown","monthlyReport","tips","rules","h:Tools","expPlanner","investCalc","cardPayFix","profiles","h:AI","chat","billScan","stmtAnalyze","aiInsights","h:Settings & Data","categories","backup","userMgr","settings"];
-const SB_META={chat:{e:"✨",l:"AI Assistant",s:"Log expenses by chat"},billScan:{e:"📸",l:"Snap a Bill",s:"Auto-extract from receipt"},stmtAnalyze:{e:"📊",l:"Statement Analyzer",s:"Find missing transactions & discrepancies"},aiInsights:{e:"💡",l:"AI Insights",s:"Spending patterns & AI suggestions"},userMgr:{e:"👥",l:"Switch User",s:"Manage profiles"},rules:{e:"📋",l:"Rules & Learnings",s:"Track your financial rules"},upcomingExp:{e:"📅",l:"Upcoming Expenses",s:"Plan & get alerts"},expPlanner:{e:"🧮",l:"Expense Planner",s:"Can I afford this EMI?"},investCalc:{e:"📈",l:"Investment Calculator",s:"Compound growth & SIP planner"},cards:{e:"💳",l:"Cards",acc:true},cardPayFix:{e:"🪙",l:"Fix card bill payments",s:"Remove double-counted bills",acc:true},bills:{e:"🔔",l:"Bills & Reminders",acc:true},goals:{e:"🎯",l:"Goals & Debt",acc:true},diary:{e:"📖",l:"Lending Diary",s:"Who owes you & you owe"},investments:{e:"💼",l:"My Investments",s:"NPS, Funds, FDs",acc:true},wealth:{e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},monthlyReport:{e:"📰",l:"Monthly Report",s:"Print or share PDF"},budgetTrack:{e:"📉",l:"Budget Tracker",s:"Monthly over/under record"},budgetLoans:{e:"🧾",l:"Budget Loans",s:"Repay past overspends"},breakdown:{e:"⚖️",l:"Spending Breakdown",s:"Needs/Wants · 50-30-20"},accounts:{e:"🏦",l:"Accounts",acc:true},transfer:{e:"↔️",l:"Transfer",s:"Move funds",acc:true},recurring:{e:"🔁",l:"Recurring"},profiles:{e:"⚡",l:"Quick profiles"},categoryBudgets:{e:"📏",l:"Category budgets",s:"Set spending limits"},categories:{e:"🏷️",l:"Categories",s:"Manage expense types"},backup:{e:"💾",l:"Backup & Restore",s:"Export or import data"},tips:{e:"💡",l:"Financial Health",s:"Tips & scores"},settings:{e:"⚙️",l:"Settings",s:"Currency, budget, backup"}};
+const DEFAULT_SB=["h:Money","accounts","cards","transfer","investments","wealth","h:Plan & Track","bills","goals","diary","recurring","upcomingExp","categoryBudgets","h:Insights","budgetTrack","budgetLoans","breakdown","monthlyReport","tips","rules","h:Tools","expPlanner","investCalc","cardPayFix","profiles","h:AI","chat","billScan","stmtAnalyze","stmtImports","aiInsights","h:Settings & Data","categories","backup","userMgr","settings"];
+const SB_META={chat:{e:"✨",l:"AI Assistant",s:"Log expenses by chat"},billScan:{e:"📸",l:"Snap a Bill",s:"Auto-extract from receipt"},stmtAnalyze:{e:"📊",l:"Statement Analyzer",s:"Find missing transactions & discrepancies"},stmtImports:{e:"📥",l:"Statement Imports",s:"Review transactions logged from statements"},aiInsights:{e:"💡",l:"AI Insights",s:"Spending patterns & AI suggestions"},userMgr:{e:"👥",l:"Switch User",s:"Manage profiles"},rules:{e:"📋",l:"Rules & Learnings",s:"Track your financial rules"},upcomingExp:{e:"📅",l:"Upcoming Expenses",s:"Plan & get alerts"},expPlanner:{e:"🧮",l:"Expense Planner",s:"Can I afford this EMI?"},investCalc:{e:"📈",l:"Investment Calculator",s:"Compound growth & SIP planner"},cards:{e:"💳",l:"Cards",acc:true},cardPayFix:{e:"🪙",l:"Fix card bill payments",s:"Remove double-counted bills",acc:true},bills:{e:"🔔",l:"Bills & Reminders",acc:true},goals:{e:"🎯",l:"Goals & Debt",acc:true},diary:{e:"📖",l:"Lending Diary",s:"Who owes you & you owe"},investments:{e:"💼",l:"My Investments",s:"NPS, Funds, FDs",acc:true},wealth:{e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},monthlyReport:{e:"📰",l:"Monthly Report",s:"Print or share PDF"},budgetTrack:{e:"📉",l:"Budget Tracker",s:"Monthly over/under record"},budgetLoans:{e:"🧾",l:"Budget Loans",s:"Repay past overspends"},breakdown:{e:"⚖️",l:"Spending Breakdown",s:"Needs/Wants · 50-30-20"},accounts:{e:"🏦",l:"Accounts",acc:true},transfer:{e:"↔️",l:"Transfer",s:"Move funds",acc:true},recurring:{e:"🔁",l:"Recurring"},profiles:{e:"⚡",l:"Quick profiles"},categoryBudgets:{e:"📏",l:"Category budgets",s:"Set spending limits"},categories:{e:"🏷️",l:"Categories",s:"Manage expense types"},backup:{e:"💾",l:"Backup & Restore",s:"Export or import data"},tips:{e:"💡",l:"Financial Health",s:"Tips & scores"},settings:{e:"⚙️",l:"Settings",s:"Currency, budget, backup"}};
 function Sidebar({data,onClose,onView,activeUser,onUpdateUser,focusSection}){
   const go=(id)=>{onView(id);onClose()};
   const scRef=useRef(null);
@@ -972,7 +972,8 @@ function App(){
         v==="categories"&&t(CatMgr,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
         v==="chat"&&t(Chat,{data:d,onAddExpense:aE,onView:sV,onClose:()=>sV("home")}),
         v==="billScan"&&t(BillScan,{data:d,onAddExpense:aE,onClose:()=>sV("home")}),
-        v==="stmtAnalyze"&&t(StmtAnalyze,{data:d,onClose:()=>sV(navFromRef.current),onAddExpenses:aEMany}),
+        v==="stmtAnalyze"&&t(StmtAnalyze,{data:d,onClose:()=>sV(navFromRef.current),onAddExpenses:aEMany,onViewImports:()=>{navFromRef.current="stmtAnalyze";sV("stmtImports")}}),
+        v==="stmtImports"&&t(StmtImports,{data:d,onClose:()=>sV(navFromRef.current),onTx:sAtx}),
         v==="aiInsights"&&t(AiInsights,{data:d,onClose:()=>sV(navFromRef.current)}),
         v==="cardPayFix"&&t(CardPayFix,{data:d,onConvert:convertToCardPayment,onIgnore:ignoreCardFix,onClose:()=>sV(navFromRef.current)}),
         v==="userMgr"&&t(UserMgr,{users,activeUser,onSwitch:async u=>{await switchUser(u);sV("home")},onAdd:addUserFn,onDelete:delUserFn,onUpdate:updateUserFn,onClose:()=>sV("home")}),
@@ -1518,8 +1519,33 @@ function AiChatBox({getContext,intro,suggestions,label,maxTok}){
   ]})
 }
 
+// === STATEMENT IMPORTS (everything logged from the Statement Analyzer) ===
+function StmtImports({data,onClose,onTx}){
+  const{expenses,accounts,currency}=data;const cards=data.cards||[];
+  const items=useMemo(()=>expenses.filter(e=>e.source==="statement").sort((a,b)=>b.date-a.date),[expenses]);
+  const total=items.reduce((s,e)=>s+(e.amount||0),0);
+  const groups=useMemo(()=>{const m={};for(const e of items){const k=new Date(e.date).toLocaleDateString("en-US",{month:"long",year:"numeric"});(m[k]=m[k]||[]).push(e)}return Object.entries(m)},[items]);
+  return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
+    t(SH,{title:t("em",{children:"Statement Imports"}),onBack:onClose}),
+    items.length===0?t(ES,{title:t("em",{children:"no imports yet"}),subtitle:"Transactions you log from the Statement Analyzer appear here — tagged STMT — so you can review them even when they're backdated to an earlier month."}):o(Fragment,{children:[
+      o("div",{style:{background:`linear-gradient(135deg,${c.ac}1f 0%,${c.sfg} 60%)`,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:14},children:[
+        t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:"IMPORTED EXPENSES"}),
+        t("div",{style:{fontFamily:"var(--nf)",fontSize:32,fontWeight:300,marginTop:4,color:c.tx,letterSpacing:-1,lineHeight:1},children:fm(total,currency)}),
+        t("div",{style:{fontFamily:F.mo,fontSize:11,color:c.td,marginTop:10},children:`${items.length} transaction${items.length===1?"":"s"} logged from statements`})
+      ]}),
+      ...groups.map(([label,arr])=>o("div",{key:label,style:{marginBottom:16},children:[
+        o("div",{className:"f ia jb",style:{marginBottom:8},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:label.toUpperCase()}),
+          t("div",{style:{fontFamily:F.mo,fontSize:12,color:c.td},children:fm(arr.reduce((s,e)=>s+(e.amount||0),0),currency)})
+        ]}),
+        t("div",{style:{background:c.sfg,borderRadius:16,border:`1px solid ${c.brs}`,overflow:"hidden"},children:arr.map((e,i)=>t(TX,{key:e.id,expense:e,accounts,cards,isLast:i===arr.length-1,onClick:()=>onTx(e)}))})
+      ]}))
+    ]})
+  ]})
+}
+
 // === STATEMENT ANALYZER ===
-function StmtAnalyze({data,onClose,onAddExpenses}){
+function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
   const{expenses,currency,accounts}=data;
   const cards=data.cards||[];
   const[cmpCardId,sCmpCardId]=useState(null);
@@ -1641,7 +1667,7 @@ function StmtAnalyze({data,onClose,onAddExpenses}){
   };
   const shown=filter==="logged"?logged:filter==="unlogged"?unlogged:recon;
   return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
-    t(SH,{title:t("em",{children:"Statement Analyzer"}),onBack:onClose}),
+    t(SH,{title:t("em",{children:"Statement Analyzer"}),onBack:onClose,right:t("button",{onClick:onViewImports,className:"act95 trt",style:{padding:"8px 12px",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:10,fontSize:11,fontWeight:600,fontFamily:F.mo},children:"IMPORTS"})}),
     t("div",{style:{fontSize:13,color:c.td,marginBottom:16,lineHeight:1.5},children:"Bring in your bank or credit card statement — upload a CSV/Excel file, paste CSV text, or snap a photo. Each transaction is matched against your logged expenses; log any that are missing, then ask the AI follow-up questions."}),
     o("div",{className:"f ia",style:{gap:6,marginBottom:14},children:[{id:"file",l:"📄 File"},{id:"paste",l:"📋 Paste CSV"},{id:"photo",l:"📷 Photo"}].map(mm=>t("button",{key:mm.id,onClick:()=>{sMode(mm.id);sErr(null)},className:"act95 tr",style:{flex:1,padding:"9px 0",background:mode===mm.id?c.ac:c.sf2,color:mode===mm.id?"#0a0a0a":c.td,border:`1px solid ${mode===mm.id?c.ac:c.brs}`,borderRadius:10,fontSize:12,fontFamily:F.mo},children:mm.l}))}),
     mode==="file"&&o("div",{style:{background:c.sfg,borderRadius:16,border:`2px dashed ${file?c.mt:c.brs}`,padding:20,textAlign:"center",marginBottom:16,cursor:"pointer"},onClick:()=>fileRef.current?.click(),children:[
