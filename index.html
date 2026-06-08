@@ -617,7 +617,7 @@ function FI({label,value,onChange,placeholder,type="text",readOnly,small,mono,ic
 
 function TR({label,subtitle,active,onToggle,icon}){return o("button",{onClick:onToggle,className:"w100 f ia jb act99 trt",style:{background:c.sfg,border:`1px solid ${active?c.ac:c.brs}`,borderRadius:12,padding:"12px 16px"},children:[o("div",{className:"f ia",style:{gap:12},children:[icon&&t("div",{style:{color:active?c.ac:c.td,display:"flex"},children:icon}),o("div",{className:"tl",children:[t("div",{style:{fontSize:14,color:c.tx},children:label}),subtitle&&t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:subtitle})]})]}),t("div",{style:{width:36,height:22,borderRadius:999,background:active?c.ac:c.sf2,position:"relative",transition:"background 200ms"},children:t("div",{style:{position:"absolute",top:2,left:active?16:2,width:18,height:18,borderRadius:999,background:active?"#0a0a0a":c.tm,transition:"left 200ms"}})})]})}
 
-function TX({expense:e,accounts,cards,isLast,onClick,ledger}){const cat=co(e.category),acc=accounts?.find(a=>a.id===e.accountId),card=(cards||[]).find(cr=>cr.id===e.cardId),tf=e.type==="transfer-out"||e.type==="transfer-in",cp=e.type==="card-payment",sg=e.type==="income"||e.type==="transfer-in"?"+":"−",col=e.type==="income"||e.type==="transfer-in"?c.mt:cp?c.gd:c.tx;let subLabel=card?`💳 ${card.name}`:acc?acc.name:"";if(tf){const fa=accounts?.find(a=>a.id===(e.fromId!=null?e.fromId:(e.type==="transfer-out"?e.accountId:null))),ta=accounts?.find(a=>a.id===(e.toId!=null?e.toId:(e.type==="transfer-in"?e.accountId:null)));if(fa||ta)subLabel=`${fa?.name||"?"} → ${ta?.name||"?"}`}return o("button",{onClick,className:"w100 f ia trc",style:{padding:"14px 16px",gap:12,borderBottom:isLast?"none":`1px solid ${c.brs}`},children:[t("div",{style:{width:40,height:40,borderRadius:12,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0,position:"relative"},children:tf?"↔":cp?"🪙":cat.emoji}),o("div",{className:"f1 tl minw0",children:[t("div",{className:"tru",style:{fontSize:15,fontWeight:500},children:e.merchant||e.payee||e.note||cat.label}),o("div",{className:"tru",style:{color:c.tm,fontSize:12,marginTop:2},children:[rd(e.date),subLabel?` · ${subLabel}`:"",e.subcategory?` · ${e.subcategory}`:""]}),ledger&&t("div",{style:{fontFamily:F.mo,fontSize:10.5,color:c.td,marginTop:3,letterSpacing:.3},children:ledger})]}),o("div",{style:{fontFamily:F.mo,fontSize:15,fontWeight:500,color:col},children:[sg,fm(e.amount,e.currency||acc?.currency||"₹")]})]})}
+function TX({expense:e,accounts,cards,isLast,onClick,ledger}){const cat=co(e.category),acc=accounts?.find(a=>a.id===e.accountId),card=(cards||[]).find(cr=>cr.id===e.cardId),tf=e.type==="transfer-out"||e.type==="transfer-in",cp=e.type==="card-payment",sg=e.type==="income"||e.type==="transfer-in"?"+":"−",col=e.type==="income"||e.type==="transfer-in"?c.mt:cp?c.gd:c.tx;let subLabel=card?`💳 ${card.name}`:acc?acc.name:"";if(tf){const fa=accounts?.find(a=>a.id===(e.fromId!=null?e.fromId:(e.type==="transfer-out"?e.accountId:null))),ta=accounts?.find(a=>a.id===(e.toId!=null?e.toId:(e.type==="transfer-in"?e.accountId:null)));if(fa||ta)subLabel=`${fa?.name||"?"} → ${ta?.name||"?"}`}return o("button",{onClick,className:"w100 f ia trc",style:{padding:"14px 16px",gap:12,borderBottom:isLast?"none":`1px solid ${c.brs}`},children:[t("div",{style:{width:40,height:40,borderRadius:12,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0,position:"relative"},children:tf?"↔":cp?"🪙":cat.emoji}),o("div",{className:"f1 tl minw0",children:[o("div",{className:"f ia",style:{gap:6,minWidth:0},children:[t("div",{className:"tru",style:{fontSize:15,fontWeight:500,minWidth:0},children:e.merchant||e.payee||e.note||cat.label}),e.source==="statement"&&t("span",{style:{flexShrink:0,fontFamily:F.mo,fontSize:8.5,letterSpacing:.5,color:c.ac,background:c.ac+"22",borderRadius:5,padding:"1px 5px"},children:"STMT"})]}),o("div",{className:"tru",style:{color:c.tm,fontSize:12,marginTop:2},children:[rd(e.date),subLabel?` · ${subLabel}`:"",e.subcategory?` · ${e.subcategory}`:""]}),ledger&&t("div",{style:{fontFamily:F.mo,fontSize:10.5,color:c.td,marginTop:3,letterSpacing:.3},children:ledger})]}),o("div",{style:{fontFamily:F.mo,fontSize:15,fontWeight:500,color:col},children:[sg,fm(e.amount,e.currency||acc?.currency||"₹")]})]})}
 
 // === MARQUEE ===
 function Pulse({data}){const items=useMemo(()=>{const tt=Date.now(),tds=ds(),mst=ps(new Date(),data.monthStartDay||1);const td=data.expenses.filter(e=>e.type==="expense"&&e.date>=tds).reduce((s,e)=>s+e.amount,0),me=data.expenses.filter(e=>e.type==="expense"&&e.date>=mst).reduce((s,e)=>s+e.amount,0),mi=data.expenses.filter(e=>e.type==="income"&&e.date>=mst).reduce((s,e)=>s+e.amount,0),nw=data.accounts.reduce((s,a)=>s+ab(a,data.expenses),0)-(data.cards||[]).filter(x=>x.type==="credit").reduce((s,cr)=>s+cc(cr,data.expenses).outstanding,0);const cards=data.cards||[];let cd=0;for(const cr of cards){if(cr.type!=="credit")continue;cd+=cc(cr,data.expenses).outstanding}const cu=data.currency||"$";const arr=[["TODAY",fs(td,cu)],["MONTH",fs(me,cu)],["INCOME",fs(mi,cu)],["NET WORTH",fs(nw,cu)]];if(cards.length)arr.push(["CARDS DUE",fs(cd,cu)]);return arr},[data]);const it=(l,v,k)=>o("span",{key:k,style:{display:"inline-flex",alignItems:"baseline",gap:8},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1.3,color:c.tm},children:l}),t("span",{style:{fontFamily:F.mo,fontSize:13,color:c.tx,fontWeight:500},children:v}),t("span",{style:{color:c.gd,fontSize:14},children:"·"})]});return t("div",{style:{overflow:"hidden",padding:"10px 0",borderTop:`1px solid ${c.brs}`,borderBottom:`1px solid ${c.brs}`,background:`linear-gradient(180deg,${c.sf} 0%,${c.bg} 100%)`},children:t("div",{className:"mqt",children:[...items,...items,...items].map((x,i)=>it(x[0],x[1],i))})})}
@@ -1524,6 +1524,7 @@ function StmtAnalyze({data,onClose,onAddExpenses}){
   const cards=data.cards||[];
   const[cmpCardId,sCmpCardId]=useState(null);
   const[man,sMan]=useState(null);
+  const[quick,sQuick]=useState(null);
   const[file,sFile]=useState(null);
   const[parsed,sParsed]=useState(null);
   const[analyzing,sAnalyzing]=useState(false);
@@ -1677,6 +1678,7 @@ function StmtAnalyze({data,onClose,onAddExpenses}){
     ]}),
     err&&t("div",{style:{background:c.co+"20",border:`1px solid ${c.co}40`,borderRadius:12,padding:"10px 14px",marginBottom:16,fontSize:13,color:c.co,lineHeight:1.5},children:err}),
     recon.length>0&&o(Fragment,{children:[
+      o("div",{style:{marginBottom:16},children:t(AiChatBox,{getContext:stmtCtx,label:"ASK ABOUT THIS STATEMENT",intro:"Ask anything about these transactions — e.g. \"What's my biggest unlogged expense?\", \"Group the unlogged ones by merchant\", or \"Any subscriptions I forgot?\"",suggestions:["Biggest unlogged?","Group by merchant","Spot subscriptions"]})}),
       o("div",{className:"g g2",style:{gap:10,marginBottom:14},children:[
         o("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.mt}40`,padding:"12px 14px"},children:[
           t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.mt,letterSpacing:1,marginBottom:4},children:"ALREADY LOGGED"}),
@@ -1698,7 +1700,7 @@ function StmtAnalyze({data,onClose,onAddExpenses}){
           o("div",{style:{textAlign:"right",flexShrink:0},children:[
             t("div",{style:{fontFamily:F.mo,fontSize:14,color:r.match?c.tx:c.co},children:"−"+fm(r.tx.amount,currency)}),
             r.match?t("div",{style:{fontSize:10,color:c.mt,marginTop:3,fontFamily:F.mo,letterSpacing:.3},children:"✓ LOGGED"}):o("div",{className:"f ia",style:{gap:6,marginTop:6,justifyContent:"flex-end"},children:[
-              t("button",{onClick:()=>logOne(r.tx),className:"act95 tr",style:{padding:"5px 11px",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:999,fontSize:11,fontWeight:600},children:"+ Quick"}),
+              t("button",{onClick:()=>sQuick(r.tx),className:"act95 tr",style:{padding:"5px 11px",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:999,fontSize:11,fontWeight:600},children:"+ Quick"}),
               t("button",{onClick:()=>openManual(r.tx),className:"act95 tr",style:{padding:"5px 11px",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:999,fontSize:11,fontWeight:600},children:"Edit"})
             ]})
           ]})
@@ -1715,9 +1717,20 @@ function StmtAnalyze({data,onClose,onAddExpenses}){
           t("div",{style:{display:"flex",flexDirection:"column",gap:8},children:(result.observations||[]).map((obs,i)=>o("div",{key:i,style:{background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,padding:"12px 14px",fontSize:13,color:c.tx,lineHeight:1.5},children:[t("span",{style:{color:c.ac,marginRight:8},children:"→"}),obs]}))})
         ]})
       ]}),
-      t(AiChatBox,{getContext:stmtCtx,label:"ASK ABOUT THIS STATEMENT",intro:"Ask anything about these transactions — e.g. \"What's my biggest unlogged expense?\", \"Group the unlogged ones by merchant\", or \"Any subscriptions I forgot?\"",suggestions:["Biggest unlogged?","Group by merchant","Spot subscriptions"]}),
       t("button",{onClick:()=>{sResult(null);sParsed(null);sFile(null)},className:"w100 act98 tr",style:{padding:"12px 0",background:c.sf2,color:c.td,borderRadius:12,border:`1px solid ${c.brs}`,fontSize:13,marginTop:10},children:"Upload another statement"})
     ]}),
+    quick&&t(Sht,{onClose:()=>sQuick(null),children:o(Fragment,{children:[
+      t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:6},children:"Log this transaction?"}),
+      t("div",{style:{fontSize:13,color:c.td,marginBottom:18,lineHeight:1.5},children:cmpCardId?`Will be added to ${(cards.find(cd=>cd.id===cmpCardId)||{}).name||"the selected card"}.`:"Will be added as an expense."}),
+      o("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:"14px 16px",marginBottom:18},children:[
+        o("div",{className:"f ia jb",style:{marginBottom:8},children:[t("div",{style:{fontSize:15,color:c.tx,fontWeight:600},children:quick.merchant||"Unknown"}),t("div",{style:{fontFamily:F.mo,fontSize:16,color:c.co},children:"−"+fm(quick.amount,currency)})]}),
+        t("div",{style:{fontFamily:F.mo,fontSize:12,color:c.tm},children:new Date(quick.date).toLocaleDateString("en-US",{weekday:"short",day:"numeric",month:"short",year:"numeric"})})
+      ]}),
+      o("div",{className:"f",style:{gap:10},children:[
+        t("button",{onClick:()=>sQuick(null),className:"f1 act98 tr",style:{padding:"13px 0",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:12,fontSize:14,fontWeight:500},children:"Cancel"}),
+        t("button",{onClick:()=>{logOne(quick);sQuick(null)},className:"f1 act98 tr",style:{padding:"13px 0",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:12,fontSize:14,fontWeight:600},children:"Add"})
+      ]})
+    ]})}),
     man&&t(Sht,{onClose:()=>sMan(null),children:o(Fragment,{children:[
       o("div",{className:"f ia jb",style:{marginBottom:14},children:[
         t("div",{style:{fontFamily:c.hf,fontSize:22},children:"Log transaction"}),
