@@ -1519,6 +1519,9 @@ function AiChatBox({getContext,intro,suggestions,label,maxTok}){
 // === STATEMENT ANALYZER ===
 function StmtAnalyze({data,onClose,onAddExpenses}){
   const{expenses,currency,accounts}=data;
+  const cards=data.cards||[];
+  const[cmpCardId,sCmpCardId]=useState(null);
+  const[man,sMan]=useState(null);
   const[file,sFile]=useState(null);
   const[parsed,sParsed]=useState(null);
   const[analyzing,sAnalyzing]=useState(false);
@@ -1596,7 +1599,7 @@ function StmtAnalyze({data,onClose,onAddExpenses}){
     if(!parsed)return[];
     const cutoff=Date.now()-period*30*864e5;
     const txns=parsed.filter(x=>x.date>=cutoff);
-    const pool=expenses.filter(e=>(e.type==="expense"||e.type==="card-payment")&&e.date>=cutoff-7*864e5).map(e=>({e,used:false}));
+    const pool=expenses.filter(e=>(e.type==="expense"||e.type==="card-payment")&&e.date>=cutoff-7*864e5&&(!cmpCardId||e.cardId===cmpCardId)).map(e=>({e,used:false}));
     return txns.map(tx=>{
       let match=null;
       for(const p of pool){
@@ -1607,11 +1610,13 @@ function StmtAnalyze({data,onClose,onAddExpenses}){
       }
       return{tx,match};
     });
-  },[parsed,expenses,period]);
+  },[parsed,expenses,period,cmpCardId]);
   const logged=recon.filter(r=>r.match);
   const unlogged=recon.filter(r=>!r.match);
-  const mkExp=(tx)=>({type:"expense",amount:tx.amount,currency,accountId:(accounts&&accounts[0]&&accounts[0].id)||null,category:"other",merchant:tx.merchant||null,note:"From statement",date:tx.date,source:"statement"});
+  const mkExp=(tx)=>({type:"expense",amount:tx.amount,currency,accountId:(accounts&&accounts[0]&&accounts[0].id)||null,cardId:cmpCardId||null,category:"other",merchant:tx.merchant||null,note:"From statement",date:tx.date,source:"statement"});
   const logOne=(tx)=>onAddExpenses&&onAddExpenses([mkExp(tx)]);
+  const openManual=(tx)=>sMan({merchant:tx.merchant||"",amount:String(tx.amount),date:new Date(tx.date).toISOString().slice(0,10),category:"other",accountId:(accounts&&accounts[0]&&accounts[0].id)||null,cardId:cmpCardId||null,note:"From statement"});
+  const saveManual=()=>{const amt=parseFloat(man.amount);if(!amt||amt<=0)return;onAddExpenses&&onAddExpenses([{type:"expense",amount:amt,currency,accountId:man.accountId||null,cardId:man.cardId||null,category:man.category||"other",merchant:(man.merchant||"").trim()||null,note:(man.note||"").trim()||null,date:man.date?new Date(man.date).getTime():Date.now(),source:"statement"}]);sMan(null)};
   const logAll=()=>{if(unlogged.length&&onAddExpenses)onAddExpenses(unlogged.map(r=>mkExp(r.tx)))};
   const analyze=async()=>{
     if(!recon.length){sErr("Upload a statement first.");return}
@@ -1660,6 +1665,14 @@ function StmtAnalyze({data,onClose,onAddExpenses}){
       t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:8},children:"COMPARE PERIOD"}),
       o("div",{className:"f ia",style:{gap:6},children:[1,3,6,12].map(mo=>t("button",{key:mo,onClick:()=>sPeriod(mo),className:"act95 tr",style:{padding:"7px 14px",background:period===mo?c.ac:c.sf2,color:period===mo?"#0a0a0a":c.td,border:`1px solid ${period===mo?c.ac:c.brs}`,borderRadius:999,fontSize:12,fontFamily:F.mo},children:mo===1?"1 month":mo+" months"}))})
     ]}),
+    parsed&&cards.length>0&&o("div",{style:{marginBottom:16},children:[
+      t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:8},children:"COMPARE AGAINST"}),
+      o("div",{className:"f",style:{gap:6,flexWrap:"wrap"},children:[
+        t("button",{key:"all",onClick:()=>sCmpCardId(null),className:"act95 tr",style:{padding:"7px 14px",background:!cmpCardId?c.ac:c.sf2,color:!cmpCardId?"#0a0a0a":c.td,border:`1px solid ${!cmpCardId?c.ac:c.brs}`,borderRadius:999,fontSize:12,fontFamily:F.mo},children:"All expenses"}),
+        ...cards.map(cd=>t("button",{key:cd.id,onClick:()=>sCmpCardId(cd.id),className:"act95 tr",style:{padding:"7px 14px",background:cmpCardId===cd.id?c.ac:c.sf2,color:cmpCardId===cd.id?"#0a0a0a":c.td,border:`1px solid ${cmpCardId===cd.id?c.ac:c.brs}`,borderRadius:999,fontSize:12,fontFamily:F.mo},children:"💳 "+cd.name+(cd.last4?" ··"+cd.last4:"")}))
+      ]}),
+      cmpCardId&&t("div",{style:{fontSize:11,color:c.tm,marginTop:8,lineHeight:1.5},children:"Matching only this card's transactions. Anything you log will be assigned to this card."})
+    ]}),
     err&&t("div",{style:{background:c.co+"20",border:`1px solid ${c.co}40`,borderRadius:12,padding:"10px 14px",marginBottom:16,fontSize:13,color:c.co,lineHeight:1.5},children:err}),
     recon.length>0&&o(Fragment,{children:[
       o("div",{className:"g g2",style:{gap:10,marginBottom:14},children:[
@@ -1682,7 +1695,10 @@ function StmtAnalyze({data,onClose,onAddExpenses}){
           ]}),
           o("div",{style:{textAlign:"right",flexShrink:0},children:[
             t("div",{style:{fontFamily:F.mo,fontSize:14,color:r.match?c.tx:c.co},children:"−"+fm(r.tx.amount,currency)}),
-            r.match?t("div",{style:{fontSize:10,color:c.mt,marginTop:3,fontFamily:F.mo,letterSpacing:.3},children:"✓ LOGGED"}):t("button",{onClick:()=>logOne(r.tx),className:"act95 tr",style:{marginTop:6,padding:"5px 12px",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:999,fontSize:11,fontWeight:600},children:"+ Log"})
+            r.match?t("div",{style:{fontSize:10,color:c.mt,marginTop:3,fontFamily:F.mo,letterSpacing:.3},children:"✓ LOGGED"}):o("div",{className:"f ia",style:{gap:6,marginTop:6,justifyContent:"flex-end"},children:[
+              t("button",{onClick:()=>logOne(r.tx),className:"act95 tr",style:{padding:"5px 11px",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:999,fontSize:11,fontWeight:600},children:"+ Quick"}),
+              t("button",{onClick:()=>openManual(r.tx),className:"act95 tr",style:{padding:"5px 11px",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:999,fontSize:11,fontWeight:600},children:"Edit"})
+            ]})
           ]})
         ]})
       ]}))}),
@@ -1699,7 +1715,20 @@ function StmtAnalyze({data,onClose,onAddExpenses}){
       ]}),
       t(AiChatBox,{getContext:stmtCtx,label:"ASK ABOUT THIS STATEMENT",intro:"Ask anything about these transactions — e.g. \"What's my biggest unlogged expense?\", \"Group the unlogged ones by merchant\", or \"Any subscriptions I forgot?\"",suggestions:["Biggest unlogged?","Group by merchant","Spot subscriptions"]}),
       t("button",{onClick:()=>{sResult(null);sParsed(null);sFile(null)},className:"w100 act98 tr",style:{padding:"12px 0",background:c.sf2,color:c.td,borderRadius:12,border:`1px solid ${c.brs}`,fontSize:13,marginTop:10},children:"Upload another statement"})
-    ]})
+    ]}),
+    man&&t(Sht,{onClose:()=>sMan(null),children:o(Fragment,{children:[
+      t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:14},children:"Log transaction"}),
+      o("div",{style:{marginBottom:12},children:t(FI,{label:"Merchant / description",value:man.merchant,onChange:v=>sMan({...man,merchant:v}),placeholder:"e.g., Amazon"})}),
+      o("div",{className:"g g2",style:{gap:10,marginBottom:12},children:[
+        o("div",{children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"AMOUNT"}),o("div",{className:"f ia",style:{gap:6,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 12px"},children:[t("span",{style:{color:c.td,fontFamily:F.mo,fontSize:15},children:currency}),t("input",{type:"text",inputMode:"decimal",value:man.amount,onChange:e=>sMan({...man,amount:e.target.value.replace(/[^\d.]/g,"")}),style:{flex:1,minWidth:0,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:15,fontFamily:F.mo}})]})]}),
+        o("div",{children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"DATE"}),t("input",{type:"date",value:man.date,onChange:e=>sMan({...man,date:e.target.value}),style:{width:"100%",boxSizing:"border-box",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 12px",color:c.tx,fontSize:13,outline:"none",fontFamily:'var(--tf)',colorScheme:"dark"}})]})
+      ]}),
+      o("div",{style:{marginBottom:12},children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"CATEGORY"}),t("select",{value:man.category,onChange:e=>sMan({...man,category:e.target.value}),style:{width:"100%",boxSizing:"border-box",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 12px",color:c.tx,fontSize:14,outline:"none",fontFamily:'var(--tf)'},children:ceAll().map(ct=>t("option",{key:ct.id,value:ct.id,children:(ct.emoji||"")+" "+ct.label}))})]}),
+      o("div",{style:{marginBottom:12},children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"ACCOUNT"}),t("select",{value:man.accountId||"",onChange:e=>sMan({...man,accountId:e.target.value||null}),style:{width:"100%",boxSizing:"border-box",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 12px",color:c.tx,fontSize:14,outline:"none",fontFamily:'var(--tf)'},children:(accounts||[]).map(a=>t("option",{key:a.id,value:a.id,children:(a.emoji?a.emoji+" ":"")+a.name}))})]}),
+      cards.length>0&&o("div",{style:{marginBottom:12},children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"CARD (OPTIONAL)"}),t("select",{value:man.cardId||"",onChange:e=>sMan({...man,cardId:e.target.value||null}),style:{width:"100%",boxSizing:"border-box",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 12px",color:c.tx,fontSize:14,outline:"none",fontFamily:'var(--tf)'},children:[t("option",{key:"none",value:"",children:"No card"}),...cards.map(cd=>t("option",{key:cd.id,value:cd.id,children:"💳 "+cd.name+(cd.last4?" ··"+cd.last4:"")}))]})]}),
+      o("div",{style:{marginBottom:18},children:t(FI,{label:"Note (optional)",value:man.note,onChange:v=>sMan({...man,note:v}),placeholder:"e.g., from statement"})}),
+      t("button",{disabled:!parseFloat(man.amount)||parseFloat(man.amount)<=0,onClick:saveManual,className:"w100 act98 tr",style:{padding:"14px 0",background:parseFloat(man.amount)?c.ac:c.sf2,color:parseFloat(man.amount)?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:parseFloat(man.amount)?`Log ${fm(parseFloat(man.amount),currency)}`:"Enter an amount"})
+    ]})})
   ]})
 }
 
