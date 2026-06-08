@@ -889,6 +889,7 @@ function App(){
   const delLedgerPerson=(id)=>pst({ledger:(d.ledger||[]).filter(x=>x.id!==id)});
   const addLedgerEntry=(id,e)=>pst({ledger:(d.ledger||[]).map(x=>x.id!==id?x:{...x,entries:[{id:"le_"+uid(),kind:e.kind,amount:e.amount,date:e.date||Date.now(),note:(e.note||"").trim()},...(x.entries||[])]})});
   const delLedgerEntry=(id,eid)=>pst({ledger:(d.ledger||[]).map(x=>x.id!==id?x:{...x,entries:(x.entries||[]).filter(en=>en.id!==eid)})});
+  const editLedgerEntry=(id,eid,patch)=>pst({ledger:(d.ledger||[]).map(x=>x.id!==id?x:{...x,entries:(x.entries||[]).map(en=>en.id===eid?{...en,...patch,note:(patch.note!=null?patch.note.trim():en.note)}:en)})});
   const aInv=(inv)=>pst({investments:[...(d.investments||[]),{...inv,id:"inv_"+uid(),createdAt:Date.now()}]});
   const uInv=(inv)=>pst({investments:(d.investments||[]).map(x=>x.id===inv.id?{...x,...inv}:x)});
   const dInv=(id)=>pst({investments:(d.investments||[]).filter(x=>x.id!==id)});
@@ -966,7 +967,7 @@ function App(){
         v==="breakdown"&&t(Breakdown,{data:d,persist:pst,onClose:()=>sV(navFromRef.current),onTx:sAtx}),
         v==="budgetTrack"&&t(BudgetTrack,{data:d,onClose:()=>sV(navFromRef.current),onRepay:repayMonth,onOpenLoans:()=>{navFromRef.current="budgetTrack";sV("budgetLoans")}}),
         v==="budgetLoans"&&t(BudgetLoans,{data:d,onClose:()=>sV(navFromRef.current),onPay:payBL,onDelete:dBL,onDeletePay:delPayBL,onEditPay:editPayBL,onUpdate:uBL,onOpenTracker:()=>{navFromRef.current="budgetLoans";sV("budgetTrack")}}),
-        v==="diary"&&t(LendingDiary,{data:d,onClose:()=>sV(navFromRef.current),onAddPerson:addLedgerPerson,onUpdatePerson:updLedgerPerson,onDeletePerson:delLedgerPerson,onAddEntry:addLedgerEntry,onDeleteEntry:delLedgerEntry}),
+        v==="diary"&&t(LendingDiary,{data:d,onClose:()=>sV(navFromRef.current),onAddPerson:addLedgerPerson,onUpdatePerson:updLedgerPerson,onDeletePerson:delLedgerPerson,onAddEntry:addLedgerEntry,onDeleteEntry:delLedgerEntry,onEditEntry:editLedgerEntry}),
         v==="categories"&&t(CatMgr,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
         v==="chat"&&t(Chat,{data:d,onAddExpense:aE,onView:sV,onClose:()=>sV("home")}),
         v==="billScan"&&t(BillScan,{data:d,onAddExpense:aE,onClose:()=>sV("home")}),
@@ -1773,11 +1774,12 @@ function AiInsights({data,onClose}){
 }
 
 // === LENDING DIARY (who owes you / you owe — running per-person ledger) ===
-function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,onAddEntry,onDeleteEntry}){
+function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,onAddEntry,onDeleteEntry,onEditEntry}){
   const{ledger=[],currency}=data;
+  const kindLabel=k=>k==="gave"?"Lent":"Received";
   const[sel,sSel]=useState(null);
   const[addP,sAddP]=useState(false);const[pName,sPName]=useState("");const[pNote,sPNote]=useState("");const[pDue,sPDue]=useState("");
-  const[entryFor,sEntryFor]=useState(null);const[eKind,sEKind]=useState("gave");const[eAmt,sEAmt]=useState("");const[eNote,sENote]=useState("");const[eDate,sEDate]=useState("");
+  const[entryFor,sEntryFor]=useState(null);const[editEntryId,sEditEntryId]=useState(null);const[eKind,sEKind]=useState("gave");const[eAmt,sEAmt]=useState("");const[eNote,sENote]=useState("");const[eDate,sEDate]=useState("");
   const[editP,sEditP]=useState(null);const[edName,sEdName]=useState("");const[edNote,sEdNote]=useState("");const[edDue,sEdDue]=useState("");
   const[delP,sDelP]=useState(null);
   const today=()=>new Date().toISOString().slice(0,10);
@@ -1788,12 +1790,16 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
   const sorted=[...ledger].sort((a,b)=>{const oa=overdue(a)?1:0,ob=overdue(b)?1:0;if(oa!==ob)return ob-oa;return Math.abs(bal(b))-Math.abs(bal(a))});
   const selP=sel?ledger.find(p=>p.id===sel):null;
   const dueLabel=p=>{if(!p.dueDate)return null;const md=Math.ceil((p.dueDate-Date.now())/864e5);return md<0?`${Math.abs(md)}d overdue`:md===0?"due today":`due in ${md}d`};
-  const openEntry=(pid,kind)=>{sEntryFor(pid);sEKind(kind);sEAmt("");sENote("");sEDate(today())};
+  const openEntry=(pid,kind)=>{sEntryFor(pid);sEditEntryId(null);sEKind(kind);sEAmt("");sENote("");sEDate(today())};
+  const openEditEntry=(pid,en)=>{sEntryFor(pid);sEditEntryId(en.id);sEKind(en.kind);sEAmt(String(en.amount));sENote(en.note||"");sEDate(new Date(en.date).toISOString().slice(0,10))};
   const balLine=(b)=>b>0.005?{txt:fm(b,currency)+" owes you",col:c.mt}:b<-0.005?{txt:fm(-b,currency)+" you owe",col:c.co}:{txt:"settled up",col:c.tm};
   // ---- DETAIL VIEW ----
   if(selP){const b=bal(selP),bl=balLine(b),od=overdue(selP);
     return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
-      t(SH,{title:t("em",{children:selP.name}),onBack:()=>sSel(null)}),
+      t(SH,{title:t("em",{children:selP.name}),onBack:()=>sSel(null),right:o("div",{className:"f ia",style:{gap:2},children:[
+        t("button",{onClick:()=>{sEditP(selP);sEdName(selP.name);sEdNote(selP.note||"");sEdDue(selP.dueDate?new Date(selP.dueDate).toISOString().slice(0,10):"")},style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:6},children:t(Pencil,{size:15})}),
+        t("button",{onClick:()=>sDelP(selP),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:6},children:t(Trash2,{size:15})})
+      ]})}),
       o("div",{style:{background:`linear-gradient(135deg,${(b<-0.005?c.co:c.mt)}1f 0%,${c.sfg} 60%)`,borderRadius:20,border:`1px solid ${od?c.co:c.brs}`,padding:18,marginBottom:14},children:[
         t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:b<-0.005?"YOU OWE":"OWES YOU"}),
         t("div",{style:{fontFamily:"var(--nf)",fontSize:34,fontWeight:300,marginTop:4,color:bl.col,letterSpacing:-1,lineHeight:1},children:fm(Math.abs(b),currency)}),
@@ -1803,31 +1809,26 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
         ]})
       ]}),
       o("div",{className:"g g2",style:{gap:10,marginBottom:16},children:[
-        t("button",{onClick:()=>openEntry(selP.id,"gave"),className:"act98 tr",style:{padding:"13px 0",background:c.mt+"22",color:c.mt,border:`1px solid ${c.mt}55`,borderRadius:12,fontWeight:600,fontSize:13},children:"+ You gave"}),
-        t("button",{onClick:()=>openEntry(selP.id,"got"),className:"act98 tr",style:{padding:"13px 0",background:c.co+"22",color:c.co,border:`1px solid ${c.co}55`,borderRadius:12,fontWeight:600,fontSize:13},children:"− You got"})
+        t("button",{onClick:()=>openEntry(selP.id,"gave"),className:"act98 tr",style:{padding:"13px 0",background:c.mt+"22",color:c.mt,border:`1px solid ${c.mt}55`,borderRadius:12,fontWeight:600,fontSize:13},children:"+ Lent"}),
+        t("button",{onClick:()=>openEntry(selP.id,"got"),className:"act98 tr",style:{padding:"13px 0",background:c.co+"22",color:c.co,border:`1px solid ${c.co}55`,borderRadius:12,fontWeight:600,fontSize:13},children:"− Received"})
       ]}),
-      o("div",{className:"f ia jb",style:{marginBottom:10},children:[
-        t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:"HISTORY"}),
-        o("div",{className:"f ia",style:{gap:4},children:[
-          t("button",{onClick:()=>{sEditP(selP);sEdName(selP.name);sEdNote(selP.note||"");sEdDue(selP.dueDate?new Date(selP.dueDate).toISOString().slice(0,10):"")},style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(Pencil,{size:14})}),
-          t("button",{onClick:()=>sDelP(selP),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(Trash2,{size:14})})
-        ]})
-      ]}),
+      t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:"HISTORY"}),
       (selP.entries||[]).length===0?t("div",{style:{fontSize:13,color:c.tm,textAlign:"center",padding:"24px 0",background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`},children:"No entries yet. Use the buttons above."}):t("div",{style:{display:"flex",flexDirection:"column",gap:8},children:[...(selP.entries||[])].sort((a,b2)=>b2.date-a.date).map(en=>o("div",{key:en.id,className:"f ia jb",style:{background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,padding:"12px 14px",gap:8},children:[
         o("div",{className:"f1 minw0",children:[
-          t("div",{style:{fontSize:13,color:c.tx,fontWeight:500},children:en.kind==="gave"?"You gave":"You got"}),
+          t("div",{style:{fontSize:13,color:c.tx,fontWeight:500},children:kindLabel(en.kind)}),
           t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:new Date(en.date).toLocaleDateString("en-US",{day:"numeric",month:"short",year:"numeric"})+(en.note?" · "+en.note:"")})
         ]}),
-        o("div",{className:"f ia",style:{gap:6,flexShrink:0},children:[
-          t("div",{style:{fontFamily:F.mo,fontSize:14,color:en.kind==="gave"?c.mt:c.co},children:(en.kind==="gave"?"+":"−")+fm(en.amount,currency)}),
+        o("div",{className:"f ia",style:{gap:4,flexShrink:0},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:14,color:en.kind==="gave"?c.mt:c.co,marginRight:2},children:(en.kind==="gave"?"+":"−")+fm(en.amount,currency)}),
+          t("button",{onClick:()=>openEditEntry(selP.id,en),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(Pencil,{size:13})}),
           t("button",{onClick:()=>onDeleteEntry(selP.id,en.id),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(X,{size:13})})
         ]})
       ]}))}),
-      entryFor&&t(Sht,{onClose:()=>sEntryFor(null),children:o(Fragment,{children:[
-        t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:14},children:"Add entry"}),
+      entryFor&&t(Sht,{onClose:()=>{sEntryFor(null);sEditEntryId(null)},children:o(Fragment,{children:[
+        t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:14},children:editEntryId?"Edit entry":"Add entry"}),
         o("div",{className:"g g2",style:{gap:8,marginBottom:16},children:[
-          t("button",{onClick:()=>sEKind("gave"),className:"act95 tr",style:{padding:"11px 0",background:eKind==="gave"?c.mt+"22":c.sf2,color:eKind==="gave"?c.mt:c.td,border:`1px solid ${eKind==="gave"?c.mt:c.brs}`,borderRadius:10,fontSize:13,fontWeight:600},children:"You gave (+)"}),
-          t("button",{onClick:()=>sEKind("got"),className:"act95 tr",style:{padding:"11px 0",background:eKind==="got"?c.co+"22":c.sf2,color:eKind==="got"?c.co:c.td,border:`1px solid ${eKind==="got"?c.co:c.brs}`,borderRadius:10,fontSize:13,fontWeight:600},children:"You got (−)"})
+          t("button",{onClick:()=>sEKind("gave"),className:"act95 tr",style:{padding:"11px 0",background:eKind==="gave"?c.mt+"22":c.sf2,color:eKind==="gave"?c.mt:c.td,border:`1px solid ${eKind==="gave"?c.mt:c.brs}`,borderRadius:10,fontSize:13,fontWeight:600},children:"Lent (+)"}),
+          t("button",{onClick:()=>sEKind("got"),className:"act95 tr",style:{padding:"11px 0",background:eKind==="got"?c.co+"22":c.sf2,color:eKind==="got"?c.co:c.td,border:`1px solid ${eKind==="got"?c.co:c.brs}`,borderRadius:10,fontSize:13,fontWeight:600},children:"Received (−)"})
         ]}),
         t("div",{style:{fontSize:11,color:c.tm,textAlign:"center",marginBottom:14},children:eKind==="gave"?"Money you lent / paid them → increases what they owe you":"Money they paid / lent you → decreases what they owe you"}),
         o("div",{style:{marginBottom:14,textAlign:"center"},children:[
@@ -1839,7 +1840,7 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
         ]}),
         o("div",{style:{marginBottom:14},children:t(FI,{label:"Note (optional)",value:eNote,onChange:sENote,placeholder:"e.g., lunch, cash"})}),
         o("div",{style:{marginBottom:16},children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"DATE"}),t("input",{type:"date",value:eDate,max:today(),onChange:e=>sEDate(e.target.value),style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px",color:c.tx,fontSize:14,outline:"none",fontFamily:'var(--tf)',colorScheme:"dark"}})]}),
-        t("button",{disabled:!parseFloat(eAmt)||parseFloat(eAmt)<=0,onClick:()=>{onAddEntry(entryFor,{kind:eKind,amount:parseFloat(eAmt),note:eNote,date:eDate?new Date(eDate).getTime():Date.now()});sEntryFor(null)},className:"w100 act98 tr",style:{padding:"14px 0",background:parseFloat(eAmt)?c.ac:c.sf2,color:parseFloat(eAmt)?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:parseFloat(eAmt)?`Add ${eKind==="gave"?"+":"−"}${fm(parseFloat(eAmt),currency)}`:"Enter an amount"})
+        t("button",{disabled:!parseFloat(eAmt)||parseFloat(eAmt)<=0,onClick:()=>{const payload={kind:eKind,amount:parseFloat(eAmt),note:eNote,date:eDate?new Date(eDate).getTime():Date.now()};if(editEntryId)onEditEntry(entryFor,editEntryId,payload);else onAddEntry(entryFor,payload);sEntryFor(null);sEditEntryId(null)},className:"w100 act98 tr",style:{padding:"14px 0",background:parseFloat(eAmt)?c.ac:c.sf2,color:parseFloat(eAmt)?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:parseFloat(eAmt)?`${editEntryId?"Save":"Add"} ${eKind==="gave"?"+":"−"}${fm(parseFloat(eAmt),currency)}`:"Enter an amount"})
       ]})}),
       editP&&t(Sht,{onClose:()=>sEditP(null),children:o(Fragment,{children:[
         t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:14},children:"Edit person"}),
