@@ -1652,8 +1652,8 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
       for(const p of pool){
         if(p.used)continue;
         const amtOk=Math.abs(p.e.amount-tx.amount)<=0.01;
-        const dayOk=ds(new Date(p.e.date))===ds(new Date(tx.date));
-        if(amtOk&&dayOk){p.used=true;match=p.e;break}
+        const dayDiff=Math.abs(ds(new Date(p.e.date))-ds(new Date(tx.date)))/864e5;
+        if(amtOk&&dayDiff<=2){p.used=true;match=p.e;break}
       }
       return{tx,match};
     });
