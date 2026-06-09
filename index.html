@@ -991,10 +991,23 @@ function App(){
 }
 
 // === BOTTOM NAV ===
-function Nav({view,setView}){const tabs=[{id:"home",icon:Hm,label:"home"},{id:"calendar",icon:Cal,label:"calendar"},{id:"add",icon:Plus,label:"add",main:true},{id:"stats",icon:BarChart3,label:"stats"},{id:"settings",icon:Gear,label:"settings"}];return t("div",{className:"nav-bar noprint",style:{background:c.bg},children:o("div",{className:"nav-inner",style:{position:"relative"},children:[
-  o("div",{className:"f ia jb",style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:24,padding:"7px 14px",boxShadow:"6px 6px 16px rgba(0,0,0,.6),-5px -5px 13px rgba(255,255,255,.06)"},children:tabs.map(tb=>{if(tb.main)return t("div",{key:"sp",style:{width:60,flexShrink:0}});const a=view===tb.id,I=tb.icon;return o("button",{key:tb.id,onClick:()=>setView(tb.id),className:"act90 trt f fc ia",style:{background:"transparent",border:"none",gap:3,color:a?c.cu:c.cu+"73",flexShrink:0,padding:"2px 4px"},children:[t(I,{size:20,strokeWidth:a?2.4:1.7}),t("span",{style:{fontSize:10,fontFamily:F.mo,letterSpacing:.2,fontWeight:a?700:400},children:tb.label}),t("div",{style:{width:4,height:4,borderRadius:999,marginTop:2,background:a?c.cu:"transparent",transition:"background 180ms"}})]})})}),
+function Nav({view,setView}){const[open,sOpen]=useState(false);const tabs=[{id:"home",icon:Hm,label:"home"},{id:"calendar",icon:Cal,label:"calendar"},{id:"add",icon:Plus,label:"add",main:true},{id:"stats",icon:BarChart3,label:"stats"},{id:"settings",icon:Gear,label:"settings"}];const go=(id)=>{sOpen(false);setView(id)};return t("div",{className:"nav-bar noprint",style:{background:c.bg},children:o("div",{className:"nav-inner",style:{position:"relative"},children:[
+  open&&t("div",{onClick:()=>sOpen(false),style:{position:"fixed",inset:0,zIndex:49}}),
+  open&&o("div",{style:{position:"absolute",bottom:72,left:"50%",transform:"translateX(-50%)",display:"flex",gap:10,zIndex:50,padding:4}},children:[
+    o("button",{onClick:()=>go("profiles"),className:"act95 trt f fc ia",style:{gap:8,padding:"14px 18px",background:c.sfg,border:`1px solid ${c.cu}55`,borderRadius:18,minWidth:88,boxShadow:"0 8px 24px rgba(0,0,0,.55)"},children:[
+      t(Zap,{size:22,color:c.cu}),
+      t("span",{style:{fontSize:13,fontWeight:600,color:c.tx,fontFamily:F.mo,letterSpacing:.3},children:"quick"}),
+      t("span",{style:{fontSize:10,color:c.tm,fontFamily:F.mo},children:"profiles"})
+    ]}),
+    o("button",{onClick:()=>go("add"),className:"act95 trt f fc ia",style:{gap:8,padding:"14px 18px",background:c.sfg,border:`1px solid ${c.ac}55`,borderRadius:18,minWidth:88,boxShadow:"0 8px 24px rgba(0,0,0,.55)"},children:[
+      t(Pencil,{size:22,color:c.ac}),
+      t("span",{style:{fontSize:13,fontWeight:600,color:c.tx,fontFamily:F.mo,letterSpacing:.3},children:"add"}),
+      t("span",{style:{fontSize:10,color:c.tm,fontFamily:F.mo},children:"expense"})
+    ]})
+  ]),
+  o("div",{className:"f ia jb",style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:24,padding:"7px 14px",boxShadow:"6px 6px 16px rgba(0,0,0,.6),-5px -5px 13px rgba(255,255,255,.06)"},children:tabs.map(tb=>{if(tb.main)return t("div",{key:"sp",style:{width:60,flexShrink:0}});const a=view===tb.id,I=tb.icon;return o("button",{key:tb.id,onClick:()=>go(tb.id),className:"act90 trt f fc ia",style:{background:"transparent",border:"none",gap:3,color:a?c.cu:c.cu+"73",flexShrink:0,padding:"2px 4px"},children:[t(I,{size:20,strokeWidth:a?2.4:1.7}),t("span",{style:{fontSize:10,fontFamily:F.mo,letterSpacing:.2,fontWeight:a?700:400},children:tb.label}),t("div",{style:{width:4,height:4,borderRadius:999,marginTop:2,background:a?c.cu:"transparent",transition:"background 180ms"}})]})})}),
   t("div",{style:{position:"absolute",top:-12,left:"50%",transform:"translateX(-50%)",width:74,height:74,borderRadius:999,background:c.bg,pointerEvents:"none"}}),
-  t("button",{onClick:()=>setView("add"),"aria-label":"add",className:"neu-circ neu-press act90 f ia jc",style:{position:"absolute",top:-16,left:"50%",transform:"translateX(-50%)",width:58,height:58,borderRadius:999,background:`radial-gradient(circle at 36% 28%,${c.sf3} 0%,${c.sfg} 70%)`,border:`1px solid ${c.cu}66`,color:c.cu},children:t(Plus,{size:26,strokeWidth:2.3})})
+  t("button",{onClick:()=>sOpen(x=>!x),"aria-label":"add",className:"neu-circ neu-press act90 f ia jc",style:{position:"absolute",top:-16,left:"50%",transform:"translateX(-50%)",width:58,height:58,borderRadius:999,background:open?`radial-gradient(circle at 36% 28%,${c.ac}33 0%,${c.sfg} 70%)`:`radial-gradient(circle at 36% 28%,${c.sf3} 0%,${c.sfg} 70%)`,border:`1px solid ${open?c.ac:c.cu}66`,color:open?c.ac:c.cu,transition:"border-color 150ms,color 150ms"},children:open?t(X,{size:22,strokeWidth:2.2}):t(Plus,{size:26,strokeWidth:2.3})})
 ]})})}
 
 
