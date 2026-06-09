@@ -993,7 +993,7 @@ function App(){
 // === BOTTOM NAV ===
 function Nav({view,setView}){const[open,sOpen]=useState(false);const tabs=[{id:"home",icon:Hm,label:"home"},{id:"calendar",icon:Cal,label:"calendar"},{id:"add",icon:Plus,label:"add",main:true},{id:"stats",icon:BarChart3,label:"stats"},{id:"settings",icon:Gear,label:"settings"}];const go=(id)=>{sOpen(false);setView(id)};return t("div",{className:"nav-bar noprint",style:{background:c.bg},children:o("div",{className:"nav-inner",style:{position:"relative"},children:[
   open&&t("div",{onClick:()=>sOpen(false),style:{position:"fixed",inset:0,zIndex:49}}),
-  open&&o("div",{style:{position:"absolute",bottom:72,left:"50%",transform:"translateX(-50%)",display:"flex",gap:10,zIndex:50,padding:4}},children:[
+  open&&o("div",{style:{position:"absolute",bottom:72,left:"50%",transform:"translateX(-50%)",display:"flex",gap:10,zIndex:50,padding:4},children:[
     o("button",{onClick:()=>go("profiles"),className:"act95 trt f fc ia",style:{gap:8,padding:"14px 18px",background:c.sfg,border:`1px solid ${c.cu}55`,borderRadius:18,minWidth:88,boxShadow:"0 8px 24px rgba(0,0,0,.55)"},children:[
       t(Zap,{size:22,color:c.cu}),
       t("span",{style:{fontSize:13,fontWeight:600,color:c.tx,fontFamily:F.mo,letterSpacing:.3},children:"quick"}),
