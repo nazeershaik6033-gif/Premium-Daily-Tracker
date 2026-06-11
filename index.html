@@ -557,6 +557,16 @@ const fdDaysLeft=inv=>{if(inv.type!=="fd"||!inv.maturityDate)return null;return 
 function psip(investments){const n=Date.now();let any=false;const up=(investments||[]).map(inv=>{if(!inv.sip||!inv.sip.enabled||!inv.sip.amount)return inv;let invested=Number(inv.invested)||0,current=(inv.current!=null&&inv.current!=="")?Number(inv.current)||0:null,last=inv.sip.lastPosted||inv.createdAt||n,st=0,local=false,nx=new Date(last);nx.setMonth(nx.getMonth()+1);while(nx.getTime()<=n&&st<200){invested+=Number(inv.sip.amount)||0;if(current!=null)current+=Number(inv.sip.amount)||0;last=nx.getTime();nx=new Date(last);nx.setMonth(nx.getMonth()+1);st++;local=true}if(!local)return inv;any=true;return{...inv,invested,...(current!=null?{current}:{}),sip:{...inv.sip,lastPosted:last}}});return{changed:any,investments:up}}
 
 const AI_PROV_K="etp-ai-provider",AI_MDL_K="etp-ai-model";
+function friendlyAPIError(e,providerName){
+  const p=providerName||(AI_PROVIDERS[gProv()]||AI_PROVIDERS.anthropic).name;
+  if(e.code==="NO_API_KEY")return`No API key set — add one in Settings → AI Assistant.`;
+  if(e.code==="INVALID_KEY"||e.status===401)return`Invalid API key for ${p} — double-check it in Settings → AI Assistant.`;
+  if(e.status===403)return`Access denied (${p}). Make sure the API is enabled and the key has the right permissions.`;
+  if(e.status===429)return`Rate limit reached on ${p}. Free tier allows ~15 requests/min — wait 30 seconds and try again.`;
+  if(e.status===503||e.status===502||e.status===504)return`${p} is temporarily unavailable — try again in a moment.`;
+  if(e.status===400)return`Bad request to ${p}: ${e.message}`;
+  return e.message||`Unexpected error from ${p}`;
+}
 function sanitizeForPrompt(v){if(v==null)return"";const s=String(v).slice(0,500);return s.replace(/[\x00-\x1F\x7F]/g," ").replace(/[<>]/g," ");}
 function sanitizeObj(obj){if(!obj||typeof obj!=="object")return obj;if(Array.isArray(obj))return obj.map(sanitizeObj);const r={};for(const k of Object.keys(obj))r[k]=typeof obj[k]==="string"?sanitizeForPrompt(obj[k]):sanitizeObj(obj[k]);return r;}
 const AI_PROVIDERS={
@@ -580,7 +590,7 @@ async function cAPI(p){
   const model=hasImage?(gMdl()||pc.visionModel||pc.def||p.model):(gMdl()||pc.def||p.model);
   if(pc.fmt==="anthropic"){
     const r=await fetch(pc.url,{method:"POST",headers:{"Content-Type":"application/json","x-api-key":k,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({...p,model})});
-    if(!r.ok){const tx=await r.text();let m=`API error ${r.status}`;try{const j=JSON.parse(tx);if(j?.error?.message)m=j.error.message}catch{m+=": "+tx.slice(0,200)}const e=new Error(m);e.status=r.status;if(r.status===401)e.code="INVALID_KEY";throw e}
+    if(!r.ok){const tx=await r.text();let m=`API error ${r.status}`;try{const j=JSON.parse(tx);if(j?.error?.message)m=j.error.message}catch{m+=": "+tx.slice(0,200)}const e=new Error(m);e.status=r.status;if(r.status===401)e.code="INVALID_KEY";if(r.status===429)e.code="RATE_LIMITED";if(r.status===403)e.code="FORBIDDEN";throw e}
     return r.json();
   }
   const msgs=[];
@@ -594,7 +604,7 @@ async function cAPI(p){
   const isReasoner=/(^|\/)deepseek-r|r1|reason|o[134]-|qwq/i.test(model);
   const maxTok=isReasoner?Math.max(p.max_tokens||1024,6000):p.max_tokens;
   const r=await fetch(pc.url,{method:"POST",headers:hdrs,body:JSON.stringify({model,max_tokens:maxTok,messages:msgs})});
-  if(!r.ok){const tx=await r.text();let m=`API error ${r.status}`;try{const j=JSON.parse(tx);if(j?.error?.message)m=j.error.message}catch{m+=": "+tx.slice(0,200)}if(/no endpoints|not a valid model|does not exist|model_not_found|no allowed providers/i.test(m))m+=` — set a different model for ${pc.name} in Settings → AI Assistant.`;const e=new Error(m);e.status=r.status;if(r.status===401)e.code="INVALID_KEY";throw e}
+  if(!r.ok){const tx=await r.text();let m=`API error ${r.status}`;try{const j=JSON.parse(tx);if(j?.error?.message)m=j.error.message}catch{m+=": "+tx.slice(0,200)}if(/no endpoints|not a valid model|does not exist|model_not_found|no allowed providers/i.test(m))m+=` — set a different model for ${pc.name} in Settings → AI Assistant.`;const e=new Error(m);e.status=r.status;if(r.status===401)e.code="INVALID_KEY";if(r.status===429)e.code="RATE_LIMITED";if(r.status===403)e.code="FORBIDDEN";throw e}
   const j=await r.json();
   return{content:[{type:"text",text:j.choices?.[0]?.message?.content||""}]};
 }
@@ -3838,7 +3848,7 @@ function Chat({data,onAddExpense,onView,onClose}){
       if(j.type==="add"){const d=j.date?new Date(j.date).getTime():Date.now();onAddExpense({type:j.kind==="income"?"income":"expense",amount:Number(j.amount),accountId:j.accountId||data.accounts[0].id,category:j.category||(j.kind==="income"?"income_other":"other"),merchant:j.merchant||null,note:j.note||null,date:d,currency:data.currency,source:"chat"});sMs(M=>[...M,{role:"assistant",content:`✓ Added ${j.kind} of ${fm(j.amount,data.currency)} — ${j.merchant||""}`}])}
       else if(j.type==="clarify")sMs(M=>[...M,{role:"assistant",content:j.question}]);
       else sMs(M=>[...M,{role:"assistant",content:j.message||txt}]);
-    }catch(e){sMs(M=>[...M,{role:"assistant",content:`Error: ${e.message}`+(e.code==="NO_API_KEY"||e.code==="INVALID_KEY"?" — fix in Settings.":"")}])}
+    }catch(e){sMs(M=>[...M,{role:"assistant",content:friendlyAPIError(e)}])}
     sBusy(false);
   };
   return o("div",{style:{display:"flex",flexDirection:"column",height:"100%",minHeight:"60vh"},children:[
@@ -3902,7 +3912,7 @@ function BillScan({data,onAddExpense,onClose}){
       const m=txt.match(/\{[\s\S]*\}/);
       if(m)sRes(JSON.parse(m[0]));
       else sErr("Could not parse response");
-    }catch(e){sErr(e.message)}
+    }catch(e){sErr(friendlyAPIError(e))}
     sBusy(false);
   };
   const save=()=>{
