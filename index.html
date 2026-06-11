@@ -661,7 +661,7 @@ function AppHeader({onMenu,onSearch,onToggleTheme,isDark,theme,onHome,onAI,onDia
       ]}),
     ]}),
     o("div",{className:"f ia",style:{gap:6},children:[
-      t("button",{onClick:onAI,className:"act90 trt",style:{...btnStyle,background:c.ac+"22",border:`1px solid ${c.ac}45`},title:"AI tools",children:t("span",{style:{fontSize:15,lineHeight:1},children:"✨"})}),
+      t("button",{onClick:onAI,className:"act90 trt",style:btnStyle,title:"AI tools",children:t("span",{style:{fontSize:15,lineHeight:1},children:"✨"})}),
       t("button",{onClick:onSearch,className:"act90 trt",style:btnStyle,children:t(Srch,{size:16,color:c.tx})}),
       t("button",{onClick:onDiary,className:"act90 trt",style:btnStyle,title:"Lending diary — who owes you",children:t(Book,{size:16,color:c.tx})})
     ]})
