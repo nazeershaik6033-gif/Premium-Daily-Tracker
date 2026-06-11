@@ -1079,7 +1079,33 @@ return o("div",{className:"st",children:[
     ,data.accounts.length===0&&data.expenses.length===0&&!localStorage.getItem("welcomeDismissed")&&t(WelcomeCard,{onView,onTour:onTour||function(){},onDismiss:()=>{localStorage.setItem("welcomeDismissed","1");onView("home")}}),
     t("div",{style:{marginTop:20},children:t(BudgetBlock,{data})}),
     data.expenses.length>0&&t(TipOfDay,{}),
-    safeToday&&o("div",{style:{marginTop:10,background:`linear-gradient(135deg,${c.mt}12 0%,${c.sf} 100%)`,borderRadius:16,border:`1px solid ${c.brs}`,padding:"14px 16px"},children:o("div",{className:"f ia jb",children:[o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1.5,marginBottom:4},children:"SAFE TO SPEND TODAY"}),t("div",{style:{fontFamily:'var(--nf)',fontSize:28,fontWeight:400,color:safeToday.left<0?c.co:c.mt,letterSpacing:-0.5,lineHeight:1},children:(safeToday.val<0?"−":"")+fm(Math.abs(safeToday.val),data.currency)})]}),o("div",{style:{textAlign:"right"},children:[t("div",{style:{fontFamily:F.mo,fontSize:10,color:safeToday.left<0?c.co:c.td},children:(safeToday.left<0?"−":"")+fs(Math.abs(safeToday.left),data.currency)+" left"}),t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,marginTop:2},children:safeToday.daysLeft+" day"+(safeToday.daysLeft!==1?"s":"")+" left"})]})]})}),
+    safeToday&&(safeToday.left<0
+      ?o("div",{style:{marginTop:10,background:`linear-gradient(135deg,${c.co}14 0%,${c.sf} 100%)`,borderRadius:16,border:`1px solid ${c.co}45`,padding:"14px 16px"},children:[
+        o("div",{className:"f ia jb",style:{marginBottom:10},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.co,letterSpacing:1.5},children:"OVER BUDGET"}),
+          t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm},children:safeToday.daysLeft+" day"+(safeToday.daysLeft!==1?"s":"")+" left"}),
+        ]}),
+        o("div",{className:"f ia jb",children:[
+          o("div",{children:[
+            t("div",{style:{fontFamily:'var(--nf)',fontSize:28,fontWeight:400,color:c.co,letterSpacing:-0.5,lineHeight:1},children:fs(Math.abs(safeToday.left),data.currency)+" over"}),
+            t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,marginTop:5},children:"exceeded this period's budget"}),
+          ]}),
+          o("div",{style:{textAlign:"center",background:c.co+"15",border:`1px solid ${c.co}35`,borderRadius:10,padding:"8px 12px"},children:[
+            t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.co,letterSpacing:1,marginBottom:4},children:"SAVE / DAY TO RECOVER"}),
+            t("div",{style:{fontFamily:F.mo,fontSize:15,fontWeight:700,color:c.co},children:fm(Math.abs(safeToday.val),data.currency)}),
+          ]}),
+        ]}),
+      ]})
+      :o("div",{style:{marginTop:10,background:`linear-gradient(135deg,${c.mt}12 0%,${c.sf} 100%)`,borderRadius:16,border:`1px solid ${c.brs}`,padding:"14px 16px"},children:o("div",{className:"f ia jb",children:[
+        o("div",{children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1.5,marginBottom:4},children:"SAFE TO SPEND TODAY"}),
+          t("div",{style:{fontFamily:'var(--nf)',fontSize:28,fontWeight:400,color:c.mt,letterSpacing:-0.5,lineHeight:1},children:fm(safeToday.val,data.currency)}),
+        ]}),
+        o("div",{style:{textAlign:"right"},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.td},children:fs(safeToday.left,data.currency)+" left"}),
+          t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,marginTop:2},children:safeToday.daysLeft+" day"+(safeToday.daysLeft!==1?"s":"")+" left"}),
+        ]}),
+      ]})})),
     (budgetOver||catOver.length>0)&&o("button",{onClick:()=>onView("stats"),className:"act99 trt",style:{display:"block",width:"100%",marginTop:10,padding:"16px 18px",background:c.sfg,border:`1px solid ${c.co}50`,borderRadius:18},children:o("div",{className:"f ia jb",children:[o("div",{className:"f ia",style:{gap:10},children:[t("div",{style:{width:36,height:36,borderRadius:11,background:c.co+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16},children:"🚨"}),o("div",{className:"tl",children:[t("div",{style:{fontFamily:c.hf,fontWeight:600,fontSize:14,color:c.tx},children:budgetOver?"over budget":"category over budget"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:budgetOver?"You've exceeded your "+periodLabel+" budget":catOver.length+" categor"+(catOver.length===1?"y":"ies")+" over limit"})]})]}),t(CR,{size:16,color:c.co})]})}),
     invList.length>0&&o("button",{onClick:()=>onView("investments"),className:"act99 trt",style:{display:"block",width:"100%",marginTop:10,padding:"14px 16px",background:`linear-gradient(135deg,${c.gd}12 0%,${c.sf} 100%)`,border:`1px solid ${c.gd}40`,borderRadius:16},children:o("div",{className:"f ia jb",children:[o("div",{className:"f ia",style:{gap:10},children:[t("div",{style:{width:34,height:34,borderRadius:10,background:c.gd+"20",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17},children:"💼"}),o("div",{className:"tl",children:[t("div",{style:{fontSize:13,color:c.tx,fontWeight:600},children:"Investments"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:invList.length+" holding"+(invList.length!==1?"s":"")})]})]}),o("div",{className:"trg",children:[t("div",{style:{fontFamily:F.mo,fontSize:14,fontWeight:600,color:c.gd},children:fs(invTotCur,data.currency)}),t("div",{style:{fontFamily:F.mo,fontSize:10,color:(invTotCur-invTotInv)>=0?c.mt:c.co,marginTop:1},children:((invTotCur-invTotInv)>=0?"+":"")+(invTotInv>0?(((invTotCur-invTotInv)/invTotInv)*100).toFixed(1):"0.0")+"%"})]})]})}),
     o("div",{style:{marginTop:16},children:[
