@@ -558,9 +558,9 @@ function psip(investments){const n=Date.now();let any=false;const up=(investment
 const AI_PROV_K="etp-ai-provider",AI_MDL_K="etp-ai-model";
 const AI_PROVIDERS={
   anthropic:{name:"Anthropic",ph:"sk-ant-…",url:"https://api.anthropic.com/v1/messages",def:"claude-haiku-4-5-20251001",fmt:"anthropic",vision:true,visionModel:"claude-haiku-4-5-20251001"},
-  deepseek:{name:"DeepSeek",ph:"sk-…",url:"https://api.deepseek.com/v1/chat/completions",def:"deepseek-chat",fmt:"openai",vision:false,visionModel:null},
+  deepseek:{name:"DeepSeek",ph:"sk-…",url:"https://api.deepseek.com/v1/chat/completions",def:"deepseek-chat",fmt:"openai",vision:true,visionModel:"deepseek-chat"},
   openai:{name:"OpenAI",ph:"sk-…",url:"https://api.openai.com/v1/chat/completions",def:"gpt-4o-mini",fmt:"openai",vision:true,visionModel:"gpt-4o-mini"},
-  openrouter:{name:"OpenRouter",ph:"sk-or-…",url:"https://openrouter.ai/api/v1/chat/completions",def:"deepseek/deepseek-r1-0528",fmt:"openai",vision:true,visionModel:"openai/gpt-4o-mini"}
+  openrouter:{name:"OpenRouter",ph:"sk-or-…",url:"https://openrouter.ai/api/v1/chat/completions",def:"deepseek/deepseek-r1-0528",fmt:"openai",vision:true,visionModel:"deepseek/deepseek-chat"}
 };
 function gAK(){try{return localStorage.getItem("etp-ai-apikey")||localStorage.getItem(KK)||null}catch{return null}}
 function sAK(k){try{if(k){localStorage.setItem("etp-ai-apikey",k);localStorage.removeItem(KK)}else{localStorage.removeItem("etp-ai-apikey");localStorage.removeItem(KK)}}catch{}}
@@ -3815,7 +3815,7 @@ function Chat({data,onAddExpense,onView,onClose}){
   const send=async()=>{
     if((!inp.trim()&&!att)||busy)return;
     const u=inp.trim();
-    if(att&&att.kind==="image"&&!(AI_PROVIDERS[gProv()]||AI_PROVIDERS.anthropic).vision){sMs(M=>[...M,{role:"assistant",content:`Image attachments need a vision-capable provider. Switch to Anthropic or OpenAI in Settings (currently ${(AI_PROVIDERS[gProv()]||AI_PROVIDERS.anthropic).name}).`}]);return}
+    if(att&&att.kind==="image"&&!(AI_PROVIDERS[gProv()]||AI_PROVIDERS.anthropic).vision){sMs(M=>[...M,{role:"assistant",content:`Image attachments need a vision-capable provider. Switch to Anthropic, DeepSeek, OpenAI, or OpenRouter in Settings (currently ${(AI_PROVIDERS[gProv()]||AI_PROVIDERS.anthropic).name}).`}]);return}
     const myAtt=att;
     sMs(M=>[...M,{role:"user",content:u||(myAtt?("📎 "+myAtt.name):""),img:myAtt&&myAtt.kind==="image"?myAtt.b64:null,file:myAtt&&myAtt.kind==="text"?myAtt.name:null}]);
     sInp("");sAtt(null);sBusy(true);
@@ -3881,7 +3881,7 @@ function BillScan({data,onAddExpense,onClose}){
     sImg(b64);
     sBusy(true);
     if(!gAK()){sErr("Add an AI API key in Settings first.");sBusy(false);return}
-    if(!(AI_PROVIDERS[gProv()]||AI_PROVIDERS.anthropic).vision){sErr(`Bill scan needs a vision-capable provider. Switch to Anthropic or OpenAI in Settings (currently ${(AI_PROVIDERS[gProv()]||AI_PROVIDERS.anthropic).name}).`);sBusy(false);return}
+    if(!(AI_PROVIDERS[gProv()]||AI_PROVIDERS.anthropic).vision){sErr(`Bill scan needs a vision-capable provider. Switch to Anthropic, DeepSeek, OpenAI, or OpenRouter in Settings (currently ${(AI_PROVIDERS[gProv()]||AI_PROVIDERS.anthropic).name}).`);sBusy(false);return}
     try{
       const r=await cAPI({
         model:"claude-sonnet-4-20250514",
