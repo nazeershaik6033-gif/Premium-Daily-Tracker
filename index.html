@@ -1020,7 +1020,7 @@ function Nav({view,setView}){const[open,sOpen]=useState(false);const tabs=[{id:"
     ]}),
     o("button",{onClick:()=>go("add"),className:"act95 trt",style:{display:"flex",flexDirection:"row",alignItems:"center",gap:12,padding:"12px 16px",background:c.sfg,border:`1px solid ${c.ac}44`,borderRadius:18,minWidth:120,textAlign:"left",boxShadow:"0 8px 24px rgba(0,0,0,.55)"},children:[
       t("div",{style:{width:36,height:36,borderRadius:12,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",color:c.ac,flexShrink:0},children:t(Pencil,{size:18})}),
-      o("div",{children:[t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:13,color:c.tx},children:"add"}),t("div",{style:{fontSize:10,color:c.tm,marginTop:2},children:"expense"})]})
+      o("div",{children:[t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:13,color:c.tx},children:"add"}),t("div",{style:{fontSize:10,color:c.tm,marginTop:2},children:"manual"})]})
     ]})
   ]}),
   o("div",{className:"f ia jb",style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:24,padding:"7px 14px",boxShadow:"6px 6px 16px rgba(0,0,0,.6),-5px -5px 13px rgba(255,255,255,.06)"},children:tabs.map(tb=>{if(tb.main)return t("div",{key:"sp",style:{width:60,flexShrink:0}});const a=view===tb.id,I=tb.icon;return o("button",{key:tb.id,onClick:()=>go(tb.id),className:"act90 trt f fc ia",style:{background:"transparent",border:"none",gap:3,color:a?c.cu:c.cu+"73",flexShrink:0,padding:"2px 4px"},children:[t(I,{size:20,strokeWidth:a?2.4:1.7}),t("span",{style:{fontSize:10,fontFamily:F.mo,letterSpacing:.2,fontWeight:a?700:400},children:tb.label}),t("div",{style:{width:4,height:4,borderRadius:999,marginTop:2,background:a?c.cu:"transparent",transition:"background 180ms"}})]})})}),
