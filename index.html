@@ -239,6 +239,7 @@ const Dl=_i("M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4","m7 10 5 5 5-5","M12 15V
 const Ul=_i("M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4","m17 8-5-5-5 5","M12 3v12");
 const Copy=_i({r:[9,9,13,13,2]},"M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1");
 const Camera=_i("M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z",{c:[12,13,3]});
+const ImgIc=_i({r:[3,3,18,18,2]},"m3 21 6-6 4 4 4-5 5 7",{c:[8.5,8.5,1.5]});
 const CC=_i({r:[2,5,20,14,2]},"M2 10h20");
 const Send=_i("M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z","m21.854 2.147-10.94 10.939");
 const KeyI=_i("M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z");
@@ -1066,7 +1067,7 @@ return o("div",{className:"fx f fc",style:{inset:0,background:c.bg,zIndex:45},ch
     t("button",{onClick:exportXls,className:"act90 trt f ia jc",style:{width:"100%",gap:8,padding:"14px 0",background:c.ac,border:"none",borderRadius:14,fontSize:13,fontFamily:F.mo,color:"#0a0a0a",letterSpacing:.5,fontWeight:600,pointerEvents:"auto"},children:[t(Dl,{size:14,color:"#0a0a0a"}),"EXPORT TO XLSX"]}),
   ]}),
 ]})}
-function Home({data,onTx,onView,onFlt,onUseProfile,onTour,onAddExpenses}){const{expenses,recurring,bills=[]}=data;const[pr,sPr]=useState("month");const[spendFlt,setSpendFlt]=useState(()=>{try{const s=localStorage.getItem("etp-spend-flt");return s?JSON.parse(s):{from:"",to:""}}catch{return{from:"",to:""}}});const[askQ,setAskQ]=useState("");const[snapOpen,setSnapOpen]=useState(false);const[snapItems,setSnapItems]=useState(null);const[snapBusy,setSnapBusy]=useState(false);const[snapErr,setSnapErr]=useState(null);const[snapSel,setSnapSel]=useState({});const snapFileRef=useRef(null);const[nudge,setNudge]=useState(()=>{try{return JSON.parse(localStorage.getItem("etp-nudge-"+new Date().toISOString().slice(0,10)))||null}catch{return null}});const[nudgeLoading,setNudgeLoading]=useState(false);const q=useMemo(()=>dq(),[]);const msd=data.monthStartDay||1;
+function Home({data,onTx,onView,onFlt,onUseProfile,onTour,onAddExpenses}){const{expenses,recurring,bills=[]}=data;const[pr,sPr]=useState("month");const[spendFlt,setSpendFlt]=useState(()=>{try{const s=localStorage.getItem("etp-spend-flt");return s?JSON.parse(s):{from:"",to:""}}catch{return{from:"",to:""}}});const[askQ,setAskQ]=useState("");const[snapOpen,setSnapOpen]=useState(false);const[snapItems,setSnapItems]=useState(null);const[snapBusy,setSnapBusy]=useState(false);const[snapErr,setSnapErr]=useState(null);const[snapSel,setSnapSel]=useState({});const snapFileRef=useRef(null);const snapGallRef=useRef(null);const snapDocRef=useRef(null);const[nudge,setNudge]=useState(()=>{try{return JSON.parse(localStorage.getItem("etp-nudge-"+new Date().toISOString().slice(0,10)))||null}catch{return null}});const[nudgeLoading,setNudgeLoading]=useState(false);const q=useMemo(()=>dq(),[]);const msd=data.monthStartDay||1;
 const periodRange=useMemo(()=>{const n=new Date(),y=n.getFullYear(),m=n.getMonth();if(pr==="quarter"){const sm=Math.floor(m/3)*3;return{start:mss(y,sm,msd),end:mss(y,sm+3,msd)}}if(pr==="half"){const sm=m<6?0:6;return{start:mss(y,sm,msd),end:mss(y,sm+6,msd)}}if(pr==="year")return{start:mss(y,0,msd),end:mss(y+1,0,msd)};return{start:ps(n,msd),end:mse(y,m,msd)}},[pr,msd]);
 const periodStart=periodRange.start,periodEnd=periodRange.end;
 const periodLabel=useMemo(()=>{const n=new Date();if(pr==="quarter"){const q=Math.floor(n.getMonth()/3)+1;return `Q${q} ${n.getFullYear()}`}if(pr==="half")return (n.getMonth()<6?"H1":"H2")+" "+n.getFullYear();if(pr==="year")return String(n.getFullYear());return n.toLocaleDateString("en-US",{month:"long",year:"numeric"})},[pr]);
@@ -1284,13 +1285,25 @@ return o("div",{className:"st",children:[
     t("div",{style:{fontFamily:c.hf,fontSize:20,marginBottom:4},children:"Scan Receipt"}),
     t("div",{style:{fontSize:13,color:c.td,marginBottom:16,lineHeight:1.4},children:"Take or upload a photo — AI extracts each expense item automatically."}),
     t("input",{ref:snapFileRef,type:"file",accept:"image/*",capture:"environment",style:{display:"none"},onChange:ev=>{snapPhoto(ev.target.files?.[0]);ev.target.value=""}}),
+    t("input",{ref:snapGallRef,type:"file",accept:"image/*",style:{display:"none"},onChange:ev=>{snapPhoto(ev.target.files?.[0]);ev.target.value=""}}),
+    t("input",{ref:snapDocRef,type:"file",accept:"image/*,application/pdf,.pdf",style:{display:"none"},onChange:ev=>{snapPhoto(ev.target.files?.[0]);ev.target.value=""}}),
     !snapItems&&!snapBusy&&o("div",{children:[
       snapErr&&t("div",{style:{background:c.co+"15",border:`1px solid ${c.co}30`,borderRadius:10,padding:"10px 12px",fontSize:13,color:c.co,marginBottom:12,lineHeight:1.4},children:snapErr}),
-      t("button",{onClick:()=>snapFileRef.current?.click(),className:"w100 act95 trt",style:{padding:"20px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,display:"flex",flexDirection:"column",alignItems:"center",gap:10},children:[
-        t("span",{style:{width:52,height:52,borderRadius:999,background:c.ac+"18",display:"flex",alignItems:"center",justifyContent:"center"},children:t(Camera,{size:26,color:c.ac})}),
-        t("div",{style:{fontFamily:c.hf,fontSize:15,color:c.tx},children:"Take Photo or Choose from Gallery"}),
-        t("div",{style:{fontSize:11.5,color:c.tm},children:"Receipt · Bill · Invoice · Credit card statement"}),
+      o("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:4},children:[
+        t("button",{onClick:()=>snapFileRef.current?.click(),className:"act95 trt",style:{padding:"16px 6px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,display:"flex",flexDirection:"column",alignItems:"center",gap:8},children:[
+          t("span",{style:{width:42,height:42,borderRadius:999,background:c.ac+"18",display:"flex",alignItems:"center",justifyContent:"center"},children:t(Camera,{size:22,color:c.ac})}),
+          t("div",{style:{fontFamily:c.hf,fontSize:12,color:c.tx,textAlign:"center",lineHeight:1.3},children:"Take Photo"}),
+        ]}),
+        t("button",{onClick:()=>snapGallRef.current?.click(),className:"act95 trt",style:{padding:"16px 6px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,display:"flex",flexDirection:"column",alignItems:"center",gap:8},children:[
+          t("span",{style:{width:42,height:42,borderRadius:999,background:c.ac+"18",display:"flex",alignItems:"center",justifyContent:"center"},children:t(ImgIc,{size:22,color:c.ac})}),
+          t("div",{style:{fontFamily:c.hf,fontSize:12,color:c.tx,textAlign:"center",lineHeight:1.3},children:"From Photos"}),
+        ]}),
+        t("button",{onClick:()=>snapDocRef.current?.click(),className:"act95 trt",style:{padding:"16px 6px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,display:"flex",flexDirection:"column",alignItems:"center",gap:8},children:[
+          t("span",{style:{width:42,height:42,borderRadius:999,background:c.ac+"18",display:"flex",alignItems:"center",justifyContent:"center"},children:t(Clp,{size:22,color:c.ac})}),
+          t("div",{style:{fontFamily:c.hf,fontSize:12,color:c.tx,textAlign:"center",lineHeight:1.3},children:"From Files"}),
+        ]}),
       ]}),
+      t("div",{style:{fontSize:11,color:c.tm,textAlign:"center",marginBottom:4},children:"Receipt · Bill · Invoice · PDF statement"}),
       !gAK()&&t("div",{style:{fontSize:12,color:c.tm,textAlign:"center",marginTop:10},children:"⚠️ Add an AI API key in Settings first"}),
     ]}),
     snapBusy&&o("div",{className:"tc",style:{padding:"28px 0"},children:[
@@ -4009,7 +4022,7 @@ function BillScan({data,onAddExpense,onClose}){
   const[busy,sBusy]=useState(false);
   const[res,sRes]=useState(null);
   const[err,sErr]=useState(null);
-  const fileRef=useRef(null);
+  const fileRef=useRef(null);const gallRef=useRef(null);const docRef=useRef(null);
   const pick=async f=>{
     if(!f)return;
     if(f.size>4.5e6){sErr("Image too big (max 4.5MB)");return}
@@ -4053,7 +4066,7 @@ function BillScan({data,onAddExpense,onClose}){
     });
     onClose();
   };
-  const pickerArea=t("button",{onClick:()=>fileRef.current?.click(),className:"w100 act98 trt f fc ia jc",style:{gap:12,padding:"48px 0",background:c.sfg,border:`1px dashed ${c.br}`,borderRadius:18,color:c.td,fontSize:14},children:o(Fragment,{children:[t(Camera,{size:32,color:c.ac}),t("span",{children:"Tap to snap or pick a receipt"})]})});
+  const pickerArea=o("div",{children:[o("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10},children:[t("button",{onClick:()=>fileRef.current?.click(),className:"act95 trt",style:{padding:"20px 6px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,display:"flex",flexDirection:"column",alignItems:"center",gap:10},children:[t("span",{style:{width:48,height:48,borderRadius:999,background:c.ac+"18",display:"flex",alignItems:"center",justifyContent:"center"},children:t(Camera,{size:24,color:c.ac})}),t("div",{style:{fontFamily:c.hf,fontSize:12,color:c.tx,textAlign:"center",lineHeight:1.3},children:"Take Photo"})]}),t("button",{onClick:()=>gallRef.current?.click(),className:"act95 trt",style:{padding:"20px 6px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,display:"flex",flexDirection:"column",alignItems:"center",gap:10},children:[t("span",{style:{width:48,height:48,borderRadius:999,background:c.ac+"18",display:"flex",alignItems:"center",justifyContent:"center"},children:t(ImgIc,{size:24,color:c.ac})}),t("div",{style:{fontFamily:c.hf,fontSize:12,color:c.tx,textAlign:"center",lineHeight:1.3},children:"From Photos"})]}),t("button",{onClick:()=>docRef.current?.click(),className:"act95 trt",style:{padding:"20px 6px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,display:"flex",flexDirection:"column",alignItems:"center",gap:10},children:[t("span",{style:{width:48,height:48,borderRadius:999,background:c.ac+"18",display:"flex",alignItems:"center",justifyContent:"center"},children:t(Clp,{size:24,color:c.ac})}),t("div",{style:{fontFamily:c.hf,fontSize:12,color:c.tx,textAlign:"center",lineHeight:1.3},children:"From Files"})]})]}),t("div",{style:{textAlign:"center",fontSize:11,color:c.tm},children:"Receipt · Bill · Invoice · PDF statement"})]});
   const extractedView=res?o(Fragment,{children:[
     o("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,padding:18,marginBottom:12},children:o(Fragment,{children:[
       t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.ac,letterSpacing:1,marginBottom:8},children:"✓ EXTRACTED"}),
@@ -4078,6 +4091,8 @@ function BillScan({data,onAddExpense,onClose}){
     t(SH,{title:t("em",{children:"Bill scan"}),onBack:onClose}),
     err?t("div",{style:{padding:"10px 14px",background:c.ro+"20",border:`1px solid ${c.ro}40`,borderRadius:11,fontSize:13,color:c.ro,marginBottom:16},children:err}):null,
     t("input",{type:"file",accept:"image/*",capture:"environment",ref:fileRef,onChange:e=>pick(e.target.files?.[0]),style:{display:"none"}}),
+    t("input",{type:"file",accept:"image/*",ref:gallRef,onChange:e=>pick(e.target.files?.[0]),style:{display:"none"}}),
+    t("input",{type:"file",accept:"image/*,application/pdf,.pdf",ref:docRef,onChange:e=>pick(e.target.files?.[0]),style:{display:"none"}}),
     img?imageView:pickerArea,
     t(AiChatBox,{getContext:billCtx,label:"ASK ABOUT THIS BILL",intro:"Snap a receipt above, then ask about it — e.g. \"What category should this be?\", \"Split this 3 ways\", or \"Is this a subscription?\"",suggestions:["What category?","Split this bill","Itemize it"]})
   ]})});
