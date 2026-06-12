@@ -1199,7 +1199,7 @@ return o("div",{className:"st",children:[
           ]}),
         ]}))})
       ]}),
-      (accSpend.length>0||cardSpend.length>0)&&o("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,padding:"10px 14px",marginBottom:8},children:[
+      monExp.length>0&&o("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,padding:"10px 14px",marginBottom:8},children:[
         o("div",{className:"f ia jb",style:{marginBottom:6},children:[
           o("div",{className:"f ia",style:{gap:5},children:[
             t("div",{style:{width:6,height:6,borderRadius:"50%",background:c.co}}),
@@ -1214,41 +1214,45 @@ return o("div",{className:"st",children:[
         ]}),
         (spendFlt.from||spendFlt.to)&&t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,marginTop:5,textAlign:"center"},children:`Custom range · ${spendExp.length} expense${spendExp.length!==1?"s":""}`}),
       ]}),
-      accSpend.length>0&&o("div",{style:{background:c.sfg,borderRadius:16,border:`1px solid ${c.brs}`,overflow:"hidden",marginBottom:10},children:[
+      (accSpend.length>0||((spendFlt.from||spendFlt.to)&&monExp.some(e=>!e.cardId)))&&o("div",{style:{background:c.sfg,borderRadius:16,border:`1px solid ${c.brs}`,overflow:"hidden",marginBottom:10},children:[
         o("div",{style:{padding:"12px 16px 10px",borderBottom:`1px solid ${c.brs}`,background:`linear-gradient(135deg,${c.co}10 0%,transparent 60%)`},children:[
           o("div",{className:"f ia jb",children:[
             o("div",{className:"f ia",style:{gap:6},children:[
               t("div",{style:{width:6,height:6,borderRadius:"50%",background:c.co}}),
               t("div",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1.5,color:c.co,fontWeight:600},children:"SPENDINGS BY ACCOUNT"}),
             ]}),
-            t("button",{onClick:()=>onFlt({title:"Account Spending",items:spendExp.filter(e=>!e.cardId)}),style:{fontFamily:F.mo,fontSize:10,color:c.ac,background:"transparent",border:"none",letterSpacing:.5},children:"VIEW ALL"}),
+            accSpend.length>0&&t("button",{onClick:()=>onFlt({title:"Account Spending",items:spendExp.filter(e=>!e.cardId)}),style:{fontFamily:F.mo,fontSize:10,color:c.ac,background:"transparent",border:"none",letterSpacing:.5},children:"VIEW ALL"}),
           ]}),
         ]}),
-        t("div",{style:{padding:"4px 0"},children:accSpend.map((x,i)=>o("button",{key:x.acc.id,onClick:()=>onFlt({title:`${x.acc.emoji} ${x.acc.name}`,items:spendExp.filter(e=>e.accountId===x.acc.id&&!e.cardId)}),className:"w100 f ia jb act95 trt",style:{padding:"10px 16px",borderBottom:i===accSpend.length-1?"none":`1px solid ${c.brs}`},children:[
+        accSpend.length===0
+          ?t("div",{style:{padding:"16px",textAlign:"center",fontSize:13,color:c.tm},children:"No account spending in this date range"})
+          :t("div",{style:{padding:"4px 0"},children:accSpend.map((x,i)=>o("button",{key:x.acc.id,onClick:()=>onFlt({title:`${x.acc.emoji} ${x.acc.name}`,items:spendExp.filter(e=>e.accountId===x.acc.id&&!e.cardId)}),className:"w100 f ia jb act95 trt",style:{padding:"10px 16px",borderBottom:i===accSpend.length-1?"none":`1px solid ${c.brs}`},children:[
           o("div",{className:"f ia",style:{gap:10},children:[
             t("div",{style:{width:34,height:34,borderRadius:10,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16},children:x.acc.emoji}),
             t("div",{style:{fontSize:13,color:c.tx,fontWeight:500},children:x.acc.name}),
           ]}),
           o("div",{className:"f ia",style:{gap:8},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:'var(--ns)',fontWeight:500,color:c.co,letterSpacing:-0.5},children:fm(x.amt,data.currency)}),t(CR,{size:13,color:c.tm})]}),
-        ]}))})
+        ]}))}),
       ]}),
-      cardSpend.length>0&&o("div",{style:{background:c.sfg,borderRadius:16,border:`1px solid ${c.brs}`,overflow:"hidden",marginBottom:10},children:[
+      (cardSpend.length>0||((spendFlt.from||spendFlt.to)&&monExp.some(e=>!!e.cardId)))&&o("div",{style:{background:c.sfg,borderRadius:16,border:`1px solid ${c.brs}`,overflow:"hidden",marginBottom:10},children:[
         o("div",{style:{padding:"12px 16px 10px",borderBottom:`1px solid ${c.brs}`,background:`linear-gradient(135deg,${c.co}10 0%,transparent 60%)`},children:[
           o("div",{className:"f ia jb",children:[
             o("div",{className:"f ia",style:{gap:6},children:[
               t("div",{style:{width:6,height:6,borderRadius:"50%",background:c.co}}),
               t("div",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1.5,color:c.co,fontWeight:600},children:"SPENDINGS BY CARD"}),
             ]}),
-            t("button",{onClick:()=>onFlt({title:"Card Spending",items:spendExp.filter(e=>!!e.cardId)}),style:{fontFamily:F.mo,fontSize:10,color:c.ac,background:"transparent",border:"none",letterSpacing:.5},children:"VIEW ALL"}),
+            cardSpend.length>0&&t("button",{onClick:()=>onFlt({title:"Card Spending",items:spendExp.filter(e=>!!e.cardId)}),style:{fontFamily:F.mo,fontSize:10,color:c.ac,background:"transparent",border:"none",letterSpacing:.5},children:"VIEW ALL"}),
           ]}),
         ]}),
-        t("div",{style:{padding:"4px 0"},children:cardSpend.map((x,i)=>o("button",{key:x.card.id,onClick:()=>onFlt({title:x.card.name+(x.card.last4?" ····"+x.card.last4:""),items:spendExp.filter(e=>e.cardId===x.card.id)}),className:"w100 f ia jb act95 trt",style:{padding:"10px 16px",borderBottom:i===cardSpend.length-1?"none":`1px solid ${c.brs}`},children:[
+        cardSpend.length===0
+          ?t("div",{style:{padding:"16px",textAlign:"center",fontSize:13,color:c.tm},children:"No card spending in this date range"})
+          :t("div",{style:{padding:"4px 0"},children:cardSpend.map((x,i)=>o("button",{key:x.card.id,onClick:()=>onFlt({title:x.card.name+(x.card.last4?" ····"+x.card.last4:""),items:spendExp.filter(e=>e.cardId===x.card.id)}),className:"w100 f ia jb act95 trt",style:{padding:"10px 16px",borderBottom:i===cardSpend.length-1?"none":`1px solid ${c.brs}`},children:[
           o("div",{className:"f ia",style:{gap:10},children:[
             t("div",{style:{width:34,height:34,borderRadius:10,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16},children:"💳"}),
             o("div",{children:[t("div",{style:{fontSize:13,color:c.tx,fontWeight:500},children:x.card.name}),x.card.last4&&t("div",{style:{fontSize:10,color:c.tm,fontFamily:F.mo},children:"····"+x.card.last4})]}),
           ]}),
           o("div",{className:"f ia",style:{gap:8},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:'var(--ns)',fontWeight:500,color:c.co,letterSpacing:-0.5},children:fm(x.amt,data.currency)}),t(CR,{size:13,color:c.tm})]}),
-        ]}))})
+        ]}))}),
       ]}),
     ]}),
     cDue.length>0&&o("button",{onClick:()=>onView("cards"),className:"act99 trt",style:{display:"block",width:"100%",marginTop:12,padding:"16px 18px",background:c.sfg,border:`1px solid ${c.gd}35`,borderRadius:18},children:[
