@@ -3761,7 +3761,7 @@ const[numFont,sNumFont]=useState(fpx.numFont||'sfmono');
 const[numSize,sNumSize]=useState(fpx.numSize||14);
 const[txtFont,sTxtFont]=useState(fpx.txtFont||'system');const[inc,sInc]=useState(String(fp.monthlyIncome||""));const[fxE,sFxE]=useState(String(fp.fixedExpenses||""));const[spg,sSpg]=useState(String(fp.savingsGoalPct||"20"));const[efm,sEfm]=useState(String(fp.emergencyFundMonths||"6"));const[dbt,sDbt]=useState(String(fp.totalDebt||""));const save=()=>{persist({budget:parseFloat(b)||null,budgetPeriod:bp,currency:cu,monthStartDay:parseInt(ms)||1,fontSize:fz,alertThreshold:parseFloat(at)||null,fontPrefs:{numFont,numSize,txtFont},morningEnabled:mEn,morningTime:mTime,eveningEnabled:eEn,eveningTime:eTime,reminderEnabled:eEn,reminderTime:eTime,financeProfile:{monthlyIncome:parseFloat(inc)||null,fixedExpenses:parseFloat(fxE)||null,savingsGoalPct:parseFloat(spg)||20,emergencyFundMonths:parseFloat(efm)||6,totalDebt:parseFloat(dbt)||null}});sAK(ak.trim()||null);sProv(prov);sMdl(mdl2.trim()||null);if((mEn||eEn)&&notifPerm==='granted'){try{navigator.serviceWorker?.ready.then(reg=>reg.periodicSync?.register('expense-reminder',{minInterval:86400000}).catch(()=>{}))}catch{}}onClose()};
 if(showResetCur)return t(ResetCurrencies,{data,persist,onClose:()=>sShowResetCur(false)});
-return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
+return o("div",{style:{padding:"8px 24px 104px"},className:"st",children:[
   t(SH,{title:t("em",{children:"Settings"}),onBack:onClose,right:t("button",{onClick:save,className:"act95 trt",style:{padding:"8px 14px",background:c.ac,color:"#0a0a0a",borderRadius:10,fontSize:12,fontWeight:600,border:"none"},children:"Save"})}),
   o("button",{onClick:()=>onView&&onView("howToUse"),className:"w100 f ia trc act95",style:{gap:12,padding:"14px 18px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:18,marginBottom:12},children:[t("div",{style:{width:36,height:36,borderRadius:10,background:c.ac+"20",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0},children:"❓"}),o("div",{className:"f1 tl",children:[t("div",{style:{fontSize:14,color:c.tx,fontWeight:500},children:"How to use"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:"Guide, tips, and feature tour"})]}),t(CR,{size:14,color:c.tm})]}),
   o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden",marginBottom:16},children:[
@@ -3882,6 +3882,7 @@ return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
       t(FI,{label:"Total debt outstanding",value:dbt,onChange:sDbt,placeholder:"0",mono:true}),
     ]}),
   ]}),
+  t("div",{className:"fx noprint",style:{left:0,right:0,bottom:"calc(82px + env(safe-area-inset-bottom))",zIndex:24,display:"flex",justifyContent:"center",pointerEvents:"none"},children:o("div",{style:{width:"100%",maxWidth:440,boxSizing:"border-box",padding:"0 22px",display:"flex",justifyContent:"flex-end"},children:t("button",{onClick:save,"aria-label":"Save settings",title:"Save settings",className:"act90 trt f ia jc",style:{pointerEvents:"auto",width:58,height:58,borderRadius:"50%",background:c.ac,color:"#0a0a0a",border:"none",boxShadow:"0 10px 28px rgba(0,0,0,.55)"},children:t(Check,{size:26,strokeWidth:2.6})})})}),
 ]})}
 
 // === BACKUP / RESTORE ===
