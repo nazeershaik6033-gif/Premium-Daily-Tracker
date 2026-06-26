@@ -884,11 +884,13 @@ function App(){
   const doReimburse=(exp,amount,date)=>{const id=uid();const rEntry={id,type:"reimbursement",amount,currency:exp.currency||d.currency,date,category:exp.category,merchant:exp.merchant||exp.payee||null,note:`Reimbursement for ${exp.merchant||exp.payee||co(exp.category).label}`,accountId:exp.cardId?null:(exp.accountId||null),cardId:exp.cardId||null,reimbFor:exp.id,source:"reimbursement"};const L=[rEntry,...d.expenses.map(x=>x.id===exp.id?{...x,reimbursedBy:id,reimbursedAt:date,reimbursedAmount:amount}:x)].sort((a,b)=>b.date-a.date);pst({expenses:L});};
   const unReimburse=(exp)=>{const L=d.expenses.filter(x=>x.id!==exp.reimbursedBy).map(x=>x.id===exp.id?{...x,reimbursedBy:null,reimbursedAt:null,reimbursedAmount:null}:x);pst({expenses:L});};
 
-  const doReconcile=(entries)=>{const now=Date.now();const month=new Date().toISOString().slice(0,7);const accountIds=new Set(entries.map(e=>e.accountId));const toArchive=d.expenses.filter(e=>accountIds.has(e.accountId)&&!e.archived&&e.date<now);const archivedMap={};for(const e of toArchive){if(!archivedMap[e.accountId])archivedMap[e.accountId]=[];archivedMap[e.accountId].push(e.id);}const newObs=entries.map(e=>({id:"ob_"+uid(),accountId:e.accountId,amount:e.amount,month,date:now,archivedIds:archivedMap[e.accountId]||[]}));const archivedSet=new Set(toArchive.map(e=>e.id));const updatedExp=d.expenses.map(e=>archivedSet.has(e.id)?{...e,archived:true}:e);pst({expenses:updatedExp,openingBalances:[...(d.openingBalances||[]),...newObs]})};
+  // Just stores the opening balance — no archiving. Transactions stay intact.
+  const doReconcile=(entries)=>{const now=Date.now();const month=new Date().toISOString().slice(0,7);const newObs=entries.map(e=>({id:"ob_"+uid(),accountId:e.accountId,amount:e.amount,month,date:now}));pst({openingBalances:[...(d.openingBalances||[]),...newObs]})};
   const doRevertAllReconcile=()=>{const updatedExp=d.expenses.map(e=>e.archived?{...e,archived:false}:e);pst({expenses:updatedExp,openingBalances:[],cardOpeningBalances:[]})};
-  const doRevertReconcile=(accountId)=>{const obs=(d.openingBalances||[]).filter(ob=>ob.accountId===accountId).sort((a,b)=>b.date-a.date);const latest=obs[0];if(!latest)return;const toRestore=latest.archivedIds&&latest.archivedIds.length?new Set(latest.archivedIds):null;const updatedExp=d.expenses.map(e=>{if(e.accountId!==accountId||!e.archived)return e;if(toRestore?toRestore.has(e.id):true)return{...e,archived:false};return e});const updatedObs=(d.openingBalances||[]).filter(ob=>ob.id!==latest.id);pst({expenses:updatedExp,openingBalances:updatedObs})};
-  const doCardReconcile=({cardId,amount,cycleDate})=>{const now=Date.now();const toArchive=d.expenses.filter(e=>e.cardId===cardId&&!e.archived&&e.date<cycleDate);const newOb={id:"cob_"+uid(),cardId,amount,cycleDate,date:now,archivedIds:toArchive.map(e=>e.id)};const archivedSet=new Set(toArchive.map(e=>e.id));const updatedExp=d.expenses.map(e=>archivedSet.has(e.id)?{...e,archived:true}:e);pst({expenses:updatedExp,cardOpeningBalances:[...(d.cardOpeningBalances||[]),newOb]})};
-  const doRevertCardReconcile=(cardId)=>{const obs=(d.cardOpeningBalances||[]).filter(ob=>ob.cardId===cardId).sort((a,b)=>b.date-a.date);const latest=obs[0];if(!latest)return;const toRestore=latest.archivedIds&&latest.archivedIds.length?new Set(latest.archivedIds):null;const updatedExp=d.expenses.map(e=>{if(e.cardId!==cardId||!e.archived)return e;if(toRestore?toRestore.has(e.id):true)return{...e,archived:false};return e});const updatedObs=(d.cardOpeningBalances||[]).filter(ob=>ob.id!==latest.id);pst({expenses:updatedExp,cardOpeningBalances:updatedObs})};
+  // Removes the opening balance entry — transactions are untouched.
+  const doRevertReconcile=(accountId)=>{const obs=(d.openingBalances||[]).filter(ob=>ob.accountId===accountId).sort((a,b)=>b.date-a.date);const latest=obs[0];if(!latest)return;pst({openingBalances:(d.openingBalances||[]).filter(ob=>ob.id!==latest.id)})};
+  const doCardReconcile=({cardId,amount,cycleDate})=>{const now=Date.now();const newOb={id:"cob_"+uid(),cardId,amount,cycleDate,date:now};pst({cardOpeningBalances:[...(d.cardOpeningBalances||[]),newOb]})};
+  const doRevertCardReconcile=(cardId)=>{const obs=(d.cardOpeningBalances||[]).filter(ob=>ob.cardId===cardId).sort((a,b)=>b.date-a.date);const latest=obs[0];if(!latest)return;pst({cardOpeningBalances:(d.cardOpeningBalances||[]).filter(ob=>ob.id!==latest.id)})};
   const aA=(a)=>pst({accounts:[...d.accounts,{...a,id:"acc_"+uid()}]});
   const uA=(a)=>pst({accounts:d.accounts.map(x=>x.id===a.id?{...x,...a}:x)});
   const dA=(id)=>{if(d.accounts.length<=1){alert("Keep at least one account.");return}const re=d.accounts.filter(a=>a.id!==id),fb=re[0].id,rs=d.expenses.map(e=>e.accountId===id?{...e,accountId:fb}:e);pst({accounts:re,expenses:rs})};
@@ -2757,7 +2759,7 @@ function Reconcile({data,onClose,onReconcile}){
           ]})
         ]});
       }),
-      accts.length>0&&t("button",{disabled:!allFilled,onClick:handle,className:"w100 act98 tr",style:{marginTop:10,padding:"16px 0",background:allFilled?c.ac:c.sf2,color:allFilled?"#0a0a0a":c.tm,borderRadius:14,fontWeight:600,fontSize:15,letterSpacing:.3,border:"none"},children:allFilled?"Reconcile & Archive Old":"Fill in all balances"})
+      accts.length>0&&t("button",{disabled:!allFilled,onClick:handle,className:"w100 act98 tr",style:{marginTop:10,padding:"16px 0",background:allFilled?c.ac:c.sf2,color:allFilled?"#0a0a0a":c.tm,borderRadius:14,fontWeight:600,fontSize:15,letterSpacing:.3,border:"none"},children:allFilled?"Set Opening Balance":"Fill in all balances"})
     ]})
   ]});
 }
@@ -2831,9 +2833,9 @@ function AcctDet({data,acctId,onClose,onEdit,onTx,onDelete,onRevertReconcile}){c
       t("button",{onClick:onEdit,className:"act95 trt f ia jc",style:{gap:6,padding:"12px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:11,color:c.tx,fontSize:13},children:[t(Pencil,{size:14})," Edit account"]}),
       data.accounts.length>1&&t("button",{onClick:()=>sDel(true),className:"act95 trt f ia jc",style:{gap:6,padding:"12px 0",background:c.ro+"20",border:`1px solid ${c.ro}40`,borderRadius:11,color:c.ro,fontSize:13},children:[t(Trash2,{size:14})," Delete"]}),
     ]}),
-    latestOb&&onRevertReconcile&&t("button",{onClick:()=>sRvConf(true),className:"w100 act98 tr",style:{marginTop:10,padding:"12px 0",background:"transparent",border:`1px solid ${c.co}55`,borderRadius:12,color:c.co,fontSize:13},children:"↩ Revert last reconcile ("+new Date(latestOb.date).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})+")"}),
+    latestOb&&onRevertReconcile&&t("button",{onClick:()=>sRvConf(true),className:"w100 act98 tr",style:{marginTop:10,padding:"12px 0",background:"transparent",border:`1px solid ${c.co}55`,borderRadius:12,color:c.co,fontSize:13},children:"↩ Clear opening balance ("+new Date(latestOb.date).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})+")"}),
     del&&t(CSht,{onClose:()=>sDel(false),title:"Delete account?",subtitle:"Transactions move to your first remaining account.",onConfirm:()=>{sDel(false);onDelete&&onDelete()},confirmLabel:"Delete"}),
-    rvConf&&t(CSht,{onClose:()=>sRvConf(false),title:"Revert reconcile?",subtitle:"Archived transactions will be restored and the opening balance entry will be removed.",onConfirm:()=>{sRvConf(false);onRevertReconcile(acctId)},confirmLabel:"Revert"}),
+    rvConf&&t(CSht,{onClose:()=>sRvConf(false),title:"Clear opening balance?",subtitle:"The opening balance entry will be removed. Your transactions are unaffected.",onConfirm:()=>{sRvConf(false);onRevertReconcile(acctId)},confirmLabel:"Clear"}),
   ]})}
 
 const ACC_EMOJIS=["💰","💵","💴","💶","💷","💳","🏦","🏧","💎","📈","📉","📊","🐖","💼","🏠","🏡","🚗","✈️","🎯","⚡","🌟","💡","🔑","🏆","🎁","💊","🛒","📱","💻","🎮","🎵","☕","🍜","🛍️","📦","💫","✨","🔧","🌐","🏅"];
@@ -2997,7 +2999,6 @@ function CardReconcile({card,data,onClose,onConfirm}){
   const[cycleDate,sCycleDate]=useState(today);
   const obs=(data.cardOpeningBalances||[]).filter(ob=>ob.cardId===card.id).sort((a,b)=>b.date-a.date);
   const lastRec=obs[0]||null;
-  const archiveCount=data.expenses.filter(e=>e.cardId===card.id&&!e.archived&&new Date(cycleDate+"T00:00:00").getTime()>e.date).length;
   const doConfirm=()=>{
     const a=mode==="settle"?0:Math.max(0,parseFloat(amt)||0);
     const cd=new Date(cycleDate+"T00:00:00").getTime();
@@ -3007,9 +3008,9 @@ function CardReconcile({card,data,onClose,onConfirm}){
   return t(Sht,{onClose,children:o("div",{style:{padding:"0 20px 32px"},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1.5,color:c.tm,marginBottom:4},children:"RECONCILE CARD"}),
     t("div",{style:{fontSize:22,fontWeight:700,marginBottom:4},children:card.name}),
-    lastRec&&t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,marginBottom:20},children:"Last reconciled: "+new Date(lastRec.date).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}),
-    !lastRec&&t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,marginBottom:20},children:"First reconcile — sets the starting balance"}),
-    t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:.5,marginBottom:6},children:"CYCLE CUTOFF DATE"}),
+    lastRec&&t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,marginBottom:20},children:"Last set: "+new Date(lastRec.date).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}),
+    !lastRec&&t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,marginBottom:20},children:"Sets the opening balance — transactions stay untouched"}),
+    t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:.5,marginBottom:6},children:"CYCLE START DATE"}),
     t("input",{type:"date",value:cycleDate,max:today,onChange:e=>sCycleDate(e.target.value),style:{width:"100%",padding:"11px 12px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,color:c.tx,fontSize:14,fontFamily:F.mo,outline:"none",colorScheme:"dark",boxSizing:"border-box",marginBottom:16}}),
     t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:.5,marginBottom:8},children:"WHAT IS THE OUTSTANDING BALANCE?"}),
     o("div",{style:{display:"flex",gap:8,marginBottom:16},children:[
@@ -3020,11 +3021,7 @@ function CardReconcile({card,data,onClose,onConfirm}){
       t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:.5,marginBottom:6},children:"OUTSTANDING AMOUNT ("+data.currency+")"}),
       t("input",{type:"number",inputMode:"decimal",placeholder:"0.00",value:amt,onChange:e=>sAmt(e.target.value),style:{width:"100%",padding:"11px 12px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,color:c.tx,fontSize:16,fontFamily:F.mo,outline:"none",boxSizing:"border-box"}}),
     ]}),
-    archiveCount>0&&o("div",{style:{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 14px",background:c.co+"12",borderRadius:12,marginBottom:16},children:[
-      t(AlertCircle,{size:15,color:c.co,style:{flexShrink:0,marginTop:1}}),
-      t("span",{style:{fontSize:12,color:c.co,lineHeight:1.5},children:`${archiveCount} transaction${archiveCount===1?"":"s"} before the cutoff date will be archived.`}),
-    ]}),
-    t("button",{onClick:doConfirm,disabled:mode==="override"&&!parseFloat(amt),className:"w100 act98 tr",style:{padding:"15px 0",background:c.ac,color:"#0a0a0a",borderRadius:14,fontWeight:700,fontSize:15,border:"none",opacity:mode==="override"&&!parseFloat(amt)?.5:1},children:"Confirm Reconcile"}),
+    t("button",{onClick:doConfirm,disabled:mode==="override"&&!parseFloat(amt),className:"w100 act98 tr",style:{padding:"15px 0",background:c.ac,color:"#0a0a0a",borderRadius:14,fontWeight:700,fontSize:15,border:"none",opacity:mode==="override"&&!parseFloat(amt)?.5:1},children:"Set Opening Balance"}),
   ]})});
 }
 function CardDet({data,cardId,onClose,onEdit,onPay,onEditPay,onDeletePay,onDelete,onTx,onAddStmt,onUpdStmt,onDelStmt,onCardReconcile,onRevertCardReconcile}){const card=(data.cards||[]).find(x=>x.id===cardId);const[pO,sPO]=useState(false);const[cD,sCD]=useState(false);const[rcO,sRcO]=useState(false);const[rvConf,sRvConf]=useState(false);const[tab,sTab]=useState("overview");const[fMode,sFMode]=useState("all");const[cFrom,sCFrom]=useState("");const[cTo,sCTo]=useState("");if(!card)return null;
