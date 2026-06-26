@@ -445,6 +445,9 @@ function pr(rec,exp){const n=Date.now(),sn=new Set(exp.map(e=>e.id)),nw=[];const
 function sms(s){if(!s||s.trim().length<4)return null;const x=s.replace(/\s+/g," ").trim();let a=null,cu="₹";const ps=[{re:/(?:rs\.?|inr|₹)\s*([\d,]+(?:\.\d{1,2})?)/i,c:"₹"},{re:/\$\s*([\d,]+(?:\.\d{1,2})?)/,c:"$"},{re:/(?:usd)\s*([\d,]+(?:\.\d{1,2})?)/i,c:"$"},{re:/(?:eur|€)\s*([\d,]+(?:\.\d{1,2})?)/i,c:"€"},{re:/(?:gbp|£)\s*([\d,]+(?:\.\d{1,2})?)/i,c:"£"},{re:/([\d,]+(?:\.\d{1,2})?)\s*(rs\.?|inr|usd|eur|gbp)/i,c:null}];for(const{re,c:cc}of ps){const m=x.match(re);if(m){a=parseFloat(m[1].replace(/,/g,""));if(cc)cu=cc;else{const t=(m[2]||"").toLowerCase();cu=t.includes("rs")||t.includes("inr")?"₹":t.includes("eur")?"€":t.includes("gbp")?"£":"$"}break}}let ct=null;if(/credit\s*card/i.test(x))ct="Credit Card";else if(/debit\s*card/i.test(x))ct="Debit Card";else if(/\bcard\b/i.test(x))ct="Card";for(const[r,n]of[[/\bvisa\b/i,"Visa"],[/master\s*card/i,"Mastercard"],[/\bamex\b|american\s*express/i,"Amex"],[/rupay/i,"RuPay"],[/discover/i,"Discover"]])if(r.test(x)){ct=ct?`${n} ${ct}`:n;break}let l4=null;const mL=x.match(/(?:x{2,}|\*{2,}|ending\s+(?:in\s+)?|xx)\s*(\d{4})/i);if(mL)l4=mL[1];const bks=["HDFC","ICICI","SBI","State Bank","Axis","Kotak","Yes Bank","IndusInd","PNB","BoB","Bank of Baroda","Canara","IDFC","Federal","Chase","Wells Fargo","Bank of America","Citi","Citibank","Capital One","Amex","Discover","US Bank","PNC","Ally","Synchrony","TD Bank","Barclays","HSBC","Standard Chartered","Lloyds","NatWest","Santander","Monzo","Revolut","Starling","BMO","Scotiabank","RBC","CIBC","DBS","OCBC","UOB","Maybank","CIMB"];let bk=null;for(const b of bks)if(new RegExp("\\b"+b.replace(/\s+/g,"\\s+")+"\\b","i").test(x)){bk=b;break}let dt=null;const mm={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,sept:8,oct:9,nov:10,dec:11,january:0,february:1,march:2,april:3,june:5,july:6,august:7,september:8,october:9,november:10,december:11};const fmts=[/(\d{1,2})[-\s]([A-Za-z]{3,9})[-\s,]+(\d{2,4})/,/([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{2,4})/,/(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/,/([A-Za-z]{3,9})\s+(\d{1,2})\b/,/(\d{1,2})[-\s]([A-Za-z]{3,9})\b/];for(let i=0;i<fmts.length;i++){const m=x.match(fmts[i]);if(!m)continue;let d,mo,y=new Date().getFullYear();try{if(i===0){d=+m[1];mo=mm[m[2].toLowerCase()];y=+m[3]}else if(i===1){mo=mm[m[1].toLowerCase()];d=+m[2];y=+m[3]}else if(i===2){d=+m[1];mo=+m[2]-1;y=+m[3]}else if(i===3){mo=mm[m[1].toLowerCase()];d=+m[2]}else{d=+m[1];mo=mm[m[2].toLowerCase()]}if(y<100)y+=2000;if(mo===undefined||isNaN(d)||isNaN(mo))continue;const dd=new Date(y,mo,d);if(!isNaN(dd.getTime())){dt=dd.getTime();break}}catch{}}let mch=null;const mM=x.match(/\bat\s+([A-Za-z0-9][A-Za-z0-9\s&.\-'*]{1,32}?)(?=\s+on\s|\s+\.|\s+ref|\s+txn|\s+avl|\s+bal|\s+for\s|$)/i);if(mM){mch=mM[1].trim().replace(/[*]/g,"").replace(/\s+/g," ");if(mch.length>28)mch=mch.slice(0,28)}let cat="other";const h=x.toLowerCase();if(/uber|ola|lyft|taxi|metro|fuel|petrol|gas\s|parking/.test(h))cat="transport";else if(/zomato|swiggy|doordash|ubereats|restaurant|cafe|coffee|starbucks|mcdonald|kfc|pizza|dominos/.test(h))cat="food";else if(/amazon|flipkart|myntra|target|walmart|costco|ikea/.test(h))cat="shopping";else if(/whole\s*foods|kroger|safeway|trader|grocery|big\s*basket|blinkit|instacart/.test(h))cat="groceries";else if(/netflix|spotify|cinema|movie|prime|hbo|disney|hulu/.test(h))cat="entertainment";else if(/electric|water|gas\s+bill|broadband|wifi|airtel|jio|verizon|att|comcast/.test(h))cat="bills";else if(/pharmacy|hospital|clinic|medical|cvs|walgreens|apollo/.test(h))cat="health";else if(/airlines|airways|hotel|airbnb|booking|expedia|flight/.test(h))cat="travel_outstation";return{amount:a,currency:cu,cardType:ct,cardLast4:l4,bank:bk,date:dt,merchant:mch,category:cat}}
 
 function ab(acc,exp,openingBalances){const obs=(openingBalances||[]).filter(ob=>ob.accountId===acc.id).sort((a,b)=>b.date-a.date);const latestOb=obs[0]||null;const baseDate=latestOb?latestOb.date:0;let b=latestOb?latestOb.amount:(acc.opening||0);for(const e of exp){if(e.accountId!==acc.id)continue;if(e.archived)continue;if(e.date<=baseDate)continue;if(e.type==="card-payment"){b-=e.amount;continue}if(e.type==="income"||e.type==="transfer-in"||e.type==="reimbursement")b+=e.amount;else b-=e.amount}return b}
+// Returns outstanding balance for a reconciled credit card: reconciledAmount + new charges - new payments.
+// Returns null if card has never been reconciled (caller falls back to cc() data).
+function cardBal(card,expenses,cardOBs){const obs=(cardOBs||[]).filter(ob=>ob.cardId===card.id).sort((a,b)=>b.date-a.date);const ob=obs[0]||null;if(!ob)return null;let bal=ob.amount;for(const e of expenses){if(e.cardId!==card.id||e.archived||e.date<ob.cycleDate)continue;if(e.type==="card-payment"||e.type==="reimbursement")bal-=e.amount;else bal+=e.amount}return Math.max(0,bal)}
 
 // === TRANSFERS: collapse the out/in pair into one combined line for lists ===
 // Maps a transferId to its source (fromId) and destination (toId) accounts.
@@ -882,6 +885,7 @@ function App(){
   const unReimburse=(exp)=>{const L=d.expenses.filter(x=>x.id!==exp.reimbursedBy).map(x=>x.id===exp.id?{...x,reimbursedBy:null,reimbursedAt:null,reimbursedAmount:null}:x);pst({expenses:L});};
 
   const doReconcile=(entries)=>{const now=Date.now();const month=new Date().toISOString().slice(0,7);const accountIds=new Set(entries.map(e=>e.accountId));const newObs=entries.map(e=>({id:"ob_"+uid(),accountId:e.accountId,amount:e.amount,month,date:now}));const updatedExp=d.expenses.map(e=>{if(!accountIds.has(e.accountId)||e.archived)return e;if(e.date<now)return{...e,archived:true};return e});pst({expenses:updatedExp,openingBalances:[...(d.openingBalances||[]),...newObs]})};
+  const doCardReconcile=({cardId,amount,cycleDate})=>{const now=Date.now();const newOb={id:"cob_"+uid(),cardId,amount,cycleDate,date:now};const updatedExp=d.expenses.map(e=>{if(e.cardId!==cardId||e.archived)return e;if(e.date<cycleDate)return{...e,archived:true};return e});pst({expenses:updatedExp,cardOpeningBalances:[...(d.cardOpeningBalances||[]),newOb]})};
   const aA=(a)=>pst({accounts:[...d.accounts,{...a,id:"acc_"+uid()}]});
   const uA=(a)=>pst({accounts:d.accounts.map(x=>x.id===a.id?{...x,...a}:x)});
   const dA=(id)=>{if(d.accounts.length<=1){alert("Keep at least one account.");return}const re=d.accounts.filter(a=>a.id!==id),fb=re[0].id,rs=d.expenses.map(e=>e.accountId===id?{...e,accountId:fb}:e);pst({accounts:re,expenses:rs})};
@@ -969,7 +973,7 @@ function App(){
         v==="editAccount"&&eAcc&&t(NewAcc,{onSave:a=>{uA({...eAcc,...a});sEAcc(null);sV("accounts")},onCancel:()=>{sEAcc(null);sV("accounts")},editing:eAcc}),
         v==="rules"&&t(Rules,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
         v==="cards"&&t(Cards,{data:d,onClose:()=>sV("home"),onAdd:()=>sV("newCard"),onSelect:cr=>{sCdId(cr.id);sV("cardDetail")},onFlt:sFlt,onReorder:(newCards)=>pst({cards:newCards})}),
-        v==="cardDetail"&&cdId&&t(CardDet,{data:d,cardId:cdId,onClose:()=>sV("cards"),onEdit:()=>{const cr=(d.cards||[]).find(x=>x.id===cdId);sECa(cr);sV("editCard")},onPay:({accountId,amount})=>aCP({cardId:cdId,accountId,amount,date:Date.now()}),onEditPay:(id,patch)=>uCP(id,patch),onDeletePay:(id)=>dCP(id),onDelete:()=>{dC(cdId);sCdId(null);sV("cards")},onTx:sAtx,onAddStmt:aSt,onUpdStmt:uSt,onDelStmt:dSt}),
+        v==="cardDetail"&&cdId&&t(CardDet,{data:d,cardId:cdId,onClose:()=>sV("cards"),onEdit:()=>{const cr=(d.cards||[]).find(x=>x.id===cdId);sECa(cr);sV("editCard")},onPay:({accountId,amount})=>aCP({cardId:cdId,accountId,amount,date:Date.now()}),onEditPay:(id,patch)=>uCP(id,patch),onDeletePay:(id)=>dCP(id),onDelete:()=>{dC(cdId);sCdId(null);sV("cards")},onTx:sAtx,onAddStmt:aSt,onUpdStmt:uSt,onDelStmt:dSt,onCardReconcile:doCardReconcile}),
         v==="newCard"&&t(NewCard,{onSave:cr=>{aC(cr);sV("cards")},onCancel:()=>sV("cards")}),
         v==="editCard"&&eCa&&t(NewCard,{onSave:cr=>{uC({...eCa,...cr});sECa(null);sV("cardDetail")},onCancel:()=>{sECa(null);sV("cardDetail")},editing:eCa}),
         v==="transfer"&&t(Xfer,{data:d,onSave:dT,onCancel:()=>sV(navFromRef.current)}),
@@ -2979,7 +2983,44 @@ function StackCard({card,cycle,monthSpent,currency,total,index,onClick}){const g
   ]}),
 ]})})}
 
-function CardDet({data,cardId,onClose,onEdit,onPay,onEditPay,onDeletePay,onDelete,onTx,onAddStmt,onUpdStmt,onDelStmt}){const card=(data.cards||[]).find(x=>x.id===cardId);const[pO,sPO]=useState(false);const[cD,sCD]=useState(false);const[tab,sTab]=useState("overview");const[fMode,sFMode]=useState("all");const[cFrom,sCFrom]=useState("");const[cTo,sCTo]=useState("");if(!card)return null;
+function CardReconcile({card,data,onClose,onConfirm}){
+  const[mode,sMode]=useState("settle");
+  const[amt,sAmt]=useState("");
+  const today=new Date().toISOString().slice(0,10);
+  const[cycleDate,sCycleDate]=useState(today);
+  const obs=(data.cardOpeningBalances||[]).filter(ob=>ob.cardId===card.id).sort((a,b)=>b.date-a.date);
+  const lastRec=obs[0]||null;
+  const archiveCount=data.expenses.filter(e=>e.cardId===card.id&&!e.archived&&new Date(cycleDate+"T00:00:00").getTime()>e.date).length;
+  const doConfirm=()=>{
+    const a=mode==="settle"?0:Math.max(0,parseFloat(amt)||0);
+    const cd=new Date(cycleDate+"T00:00:00").getTime();
+    onConfirm({cardId:card.id,amount:a,cycleDate:cd});
+    onClose();
+  };
+  return t(Sht,{onClose,children:o("div",{style:{padding:"0 20px 32px"},children:[
+    t("div",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1.5,color:c.tm,marginBottom:4},children:"RECONCILE CARD"}),
+    t("div",{style:{fontSize:22,fontWeight:700,marginBottom:4},children:card.name}),
+    lastRec&&t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,marginBottom:20},children:"Last reconciled: "+new Date(lastRec.date).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}),
+    !lastRec&&t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,marginBottom:20},children:"First reconcile — sets the starting balance"}),
+    t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:.5,marginBottom:6},children:"CYCLE CUTOFF DATE"}),
+    t("input",{type:"date",value:cycleDate,max:today,onChange:e=>sCycleDate(e.target.value),style:{width:"100%",padding:"11px 12px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,color:c.tx,fontSize:14,fontFamily:F.mo,outline:"none",colorScheme:"dark",boxSizing:"border-box",marginBottom:16}}),
+    t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:.5,marginBottom:8},children:"WHAT IS THE OUTSTANDING BALANCE?"}),
+    o("div",{style:{display:"flex",gap:8,marginBottom:16},children:[
+      t("button",{onClick:()=>sMode("settle"),className:"act95 tr",style:{flex:1,padding:"11px 0",borderRadius:12,border:`1px solid ${mode==="settle"?c.ac:c.brs}`,background:mode==="settle"?c.ac+"18":"transparent",color:mode==="settle"?c.ac:c.td,fontSize:13,fontWeight:mode==="settle"?600:400},children:"Fully paid — ₹0"}),
+      t("button",{onClick:()=>sMode("override"),className:"act95 tr",style:{flex:1,padding:"11px 0",borderRadius:12,border:`1px solid ${mode==="override"?c.ac:c.brs}`,background:mode==="override"?c.ac+"18":"transparent",color:mode==="override"?c.ac:c.td,fontSize:13,fontWeight:mode==="override"?600:400},children:"Enter balance"}),
+    ]}),
+    mode==="override"&&o("div",{style:{marginBottom:16},children:[
+      t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:.5,marginBottom:6},children:"OUTSTANDING AMOUNT ("+data.currency+")"}),
+      t("input",{type:"number",inputMode:"decimal",placeholder:"0.00",value:amt,onChange:e=>sAmt(e.target.value),style:{width:"100%",padding:"11px 12px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,color:c.tx,fontSize:16,fontFamily:F.mo,outline:"none",boxSizing:"border-box"}}),
+    ]}),
+    archiveCount>0&&o("div",{style:{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 14px",background:c.co+"12",borderRadius:12,marginBottom:16},children:[
+      t(AlertCircle,{size:15,color:c.co,style:{flexShrink:0,marginTop:1}}),
+      t("span",{style:{fontSize:12,color:c.co,lineHeight:1.5},children:`${archiveCount} transaction${archiveCount===1?"":"s"} before the cutoff date will be archived.`}),
+    ]}),
+    t("button",{onClick:doConfirm,disabled:mode==="override"&&!parseFloat(amt),className:"w100 act98 tr",style:{padding:"15px 0",background:c.ac,color:"#0a0a0a",borderRadius:14,fontWeight:700,fontSize:15,border:"none",opacity:mode==="override"&&!parseFloat(amt)?.5:1},children:"Confirm Reconcile"}),
+  ]})});
+}
+function CardDet({data,cardId,onClose,onEdit,onPay,onEditPay,onDeletePay,onDelete,onTx,onAddStmt,onUpdStmt,onDelStmt,onCardReconcile}){const card=(data.cards||[]).find(x=>x.id===cardId);const[pO,sPO]=useState(false);const[cD,sCD]=useState(false);const[rcO,sRcO]=useState(false);const[tab,sTab]=useState("overview");const[fMode,sFMode]=useState("all");const[cFrom,sCFrom]=useState("");const[cTo,sCTo]=useState("");if(!card)return null;
   const cy=card.type==="credit"?cc(card,data.expenses):null;
   const cE=useMemo(()=>data.expenses.filter(e=>e.cardId===cardId).sort((a,b)=>b.date-a.date),[data.expenses,cardId]);
   const _ymd2=ts=>{const d2=new Date(ts);return d2.getFullYear()+"-"+String(d2.getMonth()+1).padStart(2,"0")+"-"+String(d2.getDate()).padStart(2,"0")};
@@ -2995,6 +3036,9 @@ function CardDet({data,cardId,onClose,onEdit,onPay,onEditPay,onDeletePay,onDelet
   const mE=cE.filter(e=>e.date>=ps(new Date(),data.monthStartDay)&&e.type!=="card-payment").reduce((s,e)=>s+e.amount,0);
   const aE=cE.filter(e=>e.type!=="card-payment").reduce((s,e)=>s+e.amount,0);
   const g=gr(card.gradient||"ink"),nw=NW.find(x=>x.id===card.network)||NW[5];
+  const recBal=cardBal(card,data.expenses,data.cardOpeningBalances||[]);
+  const cardOBs=(data.cardOpeningBalances||[]).filter(ob=>ob.cardId===cardId).sort((a,b)=>b.date-a.date);
+  const lastRec=cardOBs[0]||null;
 return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
   t(SH,{title:t("em",{children:card.name}),onBack:onClose,right:t("button",{onClick:onEdit,className:"act90 trt",style:{width:38,height:38,borderRadius:12,background:c.sfg,border:`1px solid ${c.brs}`,display:"flex",alignItems:"center",justifyContent:"center"},children:t(Pencil,{size:16,color:c.ac})})}),
   o("div",{style:{borderRadius:20,padding:24,background:`linear-gradient(135deg,${g.from} 0%,${g.to} 100%)`,position:"relative",overflow:"hidden",boxShadow:"0 12px 36px rgba(0,0,0,0.5)",marginBottom:20},children:[
@@ -3006,6 +3050,14 @@ return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
   card.type==="credit"&&o("div",{className:"f ia",style:{gap:6,marginBottom:16,background:c.sf2,borderRadius:12,padding:4},children:[{k:"overview",l:"Overview"},{k:"stmts",l:"Statements"}].map(tb=>t("button",{key:tb.k,onClick:()=>sTab(tb.k),className:"act95 tr",style:{flex:1,padding:"9px 0",borderRadius:9,border:"none",fontSize:13,fontWeight:tab===tb.k?600:400,background:tab===tb.k?c.ac:"transparent",color:tab===tb.k?"#0a0a0a":c.td},children:tb.l}))}),
   card.type==="credit"&&tab==="stmts"&&t(CardStmts,{card,data,onAddStmt,onUpdStmt,onDelStmt,onTx}),
   (card.type!=="credit"||tab==="overview")&&o(Fragment,{children:[
+  recBal!==null&&o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${recBal>0?c.co+"55":c.mt+"55"}`,padding:18,marginBottom:16},children:[
+    o("div",{className:"f ia jb",style:{marginBottom:10},children:[
+      t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:"RECONCILED BALANCE"}),
+      t(Pl,{col:recBal>0?c.co:c.mt,children:recBal>0?"OUTSTANDING":"CLEAR"}),
+    ]}),
+    t("div",{style:{fontFamily:'var(--nf)',fontSize:34,fontWeight:300,color:recBal>0?c.tx:c.mt,lineHeight:1,letterSpacing:-1,marginBottom:10},children:fm(recBal,data.currency)}),
+    lastRec&&t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm},children:"Reconciled on "+new Date(lastRec.date).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})+" · "+fm(lastRec.amount,data.currency)+" opening"}),
+  ]}),
   cy&&o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     o("div",{className:"f ia jb",style:{marginBottom:14},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:"CURRENT STATEMENT"}),cy.outstanding>0?t(Pl,{col:cy.overdue?c.ro:c.co,children:cy.overdue?"OVERDUE":`${cy.daysUntilDue}d LEFT`}):t(Pl,{col:c.mt,children:"PAID"})]}),
     o("div",{className:"g g2",style:{gap:16,marginBottom:14},children:[o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1},children:"OUTSTANDING"}),t("div",{style:{fontFamily:'var(--nf)',fontSize:28,fontWeight:300,color:cy.outstanding>0?(cy.overdue?c.ro:c.tx):c.mt,marginTop:4,lineHeight:1,letterSpacing:-1},children:fm(cy.outstanding,data.currency)})]}),o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1},children:"DUE BY"}),t("div",{style:{fontFamily:'var(--nf)',fontSize:18,color:c.tx,marginTop:6,fontWeight:500},children:new Date(cy.dueDate).toLocaleDateString("en-US",{month:"short",day:"numeric"})}),t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:.5,marginTop:2},children:cy.daysUntilDue>0?`in ${cy.daysUntilDue} days`:`${Math.abs(cy.daysUntilDue)} days overdue`})]})]}),
@@ -3019,10 +3071,12 @@ return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
   fMode==="custom"&&o("div",{className:"g g2",style:{gap:8,marginBottom:12},children:[o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:.5,marginBottom:4},children:"FROM"}),t("input",{type:"date",value:cFrom,max:cTo||undefined,onChange:e=>sCFrom(e.target.value),style:{width:"100%",padding:"9px 10px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,color:c.tx,fontSize:13,fontFamily:F.mo,outline:"none",colorScheme:"dark",boxSizing:"border-box"}})]}),o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:.5,marginBottom:4},children:"TO"}),t("input",{type:"date",value:cTo,min:cFrom||undefined,onChange:e=>sCTo(e.target.value),style:{width:"100%",padding:"9px 10px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,color:c.tx,fontSize:13,fontFamily:F.mo,outline:"none",colorScheme:"dark",boxSizing:"border-box"}})]})]}),
   o("div",{className:"f ib jb",style:{marginBottom:10},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm},children:`${fE.length} ${range?"IN RANGE":"TOTAL"}`}),range?t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.td},children:fm(fE.filter(e=>e.type!=="card-payment").reduce((s,e)=>s+e.amount,0),data.currency)}):null]}),
   fE.length===0?t("div",{style:{padding:"32px 16px",textAlign:"center",background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,color:c.tm,fontSize:13},children:fMode==="custom"&&(!cFrom||!cTo)?"Pick a start and end date.":(range?"No transactions in this range":"No transactions on this card yet")}):t("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`},children:fE.slice(0,100).map((e,i)=>t(TX,{key:e.id,expense:e,accounts:data.accounts,cards:data.cards||[],isLast:i===Math.min(fE.length,100)-1,onClick:()=>onTx(e),ledger:(card.limit!=null?"Avail: ":"Used: ")+fm(availMap[e.id]||0,data.currency)}))}),
-  t("button",{onClick:()=>sCD(true),className:"w100 act98 tr",style:{marginTop:20,padding:"12px 0",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:12,color:c.ro,fontSize:13},children:"Delete this card"}),
+  onCardReconcile&&t("button",{onClick:()=>sRcO(true),className:"w100 act98 tr",style:{marginTop:12,padding:"12px 0",background:"transparent",border:`1px solid ${c.ac}55`,borderRadius:12,color:c.ac,fontSize:13,fontWeight:500},children:"⚖️ Reconcile cycle"}),
+  t("button",{onClick:()=>sCD(true),className:"w100 act98 tr",style:{marginTop:10,padding:"12px 0",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:12,color:c.ro,fontSize:13},children:"Delete this card"}),
   ]}),
   pO&&t(PaySht,{card,cycle:cy,data,onClose:()=>sPO(false),onConfirm:({accountId,amount})=>{onPay({accountId,amount});sPO(false)},onEditPay,onDeletePay}),
   cD&&t(CSht,{onClose:()=>sCD(false),title:"Delete card?",subtitle:"Existing transactions stay; their card link is cleared.",onConfirm:onDelete,confirmLabel:"Delete"}),
+  rcO&&t(CardReconcile,{card,data,onClose:()=>sRcO(false),onConfirm:(entry)=>{if(onCardReconcile)onCardReconcile(entry);sRcO(false)}}),
 ]})}
 
 function CardStmts({card,data,onAddStmt,onUpdStmt,onDelStmt,onTx}){
