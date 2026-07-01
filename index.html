@@ -445,6 +445,8 @@ function pr(rec,exp){const n=Date.now(),sn=new Set(exp.map(e=>e.id)),nw=[];const
 function sms(s){if(!s||s.trim().length<4)return null;const x=s.replace(/\s+/g," ").trim();let a=null,cu="₹";const ps=[{re:/(?:rs\.?|inr|₹)\s*([\d,]+(?:\.\d{1,2})?)/i,c:"₹"},{re:/\$\s*([\d,]+(?:\.\d{1,2})?)/,c:"$"},{re:/(?:usd)\s*([\d,]+(?:\.\d{1,2})?)/i,c:"$"},{re:/(?:eur|€)\s*([\d,]+(?:\.\d{1,2})?)/i,c:"€"},{re:/(?:gbp|£)\s*([\d,]+(?:\.\d{1,2})?)/i,c:"£"},{re:/([\d,]+(?:\.\d{1,2})?)\s*(rs\.?|inr|usd|eur|gbp)/i,c:null}];for(const{re,c:cc}of ps){const m=x.match(re);if(m){a=parseFloat(m[1].replace(/,/g,""));if(cc)cu=cc;else{const t=(m[2]||"").toLowerCase();cu=t.includes("rs")||t.includes("inr")?"₹":t.includes("eur")?"€":t.includes("gbp")?"£":"$"}break}}let ct=null;if(/credit\s*card/i.test(x))ct="Credit Card";else if(/debit\s*card/i.test(x))ct="Debit Card";else if(/\bcard\b/i.test(x))ct="Card";for(const[r,n]of[[/\bvisa\b/i,"Visa"],[/master\s*card/i,"Mastercard"],[/\bamex\b|american\s*express/i,"Amex"],[/rupay/i,"RuPay"],[/discover/i,"Discover"]])if(r.test(x)){ct=ct?`${n} ${ct}`:n;break}let l4=null;const mL=x.match(/(?:x{2,}|\*{2,}|ending\s+(?:in\s+)?|xx)\s*(\d{4})/i);if(mL)l4=mL[1];const bks=["HDFC","ICICI","SBI","State Bank","Axis","Kotak","Yes Bank","IndusInd","PNB","BoB","Bank of Baroda","Canara","IDFC","Federal","Chase","Wells Fargo","Bank of America","Citi","Citibank","Capital One","Amex","Discover","US Bank","PNC","Ally","Synchrony","TD Bank","Barclays","HSBC","Standard Chartered","Lloyds","NatWest","Santander","Monzo","Revolut","Starling","BMO","Scotiabank","RBC","CIBC","DBS","OCBC","UOB","Maybank","CIMB"];let bk=null;for(const b of bks)if(new RegExp("\\b"+b.replace(/\s+/g,"\\s+")+"\\b","i").test(x)){bk=b;break}let dt=null;const mm={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,sept:8,oct:9,nov:10,dec:11,january:0,february:1,march:2,april:3,june:5,july:6,august:7,september:8,october:9,november:10,december:11};const fmts=[/(\d{1,2})[-\s]([A-Za-z]{3,9})[-\s,]+(\d{2,4})/,/([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{2,4})/,/(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/,/([A-Za-z]{3,9})\s+(\d{1,2})\b/,/(\d{1,2})[-\s]([A-Za-z]{3,9})\b/];for(let i=0;i<fmts.length;i++){const m=x.match(fmts[i]);if(!m)continue;let d,mo,y=new Date().getFullYear();try{if(i===0){d=+m[1];mo=mm[m[2].toLowerCase()];y=+m[3]}else if(i===1){mo=mm[m[1].toLowerCase()];d=+m[2];y=+m[3]}else if(i===2){d=+m[1];mo=+m[2]-1;y=+m[3]}else if(i===3){mo=mm[m[1].toLowerCase()];d=+m[2]}else{d=+m[1];mo=mm[m[2].toLowerCase()]}if(y<100)y+=2000;if(mo===undefined||isNaN(d)||isNaN(mo))continue;const dd=new Date(y,mo,d);if(!isNaN(dd.getTime())){dt=dd.getTime();break}}catch{}}let mch=null;const mM=x.match(/\bat\s+([A-Za-z0-9][A-Za-z0-9\s&.\-'*]{1,32}?)(?=\s+on\s|\s+\.|\s+ref|\s+txn|\s+avl|\s+bal|\s+for\s|$)/i);if(mM){mch=mM[1].trim().replace(/[*]/g,"").replace(/\s+/g," ");if(mch.length>28)mch=mch.slice(0,28)}let cat="other";const h=x.toLowerCase();if(/uber|ola|lyft|taxi|metro|fuel|petrol|gas\s|parking/.test(h))cat="transport";else if(/zomato|swiggy|doordash|ubereats|restaurant|cafe|coffee|starbucks|mcdonald|kfc|pizza|dominos/.test(h))cat="food";else if(/amazon|flipkart|myntra|target|walmart|costco|ikea/.test(h))cat="shopping";else if(/whole\s*foods|kroger|safeway|trader|grocery|big\s*basket|blinkit|instacart/.test(h))cat="groceries";else if(/netflix|spotify|cinema|movie|prime|hbo|disney|hulu/.test(h))cat="entertainment";else if(/electric|water|gas\s+bill|broadband|wifi|airtel|jio|verizon|att|comcast/.test(h))cat="bills";else if(/pharmacy|hospital|clinic|medical|cvs|walgreens|apollo/.test(h))cat="health";else if(/airlines|airways|hotel|airbnb|booking|expedia|flight/.test(h))cat="travel_outstation";return{amount:a,currency:cu,cardType:ct,cardLast4:l4,bank:bk,date:dt,merchant:mch,category:cat}}
 
 function ab(acc,exp,openingBalances){const obs=(openingBalances||[]).filter(ob=>ob.accountId===acc.id).sort((a,b)=>b.date-a.date);const latestOb=obs[0]||null;const baseDate=latestOb?latestOb.date:0;let b=latestOb?latestOb.amount:(acc.opening||0);for(const e of exp){if(e.accountId!==acc.id)continue;if(e.archived)continue;if(e.date<=baseDate)continue;if(e.type==="card-payment"){b-=e.amount;continue}if(e.type==="income"||e.type==="transfer-in"||e.type==="reimbursement")b+=e.amount;else b-=e.amount}return b}
+// Balance for an account as of a point in time — same rule as ab(), but only counting transactions/reconciles known by cutoffTs.
+function abAsOf(acc,allExp,openingBalances,cutoffTs){const past=(allExp||[]).filter(e=>e.date<=cutoffTs);const obs=(openingBalances||[]).filter(ob=>ob.date<=cutoffTs);return ab(acc,past,obs)}
 // Returns outstanding balance for a reconciled credit card: reconciledAmount + new charges - new payments.
 // Returns null if card has never been reconciled (caller falls back to cc() data).
 function cardBal(card,expenses,cardOBs){const obs=(cardOBs||[]).filter(ob=>ob.cardId===card.id).sort((a,b)=>b.date-a.date);const ob=obs[0]||null;if(!ob)return null;let bal=ob.amount;for(const e of expenses){if(e.cardId!==card.id||e.archived||e.date<ob.cycleDate)continue;if(e.type==="card-payment"||e.type==="reimbursement")bal-=e.amount;else bal+=e.amount}return Math.max(0,bal)}
@@ -1419,7 +1421,7 @@ return o("div",{className:"st",children:[
   ]})}),
 ]})}
 
-function BudgetBlock({data}){const{expenses,budget,budgetPeriod,currency,monthStartDay=1}=data;const now=new Date();const st=budgetPeriod==="weekly"?ws():budgetPeriod==="yearly"?ys():ps(now,monthStartDay);const en=budgetPeriod==="weekly"?st+7*864e5:budgetPeriod==="yearly"?new Date(now.getFullYear()+1,0,1).getTime():mse(now.getFullYear(),now.getMonth(),monthStartDay);const sp=useMemo(()=>expenses.filter(e=>e.type==="expense"&&e.date>=st&&e.date<en).reduce((s,e)=>s+e.amount,0),[expenses,st,en]);const reimb=useMemo(()=>expenses.filter(e=>e.type==="expense"&&e.date>=st&&e.date<en&&e.reimbursedBy).reduce((s,e)=>s+(e.reimbursedAmount??e.amount),0),[expenses,st,en]);const netSp=Math.max(0,sp-reimb);const re=budget?budget-netSp:null,barPct=budget?Math.min(100,(netSp/budget)*100):0,realPct=budget?Math.round((netSp/budget)*100):0,ov=budget&&netSp>budget;const nw=useMemo(()=>{const nn=Date.now();const past=data.expenses.filter(e=>e.date<=nn);return data.accounts.reduce((s,a)=>s+ab(a,past),0)-(data.cards||[]).filter(x=>x.type==="credit").reduce((s,cr)=>s+cc(cr,past).outstanding,0)},[data.accounts,data.cards,expenses]);const dot=ov?c.co:c.ac;
+function BudgetBlock({data}){const{expenses,budget,budgetPeriod,currency,monthStartDay=1}=data;const now=new Date();const st=budgetPeriod==="weekly"?ws():budgetPeriod==="yearly"?ys():ps(now,monthStartDay);const en=budgetPeriod==="weekly"?st+7*864e5:budgetPeriod==="yearly"?new Date(now.getFullYear()+1,0,1).getTime():mse(now.getFullYear(),now.getMonth(),monthStartDay);const sp=useMemo(()=>expenses.filter(e=>e.type==="expense"&&e.date>=st&&e.date<en).reduce((s,e)=>s+e.amount,0),[expenses,st,en]);const reimb=useMemo(()=>expenses.filter(e=>e.type==="expense"&&e.date>=st&&e.date<en&&e.reimbursedBy).reduce((s,e)=>s+(e.reimbursedAmount??e.amount),0),[expenses,st,en]);const netSp=Math.max(0,sp-reimb);const re=budget?budget-netSp:null,barPct=budget?Math.min(100,(netSp/budget)*100):0,realPct=budget?Math.round((netSp/budget)*100):0,ov=budget&&netSp>budget;const dot=ov?c.co:c.ac;
 return o("div",{style:{background:c.sfg,borderRadius:16,border:`1px solid ${ov?c.co+"50":c.brs}`,overflow:"hidden",marginBottom:10},children:[
   o("div",{style:{padding:"12px 16px 10px",borderBottom:`1px solid ${c.brs}`,background:`linear-gradient(135deg,${dot}12 0%,transparent 60%)`},children:[
     o("div",{className:"f ia jb",children:[
@@ -1449,10 +1451,6 @@ return o("div",{style:{background:c.sfg,borderRadius:16,border:`1px solid ${ov?c
     ]}),
   ]}),
   budget!=null&&t("div",{style:{padding:"0 16px 14px"},children:t("div",{style:{height:6,background:c.sf2,borderRadius:999,overflow:"hidden"},children:t("div",{style:{width:barPct+"%",height:"100%",background:ov?`linear-gradient(90deg,${c.co},#FF3300)`:c.ac,transition:"width 600ms cubic-bezier(0.2,0.9,0.2,1)",boxShadow:ov?`0 0 10px ${c.co}60`:`0 0 6px ${c.ac}40`}})})}),
-  t("div",{style:{padding:"10px 16px 14px",borderTop:`1px solid ${c.brs}`},children:o("div",{className:"f ia",style:{gap:6},children:[
-    t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1},children:"NET WORTH"}),
-    t("div",{style:{fontFamily:F.mo,fontSize:12,fontWeight:600,color:nw<0?c.co:c.gd},children:fs(nw,currency)}),
-  ]})}),
 ]})}
 
 // === SPENDING BREAKDOWN (Needs vs Wants · 50/30/20) — standalone, no app-wide effect ===
@@ -2811,7 +2809,7 @@ function Reconcile({data,onClose,onReconcile,onEditEntry,onDeleteEntry}){
             ]}),
             t("button",{onClick:()=>{onDeleteEntry&&onDeleteEntry(ob.id);sEditId(null)},className:"w100 act98 tr",style:{marginTop:8,padding:"9px 0",background:"transparent",border:`1px solid ${c.ro}55`,borderRadius:10,color:c.ro,fontSize:12},children:"Delete this entry"})
           ]});
-          return o("button",{key:ob.id,onClick:()=>startEdit(ob),className:"w100 f ia jb act95 trt",style:{padding:"12px 14px",borderBottom:last?"none":`1px solid ${c.brs}`,gap:10,background:"transparent",border:"none",cursor:"pointer"},children:[
+          return o("button",{key:ob.id,onClick:()=>startEdit(ob),className:"w100 f ia jb act95 trt",style:{padding:"12px 14px",gap:10,background:"transparent",border:"none",cursor:"pointer",borderBottom:last?"none":`1px solid ${c.brs}`},children:[
             o("div",{className:"f ia",style:{gap:10,minWidth:0},children:[
               t("span",{style:{fontSize:18},children:acc?acc.emoji:"💼"}),
               o("div",{className:"tl minw0",children:[
@@ -2828,7 +2826,40 @@ function Reconcile({data,onClose,onReconcile,onEditEntry,onDeleteEntry}){
 }
 
 // === MONTHLY HISTORY (reset amounts + activity by month) ===
+function MonthAcctDetail({data,mk,accountId,onBack}){
+  const acc=(data.accounts||[]).find(a=>a.id===accountId);
+  const isCredit=e=>e.type==="income"||e.type==="transfer-in"||e.type==="reimbursement";
+  const{start,end}=useMemo(()=>{const[y,mo]=mk.split("-").map(Number);return{start:new Date(y,mo-1,1,0,0,0,0).getTime(),end:new Date(y,mo,1,0,0,0,0).getTime()}},[mk]);
+  const opening=useMemo(()=>acc?abAsOf(acc,data.expenses,data.openingBalances,start-1):0,[acc,data.expenses,data.openingBalances,start]);
+  const closing=useMemo(()=>acc?abAsOf(acc,data.expenses,data.openingBalances,end-1):0,[acc,data.expenses,data.openingBalances,end]);
+  const monthTx=useMemo(()=>acc?(data.expenses||[]).filter(e=>e.accountId===accountId&&e.date>=start&&e.date<end):[],[data.expenses,accountId,start,end,acc]);
+  const totalIncome=useMemo(()=>monthTx.filter(isCredit).reduce((s,e)=>s+e.amount,0),[monthTx]);
+  const totalExpense=useMemo(()=>monthTx.filter(e=>!isCredit(e)).reduce((s,e)=>s+e.amount,0),[monthTx]);
+  const pairs=useMemo(()=>txPairs(data.expenses),[data.expenses]);
+  const list=useMemo(()=>[...monthTx].sort((a,b)=>b.date-a.date||(a.id>b.id?1:-1)).map(e=>enrichTx(e,pairs)),[monthTx,pairs]);
+  if(!acc)return null;
+  const cur=acc.currency||data.currency;
+  const monLabel=new Date(start).toLocaleDateString("en-US",{month:"long",year:"numeric"});
+  return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
+    t(SH,{title:t("em",{children:acc.name}),onBack}),
+    t("div",{style:{fontFamily:F.mo,fontSize:11,color:c.tm,letterSpacing:1,marginBottom:12},children:monLabel.toUpperCase()+(acc.isBank?" · BANK":"")}),
+    o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:16,marginBottom:16},children:[
+      o("div",{className:"g g2",style:{gap:12},children:[
+        o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1},children:"OPENING BALANCE"}),t("div",{style:{fontFamily:F.mo,fontSize:16,fontWeight:600,color:opening<0?c.co:c.tx,marginTop:3},children:fm(opening,cur)})]}),
+        o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1},children:"CLOSING BALANCE"}),t("div",{style:{fontFamily:F.mo,fontSize:16,fontWeight:600,color:closing<0?c.co:c.tx,marginTop:3},children:fm(closing,cur)})]}),
+      ]}),
+      t(Hr,{mt:"14px",mb:"12px"}),
+      o("div",{className:"g g2",style:{gap:12},children:[
+        o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.mt,letterSpacing:1},children:"TOTAL INCOME"}),t("div",{style:{fontFamily:F.mo,fontSize:16,fontWeight:600,color:c.mt,marginTop:3},children:"+"+fm(totalIncome,cur)})]}),
+        o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.co,letterSpacing:1},children:"TOTAL EXPENSES"}),t("div",{style:{fontFamily:F.mo,fontSize:16,fontWeight:600,color:c.co,marginTop:3},children:"−"+fm(totalExpense,cur)})]}),
+      ]}),
+    ]}),
+    o("div",{className:"f ia jb",style:{marginBottom:10},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:"TRANSACTIONS"}),t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm},children:`${list.length} TOTAL`})]}),
+    list.length===0?t("div",{style:{padding:"32px 16px",textAlign:"center",background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,color:c.tm,fontSize:13},children:"No transactions this month"}):t("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`},children:list.map((e,i)=>t(TX,{key:e.id,expense:e,accounts:data.accounts,cards:data.cards||[],isLast:i===list.length-1}))}),
+  ]});
+}
 function MonthHist({data,onClose}){
+  const[sel,setSel]=useState(null);
   const accMap=Object.fromEntries((data.accounts||[]).map(a=>[a.id,a]));
   const isCredit=e=>e.type==="income"||e.type==="transfer-in"||e.type==="reimbursement";
   const months=useMemo(()=>{
@@ -2846,6 +2877,7 @@ function MonthHist({data,onClose}){
     return Object.keys(m).sort((a,b)=>a<b?1:-1).map(mk=>({mk,accts:m[mk]}));
   },[data.expenses,data.openingBalances]);
   const monLabel=(mk)=>{const[y,mo]=mk.split("-").map(Number);return new Date(y,mo-1,1).toLocaleDateString("en-US",{month:"long",year:"numeric"})};
+  if(sel)return t(MonthAcctDetail,{data,mk:sel.mk,accountId:sel.accountId,onBack:()=>setSel(null)});
   return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
     t(SH,{title:t("em",{children:"Monthly History"}),onBack:onClose}),
     months.length===0?t("div",{style:{padding:"48px 8px",textAlign:"center",color:c.tm,fontSize:13,lineHeight:1.6},children:"No history yet. Reconcile an account or log transactions and each month will show up here."})
@@ -2863,7 +2895,7 @@ function MonthHist({data,onClose}){
         ]}),
         ...ids.map((id,i)=>{
           const a=accMap[id];const cell=accts[id];const cur=a.currency||data.currency;const last=i===ids.length-1;
-          return o("div",{key:id,style:{padding:"12px 16px",borderBottom:last?"none":`1px solid ${c.brs}`},children:
+          return o("button",{key:id,onClick:()=>setSel({mk,accountId:id}),className:"w100 act95 trt",style:{display:"block",textAlign:"left",padding:"12px 16px",background:"transparent",border:"none",borderBottom:last?"none":`1px solid ${c.brs}`},children:
             o("div",{className:"f ia jb",children:[
               o("div",{className:"f ia",style:{gap:9,minWidth:0},children:[
                 t("span",{style:{fontSize:17},children:a.emoji}),
