@@ -2733,21 +2733,44 @@ const RECONCILABLE_TYPES=new Set(["savings","checking","cash","other"]);
 const tsToIso=(ts)=>{const d=new Date(ts);const p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())};
 const isoToTs=(iso)=>{const[y,m,dd]=(iso||"").split("-").map(Number);return new Date(y||1970,(m||1)-1,dd||1,23,59,59,999).getTime()};
 function Reconcile({data,onClose,onReconcile,onEditEntry,onDeleteEntry}){
-  const accts=(data.accounts||[]).filter(a=>RECONCILABLE_TYPES.has(a.type));
-  const[bals,sBals]=useState(()=>Object.fromEntries(accts.map(a=>[a.id,""])));
+  const recon=(data.accounts||[]).filter(a=>RECONCILABLE_TYPES.has(a.type));
+  const trackerAccts=recon.filter(a=>!a.isBank);
+  const bankAccts=recon.filter(a=>a.isBank);
+  const[bals,sBals]=useState(()=>Object.fromEntries(recon.map(a=>[a.id,""])));
   const todayIso=tsToIso(Date.now());
   const[dateIso,sDateIso]=useState(todayIso);
   const[editId,sEditId]=useState(null);
   const[eAmt,sEAmt]=useState("");
   const[eDate,sEDate]=useState("");
   const monthLabel=new Date(isoToTs(dateIso)).toLocaleDateString("en-US",{month:"long",year:"numeric"});
-  const allFilled=accts.length>0&&accts.every(a=>bals[a.id]!==''&&!isNaN(parseFloat(bals[a.id])));
-  const handle=()=>{if(!allFilled)return;const dt=isoToTs(dateIso);onReconcile(accts.map(a=>({accountId:a.id,amount:parseFloat(bals[a.id]),date:dt})));};
+  const filled=a=>bals[a.id]!==''&&!isNaN(parseFloat(bals[a.id]));
+  const trackerFilled=trackerAccts.every(filled);
+  const canSubmit=recon.length>0&&(trackerAccts.length>0?trackerFilled:recon.some(filled));
+  const handle=()=>{if(!canSubmit)return;const dt=isoToTs(dateIso);const entries=recon.filter(filled).map(a=>({accountId:a.id,amount:parseFloat(bals[a.id]),date:dt}));if(!entries.length)return;onReconcile(entries);};
   const accMap=Object.fromEntries((data.accounts||[]).map(a=>[a.id,a]));
   const log=[...(data.openingBalances||[])].sort((a,b)=>b.date-a.date);
   const startEdit=(ob)=>{sEditId(ob.id);sEAmt(String(ob.amount));sEDate(tsToIso(ob.date))};
   const saveEdit=()=>{const amt=parseFloat(eAmt);if(isNaN(amt)||!eDate)return;onEditEntry&&onEditEntry(editId,{amount:amt,date:isoToTs(eDate)});sEditId(null)};
   const dateInpSty={width:"100%",boxSizing:"border-box",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px",color:c.tx,fontSize:15,fontFamily:F.mo,outline:"none",colorScheme:"dark"};
+  const row=(a)=>{
+    const curBal=ab(a,data.expenses,data.openingBalances);
+    return o("div",{key:a.id,style:{marginBottom:14},children:[
+      o("div",{className:"f ia jb",style:{marginBottom:8},children:[
+        o("div",{className:"f ia",style:{gap:8},children:[
+          t("span",{style:{fontSize:20},children:a.emoji}),
+          t("span",{style:{fontWeight:600,fontSize:15,color:c.tx},children:a.name})
+        ]}),
+        o("div",{className:"trg",children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:.5},children:"APP BALANCE"}),
+          t("div",{style:{fontFamily:F.mo,fontSize:13,color:c.td,marginTop:1},children:fm(curBal,a.currency||data.currency)})
+        ]})
+      ]}),
+      o("div",{className:"f ia",style:{background:c.sfg,border:`1px solid ${bals[a.id]?c.ac:c.brs}`,borderRadius:12,padding:"12px 14px",gap:8},children:[
+        t("span",{style:{color:c.td,fontFamily:F.mo,fontSize:16},children:a.currency||data.currency}),
+        t("input",{type:"text",inputMode:"decimal",value:bals[a.id],onChange:e=>sBals(b=>({...b,[a.id]:e.target.value.replace(/[^\d.\-]/g,"")})),placeholder:"Actual balance",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:16,fontFamily:F.mo}})
+      ]})
+    ]});
+  };
   return o("div",{style:{padding:"8px 0 32px"},children:[
     t(SH,{title:t("em",{children:"Reconcile"}),onBack:onClose}),
     o("div",{style:{padding:"0 24px"},children:[
@@ -2759,27 +2782,15 @@ function Reconcile({data,onClose,onReconcile,onEditEntry,onDeleteEntry}){
         t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,marginBottom:6},children:"AS OF DATE"}),
         t("input",{type:"date",value:dateIso,max:todayIso,onChange:e=>sDateIso(e.target.value),style:dateInpSty})
       ]}),
-      accts.length===0&&t("div",{style:{padding:"32px 0",textAlign:"center",color:c.tm,fontSize:13},children:"No savings, checking, cash, or other accounts found."}),
-      ...accts.map(a=>{
-        const curBal=ab(a,data.expenses,data.openingBalances);
-        return o("div",{key:a.id,style:{marginBottom:14},children:[
-          o("div",{className:"f ia jb",style:{marginBottom:8},children:[
-            o("div",{className:"f ia",style:{gap:8},children:[
-              t("span",{style:{fontSize:20},children:a.emoji}),
-              t("span",{style:{fontWeight:600,fontSize:15,color:c.tx},children:a.name})
-            ]}),
-            o("div",{className:"trg",children:[
-              t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:.5},children:"APP BALANCE"}),
-              t("div",{style:{fontFamily:F.mo,fontSize:13,color:c.td,marginTop:1},children:fm(curBal,a.currency||data.currency)})
-            ]})
-          ]}),
-          o("div",{className:"f ia",style:{background:c.sfg,border:`1px solid ${bals[a.id]?c.ac:c.brs}`,borderRadius:12,padding:"12px 14px",gap:8},children:[
-            t("span",{style:{color:c.td,fontFamily:F.mo,fontSize:16},children:a.currency||data.currency}),
-            t("input",{type:"text",inputMode:"decimal",value:bals[a.id],onChange:e=>sBals(b=>({...b,[a.id]:e.target.value.replace(/[^\d.\-]/g,"")})),placeholder:"Actual balance",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:16,fontFamily:F.mo}})
-          ]})
-        ]});
-      }),
-      accts.length>0&&t("button",{disabled:!allFilled,onClick:handle,className:"w100 act98 tr",style:{marginTop:10,padding:"16px 0",background:allFilled?c.ac:c.sf2,color:allFilled?"#0a0a0a":c.tm,borderRadius:14,fontWeight:600,fontSize:15,letterSpacing:.3,border:"none"},children:allFilled?"Set Opening Balance":"Fill in all balances"}),
+      recon.length===0&&t("div",{style:{padding:"32px 0",textAlign:"center",color:c.tm,fontSize:13},children:"No savings, checking, cash, or other accounts found."}),
+      trackerAccts.length>0&&bankAccts.length>0&&t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,marginBottom:10},children:"ACCOUNTS TO RESET"}),
+      ...trackerAccts.map(row),
+      bankAccts.length>0&&o("div",{style:{marginTop:trackerAccts.length?18:0,marginBottom:10},children:[
+        t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1},children:"🏦 BANK ACCOUNTS · OPTIONAL"}),
+        t("div",{style:{fontSize:11,color:c.tm,marginTop:3,lineHeight:1.4},children:"Only fill these to correct a bank balance — they're not part of the monthly reset."})
+      ]}),
+      ...bankAccts.map(row),
+      recon.length>0&&t("button",{disabled:!canSubmit,onClick:handle,className:"w100 act98 tr",style:{marginTop:10,padding:"16px 0",background:canSubmit?c.ac:c.sf2,color:canSubmit?"#0a0a0a":c.tm,borderRadius:14,fontWeight:600,fontSize:15,letterSpacing:.3,border:"none"},children:canSubmit?"Set Opening Balance":(trackerAccts.length>0?"Fill in all accounts to reset":"Enter at least one balance")}),
       log.length>0&&o("div",{style:{marginTop:28},children:[
         t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,marginBottom:10},children:"RECONCILE LOG · "+log.length}),
         t("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,overflow:"hidden"},children:log.map((ob,i)=>{
@@ -2822,12 +2833,15 @@ function Accts({data,onClose,onAdd,onSelect,onReconcile}){
   const accentOf=t2=>({cash:c.mt,checking:c.sk,savings:c.ac,credit:c.co,investment:c.lv,other:c.gd}[t2]||c.gd);
   const accts=data.accounts.map(a=>({a,bal:ab(a,data.expenses,data.openingBalances),cnt:data.expenses.filter(e=>e.accountId===a.id).length}));
   const curMonth=new Date().toISOString().slice(0,7);
-  const needsReconcile=onReconcile&&data.accounts.some(a=>RECONCILABLE_TYPES.has(a.type))&&!(data.openingBalances||[]).some(ob=>ob.month===curMonth);
+  const trackerIds=new Set(data.accounts.filter(a=>RECONCILABLE_TYPES.has(a.type)&&!a.isBank).map(a=>a.id));
+  const needsReconcile=onReconcile&&trackerIds.size>0&&!(data.openingBalances||[]).some(ob=>ob.month===curMonth&&trackerIds.has(ob.accountId));
   const cardLiab=(data.cards||[]).filter(x=>x.type==="credit").reduce((s,cr)=>s+cc(cr,data.expenses).outstanding,0);
   const assets=accts.reduce((s,x)=>s+Math.max(0,x.bal),0);
   const liab=accts.reduce((s,x)=>s+Math.max(0,-x.bal),0)+cardLiab;
   const net=assets-liab,tot=assets+liab,aPct=tot>0?Math.round(assets/tot*100):50;
-  const groups=AT.map(T=>({T,items:accts.filter(x=>(known.has(x.a.type)?x.a.type:"other")===T.id)})).filter(g=>g.items.length);
+  const bankItems=accts.filter(x=>x.a.isBank);
+  const typeGroups=AT.map(T=>({key:T.id,label:T.label.toUpperCase(),items:accts.filter(x=>!x.a.isBank&&(known.has(x.a.type)?x.a.type:"other")===T.id)})).filter(g=>g.items.length);
+  const groups=[...(bankItems.length?[{key:"__bank",label:"🏦 BANK ACCOUNTS",items:bankItems}]:[]),...typeGroups];
   return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
   t(SH,{title:t("em",{children:"Accounts"}),onBack:onClose,right:t("button",{onClick:onAdd,className:"act90 trt",style:{width:38,height:38,borderRadius:12,background:c.ac,color:"#0a0a0a",display:"flex",alignItems:"center",justifyContent:"center",border:"none"},children:t(Plus,{size:20,strokeWidth:2.5})})}),
   o("div",{style:{marginBottom:20,background:`linear-gradient(135deg,${(net<0?c.co:c.mt)}1f 0%,${c.sfg} 58%)`,borderRadius:20,border:`1px solid ${c.brs}`,padding:18},children:[
@@ -2840,8 +2854,8 @@ function Accts({data,onClose,onAdd,onSelect,onReconcile}){
     ]}),
   ]}),
   needsReconcile&&o("button",{onClick:onReconcile,className:"w100 act97 trt",style:{display:"flex",alignItems:"center",gap:12,padding:"13px 14px",background:`linear-gradient(135deg,${c.gd}20 0%,${c.sfg} 60%)`,border:`1px solid ${c.gd}50`,borderRadius:14,textAlign:"left",marginBottom:16,width:"100%"},children:[t("span",{style:{fontSize:20},children:"⚖️"}),o("div",{className:"f1",children:[t("div",{style:{fontWeight:600,fontSize:14,color:c.tx},children:"Monthly Reconcile Due"}),t("div",{style:{fontSize:12,color:c.td,marginTop:2},children:"Tap to set opening balances for "+new Date().toLocaleDateString("en-US",{month:"long",year:"numeric"})})]})]}),
-  ...groups.map(g=>o("div",{key:g.T.id,style:{marginBottom:18},children:[
-    o("div",{className:"f ia jb",style:{marginBottom:10,padding:"0 2px"},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:g.T.label.toUpperCase()}),t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.td},children:fm(g.items.reduce((s,x)=>s+x.bal,0),data.currency)})]}),
+  ...groups.map(g=>o("div",{key:g.key,style:{marginBottom:18},children:[
+    o("div",{className:"f ia jb",style:{marginBottom:10,padding:"0 2px"},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:g.label}),t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.td},children:fm(g.items.reduce((s,x)=>s+x.bal,0),data.currency)})]}),
     ...g.items.map(({a,bal,cnt})=>{const accent=accentOf(known.has(a.type)?a.type:"other");return o("button",{key:a.id,onClick:()=>onSelect&&onSelect(a),className:"w100 act98 trt",style:{display:"block",textAlign:"left",border:`1px solid ${accent}40`,borderRadius:18,padding:"15px 16px",background:`linear-gradient(135deg,${accent}1f 0%,${c.sfg} 62%)`,marginBottom:10},children:o("div",{className:"f ia jb",children:[
       o("div",{className:"f ia",style:{gap:13,minWidth:0},children:[t("div",{style:{width:46,height:46,borderRadius:14,background:accent+"26",display:"flex",alignItems:"center",justifyContent:"center",fontSize:23,flexShrink:0},children:a.emoji}),o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:16,fontWeight:600,color:c.tx},children:a.name}),o("div",{style:{fontSize:11.5,color:c.tm,marginTop:2},children:`${cnt} txn`})]})]}),
       o("div",{className:"f ia",style:{gap:10,flexShrink:0},children:[o("div",{className:"trg",children:[t("div",{style:{fontFamily:F.mo,fontSize:8.5,color:c.tm,letterSpacing:1},children:"BALANCE"}),t("div",{style:{fontFamily:F.mo,fontSize:16,fontWeight:600,color:bal<0?c.co:c.tx,marginTop:2},children:fm(bal,a.currency)})]}),t(CR,{size:16,color:accent})]}),
@@ -2888,7 +2902,7 @@ function AcctDet({data,acctId,onClose,onEdit,onTx,onDelete,onRevertReconcile}){c
   ]})}
 
 const ACC_EMOJIS=["💰","💵","💴","💶","💷","💳","🏦","🏧","💎","📈","📉","📊","🐖","💼","🏠","🏡","🚗","✈️","🎯","⚡","🌟","💡","🔑","🏆","🎁","💊","🛒","📱","💻","🎮","🎵","☕","🍜","🛍️","📦","💫","✨","🔧","🌐","🏅"];
-function NewAcc({onSave,onCancel,editing}){const iE=!!editing;const[n,sN]=useState(iE?editing.name:""),[ty,sTy]=useState(iE?editing.type:"checking"),[cu,sCu]=useState(iE?editing.currency:"₹"),[op2,sOp]=useState(iE?String(editing.opening||""):"");const T2=AT.find(x=>x.id===ty)||AT[0];const[em,sEm]=useState(iE?(editing.emoji||T2.emoji):T2.emoji);const[manEm,sManEm]=useState(false);const[showEP,sShowEP]=useState(false);const va=n.trim().length>0;return o("div",{style:{padding:"8px 0 32px"},children:[t(SH,{title:t("em",{children:iE?"Edit account":"New account"}),onBack:onCancel}),o("div",{style:{padding:"0 24px"},children:[
+function NewAcc({onSave,onCancel,editing}){const iE=!!editing;const[n,sN]=useState(iE?editing.name:""),[ty,sTy]=useState(iE?editing.type:"checking"),[cu,sCu]=useState(iE?editing.currency:"₹"),[op2,sOp]=useState(iE?String(editing.opening||""):"");const T2=AT.find(x=>x.id===ty)||AT[0];const[em,sEm]=useState(iE?(editing.emoji||T2.emoji):T2.emoji);const[manEm,sManEm]=useState(false);const[showEP,sShowEP]=useState(false);const[isBank,sIsBank]=useState(iE?!!editing.isBank:false);const va=n.trim().length>0;return o("div",{style:{padding:"8px 0 32px"},children:[t(SH,{title:t("em",{children:iE?"Edit account":"New account"}),onBack:onCancel}),o("div",{style:{padding:"0 24px"},children:[
   t(FI,{label:"Name",value:n,onChange:sN,placeholder:"e.g., Chase Checking"}),
   o("div",{style:{marginTop:16},children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"TYPE"}),t("div",{className:"g g3",style:{gap:8},children:AT.map(x=>{const ac2=ty===x.id;return o("button",{key:x.id,onClick:()=>{sTy(x.id);if(!manEm)sEm(AT.find(a=>a.id===x.id)?.emoji||em)},className:"act95 tr f fc ia",style:{gap:4,padding:"12px 0",background:ac2?c.sf3:c.sf,border:`1px solid ${ac2?c.ac:c.brs}`,borderRadius:12},children:[t("span",{style:{fontSize:20},children:x.emoji}),t("span",{style:{fontSize:11,color:ac2?c.tx:c.td},children:x.label})]})})})]}),
   o("div",{style:{marginTop:16},children:[
@@ -2901,7 +2915,8 @@ function NewAcc({onSave,onCancel,editing}){const iE=!!editing;const[n,sN]=useSta
   ]}),
   o("div",{style:{marginTop:16},children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"CURRENCY"}),t("div",{className:"g g5",style:{gap:6},children:CUR.map(x=>t("button",{key:x,onClick:()=>sCu(x),style:{padding:"10px 0",background:cu===x?c.sf3:c.sf,border:`1px solid ${cu===x?c.ac:c.brs}`,borderRadius:10,color:c.tx,fontFamily:F.mo,fontSize:14,fontWeight:500},children:x}))})]}),
   o("div",{style:{marginTop:16},children:[t(FI,{label:"Opening balance (optional)",value:op2,onChange:v=>sOp(v.replace(/[^\d.\-]/g,"")),placeholder:"0.00",mono:true})]}),
-  t("div",{style:{marginTop:24},children:t("button",{disabled:!va,onClick:()=>onSave({name:n.trim(),type:ty,currency:cu,emoji:em,opening:parseFloat(op2)||0}),className:"w100 act98 tr",style:{padding:"16px 0",background:va?c.ac:c.sf2,color:va?"#0a0a0a":c.tm,borderRadius:14,fontWeight:600,fontSize:15,letterSpacing:.3,border:"none"},children:va?(iE?"Save changes":"Add account"):"Enter a name"})}),
+  o("div",{style:{marginTop:16},children:t(TR,{icon:t("span",{style:{fontSize:16},children:"🏦"}),label:"Bank account",subtitle:isBank?"Kept in its own section · left out of the monthly reset":"Turn on to keep this account separate from your monthly reset",active:isBank,onToggle:()=>sIsBank(v=>!v)})}),
+  t("div",{style:{marginTop:24},children:t("button",{disabled:!va,onClick:()=>onSave({name:n.trim(),type:ty,currency:cu,emoji:em,opening:parseFloat(op2)||0,isBank}),className:"w100 act98 tr",style:{padding:"16px 0",background:va?c.ac:c.sf2,color:va?"#0a0a0a":c.tm,borderRadius:14,fontWeight:600,fontSize:15,letterSpacing:.3,border:"none"},children:va?(iE?"Save changes":"Add account"):"Enter a name"})}),
 ]})]})}
 
 // === CARDS (CRED-style) ===
