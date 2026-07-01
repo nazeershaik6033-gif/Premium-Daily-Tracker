@@ -979,6 +979,7 @@ function App(){
         v==="accounts"&&t(Accts,{data:dv,onClose:()=>sV(navFromRef.current),onAdd:()=>sV("newAccount"),onDelete:dA,onEdit:a=>{sEAcc(a);sV("editAccount")},onSelect:a=>{sAdId(a.id);sV("acctDetail")},onReconcile:()=>sV("reconcile")}),
         v==="acctDetail"&&adId&&t(AcctDet,{data:dv,acctId:adId,onClose:()=>sV("accounts"),onEdit:()=>{const a=d.accounts.find(x=>x.id===adId);sEAcc(a);sV("editAccount")},onTx:sAtx,onDelete:()=>{dA(adId);sAdId(null);sV("accounts")},onRevertReconcile:doRevertReconcile}),
         v==="reconcile"&&t(Reconcile,{data:dv,onClose:()=>sV("accounts"),onReconcile:(entries)=>{doReconcile(entries);sV("accounts")},onEditEntry:doEditReconcile,onDeleteEntry:doDeleteReconcile}),
+        v==="monthHist"&&t(MonthHist,{data:dv,onClose:()=>sV(navFromRef.current||"more")}),
         v==="newAccount"&&t(NewAcc,{onSave:a=>{aA(a);sV("accounts")},onCancel:()=>sV("accounts")}),
         v==="editAccount"&&eAcc&&t(NewAcc,{onSave:a=>{uA({...eAcc,...a});sEAcc(null);sV("accounts")},onCancel:()=>{sEAcc(null);sV("accounts")},editing:eAcc}),
         v==="rules"&&t(Rules,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
@@ -2723,7 +2724,7 @@ return o("div",{className:"fi",style:{paddingTop:48,paddingBottom:32},children:[
 function KV({label,value,full}){return o("div",{style:full?{gridColumn:"1 / -1"}:{},children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:2},children:label.toUpperCase()}),t("div",{className:"tru",style:{fontSize:14},children:value})]})}
 
 // === MORE ===
-function More({data,onClose,onView}){const items=[{id:"chat",e:"✨",l:"AI Assistant",s:"Add or edit by chat",hi:true},{id:"billScan",e:"📸",l:"Snap a bill",s:"Auto-extract from receipt",hi:true},t("h",1),{id:"cards",e:"💳",l:"Cards",s:`${(data.cards||[]).length} ${(data.cards||[]).length===1?"card":"cards"}`,acc:true},{id:"cardPayFix",e:"🪙",l:"Fix card bill payments",s:(()=>{const n=(data.expenses||[]).filter(e=>isCardBillPayment(e,data.cards)).length;return n>0?`${n} suspected double-count${n===1?"":"s"}`:"Remove double-counted bills"})(),acc:true},{id:"bills",e:"🔔",l:"Bills & Reminders",s:`${(data.bills||[]).length} ${(data.bills||[]).length===1?"bill":"bills"}`,acc:true},{id:"goals",e:"🎯",l:"Goals & Debt",s:`${(data.goals||[]).length} active`,acc:true},{id:"budgetLoans",e:"🧾",l:"Budget Loans",s:(()=>{const n=(data.budgetLoans||[]).filter(l=>l.status!=="paid").length;return n>0?`${n} to repay`:"Repay past overspends"})(),acc:true},{id:"investments",e:"💼",l:"My Investments",s:`${(data.investments||[]).length} holding${(data.investments||[]).length!==1?"s":""}`,acc:true},{id:"wealth",e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},{id:"monthlyReport",e:"📰",l:"Monthly Report",s:"Print or share PDF",acc:true},t("h",2),{id:"search",e:"🔍",l:"Search",s:"Find any transaction"},{id:"accounts",e:"🏦",l:"Accounts",s:`${data.accounts.length} active`},{id:"reconcile",e:"⚖️",l:"Reconcile Accounts",s:"Monthly opening balance reset"},{id:"transfer",e:"↔️",l:"Transfer",s:"Move between accounts"},{id:"recurring",e:"🔁",l:"Recurring",s:`${data.recurring.length} subscriptions`},{id:"profiles",e:"⚡",l:"Quick profiles",s:`${data.profiles.length} saved`},{id:"categoryBudgets",e:"📏",l:"Category budgets",s:`${Object.keys(data.categoryBudgets||{}).filter(k=>data.categoryBudgets[k].limit>0).length} set`},{id:"categories",e:"🏷️",l:"Categories",s:"Manage expense types"},{id:"tips",e:"💡",l:"Financial Health",s:"Scores, ratios & tips"},{id:"settings",e:"⚙️",l:"Settings",s:"Currency, budget, backup"}];return o("div",{style:{padding:"8px 24px 32px"},children:[
+function More({data,onClose,onView}){const items=[{id:"chat",e:"✨",l:"AI Assistant",s:"Add or edit by chat",hi:true},{id:"billScan",e:"📸",l:"Snap a bill",s:"Auto-extract from receipt",hi:true},t("h",1),{id:"cards",e:"💳",l:"Cards",s:`${(data.cards||[]).length} ${(data.cards||[]).length===1?"card":"cards"}`,acc:true},{id:"cardPayFix",e:"🪙",l:"Fix card bill payments",s:(()=>{const n=(data.expenses||[]).filter(e=>isCardBillPayment(e,data.cards)).length;return n>0?`${n} suspected double-count${n===1?"":"s"}`:"Remove double-counted bills"})(),acc:true},{id:"bills",e:"🔔",l:"Bills & Reminders",s:`${(data.bills||[]).length} ${(data.bills||[]).length===1?"bill":"bills"}`,acc:true},{id:"goals",e:"🎯",l:"Goals & Debt",s:`${(data.goals||[]).length} active`,acc:true},{id:"budgetLoans",e:"🧾",l:"Budget Loans",s:(()=>{const n=(data.budgetLoans||[]).filter(l=>l.status!=="paid").length;return n>0?`${n} to repay`:"Repay past overspends"})(),acc:true},{id:"investments",e:"💼",l:"My Investments",s:`${(data.investments||[]).length} holding${(data.investments||[]).length!==1?"s":""}`,acc:true},{id:"wealth",e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},{id:"monthlyReport",e:"📰",l:"Monthly Report",s:"Print or share PDF",acc:true},t("h",2),{id:"search",e:"🔍",l:"Search",s:"Find any transaction"},{id:"accounts",e:"🏦",l:"Accounts",s:`${data.accounts.length} active`},{id:"reconcile",e:"⚖️",l:"Reconcile Accounts",s:"Monthly opening balance reset"},{id:"monthHist",e:"🗓️",l:"Monthly History",s:"Reset & activity by month"},{id:"transfer",e:"↔️",l:"Transfer",s:"Move between accounts"},{id:"recurring",e:"🔁",l:"Recurring",s:`${data.recurring.length} subscriptions`},{id:"profiles",e:"⚡",l:"Quick profiles",s:`${data.profiles.length} saved`},{id:"categoryBudgets",e:"📏",l:"Category budgets",s:`${Object.keys(data.categoryBudgets||{}).filter(k=>data.categoryBudgets[k].limit>0).length} set`},{id:"categories",e:"🏷️",l:"Categories",s:"Manage expense types"},{id:"tips",e:"💡",l:"Financial Health",s:"Scores, ratios & tips"},{id:"settings",e:"⚙️",l:"Settings",s:"Currency, budget, backup"}];return o("div",{style:{padding:"8px 24px 32px"},children:[
   t(SH,{title:t("em",{children:"More"}),onBack:onClose}),
   t("div",{style:{marginTop:16,background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden"},children:items.filter(x=>x.id).map((d2,i)=>{const last=i===items.filter(x=>x.id).length-1;return o("button",{key:d2.id,onClick:()=>onView(d2.id),className:"w100 f ia trc",style:{gap:12,padding:"14px 16px",background:"transparent",borderBottom:last?"none":`1px solid ${c.brs}`},children:[t("div",{style:{width:40,height:40,borderRadius:12,background:d2.hi?c.lv+"25":d2.acc?c.sk+"20":c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0},children:d2.e}),o("div",{className:"f1 tl",children:[t("div",{style:{fontFamily:c.hf,fontSize:14,fontWeight:600,color:d2.hi?c.lv:(d2.acc?c.sk:c.tx)},children:d2.l}),t("div",{style:{fontSize:12,color:c.tm,marginTop:2},children:d2.s})]}),t(CR,{size:15,color:c.tm})]})})}),
 ]})}
@@ -2821,6 +2822,64 @@ function Reconcile({data,onClose,onReconcile,onEditEntry,onDeleteEntry}){
         })})
       ]})
     ]})
+  ]});
+}
+
+// === MONTHLY HISTORY (reset amounts + activity by month) ===
+function MonthHist({data,onClose}){
+  const accMap=Object.fromEntries((data.accounts||[]).map(a=>[a.id,a]));
+  const isCredit=e=>e.type==="income"||e.type==="transfer-in"||e.type==="reimbursement";
+  const months=useMemo(()=>{
+    const m={};
+    const ensure=(mk,id)=>{m[mk]=m[mk]||{};m[mk][id]=m[mk][id]||{spent:0,credited:0,reset:null,resetDate:0};return m[mk][id]};
+    for(const e of (data.expenses||[])){
+      if(e.archived||!e.accountId)continue;
+      const cell=ensure(new Date(e.date).toISOString().slice(0,7),e.accountId);
+      if(isCredit(e))cell.credited+=e.amount;else cell.spent+=e.amount;
+    }
+    for(const ob of (data.openingBalances||[])){
+      const cell=ensure(ob.month||new Date(ob.date).toISOString().slice(0,7),ob.accountId);
+      if(ob.date>=cell.resetDate){cell.reset=ob.amount;cell.resetDate=ob.date}
+    }
+    return Object.keys(m).sort((a,b)=>a<b?1:-1).map(mk=>({mk,accts:m[mk]}));
+  },[data.expenses,data.openingBalances]);
+  const monLabel=(mk)=>{const[y,mo]=mk.split("-").map(Number);return new Date(y,mo-1,1).toLocaleDateString("en-US",{month:"long",year:"numeric"})};
+  return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
+    t(SH,{title:t("em",{children:"Monthly History"}),onBack:onClose}),
+    months.length===0?t("div",{style:{padding:"48px 8px",textAlign:"center",color:c.tm,fontSize:13,lineHeight:1.6},children:"No history yet. Reconcile an account or log transactions and each month will show up here."})
+    :o(Fragment,{children:months.map(({mk,accts})=>{
+      const ids=Object.keys(accts).filter(id=>accMap[id]);
+      if(!ids.length)return null;
+      const net=ids.reduce((s,id)=>s+accts[id].credited-accts[id].spent,0);
+      return o("div",{key:mk,style:{marginBottom:16,background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden"},children:[
+        o("div",{className:"f ia jb",style:{padding:"13px 16px",borderBottom:`1px solid ${c.brs}`,background:c.sf2},children:[
+          t("div",{style:{fontFamily:c.hf,fontSize:14,fontWeight:600,color:c.tx},children:monLabel(mk)}),
+          o("div",{className:"trg",children:[
+            t("div",{style:{fontFamily:F.mo,fontSize:8.5,color:c.tm,letterSpacing:1},children:"NET"}),
+            t("div",{style:{fontFamily:F.mo,fontSize:13,fontWeight:600,color:net<0?c.co:c.mt,marginTop:1},children:(net<0?"−":"+")+fm(Math.abs(net),data.currency)})
+          ]})
+        ]}),
+        ...ids.map((id,i)=>{
+          const a=accMap[id];const cell=accts[id];const cur=a.currency||data.currency;const last=i===ids.length-1;
+          return o("div",{key:id,style:{padding:"12px 16px",borderBottom:last?"none":`1px solid ${c.brs}`},children:
+            o("div",{className:"f ia jb",children:[
+              o("div",{className:"f ia",style:{gap:9,minWidth:0},children:[
+                t("span",{style:{fontSize:17},children:a.emoji}),
+                o("div",{className:"tl minw0",children:[
+                  t("div",{style:{fontSize:14,fontWeight:500,color:c.tx},children:a.name+(a.isBank?" · Bank":"")}),
+                  cell.reset!=null&&t("div",{style:{fontSize:10.5,color:c.gd,marginTop:1,fontFamily:F.mo},children:"RESET → "+fm(cell.reset,cur)})
+                ]})
+              ]}),
+              o("div",{className:"trg",style:{flexShrink:0},children:[
+                cell.spent>0&&t("div",{style:{fontFamily:F.mo,fontSize:12,color:c.co},children:"−"+fm(cell.spent,cur)}),
+                cell.credited>0&&t("div",{style:{fontFamily:F.mo,fontSize:12,color:c.mt,marginTop:1},children:"+"+fm(cell.credited,cur)}),
+                cell.spent===0&&cell.credited===0&&t("div",{style:{fontFamily:F.mo,fontSize:11,color:c.tm},children:"no activity"})
+              ]})
+            ]})
+          });
+        })
+      ]});
+    })})
   ]});
 }
 
