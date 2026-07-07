@@ -5026,7 +5026,7 @@ function parseVoiceDate(low){
 const VOICE_KW=[
   ["milk_curd",["milk","curd","paneer","dahi","buttermilk"]],
   ["eggs",["egg","eggs"]],
-  ["groceries",["grocery","groceries","vegetable","vegetables","fruits","supermarket","bigbasket","blinkit","zepto","instamart","dmart","kirana","ration"]],
+  ["groceries",["grocery","groceries","vegetable","vegetables","fruits","chicken","mutton","fish","meat","supermarket","bigbasket","blinkit","zepto","instamart","dmart","kirana","ration"]],
   ["subscriptions",["netflix","spotify","hotstar","prime video","youtube premium","subscription","icloud"]],
   ["transport",["uber","ola","rapido","auto","cab","taxi","bus","train","metro","petrol","fuel","diesel","parking","toll","rickshaw"]],
   ["travel_outstation",["flight","airport","trip","irctc","ticket to"]],
@@ -5110,9 +5110,11 @@ async function voiceAiParse(text,data){
 }
 function VoiceDraft({v,data,onChange,onRemove}){
   const inc=v.kind==="income";
+  const[catQ,sCatQ]=useState("");
   let cats=inc?ciAll():ceAll();
-  const selCat=cats.find(x=>x.id===v.category)||co(v.category);
-  if(selCat)cats=[selCat,...cats.filter(x=>x.id!==selCat.id)];
+  const q=catQ.trim().toLowerCase();
+  if(q)cats=cats.filter(x=>x.label.toLowerCase().includes(q)||x.id.toLowerCase().includes(q)||(x.subs||[]).some(sb=>sb.toLowerCase().includes(q)));
+  else{const selCat=cats.find(x=>x.id===v.category)||co(v.category);if(selCat)cats=[selCat,...cats.filter(x=>x.id!==selCat.id)]}
   const accs=data.accounts||[],cards=inc?[]:(data.cards||[]);
   const chip=(on,label,onClick,key)=>t("button",{key,onClick,className:"act95 trt fs",style:{padding:"6px 11px",borderRadius:999,background:on?c.ac:c.sf2,color:on?"#0a0a0a":c.td,border:`1px solid ${on?c.ac:c.brs}`,fontSize:12,whiteSpace:"nowrap",flexShrink:0},children:label});
   const bad=!(Number(v.amount)>0);
@@ -5133,7 +5135,12 @@ function VoiceDraft({v,data,onChange,onRemove}){
       t("input",{value:v.merchant||"",placeholder:"Merchant (optional)",onChange:e=>onChange({...v,merchant:e.target.value||null}),style:{background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"9px 11px",color:c.tx,fontSize:13,minWidth:0}}),
       t("input",{type:"date",value:tsToIso(v.date||Date.now()),onChange:e=>onChange({...v,date:e.target.value?isoToTs(e.target.value):Date.now()}),style:{background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"9px 11px",color:c.tx,fontSize:13,minWidth:0,colorScheme:c.dk?"dark":"light"}})
     ]}),
-    t("div",{className:"f sx",style:{gap:6,overflowX:"auto",marginBottom:(accs.length+cards.length)>1?8:0},children:cats.map(ct=>chip(v.category===ct.id,`${ct.emoji} ${ct.label}`,()=>onChange({...v,category:ct.id}),ct.id))}),
+    o("div",{className:"f ia",style:{gap:6,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:9,padding:"6px 10px",marginBottom:8},children:[
+      t(Srch,{size:12,color:c.tm,style:{flexShrink:0}}),
+      t("input",{value:catQ,onChange:e=>sCatQ(e.target.value),placeholder:"Search categories…",style:{flex:1,background:"transparent",border:"none",color:c.tx,fontSize:12,minWidth:0}}),
+      catQ?t("button",{onClick:()=>sCatQ(""),"aria-label":"clear search",className:"act90",style:{color:c.tm,display:"flex",padding:2,flexShrink:0},children:t(X,{size:13})}):null
+    ]}),
+    cats.length?t("div",{className:"f sx",style:{gap:6,overflowX:"auto",marginBottom:(accs.length+cards.length)>1?8:0},children:cats.map(ct=>chip(v.category===ct.id,`${ct.emoji} ${ct.label}`,()=>onChange({...v,category:ct.id}),ct.id))}):t("div",{style:{fontSize:11,color:c.tm,fontStyle:"italic",marginBottom:(accs.length+cards.length)>1?8:0},children:`No category matches "${catQ.trim()}"`}),
     (accs.length+cards.length)>1?t("div",{className:"f sx",style:{gap:6,overflowX:"auto"},children:[
       ...accs.map(a=>chip(!v.cardId&&v.accountId===a.id,`${a.emoji||"🏦"} ${a.name}`,()=>onChange({...v,accountId:a.id,cardId:null}),a.id)),
       ...cards.map(cr=>chip(v.cardId===cr.id,`💳 ${cr.name}`,()=>onChange({...v,cardId:cr.id,accountId:null}),cr.id))
@@ -5150,7 +5157,8 @@ function VoiceAdd({data,onAddMany,onClose}){
   const[drafts,sDrafts]=useState([]);
   const[savedN,sSavedN]=useState(0);
   const[usedAI,sUsedAI]=useState(false);
-  const recRef=useRef(null),finalRef=useRef(""),cancelRef=useRef(false);
+  const[parsedTxt,sParsedTxt]=useState("");
+  const recRef=useRef(null),finalRef=useRef(""),cancelRef=useRef(false),editRef=useRef(null);
   useEffect(()=>()=>{try{cancelRef.current=true;recRef.current&&recRef.current.abort()}catch{}},[]);
   const enrich=drs=>{
     const mm=buildMerchantMemory(data.expenses,data.merchantRules);
@@ -5167,7 +5175,7 @@ function VoiceAdd({data,onAddMany,onClose}){
   };
   const parse=async text=>{
     text=String(text||"").trim();if(!text)return;
-    sTxt(text);sErr(null);sPhase("busy");
+    sTxt(text);sParsedTxt(text);sErr(null);sPhase("busy");
     let drs=null,ai=false;
     if(gAK()){try{drs=await voiceAiParse(text,data);ai=!!(drs&&drs.length)}catch(e){sErr(friendlyAPIError(e)+" — used on-device parsing instead.")}}
     if(!drs||!drs.length)drs=parseVoiceLocal(text);
@@ -5262,12 +5270,15 @@ function VoiceAdd({data,onAddMany,onClose}){
     txt?t("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,padding:16,marginTop:20,fontSize:15,color:c.td,fontStyle:"italic"},children:"🎙️ "+txt}):null,
     t("div",{style:{padding:28,textAlign:"center",color:c.td},children:gAK()?"✨ Parsing with AI…":"⚡ Parsing…"})
   ]});
+  const txtEdited=txt.trim()!==parsedTxt.trim();
   const reviewView=o(Fragment,{children:[
-    o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:"10px 12px",marginTop:4,marginBottom:14},children:[
+    o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${txtEdited?c.ac+"66":c.brs}`,borderRadius:14,padding:"10px 12px",marginTop:4},children:[
       t("span",{style:{flexShrink:0},children:"🎙️"}),
-      t("input",{value:txt,onChange:e=>sTxt(e.target.value),onKeyDown:e=>{if(e.key==="Enter")parse(txt)},style:{flex:1,background:"transparent",border:"none",color:c.td,fontSize:13,fontStyle:"italic",minWidth:0}}),
-      t("button",{onClick:()=>parse(txt),title:"Re-parse",className:"act90 trt",style:{width:30,height:30,borderRadius:8,background:c.sf2,color:c.td,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(Rpt,{size:14})})
+      t("input",{ref:editRef,value:txt,onChange:e=>sTxt(e.target.value),onKeyDown:e=>{if(e.key==="Enter"&&txtEdited)parse(txt)},placeholder:"What you said…",style:{flex:1,background:"transparent",border:"none",color:c.tx,fontSize:13,minWidth:0}}),
+      t("button",{onClick:()=>{const el=editRef.current;if(el){el.focus();try{el.setSelectionRange(el.value.length,el.value.length)}catch{}}},title:"Edit text","aria-label":"edit text",className:"act90 trt",style:{width:30,height:30,borderRadius:8,background:c.sf2,color:c.td,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(Pencil,{size:13})}),
+      t("button",{onClick:()=>parse(txt),title:"Re-parse",disabled:!txt.trim(),"aria-label":"re-parse",className:"act90 trt",style:{width:30,height:30,borderRadius:8,background:txtEdited?c.ac:c.sf2,color:txtEdited?"#0a0a0a":c.td,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(Rpt,{size:14})})
     ]}),
+    t("div",{style:{fontSize:10,color:txtEdited?c.ac:c.tm,margin:"6px 2px 14px"},children:txtEdited?"Text edited — tap ⟳ to re-parse it":"Misheard? Tap ✎ to fix the text, then ⟳ to re-parse"}),
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.ac,letterSpacing:1,marginBottom:10},children:`✓ ${drafts.length} TRANSACTION${drafts.length>1?"S":""} FOUND${usedAI?" · AI":""}`}),
     ...drafts.map(v=>t(VoiceDraft,{key:v._id,v,data,onChange:nv=>sDrafts(ds2=>ds2.map(x=>x._id===v._id?nv:x)),onRemove:()=>sDrafts(ds2=>ds2.filter(x=>x._id!==v._id))})),
     o("div",{className:"g g2",style:{gap:8,marginTop:6},children:[
