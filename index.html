@@ -65,6 +65,8 @@ input:focus,textarea:focus,select:focus{outline:none}
 .mqt{display:flex;gap:36px;animation:mq 38s linear infinite;white-space:nowrap}
 @keyframes su{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .shn{animation:su 300ms cubic-bezier(.2,.9,.2,1)}
+@keyframes vpulse{0%{box-shadow:0 0 0 0 rgba(255,77,99,.45)}70%{box-shadow:0 0 0 26px rgba(255,77,99,0)}100%{box-shadow:0 0 0 0 rgba(255,77,99,0)}}
+.vpulse{animation:vpulse 1.5s ease-out infinite}
 @keyframes slin{from{transform:translateX(-100%)}to{transform:translateX(0)}}
 .slid{animation:slin 280ms cubic-bezier(.2,.9,.2,1)}
 .act90:active{transform:scale(.9)}
@@ -240,6 +242,7 @@ const Dl=_i("M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4","m7 10 5 5 5-5","M12 15V
 const Ul=_i("M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4","m17 8-5-5-5 5","M12 3v12");
 const Copy=_i({r:[9,9,13,13,2]},"M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1");
 const Camera=_i("M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z",{c:[12,13,3]});
+const Mic=_i("M12 19v3","M19 10v2a7 7 0 0 1-14 0v-2",{r:[9,2,6,13,3]});
 const ImgIc=_i({r:[3,3,18,18,2]},"m3 21 6-6 4 4 4-5 5 7",{c:[8.5,8.5,1.5]});
 const CC=_i({r:[2,5,20,14,2]},"M2 10h20");
 const Send=_i("M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z","m21.854 2.147-10.94 10.939");
@@ -744,8 +747,8 @@ function AppHeader({onMenu,onSearch,onToggleTheme,isDark,theme,onHome,onAI,onDia
   ]})})
 }
 const SB_ORDER_KEY="etp-sidebar-order";
-const DEFAULT_SB=["h:Money","accounts","monthHist","cards","transfer","investments","wealth","budgetTrack","budgetLoans","autopilot","debtPlan","h:Plan & Track","bills","goals","diary","recurring","upcomingExp","categoryBudgets","h:Insights","breakdown","monthlyReport","tips","dailyLesson","wrapped","rules","h:Tools","expPlanner","investCalc","cardPayFix","profiles","h:AI","chat","billScan","stmtAnalyze","stmtImports","aiInsights","h:Settings & Data","categories","merchantRules","backup","userMgr","settings"];
-const SB_META={chat:{e:"✨",l:"AI Assistant",s:"Log expenses by chat"},billScan:{e:"📸",l:"Snap a Bill",s:"Auto-extract from receipt"},stmtAnalyze:{e:"📊",l:"Statement Analyzer",s:"Find missing transactions & discrepancies"},stmtImports:{e:"📥",l:"Statement Imports",s:"Review transactions logged from statements"},aiInsights:{e:"💡",l:"AI Insights",s:"Spending patterns & AI suggestions"},userMgr:{e:"👥",l:"Switch User",s:"Manage profiles"},rules:{e:"📋",l:"Rules & Learnings",s:"Track your financial rules"},upcomingExp:{e:"📅",l:"Upcoming Expenses",s:"Plan & get alerts"},expPlanner:{e:"🧮",l:"Expense Planner",s:"Can I afford this EMI?"},investCalc:{e:"📈",l:"Investment Calculator",s:"Compound growth & SIP planner"},cards:{e:"💳",l:"Cards",acc:true},cardPayFix:{e:"🪙",l:"Fix card bill payments",s:"Remove double-counted bills",acc:true},bills:{e:"🔔",l:"Bills & Reminders",acc:true},goals:{e:"🎯",l:"Goals & Debt",acc:true},diary:{e:"📖",l:"Lending Diary",s:"Who owes you & you owe"},investments:{e:"💼",l:"My Investments",s:"NPS, Funds, FDs",acc:true},wealth:{e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},monthlyReport:{e:"📰",l:"Monthly Report",s:"Print or share PDF"},budgetTrack:{e:"📉",l:"Budget Tracker",s:"Monthly over/under record"},budgetLoans:{e:"🧾",l:"Budget Loans",s:"Repay past overspends"},breakdown:{e:"⚖️",l:"Spending Breakdown",s:"Needs/Wants · 50-30-20"},accounts:{e:"🏦",l:"Accounts",acc:true},monthHist:{e:"🗓️",l:"Monthly History",s:"Reset & activity by month",acc:true},transfer:{e:"↔️",l:"Transfer",s:"Move funds",acc:true},recurring:{e:"🔁",l:"Recurring"},profiles:{e:"⚡",l:"Quick profiles"},categoryBudgets:{e:"📏",l:"Category budgets",s:"Set spending limits"},categories:{e:"🏷️",l:"Categories",s:"Manage expense types"},backup:{e:"💾",l:"Backup & Restore",s:"Export or import data"},tips:{e:"💡",l:"Financial Health",s:"Tips & scores"},dailyLesson:{e:"📖",l:"Daily Money Lesson",s:"One finance lesson a day"},autopilot:{e:"🔮",l:"Autopilot Forecast",s:"30-day cash-flow projection",acc:true},debtPlan:{e:"⚔️",l:"Debt Destroyer",s:"Avalanche vs snowball payoff plan",acc:true},wrapped:{e:"🎁",l:"Year in Review",s:"Wrapped, heatmap, badges"},merchantRules:{e:"🧠",l:"Merchant Memory",s:"Auto-fill rules per merchant"},settings:{e:"⚙️",l:"Settings",s:"Currency, budget, backup"}};
+const DEFAULT_SB=["h:Money","accounts","monthHist","cards","transfer","investments","wealth","budgetTrack","budgetLoans","autopilot","debtPlan","h:Plan & Track","bills","goals","diary","recurring","upcomingExp","categoryBudgets","h:Insights","breakdown","monthlyReport","tips","dailyLesson","wrapped","rules","h:Tools","expPlanner","investCalc","cardPayFix","profiles","h:AI","chat","voiceAdd","billScan","stmtAnalyze","stmtImports","aiInsights","h:Settings & Data","categories","merchantRules","backup","userMgr","settings"];
+const SB_META={chat:{e:"✨",l:"AI Assistant",s:"Log expenses by chat"},voiceAdd:{e:"🎙️",l:"Voice Log",s:"Speak an expense to log it"},billScan:{e:"📸",l:"Snap a Bill",s:"Auto-extract from receipt"},stmtAnalyze:{e:"📊",l:"Statement Analyzer",s:"Find missing transactions & discrepancies"},stmtImports:{e:"📥",l:"Statement Imports",s:"Review transactions logged from statements"},aiInsights:{e:"💡",l:"AI Insights",s:"Spending patterns & AI suggestions"},userMgr:{e:"👥",l:"Switch User",s:"Manage profiles"},rules:{e:"📋",l:"Rules & Learnings",s:"Track your financial rules"},upcomingExp:{e:"📅",l:"Upcoming Expenses",s:"Plan & get alerts"},expPlanner:{e:"🧮",l:"Expense Planner",s:"Can I afford this EMI?"},investCalc:{e:"📈",l:"Investment Calculator",s:"Compound growth & SIP planner"},cards:{e:"💳",l:"Cards",acc:true},cardPayFix:{e:"🪙",l:"Fix card bill payments",s:"Remove double-counted bills",acc:true},bills:{e:"🔔",l:"Bills & Reminders",acc:true},goals:{e:"🎯",l:"Goals & Debt",acc:true},diary:{e:"📖",l:"Lending Diary",s:"Who owes you & you owe"},investments:{e:"💼",l:"My Investments",s:"NPS, Funds, FDs",acc:true},wealth:{e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},monthlyReport:{e:"📰",l:"Monthly Report",s:"Print or share PDF"},budgetTrack:{e:"📉",l:"Budget Tracker",s:"Monthly over/under record"},budgetLoans:{e:"🧾",l:"Budget Loans",s:"Repay past overspends"},breakdown:{e:"⚖️",l:"Spending Breakdown",s:"Needs/Wants · 50-30-20"},accounts:{e:"🏦",l:"Accounts",acc:true},monthHist:{e:"🗓️",l:"Monthly History",s:"Reset & activity by month",acc:true},transfer:{e:"↔️",l:"Transfer",s:"Move funds",acc:true},recurring:{e:"🔁",l:"Recurring"},profiles:{e:"⚡",l:"Quick profiles"},categoryBudgets:{e:"📏",l:"Category budgets",s:"Set spending limits"},categories:{e:"🏷️",l:"Categories",s:"Manage expense types"},backup:{e:"💾",l:"Backup & Restore",s:"Export or import data"},tips:{e:"💡",l:"Financial Health",s:"Tips & scores"},dailyLesson:{e:"📖",l:"Daily Money Lesson",s:"One finance lesson a day"},autopilot:{e:"🔮",l:"Autopilot Forecast",s:"30-day cash-flow projection",acc:true},debtPlan:{e:"⚔️",l:"Debt Destroyer",s:"Avalanche vs snowball payoff plan",acc:true},wrapped:{e:"🎁",l:"Year in Review",s:"Wrapped, heatmap, badges"},merchantRules:{e:"🧠",l:"Merchant Memory",s:"Auto-fill rules per merchant"},settings:{e:"⚙️",l:"Settings",s:"Currency, budget, backup"}};
 function Sidebar({data,onClose,onView,activeUser,onUpdateUser,focusSection}){
   const go=(id)=>{onView(id);onClose()};
   const scRef=useRef(null);
@@ -1214,6 +1217,7 @@ function App(){
         v==="categories"&&t(CatMgr,{data:d,persist:pst,onClose:()=>sV(navFromRef.current),onQuickProfile:(preset)=>{sProfPreset(preset);navFromRef.current="categories";sV("newProfile")}}),
         v==="chat"&&t(Chat,{data:d,onAddExpense:aE,onView:sV,onClose:()=>sV("home")}),
         v==="billScan"&&t(BillScan,{data:d,onAddExpense:aE,onClose:()=>sV("home")}),
+        v==="voiceAdd"&&t(VoiceAdd,{data:d,onAddMany:aEMany,onClose:()=>sV(navFromRef.current||"home")}),
         v==="howToUse"&&t(HelpCenter,{onClose:()=>sV(navFromRef.current||"home"),onView:id=>{navFromRef.current="howToUse";sV(id)},onTour:()=>sShowTour(true)}),
         v==="stmtAnalyze"&&t(StmtAnalyze,{data:d,onClose:()=>sV(navFromRef.current),onAddExpenses:aEMany,onViewImports:()=>{navFromRef.current="stmtAnalyze";sV("stmtImports")}}),
         v==="stmtImports"&&t(StmtImports,{data:d,onClose:()=>sV(navFromRef.current),onTx:sAtx}),
@@ -1224,7 +1228,7 @@ function App(){
         v==="expPlanner"&&t(ExpPlanner,{data:d,onSave:aEP,onDelete:dEP,onClose:()=>sV("home")}),
         v==="investCalc"&&t(InvCalc,{data:d,onSave:aIP,onDelete:dIP,onClose:()=>sV("home")}),
       ]}),
-      nav&&t(Nav,{view:v,setView:(id)=>{if(id===v){if(scrollRef.current)scrollRef.current.scrollTo({top:0,behavior:"smooth"})}else sV(id)},onQuickPick:()=>sShowQPicker(true)}),
+      nav&&t(Nav,{view:v,setView:(id)=>{if(id===v){if(scrollRef.current)scrollRef.current.scrollTo({top:0,behavior:"smooth"})}else sV(id)},onQuickPick:()=>sShowQPicker(true),onVoice:()=>{navFromRef.current=v;sV("voiceAdd")}}),
     ]}),
     atx&&t(TxSht,{expense:atx,accounts:d.accounts,cards:d.cards||[],onClose:()=>sAtx(null),onDelete:()=>dE(atx.id),onEdit:()=>{navFromRef.current=v;sFlt(null);sEd(atx);sAtx(null);sV("edit")}}),reimbT&&t(ReimburseSht,{expense:reimbT,currency:d.currency,onConfirm:(amount,date)=>{doReimburse(reimbT,amount,date);sReimbT(null)},onClose:()=>sReimbT(null)}),profToUse&&t(UseProf,{profile:profToUse,data:d,onSave:e=>{const eid=uid();const eL=[{...e,id:eid,type:e.type||"expense"},...d.expenses].sort((a,b)=>b.date-a.date);pst({expenses:eL});sProfToUse(null)},onCancel:()=>sProfToUse(null)}),showQPicker&&t(QuickPicker,{data:d,onUse:p=>{sProfToUse(p);sShowQPicker(false)},onClose:()=>sShowQPicker(false),onManage:()=>{sShowQPicker(false);navFromRef.current=v;sV("profiles")}}),
     sbar&&t(Sidebar,{data:d,onClose:()=>{sSbar(false);sSbFocus(null)},onView:(id)=>{navFromRef.current=v;sV(id)},activeUser,onUpdateUser:updateUserFn,focusSection:sbFocus}),
@@ -1234,14 +1238,18 @@ function App(){
 }
 
 // === BOTTOM NAV ===
-function Nav({view,setView,onQuickPick}){const[open,sOpen]=useState(false);const tabs=[{id:"home",icon:Hm,label:"home"},{id:"calendar",icon:Cal,label:"calendar"},{id:"add",icon:Plus,label:"add",main:true},{id:"stats",icon:BarChart3,label:"stats"},{id:"settings",icon:Gear,label:"settings"}];const go=(id)=>{sOpen(false);setView(id)};return t("div",{className:"nav-bar noprint",style:{background:c.bg},children:o("div",{className:"nav-inner",style:{position:"relative"},children:[
+function Nav({view,setView,onQuickPick,onVoice}){const[open,sOpen]=useState(false);const tabs=[{id:"home",icon:Hm,label:"home"},{id:"calendar",icon:Cal,label:"calendar"},{id:"add",icon:Plus,label:"add",main:true},{id:"stats",icon:BarChart3,label:"stats"},{id:"settings",icon:Gear,label:"settings"}];const go=(id)=>{sOpen(false);setView(id)};return t("div",{className:"nav-bar noprint",style:{background:c.bg},children:o("div",{className:"nav-inner",style:{position:"relative"},children:[
   open&&t("div",{onClick:()=>sOpen(false),style:{position:"fixed",inset:0,zIndex:49}}),
   open&&o("div",{style:{position:"absolute",bottom:72,left:"50%",transform:"translateX(-50%)",display:"flex",gap:10,zIndex:50,padding:4},children:[
-    o("button",{onClick:()=>{sOpen(false);onQuickPick&&onQuickPick()},className:"act95 trt",style:{display:"flex",flexDirection:"row",alignItems:"center",gap:12,padding:"12px 16px",background:c.sfg,border:`1px solid ${c.cu}44`,borderRadius:18,minWidth:120,textAlign:"left",boxShadow:"0 8px 24px rgba(0,0,0,.55)"},children:[
+    o("button",{onClick:()=>{sOpen(false);onQuickPick&&onQuickPick()},className:"act95 trt",style:{display:"flex",flexDirection:"row",alignItems:"center",gap:10,padding:"12px 12px",background:c.sfg,border:`1px solid ${c.cu}44`,borderRadius:18,minWidth:100,textAlign:"left",boxShadow:"0 8px 24px rgba(0,0,0,.55)"},children:[
       t("div",{style:{width:36,height:36,borderRadius:12,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",color:c.cu,flexShrink:0},children:t(Zap,{size:18})}),
       o("div",{children:[t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:13,color:c.tx},children:"quick"}),t("div",{style:{fontSize:10,color:c.tm,marginTop:2},children:"profiles"})]})
     ]}),
-    o("button",{onClick:()=>go("add"),className:"act95 trt",style:{display:"flex",flexDirection:"row",alignItems:"center",gap:12,padding:"12px 16px",background:c.sfg,border:`1px solid ${c.ac}44`,borderRadius:18,minWidth:120,textAlign:"left",boxShadow:"0 8px 24px rgba(0,0,0,.55)"},children:[
+    o("button",{onClick:()=>{sOpen(false);onVoice&&onVoice()},className:"act95 trt",style:{display:"flex",flexDirection:"row",alignItems:"center",gap:10,padding:"12px 12px",background:c.sfg,border:`1px solid ${c.ro}44`,borderRadius:18,minWidth:100,textAlign:"left",boxShadow:"0 8px 24px rgba(0,0,0,.55)"},children:[
+      t("div",{style:{width:36,height:36,borderRadius:12,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",color:c.ro,flexShrink:0},children:t(Mic,{size:18})}),
+      o("div",{children:[t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:13,color:c.tx},children:"speak"}),t("div",{style:{fontSize:10,color:c.tm,marginTop:2},children:"voice log"})]})
+    ]}),
+    o("button",{onClick:()=>go("add"),className:"act95 trt",style:{display:"flex",flexDirection:"row",alignItems:"center",gap:10,padding:"12px 12px",background:c.sfg,border:`1px solid ${c.ac}44`,borderRadius:18,minWidth:100,textAlign:"left",boxShadow:"0 8px 24px rgba(0,0,0,.55)"},children:[
       t("div",{style:{width:36,height:36,borderRadius:12,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",color:c.ac,flexShrink:0},children:t(Pencil,{size:18})}),
       o("div",{children:[t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:13,color:c.tx},children:"add"}),t("div",{style:{fontSize:10,color:c.tm,marginTop:2},children:"manual"})]})
     ]})
@@ -3188,7 +3196,7 @@ return o("div",{className:"fi",style:{paddingTop:48,paddingBottom:32},children:[
 function KV({label,value,full}){return o("div",{style:full?{gridColumn:"1 / -1"}:{},children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:2},children:label.toUpperCase()}),t("div",{className:"tru",style:{fontSize:14},children:value})]})}
 
 // === MORE ===
-function More({data,onClose,onView}){const items=[{id:"chat",e:"✨",l:"AI Assistant",s:"Add or edit by chat",hi:true},{id:"billScan",e:"📸",l:"Snap a bill",s:"Auto-extract from receipt",hi:true},t("h",1),{id:"cards",e:"💳",l:"Cards",s:`${(data.cards||[]).length} ${(data.cards||[]).length===1?"card":"cards"}`,acc:true},{id:"cardPayFix",e:"🪙",l:"Fix card bill payments",s:(()=>{const n=(data.expenses||[]).filter(e=>isCardBillPayment(e,data.cards)).length;return n>0?`${n} suspected double-count${n===1?"":"s"}`:"Remove double-counted bills"})(),acc:true},{id:"bills",e:"🔔",l:"Bills & Reminders",s:`${(data.bills||[]).length} ${(data.bills||[]).length===1?"bill":"bills"}`,acc:true},{id:"goals",e:"🎯",l:"Goals & Debt",s:`${(data.goals||[]).length} active`,acc:true},{id:"budgetLoans",e:"🧾",l:"Budget Loans",s:(()=>{const n=(data.budgetLoans||[]).filter(l=>l.status!=="paid").length;return n>0?`${n} to repay`:"Repay past overspends"})(),acc:true},{id:"investments",e:"💼",l:"My Investments",s:`${(data.investments||[]).length} holding${(data.investments||[]).length!==1?"s":""}`,acc:true},{id:"wealth",e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},{id:"monthlyReport",e:"📰",l:"Monthly Report",s:"Print or share PDF",acc:true},t("h",2),{id:"search",e:"🔍",l:"Search",s:"Find any transaction"},{id:"accounts",e:"🏦",l:"Accounts",s:`${data.accounts.length} active`},{id:"reconcile",e:"⚖️",l:"Reconcile Accounts",s:"Monthly opening balance reset"},{id:"transfer",e:"↔️",l:"Transfer",s:"Move between accounts"},{id:"recurring",e:"🔁",l:"Recurring",s:`${data.recurring.length} subscriptions`},{id:"profiles",e:"⚡",l:"Quick profiles",s:`${data.profiles.length} saved`},{id:"categoryBudgets",e:"📏",l:"Category budgets",s:`${Object.keys(data.categoryBudgets||{}).filter(k=>data.categoryBudgets[k].limit>0).length} set`},{id:"categories",e:"🏷️",l:"Categories",s:"Manage expense types"},{id:"tips",e:"💡",l:"Financial Health",s:"Scores, ratios & tips"},{id:"settings",e:"⚙️",l:"Settings",s:"Currency, budget, backup"}];return o("div",{style:{padding:"8px 24px 32px"},children:[
+function More({data,onClose,onView}){const items=[{id:"chat",e:"✨",l:"AI Assistant",s:"Add or edit by chat",hi:true},{id:"billScan",e:"📸",l:"Snap a bill",s:"Auto-extract from receipt",hi:true},{id:"voiceAdd",e:"🎙️",l:"Voice log",s:"Say it, logged",hi:true},t("h",1),{id:"cards",e:"💳",l:"Cards",s:`${(data.cards||[]).length} ${(data.cards||[]).length===1?"card":"cards"}`,acc:true},{id:"cardPayFix",e:"🪙",l:"Fix card bill payments",s:(()=>{const n=(data.expenses||[]).filter(e=>isCardBillPayment(e,data.cards)).length;return n>0?`${n} suspected double-count${n===1?"":"s"}`:"Remove double-counted bills"})(),acc:true},{id:"bills",e:"🔔",l:"Bills & Reminders",s:`${(data.bills||[]).length} ${(data.bills||[]).length===1?"bill":"bills"}`,acc:true},{id:"goals",e:"🎯",l:"Goals & Debt",s:`${(data.goals||[]).length} active`,acc:true},{id:"budgetLoans",e:"🧾",l:"Budget Loans",s:(()=>{const n=(data.budgetLoans||[]).filter(l=>l.status!=="paid").length;return n>0?`${n} to repay`:"Repay past overspends"})(),acc:true},{id:"investments",e:"💼",l:"My Investments",s:`${(data.investments||[]).length} holding${(data.investments||[]).length!==1?"s":""}`,acc:true},{id:"wealth",e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},{id:"monthlyReport",e:"📰",l:"Monthly Report",s:"Print or share PDF",acc:true},t("h",2),{id:"search",e:"🔍",l:"Search",s:"Find any transaction"},{id:"accounts",e:"🏦",l:"Accounts",s:`${data.accounts.length} active`},{id:"reconcile",e:"⚖️",l:"Reconcile Accounts",s:"Monthly opening balance reset"},{id:"transfer",e:"↔️",l:"Transfer",s:"Move between accounts"},{id:"recurring",e:"🔁",l:"Recurring",s:`${data.recurring.length} subscriptions`},{id:"profiles",e:"⚡",l:"Quick profiles",s:`${data.profiles.length} saved`},{id:"categoryBudgets",e:"📏",l:"Category budgets",s:`${Object.keys(data.categoryBudgets||{}).filter(k=>data.categoryBudgets[k].limit>0).length} set`},{id:"categories",e:"🏷️",l:"Categories",s:"Manage expense types"},{id:"tips",e:"💡",l:"Financial Health",s:"Scores, ratios & tips"},{id:"settings",e:"⚙️",l:"Settings",s:"Currency, budget, backup"}];return o("div",{style:{padding:"8px 24px 32px"},children:[
   t(SH,{title:t("em",{children:"More"}),onBack:onClose}),
   t("div",{style:{marginTop:16,background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden"},children:items.filter(x=>x.id).map((d2,i)=>{const last=i===items.filter(x=>x.id).length-1;return o("button",{key:d2.id,onClick:()=>onView(d2.id),className:"w100 f ia trc",style:{gap:12,padding:"14px 16px",background:"transparent",borderBottom:last?"none":`1px solid ${c.brs}`},children:[t("div",{style:{width:40,height:40,borderRadius:12,background:d2.hi?c.lv+"25":d2.acc?c.sk+"20":c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0},children:d2.e}),o("div",{className:"f1 tl",children:[t("div",{style:{fontFamily:c.hf,fontSize:14,fontWeight:600,color:d2.hi?c.lv:(d2.acc?c.sk:c.tx)},children:d2.l}),t("div",{style:{fontSize:12,color:c.tm,marginTop:2},children:d2.s})]}),t(CR,{size:15,color:c.tm})]})})}),
 ]})}
@@ -4967,6 +4975,320 @@ function BillScan({data,onAddExpense,onClose}){
   ]})});
 }
 
+
+// === VOICE LOG (speech → transactions) ===
+const _SRec=()=>window.SpeechRecognition||window.webkitSpeechRecognition||null;
+const _VW={zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90};
+// Fold spoken numbers ("five hundred and fifty","1.5 k","2 lakh") into plain digits so the amount regexes can find them
+function _vFold(s){
+  const toks=s.split(/\s+/),out=[];let cur=null,used=false;
+  const flush=()=>{if(cur!=null&&used)out.push(String(cur));cur=null;used=false};
+  for(let i=0;i<toks.length;i++){
+    const raw=toks[i],w=raw.toLowerCase().replace(/[^a-z0-9.]/g,"");
+    const nxt=(toks[i+1]||"").toLowerCase().replace(/[^a-z0-9.]/g,"");
+    if(/^\d+(\.\d+)?$/.test(w)){flush();cur=parseFloat(w);used=true}
+    else if(w in _VW){if(cur==null)cur=0;cur+=_VW[w];used=true}
+    else if(w==="hundred"){cur=(cur==null?1:cur)*100;used=true}
+    else if(w==="thousand"||w==="grand"||(w==="k"&&cur!=null)){cur=(cur==null?1:cur)*1000;used=true}
+    else if(w==="lakh"||w==="lakhs"||w==="lac"){cur=(cur==null?1:cur)*1e5;used=true}
+    else if(w==="crore"||w==="crores"){cur=(cur==null?1:cur)*1e7;used=true}
+    else if(w==="half"&&cur!=null){cur+=0.5;used=true}
+    else if(w==="and"&&used&&(nxt in _VW||nxt==="a"||nxt==="half")){/* keep folding: "five hundred and fifty" */}
+    else if(w==="a"&&used&&nxt==="half"){/* "one and a half k" */}
+    else{flush();out.push(raw)}
+  }
+  flush();return out.join(" ");
+}
+function parseVoiceAmount(s){
+  let m=s.match(/(?:₹|rs\.?|rupees?|inr|\$|usd|dollars?|€|£)\s*(\d+(?:\.\d+)?)\s*(k\b)?/i);
+  if(!m)m=s.match(/(\d+(?:\.\d+)?)\s*(k)?\s*(?:₹|rs\.?|rupees?|inr|bucks|dollars?)/i);
+  if(m)return parseFloat(m[1])*(m[2]?1000:1);
+  m=s.match(/(\d+(?:\.\d+)?)\s*k\b/i);if(m)return parseFloat(m[1])*1000;
+  const nums=(s.match(/\d+(?:\.\d+)?/g)||[]).map(parseFloat).filter(n=>n>0);
+  if(!nums.length)return null;
+  return Math.max(...nums);
+}
+const _VDAYS=["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+const _VMON=["january","february","march","april","may","june","july","august","september","october","november","december"];
+function parseVoiceDate(low){
+  const t0=new Date();t0.setHours(12,0,0,0);
+  let m=low.match(/day before yesterday/);if(m)return{ts:t0.getTime()-2*864e5,txt:m[0]};
+  m=low.match(/yesterday|last night/);if(m)return{ts:t0.getTime()-864e5,txt:m[0]};
+  m=low.match(/\b(?:last |this |on )?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
+  if(m){const want=_VDAYS.indexOf(m[1]);let diff=(t0.getDay()-want+7)%7;if(diff===0&&/last/.test(m[0]))diff=7;return{ts:t0.getTime()-diff*864e5,txt:m[0]}}
+  m=low.match(/\b(\d{1,2})(?:st|nd|rd|th)\b(?:\s+(?:of\s+)?(january|february|march|april|may|june|july|august|september|october|november|december))?/);
+  if(m){const day=+m[1];if(day>=1&&day<=31){const mo=m[2]?_VMON.indexOf(m[2]):t0.getMonth();let d2=new Date(t0.getFullYear(),mo,day,12);if(d2.getTime()>t0.getTime())d2=m[2]?new Date(t0.getFullYear()-1,mo,day,12):new Date(t0.getFullYear(),mo-1,day,12);return{ts:d2.getTime(),txt:m[0]}}}
+  m=low.match(/last week/);if(m)return{ts:t0.getTime()-7*864e5,txt:m[0]};
+  m=low.match(/this morning|tonight|today|just now/);if(m)return{ts:Date.now(),txt:m[0]};
+  return null;
+}
+// Keyword → category maps (most-specific first; only built-in ids, validated against visible categories at parse time)
+const VOICE_KW=[
+  ["milk_curd",["milk","curd","paneer","dahi","buttermilk"]],
+  ["eggs",["egg","eggs"]],
+  ["groceries",["grocery","groceries","vegetable","vegetables","fruits","supermarket","bigbasket","blinkit","zepto","instamart","dmart","kirana","ration"]],
+  ["subscriptions",["netflix","spotify","hotstar","prime video","youtube premium","subscription","icloud"]],
+  ["transport",["uber","ola","rapido","auto","cab","taxi","bus","train","metro","petrol","fuel","diesel","parking","toll","rickshaw"]],
+  ["travel_outstation",["flight","airport","trip","irctc","ticket to"]],
+  ["bike",["bike","scooter","puncture","bike service"]],
+  ["gym",["gym","protein","whey"]],
+  ["health",["medicine","medicines","doctor","pharmacy","hospital","clinic","tablets","apollo","dentist"]],
+  ["bills",["electricity","water bill","gas","cylinder","wifi","broadband","recharge","mobile bill","phone bill","rent","maintenance","emi","bill"]],
+  ["entertainment",["movie","cinema","pvr","concert","game","gaming","outing"]],
+  ["online_purchases",["amazon","flipkart","myntra","ajio","online order"]],
+  ["apparel_offline",["clothes","shirt","t-shirt","tshirt","jeans","shoes","dress","saree","kurta"]],
+  ["household_sam",["household","cleaning","detergent","soap","utensils"]],
+  ["donation",["donation","charity","temple","church","mosque","gurudwara"]],
+  ["food",["food","lunch","dinner","breakfast","snack","snacks","coffee","tea","chai","restaurant","hotel","swiggy","zomato","pizza","burger","biryani","juice","cafe","canteen","tiffin","ice cream","bakery","sweets"]],
+  ["shopping",["shopping","mall","gift"]]
+];
+const VOICE_KW_INC=[
+  ["salary",["salary","payday","pay day"]],
+  ["cashback",["cashback","reward"]],
+  ["interest",["interest"]],
+  ["arrears",["refund","reimbursement","arrears"]],
+  ["trading",["profit","stocks","trading","mutual fund"]],
+  ["rental",["rent received","rental"]],
+  ["business",["freelance","client","invoice paid","business"]],
+  ["gift",["gift"]]
+];
+function parseVoiceSeg(s,ts){
+  const amount=parseVoiceAmount(s);
+  if(amount==null||!(amount>0))return null;
+  const income=/\b(got|received|earned|credited|salary|refund|cashback|income|profit|won)\b/.test(s)&&!/\b(spent|paid|bought|purchased|gave)\b/.test(s);
+  let cat=null;
+  const table=income?VOICE_KW_INC:VOICE_KW;
+  outer:for(const[id,kws]of table){for(const kw of kws){if(s.includes(kw)){cat=id;break outer}}}
+  const okIds=new Set((income?ciAll():ceAll()).map(x=>x.id));
+  if(cat&&!okIds.has(cat))cat=null;
+  let mer=null;
+  const mm=s.match(/\b(?:at|from)\s+(?:the\s+)?([a-z][a-z0-9&'. ]{1,40})/);
+  if(mm){
+    mer=mm[1].split(/\s+/).slice(0,3).join(" ")
+      .replace(/\b(yesterday|today|tomorrow|last|this|morning|night|for|and|rs|rupees?|on)\b[\s\S]*$/,"").trim();
+    if(mer.length<2)mer=null;
+    if(mer)mer=mer.split(" ").map(w=>w?w[0].toUpperCase()+w.slice(1):w).join(" ");
+  }
+  return{kind:income?"income":"expense",amount,category:cat||(income?"income_other":"other"),merchant:mer,note:null,date:ts,accountId:null,cardId:null};
+}
+function parseVoiceLocal(raw){
+  let low=_vFold(String(raw||"").trim()).toLowerCase();
+  const dt=parseVoiceDate(low);
+  const baseTs=dt?dt.ts:Date.now();
+  let body=dt?low.replace(dt.txt," "):low;
+  body=body.replace(/\b\d{1,2}(:\d{2})?\s*(am|pm)\b/g," ");
+  const parts=body.split(/\s*(?:,|;|\band\b|\balso\b|\bthen\b|\bplus\b)\s*/).map(x=>x.trim()).filter(Boolean);
+  const segs=[];
+  for(const p of parts){if(/\d/.test(p)||!segs.length)segs.push(p);else segs[segs.length-1]+=" "+p}
+  const drafts=[];
+  for(const s of segs){const d0=parseVoiceSeg(s,baseTs);if(d0)drafts.push(d0)}
+  if(!drafts.length){const d0=parseVoiceSeg(body,baseTs);if(d0)drafts.push(d0)}
+  return drafts;
+}
+async function voiceAiParse(text,data){
+  const eIds=ceAll().map(x=>x.id),iIds=ciAll().map(x=>x.id);
+  const sys=`You convert a spoken phrase into personal-finance transactions. Today is ${new Date().toISOString().slice(0,10)} (${_VDAYS[new Date().getDay()]}). Currency: ${sanitizeForPrompt(data.currency)}. Expense category ids: ${eIds.join(",")}. Income category ids: ${iIds.join(",")}. Accounts: ${data.accounts.map(a=>`${a.id}=${sanitizeForPrompt(a.name)}`).join("; ")}${(data.cards||[]).length?". Cards: "+(data.cards||[]).map(cr=>`${cr.id}=${sanitizeForPrompt(cr.name)}`).join("; "):""}. Reply with ONLY JSON: {"transactions":[{"kind":"expense"|"income","amount":N,"category":"<id>","merchant":"Name"|null,"note":"short"|null,"date":"YYYY-MM-DD","accountId":"<id>"|null,"cardId":"<id>"|null}]}. Rules: split distinct purchases into separate transactions; resolve spoken numbers ("one and a half k" = 1500) and relative dates ("yesterday","last friday"); pick the closest category id from the lists; only set accountId/cardId when the speech names one; never invent an amount — skip items without one.`;
+  const r=await cAPI({max_tokens:900,system:sys,messages:[{role:"user",content:sanitizeForPrompt(text)}]});
+  const txt=r.content?.map(x=>x.text||"").join("")||"";
+  const j=extractJSON(txt);
+  const arr=j&&Array.isArray(j.transactions)?j.transactions:null;
+  if(!arr)return null;
+  const okE=new Set(eIds),okI=new Set(iIds);
+  const out=[];
+  for(const x of arr){
+    const amt=Number(x.amount);if(!(amt>0))continue;
+    const kind=x.kind==="income"?"income":"expense";
+    let cat=String(x.category||"");
+    if(kind==="income"){if(!okI.has(cat))cat="income_other"}else if(!okE.has(cat))cat="other";
+    let ts=Date.now();
+    if(x.date&&/^\d{4}-\d{2}-\d{2}$/.test(x.date)){const[y2,m2,d2]=x.date.split("-").map(Number);const dd=new Date(y2,m2-1,d2,12);if(!isNaN(dd.getTime()))ts=Math.min(dd.getTime(),Date.now()+864e5)}
+    const acc=data.accounts.find(a=>a.id===x.accountId);
+    const card=(data.cards||[]).find(cr=>cr.id===x.cardId);
+    out.push({kind,amount:amt,category:cat,merchant:x.merchant?String(x.merchant).slice(0,40):null,note:x.note?String(x.note).slice(0,80):null,date:ts,accountId:acc?acc.id:null,cardId:kind==="expense"&&card?card.id:null});
+  }
+  return out;
+}
+function VoiceDraft({v,data,onChange,onRemove}){
+  const inc=v.kind==="income";
+  let cats=inc?ciAll():ceAll();
+  const selCat=cats.find(x=>x.id===v.category)||co(v.category);
+  if(selCat)cats=[selCat,...cats.filter(x=>x.id!==selCat.id)];
+  const accs=data.accounts||[],cards=inc?[]:(data.cards||[]);
+  const chip=(on,label,onClick,key)=>t("button",{key,onClick,className:"act95 trt fs",style:{padding:"6px 11px",borderRadius:999,background:on?c.ac:c.sf2,color:on?"#0a0a0a":c.td,border:`1px solid ${on?c.ac:c.brs}`,fontSize:12,whiteSpace:"nowrap",flexShrink:0},children:label});
+  const bad=!(Number(v.amount)>0);
+  return o("div",{style:{background:c.sfg,border:`1px solid ${bad?c.ro+"66":c.brs}`,borderRadius:16,padding:14,marginBottom:10},children:[
+    o("div",{className:"f ia jb",style:{marginBottom:10},children:[
+      o("div",{className:"f ia",style:{gap:6},children:[
+        chip(!inc,"Expense",()=>inc&&onChange({...v,kind:"expense",category:"other"}),"ke"),
+        chip(inc,"Income",()=>!inc&&onChange({...v,kind:"income",category:"income_other"}),"ki"),
+        v.mm?t("span",{title:"Prefilled from your history for this merchant",style:{fontFamily:F.mo,fontSize:9,color:c.lv,letterSpacing:.5},children:"🧠 MEMORY"}):null
+      ]}),
+      t("button",{onClick:onRemove,"aria-label":"remove",className:"act90 trt",style:{color:c.tm,display:"flex",padding:4},children:t(X,{size:16})})
+    ]}),
+    o("div",{className:"f ib",style:{gap:8,marginBottom:10},children:[
+      t("span",{style:{fontFamily:F.mo,fontSize:20,color:c.td},children:data.currency}),
+      t("input",{value:v.amount,inputMode:"decimal",placeholder:"0",onChange:e=>onChange({...v,amount:e.target.value.replace(/[^\d.]/g,"")}),style:{flex:1,background:"transparent",border:"none",borderBottom:`1px solid ${bad?c.ro:c.brs}`,color:c.tx,fontSize:26,fontFamily:F.mo,padding:"2px 0",minWidth:0}})
+    ]}),
+    o("div",{className:"g g2",style:{gap:8,marginBottom:10},children:[
+      t("input",{value:v.merchant||"",placeholder:"Merchant (optional)",onChange:e=>onChange({...v,merchant:e.target.value||null}),style:{background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"9px 11px",color:c.tx,fontSize:13,minWidth:0}}),
+      t("input",{type:"date",value:tsToIso(v.date||Date.now()),onChange:e=>onChange({...v,date:e.target.value?isoToTs(e.target.value):Date.now()}),style:{background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"9px 11px",color:c.tx,fontSize:13,minWidth:0,colorScheme:c.dk?"dark":"light"}})
+    ]}),
+    t("div",{className:"f sx",style:{gap:6,overflowX:"auto",marginBottom:(accs.length+cards.length)>1?8:0},children:cats.map(ct=>chip(v.category===ct.id,`${ct.emoji} ${ct.label}`,()=>onChange({...v,category:ct.id}),ct.id))}),
+    (accs.length+cards.length)>1?t("div",{className:"f sx",style:{gap:6,overflowX:"auto"},children:[
+      ...accs.map(a=>chip(!v.cardId&&v.accountId===a.id,`${a.emoji||"🏦"} ${a.name}`,()=>onChange({...v,accountId:a.id,cardId:null}),a.id)),
+      ...cards.map(cr=>chip(v.cardId===cr.id,`💳 ${cr.name}`,()=>onChange({...v,cardId:cr.id,accountId:null}),cr.id))
+    ]}):null
+  ]});
+}
+function VoiceAdd({data,onAddMany,onClose}){
+  const supported=!!_SRec();
+  const[phase,sPhase]=useState("idle");// idle | listen | busy | review | saved
+  const[txt,sTxt]=useState("");
+  const[interim,sInterim]=useState("");
+  const[typed,sTyped]=useState("");
+  const[err,sErr]=useState(null);
+  const[drafts,sDrafts]=useState([]);
+  const[savedN,sSavedN]=useState(0);
+  const[usedAI,sUsedAI]=useState(false);
+  const recRef=useRef(null),finalRef=useRef(""),cancelRef=useRef(false);
+  useEffect(()=>()=>{try{cancelRef.current=true;recRef.current&&recRef.current.abort()}catch{}},[]);
+  const enrich=drs=>{
+    const mm=buildMerchantMemory(data.expenses,data.merchantRules);
+    return drs.map(d0=>{
+      const hit=d0.merchant?mm(d0.merchant):null;
+      if(!hit||d0.kind!=="expense")return d0;
+      const out={...d0};
+      if(hit.category&&out.category==="other")out.category=hit.category;
+      if(!out.cardId&&!out.accountId){if(hit.cardId&&(data.cards||[]).some(cr=>cr.id===hit.cardId))out.cardId=hit.cardId;else if(hit.accountId&&data.accounts.some(a=>a.id===hit.accountId))out.accountId=hit.accountId}
+      if(hit.needWant)out.needWant=hit.needWant;
+      if(hit.subcategory)out.subcategory=hit.subcategory;
+      out.mm=true;return out;
+    });
+  };
+  const parse=async text=>{
+    text=String(text||"").trim();if(!text)return;
+    sTxt(text);sErr(null);sPhase("busy");
+    let drs=null,ai=false;
+    if(gAK()){try{drs=await voiceAiParse(text,data);ai=!!(drs&&drs.length)}catch(e){sErr(friendlyAPIError(e)+" — used on-device parsing instead.")}}
+    if(!drs||!drs.length)drs=parseVoiceLocal(text);
+    drs=enrich(drs).map(d0=>({...d0,_id:uid(),amount:String(d0.amount)}));
+    if(!drs.length){
+      sErr('Couldn\'t find an amount in that — try "Spent 450 at Swiggy yesterday".');
+      sPhase("idle");return;
+    }
+    sUsedAI(ai);sDrafts(drs);sPhase("review");
+  };
+  const startListen=()=>{
+    sErr(null);
+    const SR=_SRec();
+    if(!SR){sErr("Voice input isn't supported in this browser — type it below instead (Chrome, Edge or Safari work best).");return}
+    let rec;try{rec=new SR()}catch(e){sErr("Couldn't start the microphone: "+e.message);return}
+    rec.lang=navigator.language||"en-IN";rec.interimResults=true;rec.continuous=true;rec.maxAlternatives=1;
+    finalRef.current="";cancelRef.current=false;
+    rec.onresult=ev=>{
+      let fin="",inter="";
+      for(let i=ev.resultIndex;i<ev.results.length;i++){const r2=ev.results[i];if(r2.isFinal)fin+=r2[0].transcript+" ";else inter+=r2[0].transcript}
+      if(fin)finalRef.current=(finalRef.current+" "+fin).replace(/\s+/g," ").trim();
+      sInterim(inter);sTxt(finalRef.current);
+    };
+    rec.onerror=ev=>{
+      const er=ev.error;
+      if(er==="not-allowed"||er==="service-not-allowed")sErr("Microphone permission denied — allow mic access for this site (on iPhone, also check Settings → Siri & Dictation).");
+      else if(er!=="no-speech"&&er!=="aborted")sErr("Mic error: "+er);
+    };
+    rec.onend=()=>{
+      recRef.current=null;sInterim("");
+      const heard=finalRef.current.trim();
+      if(cancelRef.current)return;
+      if(heard)parse(heard);
+      else{sPhase("idle");sErr(e0=>e0||"Didn't catch anything — tap the mic and try again.")}
+    };
+    recRef.current=rec;
+    try{rec.start();sTxt("");sDrafts([]);sPhase("listen")}catch(e){sErr("Couldn't start the microphone.")}
+  };
+  const stopListen=()=>{try{recRef.current&&recRef.current.stop()}catch{}};
+  const cancelListen=()=>{cancelRef.current=true;stopListen();sInterim("");sTxt("");sPhase("idle")};
+  const saveAll=()=>{
+    const ok=drafts.filter(v=>Number(v.amount)>0);
+    if(!ok.length)return;
+    onAddMany(ok.map(v=>({
+      type:v.kind==="income"?"income":"expense",
+      amount:Number(v.amount),
+      accountId:v.cardId?null:(v.accountId||data.accounts[0]?.id||null),
+      cardId:v.cardId||null,
+      category:v.category||(v.kind==="income"?"income_other":"other"),
+      subcategory:v.subcategory||null,
+      merchant:v.merchant||null,
+      note:v.note||null,
+      needWant:v.kind==="expense"?(v.needWant||null):null,
+      date:v.date||Date.now(),
+      currency:data.currency,
+      source:"voice"
+    })));
+    sSavedN(ok.length);sDrafts([]);sTxt("");finalRef.current="";sPhase("saved");
+  };
+  const micBtn=t("button",{
+    onClick:phase==="listen"?stopListen:startListen,
+    "aria-label":phase==="listen"?"stop listening":"start listening",
+    className:"act95 trt"+(phase==="listen"?" vpulse":""),
+    style:{width:96,height:96,borderRadius:999,background:phase==="listen"?c.ro:c.sfg,border:`1px solid ${phase==="listen"?c.ro:c.brs}`,color:phase==="listen"?"#fff":c.ac,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto"},
+    children:t(Mic,{size:38})
+  });
+  const provName=(AI_PROVIDERS[gProv()]||AI_PROVIDERS.anthropic).name;
+  const smartLine=t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:.5,textAlign:"center",marginTop:14},children:gAK()?`✨ SMART PARSE · ${provName.toUpperCase()} + MERCHANT MEMORY`:"⚡ ON-DEVICE PARSE — ADD AN AI KEY IN SETTINGS FOR SMARTER RESULTS"});
+  const idleView=o(Fragment,{children:[
+    t("div",{style:{marginTop:24},children:micBtn}),
+    t("div",{style:{textAlign:"center",fontSize:13,color:c.td,marginTop:14},children:supported?"Tap the mic and just say it":"Voice needs Chrome, Edge or Safari — you can still type below"}),
+    smartLine,
+    o("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,padding:16,marginTop:22},children:[
+      t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,marginBottom:10},children:"TRY SAYING"}),
+      ...['"Spent 450 at Swiggy yesterday"','"Coffee 60 and auto 120"','"Got 50k salary today"','"Petrol 1.5k last Friday on credit card"'].map((s,i)=>t("div",{key:i,style:{fontSize:13,color:c.td,fontStyle:"italic",marginBottom:i<3?7:0},children:s}))
+    ]}),
+    o("div",{className:"f ia",style:{gap:6,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:"8px 10px",marginTop:14},children:[
+      t("input",{value:typed,onChange:e=>sTyped(e.target.value),onKeyDown:e=>{if(e.key==="Enter"&&typed.trim()){parse(typed);sTyped("")}},placeholder:"…or type it here",style:{flex:1,background:"transparent",border:"none",color:c.tx,fontSize:14,minWidth:0}}),
+      t("button",{onClick:()=>{if(typed.trim()){parse(typed);sTyped("")}},disabled:!typed.trim(),className:"act95 trt",style:{width:34,height:34,borderRadius:9,background:typed.trim()?c.ac:c.sf2,color:typed.trim()?"#0a0a0a":c.tm,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(Send,{size:14})})
+    ]})
+  ]});
+  const listenView=o(Fragment,{children:[
+    t("div",{style:{marginTop:24},children:micBtn}),
+    t("div",{style:{textAlign:"center",fontSize:13,color:c.ro,marginTop:14,fontWeight:600},children:"Listening… tap the mic when done"}),
+    (txt||interim)?o("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,padding:16,marginTop:20,fontSize:15,lineHeight:1.5},children:[
+      t("span",{style:{color:c.tx},children:txt+(txt&&interim?" ":"")}),
+      t("span",{style:{color:c.tm},children:interim})
+    ]}):t("div",{style:{textAlign:"center",fontSize:12,color:c.tm,marginTop:20,fontStyle:"italic"},children:'e.g. "Groceries 800 at BigBasket and coffee 60"'}),
+    t("div",{className:"f jc",style:{marginTop:18},children:t("button",{onClick:cancelListen,className:"act95 trt",style:{padding:"10px 22px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:11,color:c.td,fontSize:13},children:"Cancel"})})
+  ]});
+  const busyView=o(Fragment,{children:[
+    txt?t("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,padding:16,marginTop:20,fontSize:15,color:c.td,fontStyle:"italic"},children:"🎙️ "+txt}):null,
+    t("div",{style:{padding:28,textAlign:"center",color:c.td},children:gAK()?"✨ Parsing with AI…":"⚡ Parsing…"})
+  ]});
+  const reviewView=o(Fragment,{children:[
+    o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:"10px 12px",marginTop:4,marginBottom:14},children:[
+      t("span",{style:{flexShrink:0},children:"🎙️"}),
+      t("input",{value:txt,onChange:e=>sTxt(e.target.value),onKeyDown:e=>{if(e.key==="Enter")parse(txt)},style:{flex:1,background:"transparent",border:"none",color:c.td,fontSize:13,fontStyle:"italic",minWidth:0}}),
+      t("button",{onClick:()=>parse(txt),title:"Re-parse",className:"act90 trt",style:{width:30,height:30,borderRadius:8,background:c.sf2,color:c.td,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(Rpt,{size:14})})
+    ]}),
+    t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.ac,letterSpacing:1,marginBottom:10},children:`✓ ${drafts.length} TRANSACTION${drafts.length>1?"S":""} FOUND${usedAI?" · AI":""}`}),
+    ...drafts.map(v=>t(VoiceDraft,{key:v._id,v,data,onChange:nv=>sDrafts(ds2=>ds2.map(x=>x._id===v._id?nv:x)),onRemove:()=>sDrafts(ds2=>ds2.filter(x=>x._id!==v._id))})),
+    o("div",{className:"g g2",style:{gap:8,marginTop:6},children:[
+      t("button",{onClick:()=>{sDrafts([]);sTxt("");sPhase("idle")},className:"act98 trt",style:{padding:"13px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:11,color:c.tx,fontSize:13},children:"Discard"}),
+      t("button",{onClick:saveAll,disabled:!drafts.some(v=>Number(v.amount)>0),className:"act98 trt",style:{padding:"13px 0",background:drafts.some(v=>Number(v.amount)>0)?c.ac:c.sf2,color:drafts.some(v=>Number(v.amount)>0)?"#0a0a0a":c.tm,borderRadius:11,fontWeight:600,fontSize:13,border:"none"},children:`Save ${drafts.filter(v=>Number(v.amount)>0).length||""}`})
+    ]})
+  ]});
+  const savedView=o(Fragment,{children:[
+    t("div",{style:{textAlign:"center",fontSize:44,marginTop:34},children:"✅"}),
+    t("div",{style:{textAlign:"center",fontFamily:c.hf,fontSize:22,marginTop:10},children:`Added ${savedN} transaction${savedN>1?"s":""}`}),
+    o("div",{className:"g g2",style:{gap:8,marginTop:26},children:[
+      t("button",{onClick:onClose,className:"act98 trt",style:{padding:"13px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:11,color:c.tx,fontSize:13},children:"Done"}),
+      o("button",{onClick:startListen,className:"act98 trt f ia jc",style:{gap:8,padding:"13px 0",background:c.ac,color:"#0a0a0a",borderRadius:11,fontWeight:600,fontSize:13,border:"none"},children:[t(Mic,{size:15}),"Speak next"]})
+    ]})
+  ]});
+  return o("div",{style:{padding:"8px 24px 32px"},children:[
+    t(SH,{title:t("em",{children:"Voice log"}),onBack:onClose}),
+    err?t("div",{style:{padding:"10px 14px",background:c.ro+"20",border:`1px solid ${c.ro}40`,borderRadius:11,fontSize:13,color:c.ro,marginBottom:12},children:err}):null,
+    phase==="idle"?idleView:phase==="listen"?listenView:phase==="busy"?busyView:phase==="review"?reviewView:savedView
+  ]});
+}
 
 // === FINANCIAL HEALTH / TIPS ===
 function Tips({data,onClose}){
