@@ -583,7 +583,7 @@ async function restoreStmtFiles(map){if(!map)return;for(const k of Object.keys(m
 // === EXPENSE PHOTO STORAGE (IndexedDB — keeps receipt images out of the localStorage quota) ===
 async function collectPhotoFiles(expenses){const out={};for(const e of (expenses||[])){for(const p of ((e&&e.photos)||[])){if(p&&p.id&&!p.data&&!out[p.id]){try{const b=await idbGetFile(String(p.id));if(b)out[p.id]={name:p.name||"photo.jpg",type:b.type||"image/jpeg",dataUrl:await _blobToDataUrl(b)}}catch(err){}}}}return out}
 function usePhotoSrc(photos){const[map,sMap]=useState({});useEffect(()=>{let live=true;(async()=>{const need=(photos||[]).filter(p=>p&&p.id&&!p.data&&!map[p.id]);if(!need.length)return;const m={};for(const p of need){try{const b=await idbGetFile(String(p.id));if(b)m[p.id]=await _blobToDataUrl(b)}catch(e){}}if(live&&Object.keys(m).length)sMap(mm=>({...mm,...m}))})();return()=>{live=false}},[photos]);return p=>(p&&p.data)||map[p&&p.id]||null}
-function buildBackupObj(dd){let sidebarOrder=null;try{const s=localStorage.getItem(SB_ORDER_KEY);if(s)sidebarOrder=JSON.parse(s)}catch(e){}return{version:"v3.2",exportedAt:new Date().toISOString(),expenses:dd.expenses,recurring:dd.recurring,accounts:dd.accounts,profiles:dd.profiles,cards:dd.cards||[],cardStatements:dd.cardStatements||[],bills:dd.bills||[],goals:dd.goals||[],budgetLoans:dd.budgetLoans||[],ledger:dd.ledger||[],categoryBudgets:dd.categoryBudgets||{},monthlyRestrictionLogs:dd.monthlyRestrictionLogs||[],investments:dd.investments||[],planThreshold:dd.planThreshold??null,customExpenseCategories:dd.customExpenseCategories||[],customIncomeCategories:dd.customIncomeCategories||[],categoryOverrides:dd.categoryOverrides||{},categoryOrder:dd.categoryOrder||{expense:[],income:[]},sidebarOrder,budget:dd.budget,budgetPeriod:dd.budgetPeriod,morningEnabled:dd.morningEnabled||false,morningTime:dd.morningTime||"08:00",eveningEnabled:dd.eveningEnabled||false,eveningTime:dd.eveningTime||"21:00",currency:dd.currency,monthStartDay:dd.monthStartDay,aiProvider:gProv(),aiModel:gMdl()||null,merchantRules:dd.merchantRules||{},debtPlan:dd.debtPlan||null}}
+function buildBackupObj(dd){let sidebarOrder=null;try{const s=localStorage.getItem(SB_ORDER_KEY);if(s)sidebarOrder=JSON.parse(s)}catch(e){}return{version:"v3.2",exportedAt:new Date().toISOString(),expenses:dd.expenses,recurring:dd.recurring,accounts:dd.accounts,profiles:dd.profiles,cards:dd.cards||[],cardStatements:dd.cardStatements||[],bills:dd.bills||[],goals:dd.goals||[],budgetLoans:dd.budgetLoans||[],ledger:dd.ledger||[],categoryBudgets:dd.categoryBudgets||{},monthlyRestrictionLogs:dd.monthlyRestrictionLogs||[],investments:dd.investments||[],planThreshold:dd.planThreshold??null,customExpenseCategories:dd.customExpenseCategories||[],customIncomeCategories:dd.customIncomeCategories||[],categoryOverrides:dd.categoryOverrides||{},categoryOrder:dd.categoryOrder||{expense:[],income:[]},sidebarOrder,budget:dd.budget,budgetPeriod:dd.budgetPeriod,morningEnabled:dd.morningEnabled||false,morningTime:dd.morningTime||"08:00",eveningEnabled:dd.eveningEnabled||false,eveningTime:dd.eveningTime||"21:00",currency:dd.currency,monthStartDay:dd.monthStartDay,aiProvider:gProv(),aiModel:gMdl()||null,merchantRules:dd.merchantRules||{},debtPlan:dd.debtPlan||null,las:dd.las||null}}
 async function buildBackupJSON(dd,withFiles=true){const j=buildBackupObj(dd);if(withFiles){try{j.statementFiles=await collectStmtFiles(j.cardStatements)}catch(e){j.statementFiles={}}try{j.expensePhotos=await collectPhotoFiles(j.expenses)}catch(e){j.expensePhotos={}}}return JSON.stringify(j,null,2)}
 async function gdUpload(json){const token=localStorage.getItem("gd_token");if(!token)throw new Error("Not connected to Google Drive");const fname=`expense-backup-${new Date().toISOString().slice(0,10)}.json`;const meta=JSON.stringify({name:fname,mimeType:"application/json"});const form=new FormData();form.append("metadata",new Blob([meta],{type:"application/json"}));form.append("file",new Blob([json],{type:"application/json"}));const res=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{method:"POST",headers:{Authorization:"Bearer "+token},body:form});if(!res.ok){const txt=await res.text().catch(()=>res.status);throw new Error("Upload failed ("+res.status+"): "+txt)}}
 
@@ -747,8 +747,8 @@ function AppHeader({onMenu,onSearch,onToggleTheme,isDark,theme,onHome,onAI,onDia
   ]})})
 }
 const SB_ORDER_KEY="etp-sidebar-order";
-const DEFAULT_SB=["h:Money","accounts","monthHist","cards","transfer","investments","wealth","budgetTrack","budgetLoans","autopilot","debtPlan","h:Plan & Track","bills","goals","diary","recurring","upcomingExp","categoryBudgets","h:Insights","breakdown","monthlyReport","tips","dailyLesson","wrapped","rules","h:Tools","expPlanner","investCalc","cardPayFix","profiles","h:AI","chat","voiceAdd","billScan","stmtAnalyze","stmtImports","aiInsights","h:Settings & Data","categories","merchantRules","backup","userMgr","settings"];
-const SB_META={chat:{e:"✨",l:"AI Assistant",s:"Log expenses by chat"},voiceAdd:{e:"🎙️",l:"Voice Log",s:"Speak an expense to log it"},billScan:{e:"📸",l:"Snap a Bill",s:"Auto-extract from receipt"},stmtAnalyze:{e:"📊",l:"Statement Analyzer",s:"Find missing transactions & discrepancies"},stmtImports:{e:"📥",l:"Statement Imports",s:"Review transactions logged from statements"},aiInsights:{e:"💡",l:"AI Insights",s:"Spending patterns & AI suggestions"},userMgr:{e:"👥",l:"Switch User",s:"Manage profiles"},rules:{e:"📋",l:"Rules & Learnings",s:"Track your financial rules"},upcomingExp:{e:"📅",l:"Upcoming Expenses",s:"Plan & get alerts"},expPlanner:{e:"🧮",l:"Expense Planner",s:"Can I afford this EMI?"},investCalc:{e:"📈",l:"Investment Calculator",s:"Compound growth & SIP planner"},cards:{e:"💳",l:"Cards",acc:true},cardPayFix:{e:"🪙",l:"Fix card bill payments",s:"Remove double-counted bills",acc:true},bills:{e:"🔔",l:"Bills & Reminders",acc:true},goals:{e:"🎯",l:"Goals & Debt",acc:true},diary:{e:"📖",l:"Lending Diary",s:"Who owes you & you owe"},investments:{e:"💼",l:"My Investments",s:"NPS, Funds, FDs",acc:true},wealth:{e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},monthlyReport:{e:"📰",l:"Monthly Report",s:"Print or share PDF"},budgetTrack:{e:"📉",l:"Budget Tracker",s:"Monthly over/under record"},budgetLoans:{e:"🧾",l:"Budget Loans",s:"Repay past overspends"},breakdown:{e:"⚖️",l:"Spending Breakdown",s:"Needs/Wants · 50-30-20"},accounts:{e:"🏦",l:"Accounts",acc:true},monthHist:{e:"🗓️",l:"Monthly History",s:"Reset & activity by month",acc:true},transfer:{e:"↔️",l:"Transfer",s:"Move funds",acc:true},recurring:{e:"🔁",l:"Recurring"},profiles:{e:"⚡",l:"Quick profiles"},categoryBudgets:{e:"📏",l:"Category budgets",s:"Set spending limits"},categories:{e:"🏷️",l:"Categories",s:"Manage expense types"},backup:{e:"💾",l:"Backup & Restore",s:"Export or import data"},tips:{e:"💡",l:"Financial Health",s:"Tips & scores"},dailyLesson:{e:"📖",l:"Daily Money Lesson",s:"One finance lesson a day"},autopilot:{e:"🔮",l:"Autopilot Forecast",s:"30-day cash-flow projection",acc:true},debtPlan:{e:"⚔️",l:"Debt Destroyer",s:"Avalanche vs snowball payoff plan",acc:true},wrapped:{e:"🎁",l:"Year in Review",s:"Wrapped, heatmap, badges"},merchantRules:{e:"🧠",l:"Merchant Memory",s:"Auto-fill rules per merchant"},settings:{e:"⚙️",l:"Settings",s:"Currency, budget, backup"}};
+const DEFAULT_SB=["h:Money","accounts","monthHist","cards","transfer","investments","wealth","budgetTrack","budgetLoans","autopilot","debtPlan","las","h:Plan & Track","bills","goals","diary","recurring","upcomingExp","categoryBudgets","h:Insights","breakdown","monthlyReport","tips","dailyLesson","wrapped","rules","h:Tools","expPlanner","investCalc","cardPayFix","profiles","h:AI","chat","voiceAdd","billScan","stmtAnalyze","stmtImports","aiInsights","h:Settings & Data","categories","merchantRules","backup","userMgr","settings"];
+const SB_META={chat:{e:"✨",l:"AI Assistant",s:"Log expenses by chat"},voiceAdd:{e:"🎙️",l:"Voice Log",s:"Speak an expense to log it"},billScan:{e:"📸",l:"Snap a Bill",s:"Auto-extract from receipt"},stmtAnalyze:{e:"📊",l:"Statement Analyzer",s:"Find missing transactions & discrepancies"},stmtImports:{e:"📥",l:"Statement Imports",s:"Review transactions logged from statements"},aiInsights:{e:"💡",l:"AI Insights",s:"Spending patterns & AI suggestions"},userMgr:{e:"👥",l:"Switch User",s:"Manage profiles"},rules:{e:"📋",l:"Rules & Learnings",s:"Track your financial rules"},upcomingExp:{e:"📅",l:"Upcoming Expenses",s:"Plan & get alerts"},expPlanner:{e:"🧮",l:"Expense Planner",s:"Can I afford this EMI?"},investCalc:{e:"📈",l:"Investment Calculator",s:"Compound growth & SIP planner"},cards:{e:"💳",l:"Cards",acc:true},cardPayFix:{e:"🪙",l:"Fix card bill payments",s:"Remove double-counted bills",acc:true},bills:{e:"🔔",l:"Bills & Reminders",acc:true},goals:{e:"🎯",l:"Goals & Debt",acc:true},diary:{e:"📖",l:"Lending Diary",s:"Who owes you & you owe"},investments:{e:"💼",l:"My Investments",s:"NPS, Funds, FDs",acc:true},wealth:{e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},monthlyReport:{e:"📰",l:"Monthly Report",s:"Print or share PDF"},budgetTrack:{e:"📉",l:"Budget Tracker",s:"Monthly over/under record"},budgetLoans:{e:"🧾",l:"Budget Loans",s:"Repay past overspends"},breakdown:{e:"⚖️",l:"Spending Breakdown",s:"Needs/Wants · 50-30-20"},accounts:{e:"🏦",l:"Accounts",acc:true},monthHist:{e:"🗓️",l:"Monthly History",s:"Reset & activity by month",acc:true},transfer:{e:"↔️",l:"Transfer",s:"Move funds",acc:true},recurring:{e:"🔁",l:"Recurring"},profiles:{e:"⚡",l:"Quick profiles"},categoryBudgets:{e:"📏",l:"Category budgets",s:"Set spending limits"},categories:{e:"🏷️",l:"Categories",s:"Manage expense types"},backup:{e:"💾",l:"Backup & Restore",s:"Export or import data"},tips:{e:"💡",l:"Financial Health",s:"Tips & scores"},dailyLesson:{e:"📖",l:"Daily Money Lesson",s:"One finance lesson a day"},autopilot:{e:"🔮",l:"Autopilot Forecast",s:"30-day cash-flow projection",acc:true},debtPlan:{e:"⚔️",l:"Debt Destroyer",s:"Avalanche vs snowball payoff plan",acc:true},las:{e:"🏛️",l:"Loan Against Securities",s:"Zerodha LAS · LTV, pledge & unpledge"},wrapped:{e:"🎁",l:"Year in Review",s:"Wrapped, heatmap, badges"},merchantRules:{e:"🧠",l:"Merchant Memory",s:"Auto-fill rules per merchant"},settings:{e:"⚙️",l:"Settings",s:"Currency, budget, backup"}};
 function Sidebar({data,onClose,onView,activeUser,onUpdateUser,focusSection}){
   const go=(id)=>{onView(id);onClose()};
   const scRef=useRef(null);
@@ -1050,8 +1050,8 @@ function App(){
   const cu=usrs.find(u=>u.id===auid)||usrs[0];
   setUsers(usrs);setActiveUser(cu);
   const dk="etp-data-"+cu.id;
-  let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],cardStatements:[],bills:[],goals:[],budgetLoans:[],ledger:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},categoryOrder:{expense:[],income:[]},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,expensePlans:[],investmentPlans:[],investments:[],planThreshold:null,monthlyRestrictionLogs:[],openingBalances:[],reminderEnabled:false,reminderTime:"21:00",rules:[],backupFreq:"off",backupGDrive:false,lastBackupAt:0,merchantRules:{},debtPlan:null};
-  try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,expenses:p.expenses||[],recurring:p.recurring||[],accounts:p.accounts&&p.accounts.length?p.accounts:[DA],profiles:p.profiles||[],cards:p.cards||[],cardStatements:p.cardStatements||[],bills:p.bills||[],goals:p.goals||[],budgetLoans:p.budgetLoans||[],ledger:p.ledger||[],categoryBudgets:p.categoryBudgets||{},customExpenseCategories:p.customExpenseCategories||[],customIncomeCategories:p.customIncomeCategories||[],categoryOverrides:p.categoryOverrides||{},categoryOrder:p.categoryOrder||{expense:[],income:[]},financeProfile:p.financeProfile||null,budget:p.budget??null,budgetPeriod:p.budgetPeriod||"monthly",currency:p.currency||"₹",monthStartDay:p.monthStartDay||1,fontSize:p.fontSize||"medium",upcomingExpenses:p.upcomingExpenses||[],alertThreshold:p.alertThreshold??null,expensePlans:p.expensePlans||[],investmentPlans:p.investmentPlans||[],investments:p.investments||[],planThreshold:p.planThreshold??null,monthlyRestrictionLogs:p.monthlyRestrictionLogs||[],openingBalances:p.openingBalances||[],reminderEnabled:p.reminderEnabled||false,reminderTime:p.reminderTime||"21:00",morningEnabled:p.morningEnabled||false,morningTime:p.morningTime||"08:00",eveningEnabled:p.eveningEnabled??(p.reminderEnabled||false),eveningTime:p.eveningTime||p.reminderTime||"21:00",rules:p.rules||[],backupFreq:p.backupFreq||"off",backupGDrive:p.backupGDrive||false,lastBackupAt:p.lastBackupAt||0,merchantRules:p.merchantRules||{},debtPlan:p.debtPlan||null};_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[];_catOv=i.categoryOverrides||{};_catOrder=i.categoryOrder||{expense:[],income:[]};
+  let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],cardStatements:[],bills:[],goals:[],budgetLoans:[],ledger:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},categoryOrder:{expense:[],income:[]},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,expensePlans:[],investmentPlans:[],investments:[],planThreshold:null,monthlyRestrictionLogs:[],openingBalances:[],reminderEnabled:false,reminderTime:"21:00",rules:[],backupFreq:"off",backupGDrive:false,lastBackupAt:0,merchantRules:{},debtPlan:null,las:null};
+  try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,expenses:p.expenses||[],recurring:p.recurring||[],accounts:p.accounts&&p.accounts.length?p.accounts:[DA],profiles:p.profiles||[],cards:p.cards||[],cardStatements:p.cardStatements||[],bills:p.bills||[],goals:p.goals||[],budgetLoans:p.budgetLoans||[],ledger:p.ledger||[],categoryBudgets:p.categoryBudgets||{},customExpenseCategories:p.customExpenseCategories||[],customIncomeCategories:p.customIncomeCategories||[],categoryOverrides:p.categoryOverrides||{},categoryOrder:p.categoryOrder||{expense:[],income:[]},financeProfile:p.financeProfile||null,budget:p.budget??null,budgetPeriod:p.budgetPeriod||"monthly",currency:p.currency||"₹",monthStartDay:p.monthStartDay||1,fontSize:p.fontSize||"medium",upcomingExpenses:p.upcomingExpenses||[],alertThreshold:p.alertThreshold??null,expensePlans:p.expensePlans||[],investmentPlans:p.investmentPlans||[],investments:p.investments||[],planThreshold:p.planThreshold??null,monthlyRestrictionLogs:p.monthlyRestrictionLogs||[],openingBalances:p.openingBalances||[],reminderEnabled:p.reminderEnabled||false,reminderTime:p.reminderTime||"21:00",morningEnabled:p.morningEnabled||false,morningTime:p.morningTime||"08:00",eveningEnabled:p.eveningEnabled??(p.reminderEnabled||false),eveningTime:p.eveningTime||p.reminderTime||"21:00",rules:p.rules||[],backupFreq:p.backupFreq||"off",backupGDrive:p.backupGDrive||false,lastBackupAt:p.lastBackupAt||0,merchantRules:p.merchantRules||{},debtPlan:p.debtPlan||null,las:p.las||null};_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[];_catOv=i.categoryOverrides||{};_catOrder=i.categoryOrder||{expense:[],income:[]};
   if(i.currency==="₹"){i.accounts=i.accounts.map(a=>a.currency==="$"?{...a,currency:"₹"}:a);const accMap=Object.fromEntries(i.accounts.map(a=>[a.id,a]));i.expenses=i.expenses.map(e=>e.currency==="$"?{...e,currency:accMap[e.accountId]?.currency||i.currency}:e)}
   if(!localStorage.getItem("etp-cash-unlinked")){const cashIds=new Set(i.accounts.filter(a=>a.id==="acc_default"||a.name==="Cash").map(a=>a.id));i.expenses=i.expenses.map(e=>cashIds.has(e.accountId)?{...e,accountId:null}:e);localStorage.setItem("etp-cash-unlinked","1")}}}catch(e){console.error("load",e)}
   if(i.recurring.length>0){const{newExpenses,updatedRecurring}=pr(i.recurring,i.expenses);if(newExpenses.length>0){i.expenses=[...newExpenses,...i.expenses].sort((a,b)=>b.date-a.date);i.recurring=updatedRecurring}}
@@ -1062,7 +1062,7 @@ function App(){
   try{await window.storage.set(dk,JSON.stringify(strip(i)))}catch{}
 })()},[]);
 
-  const strip=x=>({expenses:x.expenses,recurring:x.recurring,accounts:x.accounts,profiles:x.profiles,cards:x.cards||[],cardStatements:x.cardStatements||[],bills:x.bills||[],goals:x.goals||[],budgetLoans:x.budgetLoans||[],ledger:x.ledger||[],categoryBudgets:x.categoryBudgets||{},monthlyRestrictionLogs:x.monthlyRestrictionLogs||[],openingBalances:x.openingBalances||[],customExpenseCategories:x.customExpenseCategories||[],customIncomeCategories:x.customIncomeCategories||[],categoryOverrides:x.categoryOverrides||{},categoryOrder:x.categoryOrder||{expense:[],income:[]},financeProfile:x.financeProfile||null,budget:x.budget,budgetPeriod:x.budgetPeriod,currency:x.currency,monthStartDay:x.monthStartDay,fontSize:x.fontSize||"medium",upcomingExpenses:x.upcomingExpenses||[],alertThreshold:x.alertThreshold??null,expensePlans:x.expensePlans||[],investmentPlans:x.investmentPlans||[],investments:x.investments||[],planThreshold:x.planThreshold??null,reminderEnabled:x.reminderEnabled||false,reminderTime:x.reminderTime||"21:00",morningEnabled:x.morningEnabled||false,morningTime:x.morningTime||"08:00",eveningEnabled:x.eveningEnabled||false,eveningTime:x.eveningTime||"21:00",backupFreq:x.backupFreq||"off",backupGDrive:x.backupGDrive||false,lastBackupAt:x.lastBackupAt||0,merchantRules:x.merchantRules||{},debtPlan:x.debtPlan||null});
+  const strip=x=>({expenses:x.expenses,recurring:x.recurring,accounts:x.accounts,profiles:x.profiles,cards:x.cards||[],cardStatements:x.cardStatements||[],bills:x.bills||[],goals:x.goals||[],budgetLoans:x.budgetLoans||[],ledger:x.ledger||[],categoryBudgets:x.categoryBudgets||{},monthlyRestrictionLogs:x.monthlyRestrictionLogs||[],openingBalances:x.openingBalances||[],customExpenseCategories:x.customExpenseCategories||[],customIncomeCategories:x.customIncomeCategories||[],categoryOverrides:x.categoryOverrides||{},categoryOrder:x.categoryOrder||{expense:[],income:[]},financeProfile:x.financeProfile||null,budget:x.budget,budgetPeriod:x.budgetPeriod,currency:x.currency,monthStartDay:x.monthStartDay,fontSize:x.fontSize||"medium",upcomingExpenses:x.upcomingExpenses||[],alertThreshold:x.alertThreshold??null,expensePlans:x.expensePlans||[],investmentPlans:x.investmentPlans||[],investments:x.investments||[],planThreshold:x.planThreshold??null,reminderEnabled:x.reminderEnabled||false,reminderTime:x.reminderTime||"21:00",morningEnabled:x.morningEnabled||false,morningTime:x.morningTime||"08:00",eveningEnabled:x.eveningEnabled||false,eveningTime:x.eveningTime||"21:00",backupFreq:x.backupFreq||"off",backupGDrive:x.backupGDrive||false,lastBackupAt:x.lastBackupAt||0,merchantRules:x.merchantRules||{},debtPlan:x.debtPlan||null,las:x.las||null});
 
   const pst=async(p)=>{const n={...d,...p};_custCE=n.customExpenseCategories||[];_custCI=n.customIncomeCategories||[];_catOv=n.categoryOverrides||{};_catOrder=n.categoryOrder||{expense:[],income:[]};sD(n);const dk=activeUser?"etp-data-"+activeUser.id:KS;try{await window.storage.set(dk,JSON.stringify(strip(n)))}catch(e){console.error(e);try{if(!window.__pstErrWarned){window.__pstErrWarned=true;alert("⚠ Could not save your data — device storage looks full. Recent changes may disappear when the app closes. Free up space, then make any small edit to retry saving.")}}catch(e2){}}};
 
@@ -1209,6 +1209,7 @@ function App(){
         v==="autopilot"&&t(Autopilot,{data:d,onClose:()=>sV(navFromRef.current||"home")}),
         v==="wrapped"&&t(Wrapped,{data:d,onClose:()=>sV(navFromRef.current||"home")}),
         v==="debtPlan"&&t(DebtPlan,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"home")}),
+        v==="las"&&t(LASView,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"home")}),
         v==="merchantRules"&&t(MerchantRulesView,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"home")}),
         v==="breakdown"&&t(Breakdown,{data:d,persist:pst,onClose:()=>sV(navFromRef.current),onTx:sAtx}),
         v==="budgetTrack"&&t(BudgetTrack,{data:d,onClose:()=>sV(navFromRef.current),onRepay:repayMonth,onOpenLoans:()=>{navFromRef.current="budgetTrack";sV("budgetLoans")},onCardPay:aCP}),
@@ -1772,6 +1773,190 @@ function Wrapped({data,onClose}){
 }
 
 // === DEBT DESTROYER ===
+function LASView({data,persist,onClose}){
+  const currency=data.currency||"₹";
+  const base={loan:0,rate:10.5,ltv:45,fee:32,holdings:[],txns:[]};
+  const L={...base,...(data.las||{})};
+  const up=(p)=>persist&&persist({las:{...L,...p}});
+  const holdings=L.holdings||[],txns=L.txns||[];
+  const loan=Number(L.loan)||0,rate=Number(L.rate)||0,ltvPct=Number(L.ltv)||45,scripFee=Number(L.fee)||0;
+  const pledged=holdings.reduce((s,h)=>s+(Number(h.value)||0),0);
+  const ltvNow=pledged>0?loan/pledged*100:0;
+  const maxLoan=pledged*ltvPct/100;
+  const availDraw=Math.max(0,maxLoan-loan);
+  const maxUnpledge=ltvPct>0?Math.max(0,pledged-loan/(ltvPct/100)):0;
+  const dailyInt=loan*rate/36500;
+  const monthInt=dailyInt*30;
+  const zone=loan<=0?0:pledged<=0?3:ltvNow>=60?3:ltvNow>=50?2:ltvNow>ltvPct?1:0;
+  const zc=[c.mt,c.gd,c.co,c.ro][zone];
+  const zoneLabel=["SAFE","WATCH","DANGER","CRITICAL"][zone];
+  const zoneMsg=[
+    "Below the "+ltvPct+"% drawdown LTV — you can draw more or unpledge freely.",
+    "Above the "+ltvPct+"% drawdown ceiling — no fresh drawdown, and unpledging needs a repayment first.",
+    "Above the 50% maintenance LTV — if it stays there 6 days in a row, pledged securities can be liquidated.",
+    "At 60%+ LTV Zerodha Capital can act immediately. Repay or pledge more securities now.",
+  ][zone];
+  const inS={background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:9,padding:"9px 11px",color:c.tx,fontSize:13,outline:"none",fontFamily:F.mo,width:"100%"};
+  const lbS={fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,display:"block",marginBottom:5};
+  const cardS={background:c.sfg,borderRadius:16,border:`1px solid ${c.brs}`,padding:14,marginBottom:14};
+  const[showSet,sShowSet]=useState(!data.las);
+  const[fLoan,sFLoan]=useState(loan?String(loan):"");
+  const[fRate,sFRate]=useState(String(L.rate));
+  const[fLtv,sFLtv]=useState(String(L.ltv));
+  const[fFee,sFFee]=useState(String(L.fee));
+  const saveSet=()=>{up({loan:parseFloat(fLoan)||0,rate:parseFloat(fRate)||0,ltv:parseFloat(fLtv)||45,fee:parseFloat(fFee)||0});sShowSet(false)};
+  const[hName,sHName]=useState("");const[hVal,sHVal]=useState("");
+  const addH=()=>{if(!hName.trim()||!(parseFloat(hVal)>0))return;up({holdings:[...holdings,{id:"lash_"+uid(),name:hName.trim(),value:parseFloat(hVal)}]});sHName("");sHVal("")};
+  const setHVal2=(id,v2)=>{const n2=parseFloat(v2);up({holdings:holdings.map(h=>h.id===id?{...h,value:n2>0?n2:0}:h)})};
+  const delH=(id)=>up({holdings:holdings.filter(h=>h.id!==id)});
+  const[txType,sTxType]=useState("repay");const[txAmt,sTxAmt]=useState("");const[txNote,sTxNote]=useState("");
+  const logTx=(type,amt,note)=>{const a=parseFloat(amt);if(!(a>0))return;const nl=type==="repay"?Math.max(0,loan-a):type==="draw"?loan+a:loan;up({loan:nl,txns:[{id:"lastx_"+uid(),type,amount:a,date:Date.now(),note:note||null},...txns]})};
+  const delTx=(x)=>{const nl=x.type==="repay"?loan+x.amount:x.type==="draw"?Math.max(0,loan-x.amount):loan;up({loan:nl,txns:txns.filter(y=>y.id!==x.id)})};
+  const now=new Date();const dom=now.getDate();
+  const sameMonth=(ts)=>{const d2=new Date(ts);return d2.getFullYear()===now.getFullYear()&&d2.getMonth()===now.getMonth()};
+  const intPaidThisMonth=txns.some(x=>x.type==="interest"&&sameMonth(x.date));
+  const[pU,sPU]=useState("");const[pN,sPN]=useState("1");
+  const uAmt=parseFloat(pU)||0;const nScrips=Math.max(1,parseInt(pN)||1);
+  let pl=null;
+  if(uAmt>0){const over=uAmt>pledged;const newPledged=Math.max(0,pledged-uAmt);const allowed=newPledged*ltvPct/100;const pay=Math.max(0,loan-allowed);const fees=nScrips*scripFee;const newLoan=loan-pay;pl={over,newPledged,allowed,pay,fees,newLoan,newLtv:newPledged>0?newLoan/newPledged*100:0,net:uAmt-pay-fees}}
+  const txMeta={repay:{e:"💸",l:"Loan repayment",cl:c.mt},draw:{e:"🏦",l:"Drawdown",cl:c.co},interest:{e:"⏱️",l:"Interest paid",cl:c.gd}};
+  const SCALE=70;const pct=x=>Math.min(100,x/SCALE*100)+"%";
+  return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
+    t(SH,{title:t("em",{children:"LAS Tracker"}),onBack:onClose,right:t("button",{onClick:()=>sShowSet(s=>!s),className:"act90 tr",style:{width:38,height:38,borderRadius:12,background:showSet?c.sf3:c.sf,border:`1px solid ${showSet?c.ac:c.brs}`,fontSize:16},children:"⚙️"})}),
+    t("div",{style:{fontSize:13,color:c.td,marginBottom:16,lineHeight:1.5},children:"Track your Zerodha Capital loan against securities — LTV zones, interest, and a planner that tells you how much to repay before unpledging."}),
+    showSet&&o("div",{style:cardS,children:[
+      t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:10},children:"LOAN & TERMS"}),
+      o("div",{className:"g g2",style:{gap:8,marginBottom:10},children:[
+        o("div",{children:[t("label",{style:lbS,children:"LOAN OUTSTANDING"}),t("input",{value:fLoan,onChange:e=>sFLoan(e.target.value.replace(/[^\d.]/g,"")),placeholder:"0",inputMode:"decimal",style:inS})]}),
+        o("div",{children:[t("label",{style:lbS,children:"INTEREST % P.A."}),t("input",{value:fRate,onChange:e=>sFRate(e.target.value.replace(/[^\d.]/g,"")),placeholder:"10.5",inputMode:"decimal",style:inS})]}),
+        o("div",{children:[t("label",{style:lbS,children:"DRAWDOWN LTV %"}),t("input",{value:fLtv,onChange:e=>sFLtv(e.target.value.replace(/[^\d.]/g,"")),placeholder:"45",inputMode:"decimal",style:inS})]}),
+        o("div",{children:[t("label",{style:lbS,children:"FEE PER SCRIP"}),t("input",{value:fFee,onChange:e=>sFFee(e.target.value.replace(/[^\d.]/g,"")),placeholder:"32",inputMode:"decimal",style:inS})]}),
+      ]}),
+      t("button",{onClick:saveSet,className:"w100 act95 tr",style:{padding:"10px 0",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:10,fontSize:13,fontWeight:600},children:"Save"}),
+    ]}),
+    o("div",{style:{...cardS,padding:"16px 16px 14px"},children:[
+      o("div",{className:"f ib jb",children:[
+        o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:4},children:"OUTSTANDING LOAN"}),t("div",{style:{fontFamily:F.mo,fontSize:26,fontWeight:600,color:c.tx},children:fm(loan,currency)})]}),
+        o("div",{style:{textAlign:"right"},children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:4},children:"PLEDGED VALUE"}),t("div",{style:{fontFamily:F.mo,fontSize:15,color:c.td},children:fm(pledged,currency)})]}),
+      ]}),
+      o("div",{className:"f ia jb",style:{marginTop:12,marginBottom:6},children:[
+        o("div",{className:"f ia",style:{gap:8},children:[
+          t("span",{style:{fontFamily:F.mo,fontSize:20,fontWeight:600,color:zc},children:(pledged>0?ltvNow.toFixed(1):"—")+"%"}),
+          t("span",{style:{fontFamily:F.mo,fontSize:9,letterSpacing:1,color:zc,background:zc+"22",border:`1px solid ${zc}55`,padding:"3px 8px",borderRadius:999},children:zoneLabel}),
+        ]}),
+        t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm},children:"LTV NOW"}),
+      ]}),
+      o("div",{className:"r",style:{marginTop:6,marginBottom:18},children:[
+        o("div",{className:"f",style:{height:10,borderRadius:6,overflow:"hidden"},children:[
+          t("div",{style:{width:pct(ltvPct),background:c.mt+"50"}}),
+          t("div",{style:{width:pct(50-ltvPct),background:c.gd+"55"}}),
+          t("div",{style:{width:pct(10),background:c.co+"55"}}),
+          t("div",{style:{flex:1,background:c.ro+"55"}}),
+        ]}),
+        pledged>0&&t("div",{className:"a",style:{left:pct(ltvNow),top:-4,width:3,height:18,borderRadius:2,background:zc,transform:"translateX(-1px)",boxShadow:"0 0 6px "+zc}}),
+        o(Fragment,{children:[[0,"0"],[ltvPct,String(ltvPct)],[50,"50"],[60,"60"],[SCALE,SCALE+"+"]].map(([p2,l2])=>t("div",{key:l2,className:"a",style:{left:pct(p2),top:14,transform:p2===0?"none":p2===SCALE?"translateX(-100%)":"translateX(-50%)",fontFamily:F.mo,fontSize:8.5,color:c.tm},children:l2}))}),
+      ]}),
+      t("div",{style:{fontSize:11.5,color:zone>0?zc:c.tm,lineHeight:1.5,marginTop:14},children:zoneMsg}),
+    ]}),
+    loan>0&&dom<=7&&(intPaidThisMonth?
+      t("div",{style:{background:c.mt+"14",border:`1px solid ${c.mt}40`,borderRadius:12,padding:"10px 14px",marginBottom:14,fontSize:12,color:c.mt},children:"✓ This month's interest is logged as paid."}):
+      o("div",{style:{background:c.gd+"14",border:`1px solid ${c.gd}50`,borderRadius:12,padding:"12px 14px",marginBottom:14},children:[
+        t("div",{style:{fontSize:12.5,color:c.gd,lineHeight:1.5,marginBottom:8},children:`Interest window open (1st–7th): pay ~${fm(Math.round(monthInt),currency)} this month on the Zerodha Capital dashboard.`}),
+        t("button",{onClick:()=>logTx("interest",Math.round(monthInt),"Monthly interest"),className:"act95 tr",style:{padding:"7px 14px",background:c.gd,color:"#0a0a0a",border:"none",borderRadius:9,fontSize:12,fontWeight:600},children:"Log as paid"}),
+      ]})),
+    o("div",{className:"g g2",style:{gap:10,marginBottom:14},children:[
+      [["AVAILABLE TO DRAW",availDraw,c.sk],["MAX UNPLEDGE NOW",maxUnpledge,c.mt],["INTEREST / DAY",dailyInt,c.gd],["INTEREST / MONTH (EST)",monthInt,c.co]].map(([l2,v2,cl])=>o("div",{key:l2,style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,padding:"12px 13px"},children:[
+        t("div",{style:{fontFamily:F.mo,fontSize:8.5,color:c.tm,letterSpacing:1,marginBottom:6},children:l2}),
+        t("div",{style:{fontFamily:F.mo,fontSize:15,fontWeight:600,color:cl},children:fm(Math.round(v2),currency)}),
+      ]}))
+    ]}),
+    o("div",{style:cardS,children:[
+      t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:4},children:"UNPLEDGE PLANNER"}),
+      t("div",{style:{fontSize:11.5,color:c.tm,lineHeight:1.5,marginBottom:10},children:"How much do you want to unpledge? I'll compute the repayment needed to unlock it."}),
+      o("div",{className:"g g2",style:{gap:8,marginBottom:10},children:[
+        o("div",{children:[t("label",{style:lbS,children:"UNPLEDGE AMOUNT"}),t("input",{value:pU,onChange:e=>sPU(e.target.value.replace(/[^\d.]/g,"")),placeholder:"0",inputMode:"decimal",style:inS})]}),
+        o("div",{children:[t("label",{style:lbS,children:"# OF SCRIPS"}),t("input",{value:pN,onChange:e=>sPN(e.target.value.replace(/[^\d]/g,"")),placeholder:"1",inputMode:"numeric",style:inS})]}),
+      ]}),
+      pl&&(pl.over?
+        t("div",{style:{fontSize:12,color:c.ro,lineHeight:1.5},children:"That's more than your total pledged value — reduce the amount."}):
+        o(Fragment,{children:[
+          pl.pay>0?o("div",{style:{background:c.sf2,borderRadius:12,padding:"11px 13px",marginBottom:8},children:[
+            t("div",{style:{fontSize:12,color:c.td,lineHeight:1.6},children:"Loan exceeds the post-unpledge limit, so repay first:"}),
+            o("div",{style:{fontSize:12.5,color:c.tx,lineHeight:1.8,marginTop:4},children:[
+              o("div",{children:["1. Pay ",t("b",{style:{fontFamily:F.mo,color:c.mt},children:fm(Math.ceil(pl.pay),currency)})," toward the loan → loan drops to ",t("b",{style:{fontFamily:F.mo},children:fm(Math.round(pl.newLoan),currency)})]}),
+              o("div",{children:["2. Unpledge ",t("b",{style:{fontFamily:F.mo},children:fm(uAmt,currency)})," across ",nScrips," scrip"+(nScrips>1?"s":"")," (fees ~",t("b",{style:{fontFamily:F.mo},children:fm(pl.fees,currency)}),")"]}),
+            ]}),
+          ]}):t("div",{style:{background:c.mt+"14",border:`1px solid ${c.mt}40`,borderRadius:12,padding:"11px 13px",marginBottom:8,fontSize:12.5,color:c.mt,lineHeight:1.6},children:`No repayment needed — this fits inside your current unpledge room. Just unpledge (fees ~${fm(pl.fees,currency)}).`}),
+          o("div",{className:"g g2",style:{gap:8},children:[
+            [["LTV AFTER",pl.newLtv>0?pl.newLtv.toFixed(1)+"%":"—"],["NET CASH FREED",fm(Math.round(pl.net),currency)]].map(([l2,v2])=>o("div",{key:l2,style:{background:c.sf2,borderRadius:10,padding:"9px 12px"},children:[
+              t("div",{style:{fontFamily:F.mo,fontSize:8.5,color:c.tm,letterSpacing:1,marginBottom:3},children:l2}),
+              t("div",{style:{fontFamily:F.mo,fontSize:13.5,fontWeight:600,color:c.tx},children:v2}),
+            ]}))
+          ]}),
+          pl.pay>0&&t("button",{onClick:()=>{logTx("repay",Math.ceil(pl.pay),"Pre-unpledge repayment");sPU("")},className:"w100 act95 tr",style:{marginTop:10,padding:"10px 0",background:c.sf3,color:c.tx,border:`1px solid ${c.ac}`,borderRadius:10,fontSize:12.5,fontWeight:600},children:`Log the ${fm(Math.ceil(pl.pay),currency)} repayment`}),
+        ]})),
+    ]}),
+    o("div",{style:{...cardS,padding:0,overflow:"hidden"},children:[
+      o("div",{className:"f ia jb",style:{padding:"13px 14px 11px"},children:[
+        t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1},children:"PLEDGED SECURITIES"}),
+        t("div",{style:{fontFamily:F.mo,fontSize:11,color:c.td},children:fm(pledged,currency)}),
+      ]}),
+      holdings.length===0&&t("div",{style:{padding:"4px 14px 14px",fontSize:12,color:c.tm,lineHeight:1.5},children:"Add each pledged scrip with its current market value. Update values anytime — LTV recalculates instantly."}),
+      holdings.map((h,i)=>o("div",{key:h.id,className:"f ia jb",style:{padding:"10px 14px",borderTop:`1px solid ${c.brs}`},children:[
+        t("div",{className:"tru",style:{fontSize:13,color:c.tx,fontWeight:500,flex:1,minWidth:0,marginRight:10},children:h.name}),
+        o("div",{className:"f ia",style:{gap:8,flexShrink:0},children:[
+          t("input",{key:h.id+"_v",defaultValue:h.value,onBlur:e=>{const v2=e.target.value.replace(/[^\d.]/g,"");if(v2!==""&&parseFloat(v2)!==h.value)setHVal2(h.id,v2);else e.target.value=h.value},inputMode:"decimal",style:{...inS,width:96,textAlign:"right",padding:"6px 9px",fontSize:12.5}}),
+          t("button",{onClick:()=>delH(h.id),style:{background:"transparent",border:"none",color:c.tm,padding:0,display:"flex"},children:t(X,{size:14})}),
+        ]}),
+      ]})),
+      o("div",{style:{padding:"12px 14px 14px",borderTop:`1px solid ${c.brs}`},children:[
+        o("div",{className:"g",style:{gridTemplateColumns:"1fr 96px",gap:8,marginBottom:8},children:[
+          t("input",{value:hName,onChange:e=>sHName(e.target.value),placeholder:"Scrip name",style:{...inS,fontFamily:"inherit"}}),
+          t("input",{value:hVal,onChange:e=>sHVal(e.target.value.replace(/[^\d.]/g,"")),placeholder:"Value",inputMode:"decimal",style:inS}),
+        ]}),
+        t("button",{onClick:addH,className:"w100 act95 tr",style:{padding:"9px 0",background:c.sf3,color:c.tx,border:`1px solid ${c.brs}`,borderRadius:10,fontSize:12.5,fontWeight:600},children:"+ Add pledged scrip"}),
+      ]}),
+    ]}),
+    o("div",{style:cardS,children:[
+      t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:10},children:"RECORD ACTIVITY"}),
+      t("div",{className:"f",style:{gap:6,marginBottom:8},children:[["repay","Repayment"],["draw","Drawdown"],["interest","Interest"]].map(([id,l2])=>t("button",{key:id,onClick:()=>sTxType(id),className:"act95 tr f1",style:{padding:"8px 0",borderRadius:9,fontSize:12,fontWeight:600,background:txType===id?c.sf3:c.sf2,border:`1px solid ${txType===id?c.ac:c.brs}`,color:txType===id?c.tx:c.td},children:l2}))}),
+      o("div",{className:"g",style:{gridTemplateColumns:"110px 1fr",gap:8,marginBottom:8},children:[
+        t("input",{value:txAmt,onChange:e=>sTxAmt(e.target.value.replace(/[^\d.]/g,"")),placeholder:"Amount",inputMode:"decimal",style:inS}),
+        t("input",{value:txNote,onChange:e=>sTxNote(e.target.value),placeholder:"Note (optional)",style:{...inS,fontFamily:"inherit"}}),
+      ]}),
+      t("button",{onClick:()=>{logTx(txType,txAmt,txNote.trim());sTxAmt("");sTxNote("")},className:"w100 act95 tr",style:{padding:"10px 0",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:10,fontSize:13,fontWeight:600},children:txType==="repay"?"Log repayment":txType==="draw"?"Log drawdown":"Log interest payment"}),
+      txType==="draw"&&parseFloat(txAmt)>availDraw&&t("div",{style:{fontSize:11.5,color:c.co,marginTop:8,lineHeight:1.4},children:`Heads up: that's ${fm(Math.round(parseFloat(txAmt)-availDraw),currency)} over your available drawdown at ${ltvPct}% LTV.`}),
+    ]}),
+    txns.length>0&&o("div",{style:{...cardS,padding:0,overflow:"hidden"},children:[
+      t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,padding:"13px 14px 3px"},children:"HISTORY"}),
+      txns.map(x=>{const m=txMeta[x.type]||txMeta.repay;return o("div",{key:x.id,className:"f ia jb",style:{padding:"10px 14px",borderTop:`1px solid ${c.brs}`},children:[
+        o("div",{className:"f ia minw0",style:{gap:10},children:[
+          t("span",{style:{fontSize:15},children:m.e}),
+          o("div",{className:"minw0",children:[
+            t("div",{className:"tru",style:{fontSize:12.5,color:c.tx},children:x.note||m.l}),
+            t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,marginTop:1},children:m.l+" · "+new Date(x.date).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}),
+          ]}),
+        ]}),
+        o("div",{className:"f ia",style:{gap:10,flexShrink:0},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:12.5,fontWeight:600,color:m.cl},children:(x.type==="draw"?"+":"−")+fm(x.amount,currency)}),
+          t("button",{onClick:()=>delTx(x),style:{background:"transparent",border:"none",color:c.tm,padding:0,display:"flex"},children:t(X,{size:13})}),
+        ]}),
+      ]})}),
+    ]}),
+    o("div",{style:{...cardS,marginBottom:0},children:[
+      t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:8},children:"ZERODHA CAPITAL LAS RULES"}),
+      o("div",{style:{fontSize:11.5,color:c.td,lineHeight:1.7},children:[
+        "• You can borrow up to 45% of the value of approved pledged securities (drawdown LTV).",t("br"),
+        "• If LTV stays above 50% for 6 consecutive days, pledged securities can be liquidated; at 60%+ action can be immediate.",t("br"),
+        "• Interest accrues daily on the outstanding amount, is charged monthly, and is payable on the dashboard between the 1st and 7th.",t("br"),
+        "• Tenure is 3 years, interest-only monthly — principal can be repaid anytime with no prepayment penalty.",t("br"),
+        "• Pledging or unpledging costs ₹32 + GST per scrip per request.",t("br"),
+        "• The approved-securities list changes periodically — a dropped scrip can cut your limit overnight.",
+      ]}),
+    ]}),
+  ]});
+}
+
 function DebtPlan({data,persist,onClose}){
   const{currency}=data;
   const plan=data.debtPlan||{debts:null,monthly:0};
@@ -4726,7 +4911,7 @@ const dl=async()=>{sMsg("Preparing backup (embedding statement PDFs)…");try{co
 const cp=async()=>{try{await navigator.clipboard.writeText(await exp());sMsg("Copied to clipboard (incl. statement PDFs)")}catch{alert("Clipboard blocked")}};
 const onFile=async e=>{const f=e.target.files?.[0];if(!f)return;const text=await f.text();sTxt(text)};
 const tryRestore=()=>{try{const o2=JSON.parse(txt);if(!o2.expenses||!Array.isArray(o2.expenses))throw new Error("Invalid format — missing expenses array");sConf(o2)}catch(err){sMsg("Error: "+err.message)}};
-const doRestore=async()=>{const o2=conf;try{await restoreStmtFiles(o2.statementFiles)}catch(e){}try{await restoreStmtFiles(o2.expensePhotos)}catch(e){}if(Array.isArray(o2.sidebarOrder)){try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2.sidebarOrder))}catch(e){}}persist({expenses:o2.expenses||[],recurring:o2.recurring||[],accounts:o2.accounts&&o2.accounts.length?o2.accounts:[DA],profiles:o2.profiles||[],cards:o2.cards||[],cardStatements:o2.cardStatements||[],bills:o2.bills||[],goals:o2.goals||[],budgetLoans:o2.budgetLoans||[],ledger:o2.ledger||[],categoryBudgets:o2.categoryBudgets||{},monthlyRestrictionLogs:o2.monthlyRestrictionLogs||[],investments:o2.investments||[],planThreshold:o2.planThreshold??null,customExpenseCategories:o2.customExpenseCategories||[],customIncomeCategories:o2.customIncomeCategories||[],categoryOverrides:o2.categoryOverrides||{},categoryOrder:o2.categoryOrder||{expense:[],income:[]},budget:o2.budget??null,budgetPeriod:o2.budgetPeriod||"monthly",...(o2.morningEnabled!=null?{morningEnabled:o2.morningEnabled,morningTime:o2.morningTime||"08:00",eveningEnabled:o2.eveningEnabled||false,eveningTime:o2.eveningTime||"21:00"}:{}),currency:o2.currency||"$",monthStartDay:o2.monthStartDay||1,merchantRules:o2.merchantRules||{},debtPlan:o2.debtPlan||null});try{if(o2.aiProvider)sProv(o2.aiProvider);if("aiModel" in o2)sMdl(o2.aiModel||null);sAK(null)}catch(e){}sConf(null);sMsg("✓ Restored. Re-enter your AI API key in Settings (keys are never stored in backups)"+(o2.statementFiles?" (statement PDFs included)":""));sTxt("")};
+const doRestore=async()=>{const o2=conf;try{await restoreStmtFiles(o2.statementFiles)}catch(e){}try{await restoreStmtFiles(o2.expensePhotos)}catch(e){}if(Array.isArray(o2.sidebarOrder)){try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2.sidebarOrder))}catch(e){}}persist({expenses:o2.expenses||[],recurring:o2.recurring||[],accounts:o2.accounts&&o2.accounts.length?o2.accounts:[DA],profiles:o2.profiles||[],cards:o2.cards||[],cardStatements:o2.cardStatements||[],bills:o2.bills||[],goals:o2.goals||[],budgetLoans:o2.budgetLoans||[],ledger:o2.ledger||[],categoryBudgets:o2.categoryBudgets||{},monthlyRestrictionLogs:o2.monthlyRestrictionLogs||[],investments:o2.investments||[],planThreshold:o2.planThreshold??null,customExpenseCategories:o2.customExpenseCategories||[],customIncomeCategories:o2.customIncomeCategories||[],categoryOverrides:o2.categoryOverrides||{},categoryOrder:o2.categoryOrder||{expense:[],income:[]},budget:o2.budget??null,budgetPeriod:o2.budgetPeriod||"monthly",...(o2.morningEnabled!=null?{morningEnabled:o2.morningEnabled,morningTime:o2.morningTime||"08:00",eveningEnabled:o2.eveningEnabled||false,eveningTime:o2.eveningTime||"21:00"}:{}),currency:o2.currency||"$",monthStartDay:o2.monthStartDay||1,merchantRules:o2.merchantRules||{},debtPlan:o2.debtPlan||null,las:o2.las||null});try{if(o2.aiProvider)sProv(o2.aiProvider);if("aiModel" in o2)sMdl(o2.aiModel||null);sAK(null)}catch(e){}sConf(null);sMsg("✓ Restored. Re-enter your AI API key in Settings (keys are never stored in backups)"+(o2.statementFiles?" (statement PDFs included)":""));sTxt("")};
 const prebuild=async()=>{try{const s=await window.storage.get(KB);if(!s){alert("No prebuild snapshot found");return}sTxt(s.value);sMsg("Loaded prebuild backup — review then tap Restore")}catch{alert("Error loading snapshot")}};
 return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
   t(SH,{title:t("em",{children:"Backup & Restore"}),onBack:onClose}),
