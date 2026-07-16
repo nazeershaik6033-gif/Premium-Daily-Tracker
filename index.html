@@ -1877,6 +1877,34 @@ function LASView({data,persist,onClose}){
   const addH=()=>{if(!hName.trim()||!(parseFloat(hVal)>0))return;up({holdings:[...holdings,{id:"lash_"+uid(),name:hName.trim(),value:parseFloat(hVal)}]});sHName("");sHVal("")};
   const setHVal2=(id,v2)=>{const n2=parseFloat(v2);up({holdings:holdings.map(h=>h.id===id?{...h,value:n2>0?n2:0}:h)})};
   const delH=(id)=>up({holdings:holdings.filter(h=>h.id!==id)});
+  const[scanBusy,sScanBusy]=useState(false);const[scanErr,sScanErr]=useState(null);const[scanMsg,sScanMsg]=useState(null);const scanRef=useRef(null);
+  const scanHoldings=async(files)=>{
+    const arr=Array.from(files||[]).filter(Boolean);if(!arr.length)return;
+    sScanErr(null);sScanMsg(null);
+    if(!gAK()){sScanErr("Add an AI API key in Settings first.");return}
+    const pv=AI_PROVIDERS[gProv()]||AI_PROVIDERS.anthropic;
+    if(!pv.vision){sScanErr(`${pv.name} can't read photos — switch to Anthropic, DeepSeek, OpenAI, or Gemini in Settings.`);return}
+    const tooBig=arr.find(f=>f.size>4.5e6);if(tooBig){sScanErr(`Each image must be under 4.5MB — "${tooBig.name||"one photo"}" is too large.`);return}
+    sScanBusy(true);
+    const sys="You read a stock or mutual-fund pledge / holdings screenshot (for example the Zerodha Console pledged-collateral list) and extract each pledged security with its value. Be accurate and thorough.";
+    const found=[];let firstErr=null;
+    for(const f of arr){
+      try{
+        const b64=await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(f)});
+        const u=[{type:"image",source:{type:"base64",media_type:f.type||"image/jpeg",data:b64.split(",")[1]}},{type:"text",text:'Extract every pledged security / holding row visible. For each give the instrument name and its current market value in rupees. If only a collateral or pledged value is shown, use that value. Return JSON only: {"holdings":[{"name":"RELIANCE","value":125000}]}. Values must be plain positive numbers with no commas or currency symbols. If nothing readable: {"holdings":[]}.'}];
+        const r=await cAPI({max_tokens:2000,system:sys,messages:[{role:"user",content:u}]});
+        const txt=r.content?.map(x=>x.text||"").join("")||"";
+        const pj=extractJSON(txt);const list=(pj&&pj.holdings)||[];
+        for(const it of list){const name=String(it.name||"").trim().slice(0,60);const val=parseFloat(String(it.value).replace(/[^0-9.]/g,""));if(!name||!val||isNaN(val)||val<=0)continue;found.push({name,value:val})}
+      }catch(e2){if(!firstErr)firstErr=friendlyAPIError(e2)}
+    }
+    if(!found.length){sScanErr(firstErr?("Scan failed: "+firstErr):"No pledged securities were found in the photo. Try a clearer image.");sScanBusy(false);return}
+    const idx={};holdings.forEach((h,i)=>{idx[h.name.toLowerCase()]=i});
+    const merged=holdings.map(h=>({...h}));let added=0,updated=0;
+    for(const f of found){const key=f.name.toLowerCase();if(key in idx){merged[idx[key]].value=f.value;updated++}else{merged.push({id:"lash_"+uid(),name:f.name,value:f.value});idx[key]=merged.length-1;added++}}
+    up({holdings:merged});sScanBusy(false);
+    sScanMsg(`${added?`Added ${added} scrip${added===1?"":"s"}`:""}${added&&updated?" · ":""}${updated?`updated ${updated}`:""} from the photo. Review the values below.`);
+  };
   const[txType,sTxType]=useState("repay");const[txAmt,sTxAmt]=useState("");const[txNote,sTxNote]=useState("");
   const logTx=(type,amt,note)=>{const a=parseFloat(amt);if(!(a>0))return;const nl=type==="repay"?Math.max(0,loan-a):type==="draw"?loan+a:loan;up({loan:nl,txns:[{id:"lastx_"+uid(),type,amount:a,date:Date.now(),note:note||null},...txns]})};
   const delTx=(x)=>{const nl=x.type==="repay"?loan+x.amount:x.type==="draw"?Math.max(0,loan-x.amount):loan;up({loan:nl,txns:txns.filter(y=>y.id!==x.id)})};
@@ -1978,6 +2006,11 @@ function LASView({data,persist,onClose}){
         ]}),
       ]})),
       o("div",{style:{padding:"12px 14px 14px",borderTop:`1px solid ${c.brs}`},children:[
+        t("button",{onClick:()=>{if(!scanBusy)scanRef.current?.click()},disabled:scanBusy,className:"w100 act95 tr f ia jc",style:{gap:8,padding:"10px 0",marginBottom:8,background:scanBusy?c.sf2:c.ac,color:scanBusy?c.tm:"#0a0a0a",border:"none",borderRadius:10,fontSize:12.5,fontWeight:600},children:scanBusy?"Reading the photo…":"📷 Scan holdings photo"}),
+        t("input",{ref:scanRef,type:"file",accept:"image/*",multiple:true,style:{display:"none"},onChange:e=>{scanHoldings(e.target.files);e.target.value=""}}),
+        scanErr&&t("div",{style:{background:c.co+"20",border:`1px solid ${c.co}40`,borderRadius:10,padding:"8px 12px",marginBottom:8,fontSize:12,color:c.co,lineHeight:1.5},children:scanErr}),
+        scanMsg&&t("div",{style:{background:c.mt+"18",border:`1px solid ${c.mt}45`,borderRadius:10,padding:"8px 12px",marginBottom:8,fontSize:12,color:c.mt,lineHeight:1.5},children:scanMsg}),
+        t("div",{style:{fontSize:10.5,color:c.tm,textAlign:"center",marginBottom:10,lineHeight:1.4},children:"Snap your broker's pledged-holdings screen to add scrips automatically — or enter one manually below."}),
         o("div",{className:"g",style:{gridTemplateColumns:"1fr 96px",gap:8,marginBottom:8},children:[
           t("input",{value:hName,onChange:e=>sHName(e.target.value),placeholder:"Scrip name",style:{...inS,fontFamily:"inherit"}}),
           t("input",{value:hVal,onChange:e=>sHVal(e.target.value.replace(/[^\d.]/g,"")),placeholder:"Value",inputMode:"decimal",style:inS}),
