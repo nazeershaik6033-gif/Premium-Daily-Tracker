@@ -2899,14 +2899,15 @@ function AiInsights({data,onClose}){
 // === LENDING DIARY (who owes you / you owe — running per-person ledger) ===
 function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,onAddEntry,onDeleteEntry,onEditEntry}){
   const{ledger=[],currency}=data;
-  const kindLabel=k=>k==="gave"?"Lent":"Received";
+  const kindLabel=k=>k==="gave"?"Lent":k==="borrow"?"Borrowed":k==="repaid"?"Repaid":"Received";
+  const cashOut=k=>k==="gave"||k==="repaid";// money leaving you (shown red, −)
   const[sel,sSel]=useState(null);
   const[addP,sAddP]=useState(false);const[pName,sPName]=useState("");const[pNote,sPNote]=useState("");const[pDue,sPDue]=useState("");
   const[entryFor,sEntryFor]=useState(null);const[editEntryId,sEditEntryId]=useState(null);const[eKind,sEKind]=useState("gave");const[eAmt,sEAmt]=useState("");const[eNote,sENote]=useState("");const[eDate,sEDate]=useState("");const[ePhoto,sEPhoto]=useState(null);const[viewImg,sViewImg]=useState(null);const photoRef=useRef(null);
   const[editP,sEditP]=useState(null);const[edName,sEdName]=useState("");const[edNote,sEdNote]=useState("");const[edDue,sEdDue]=useState("");
   const[delP,sDelP]=useState(null);
   const today=()=>new Date().toISOString().slice(0,10);
-  const bal=p=>(p.entries||[]).reduce((s,e)=>s+(e.kind==="gave"?e.amount:-e.amount),0);
+  const bal=p=>(p.entries||[]).reduce((s,e)=>s+((e.kind==="gave"||e.kind==="repaid")?e.amount:-e.amount),0);
   const overdue=p=>bal(p)>0.005&&p.dueDate&&p.dueDate<Date.now();
   const totOwed=ledger.reduce((s,p)=>{const b=bal(p);return s+(b>0?b:0)},0);
   const totYouOwe=ledger.reduce((s,p)=>{const b=bal(p);return s+(b<0?-b:0)},0);
@@ -2932,9 +2933,17 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
           selP.note&&t("div",{style:{fontSize:11,color:c.td},children:selP.note})
         ]})
       ]}),
-      o("div",{className:"g g2",style:{gap:10,marginBottom:16},children:[
-        t("button",{onClick:()=>openEntry(selP.id,"gave"),className:"act98 tr",style:{padding:"13px 0",background:c.co+"22",color:c.co,border:`1px solid ${c.co}55`,borderRadius:12,fontWeight:600,fontSize:13},children:"− Lent"}),
-        t("button",{onClick:()=>openEntry(selP.id,"got"),className:"act98 tr",style:{padding:"13px 0",background:c.mt+"22",color:c.mt,border:`1px solid ${c.mt}55`,borderRadius:12,fontWeight:600,fontSize:13},children:"+ Received"})
+      o("div",{style:{marginBottom:16},children:[
+        t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1.2,marginBottom:8},children:"LENDING · THEY OWE YOU"}),
+        o("div",{className:"g g2",style:{gap:10,marginBottom:12},children:[
+          t("button",{onClick:()=>openEntry(selP.id,"gave"),className:"act98 tr",style:{padding:"13px 0",background:c.co+"22",color:c.co,border:`1px solid ${c.co}55`,borderRadius:12,fontWeight:600,fontSize:13},children:"− Lent"}),
+          t("button",{onClick:()=>openEntry(selP.id,"got"),className:"act98 tr",style:{padding:"13px 0",background:c.mt+"22",color:c.mt,border:`1px solid ${c.mt}55`,borderRadius:12,fontWeight:600,fontSize:13},children:"+ Received"})
+        ]}),
+        t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1.2,marginBottom:8},children:"BORROWING · YOU OWE THEM"}),
+        o("div",{className:"g g2",style:{gap:10},children:[
+          t("button",{onClick:()=>openEntry(selP.id,"borrow"),className:"act98 tr",style:{padding:"13px 0",background:c.mt+"22",color:c.mt,border:`1px solid ${c.mt}55`,borderRadius:12,fontWeight:600,fontSize:13},children:"+ Borrowed"}),
+          t("button",{onClick:()=>openEntry(selP.id,"repaid"),className:"act98 tr",style:{padding:"13px 0",background:c.co+"22",color:c.co,border:`1px solid ${c.co}55`,borderRadius:12,fontWeight:600,fontSize:13},children:"− Repaid"})
+        ]})
       ]}),
       t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:"HISTORY"}),
       (selP.entries||[]).length===0?t("div",{style:{fontSize:13,color:c.tm,textAlign:"center",padding:"24px 0",background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`},children:"No entries yet. Use the buttons above."}):t("div",{style:{display:"flex",flexDirection:"column",gap:8},children:[...(selP.entries||[])].sort((a,b2)=>b2.date-a.date).map(en=>o("div",{key:en.id,className:"f ia jb",style:{background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,padding:"12px 14px",gap:8},children:[
@@ -2946,18 +2955,17 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
           ]})
         ]}),
         o("div",{className:"f ia",style:{gap:4,flexShrink:0},children:[
-          t("div",{style:{fontFamily:F.mo,fontSize:14,color:en.kind==="gave"?c.co:c.mt,marginRight:2},children:(en.kind==="gave"?"−":"+")+fm(en.amount,currency)}),
+          t("div",{style:{fontFamily:F.mo,fontSize:14,color:cashOut(en.kind)?c.co:c.mt,marginRight:2},children:(cashOut(en.kind)?"−":"+")+fm(en.amount,currency)}),
           t("button",{onClick:()=>openEditEntry(selP.id,en),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(Pencil,{size:13})}),
           t("button",{onClick:()=>onDeleteEntry(selP.id,en.id),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(X,{size:13})})
         ]})
       ]}))}),
       entryFor&&t(Sht,{onClose:()=>{sEntryFor(null);sEditEntryId(null)},children:o(Fragment,{children:[
         t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:14},children:editEntryId?"Edit entry":"Add entry"}),
-        o("div",{className:"g g2",style:{gap:8,marginBottom:16},children:[
-          t("button",{onClick:()=>sEKind("gave"),className:"act95 tr",style:{padding:"11px 0",background:eKind==="gave"?c.co+"22":c.sf2,color:eKind==="gave"?c.co:c.td,border:`1px solid ${eKind==="gave"?c.co:c.brs}`,borderRadius:10,fontSize:13,fontWeight:600},children:"Lent (−)"}),
-          t("button",{onClick:()=>sEKind("got"),className:"act95 tr",style:{padding:"11px 0",background:eKind==="got"?c.mt+"22":c.sf2,color:eKind==="got"?c.mt:c.td,border:`1px solid ${eKind==="got"?c.mt:c.brs}`,borderRadius:10,fontSize:13,fontWeight:600},children:"Received (+)"})
+        o("div",{className:"g g2",style:{gap:8,marginBottom:12},children:[
+          [["gave","Lent (−)",c.co],["got","Received (+)",c.mt],["borrow","Borrowed (+)",c.mt],["repaid","Repaid (−)",c.co]].map(([k,lbl,col])=>t("button",{key:k,onClick:()=>sEKind(k),className:"act95 tr",style:{padding:"11px 0",background:eKind===k?col+"22":c.sf2,color:eKind===k?col:c.td,border:`1px solid ${eKind===k?col:c.brs}`,borderRadius:10,fontSize:13,fontWeight:600},children:lbl}))
         ]}),
-        t("div",{style:{fontSize:11,color:c.tm,textAlign:"center",marginBottom:14},children:eKind==="gave"?"Money you lent / paid them → increases what they owe you":"Money they paid / lent you → decreases what they owe you"}),
+        t("div",{style:{fontSize:11,color:c.tm,textAlign:"center",marginBottom:14,lineHeight:1.5},children:eKind==="gave"?"Money you lent / paid them → increases what they owe you":eKind==="got"?"Money they paid back → decreases what they owe you":eKind==="borrow"?"Money you borrowed from them → increases what you owe them":"Money you paid back to them → decreases what you owe them"}),
         o("div",{style:{marginBottom:14,textAlign:"center"},children:[
           t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,marginBottom:6},children:"AMOUNT"}),
           o("div",{className:"f ib jc",style:{gap:4},children:[
@@ -2981,7 +2989,7 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
             ]})
           ]}):t("button",{onClick:()=>photoRef.current?.click(),className:"w100 act95 tr f ia jc",style:{gap:8,padding:"12px 0",background:c.sfg,border:`1px dashed ${c.brs}`,borderRadius:12,color:c.td,fontSize:13},children:[t(Camera,{size:16}),"Add a photo"]})
         ]}),
-        t("button",{disabled:!parseFloat(eAmt)||parseFloat(eAmt)<=0,onClick:()=>{const payload={kind:eKind,amount:parseFloat(eAmt),note:eNote,date:eDate?new Date(eDate).getTime():Date.now(),photo:ePhoto||null};if(editEntryId)onEditEntry(entryFor,editEntryId,payload);else onAddEntry(entryFor,payload);sEntryFor(null);sEditEntryId(null)},className:"w100 act98 tr",style:{padding:"14px 0",background:parseFloat(eAmt)?c.ac:c.sf2,color:parseFloat(eAmt)?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:parseFloat(eAmt)?`${editEntryId?"Save":"Add"} ${eKind==="gave"?"−":"+"}${fm(parseFloat(eAmt),currency)}`:"Enter an amount"})
+        t("button",{disabled:!parseFloat(eAmt)||parseFloat(eAmt)<=0,onClick:()=>{const payload={kind:eKind,amount:parseFloat(eAmt),note:eNote,date:eDate?new Date(eDate).getTime():Date.now(),photo:ePhoto||null};if(editEntryId)onEditEntry(entryFor,editEntryId,payload);else onAddEntry(entryFor,payload);sEntryFor(null);sEditEntryId(null)},className:"w100 act98 tr",style:{padding:"14px 0",background:parseFloat(eAmt)?c.ac:c.sf2,color:parseFloat(eAmt)?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:parseFloat(eAmt)?`${editEntryId?"Save":"Add"} ${kindLabel(eKind)} ${cashOut(eKind)?"−":"+"}${fm(parseFloat(eAmt),currency)}`:"Enter an amount"})
       ]})}),
       editP&&t(Sht,{onClose:()=>sEditP(null),children:o(Fragment,{children:[
         t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:14},children:"Edit person"}),
@@ -3004,7 +3012,7 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
   // ---- LIST VIEW ----
   return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
     t(SH,{title:t("em",{children:"Lending Diary"}),onBack:onClose,right:t("button",{onClick:()=>{sAddP(true);sPName("");sPNote("");sPDue("")},className:"act95 trt",style:{padding:"8px 13px",background:c.ac,color:"#0a0a0a",borderRadius:10,fontSize:12,fontWeight:600,border:"none"},children:"+ Person"})}),
-    ledger.length===0?t(ES,{title:t("em",{children:"your diary is empty"}),subtitle:"Track who owes you and who you owe. Add a person, then log each time you give or get money — the running balance does the rest.",cta:"Add a person",onCta:()=>{sAddP(true);sPName("");sPNote("");sPDue("")}}):o(Fragment,{children:[
+    ledger.length===0?t(ES,{title:t("em",{children:"your diary is empty"}),subtitle:"Track who owes you and who you owe. Add a person, then log money you lend, borrow, or pay back — the running balance does the rest.",cta:"Add a person",onCta:()=>{sAddP(true);sPName("");sPNote("");sPDue("")}}):o(Fragment,{children:[
       o("div",{className:"g g2",style:{gap:10,marginBottom:16},children:[
         o("div",{style:{background:`linear-gradient(135deg,${c.mt}1f 0%,${c.sfg} 60%)`,borderRadius:16,border:`1px solid ${c.brs}`,padding:16},children:[
           t("div",{style:{fontFamily:F.mo,fontSize:9.5,color:c.tm,letterSpacing:1.2},children:"OWED TO YOU"}),
