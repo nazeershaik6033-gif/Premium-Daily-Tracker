@@ -3199,6 +3199,8 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
   const[entryFor,sEntryFor]=useState(null);const[editEntryId,sEditEntryId]=useState(null);const[eKind,sEKind]=useState("gave");const[eAmt,sEAmt]=useState("");const[eNote,sENote]=useState("");const[eDate,sEDate]=useState("");const[ePhotos,sEPhotos]=useState([]);const[gallery,sGallery]=useState(null);const photoRef=useRef(null);
   const[editP,sEditP]=useState(null);const[edName,sEdName]=useState("");const[edNote,sEdNote]=useState("");const[edDue,sEdDue]=useState("");const[edPhoto,sEdPhoto]=useState(null);const edPhotoRef=useRef(null);
   const[delP,sDelP]=useState(null);
+  const[settledCollapsed,sSettledCollapsed]=useState(()=>{try{const v=localStorage.getItem("ld-settled-collapsed");return v===null?true:JSON.parse(v)}catch{return true}});
+  useEffect(()=>{try{localStorage.setItem("ld-settled-collapsed",JSON.stringify(settledCollapsed))}catch{}},[settledCollapsed]);
   const entryPhotoSrc=usePhotoSrc(ePhotos);
   const addAvatarSrc=usePhotoSrc(pPhoto?[pPhoto]:[]);
   const editAvatarSrc=usePhotoSrc(edPhoto?[edPhoto]:[]);
@@ -3208,6 +3210,21 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
   const totOwed=ledger.reduce((s,p)=>{const b=bal(p);return s+(b>0?b:0)},0);
   const totYouOwe=ledger.reduce((s,p)=>{const b=bal(p);return s+(b<0?-b:0)},0);
   const sorted=[...ledger].sort((a,b)=>{const oa=overdue(a)?1:0,ob=overdue(b)?1:0;if(oa!==ob)return ob-oa;return Math.abs(bal(b))-Math.abs(bal(a))});
+  const toSettle=sorted.filter(p=>Math.abs(bal(p))>0.005);
+  const settledUp=sorted.filter(p=>Math.abs(bal(p))<=0.005);
+  const personRow=p=>{const b=bal(p),bl=balLine(b),od=overdue(p);return o("button",{key:p.id,onClick:()=>sSel(p.id),className:"w100 act98 trc f ia jb",style:{background:c.sfg,borderRadius:14,border:`1px solid ${od?c.co:c.brs}`,padding:"14px 16px",gap:10,textAlign:"left"},children:[
+    o("div",{className:"f ia",style:{gap:12,minWidth:0},children:[
+      t(Avatar,{photo:p.photo,name:p.name,size:40,radius:11,fontSize:16}),
+      o("div",{className:"minw0",children:[
+        t("div",{className:"tru",style:{fontSize:15,fontWeight:600,color:c.tx},children:p.name}),
+        o("div",{className:"f ia",style:{gap:6,marginTop:2},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:11,color:bl.col},children:bl.txt}),
+          p.dueDate&&t("div",{style:{fontFamily:F.mo,fontSize:10,color:od?c.co:c.tm},children:"· "+(od?"⚠ ":"")+dueLabel(p)})
+        ]})
+      ]})
+    ]}),
+    t("div",{style:{fontFamily:"var(--nf)",fontSize:20,fontWeight:400,color:bl.col,flexShrink:0},children:fm(Math.abs(b),currency)})
+  ]})};
   const selP=sel?ledger.find(p=>p.id===sel):null;
   const dueLabel=p=>{if(!p.dueDate)return null;const md=Math.ceil((p.dueDate-Date.now())/864e5);return md<0?`${Math.abs(md)}d overdue`:md===0?"due today":`due in ${md}d`};
   const photoPayload=p=>p?((p._idb||!p.data)?{id:p.id,name:p.name||null}:{id:p.id,name:p.name||null,data:p.data}):null;
@@ -3321,19 +3338,12 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
           t("div",{style:{fontFamily:"var(--nf)",fontSize:26,fontWeight:300,marginTop:4,color:c.co,letterSpacing:-.5,lineHeight:1},children:fm(totYouOwe,currency)})
         ]})
       ]}),
-      t("div",{style:{display:"flex",flexDirection:"column",gap:10},children:sorted.map(p=>{const b=bal(p),bl=balLine(b),od=overdue(p);return o("button",{key:p.id,onClick:()=>sSel(p.id),className:"w100 act98 trc f ia jb",style:{background:c.sfg,borderRadius:14,border:`1px solid ${od?c.co:c.brs}`,padding:"14px 16px",gap:10,textAlign:"left"},children:[
-        o("div",{className:"f ia",style:{gap:12,minWidth:0},children:[
-          t(Avatar,{photo:p.photo,name:p.name,size:40,radius:11,fontSize:16}),
-          o("div",{className:"minw0",children:[
-            t("div",{className:"tru",style:{fontSize:15,fontWeight:600,color:c.tx},children:p.name}),
-            o("div",{className:"f ia",style:{gap:6,marginTop:2},children:[
-              t("div",{style:{fontFamily:F.mo,fontSize:11,color:bl.col},children:bl.txt}),
-              p.dueDate&&t("div",{style:{fontFamily:F.mo,fontSize:10,color:od?c.co:c.tm},children:"· "+(od?"⚠ ":"")+dueLabel(p)})
-            ]})
-          ]})
-        ]}),
-        t("div",{style:{fontFamily:"var(--nf)",fontSize:20,fontWeight:400,color:bl.col,flexShrink:0},children:fm(Math.abs(b),currency)})
-      ]})})}),
+      toSettle.length>0&&t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:8},children:`TO BE SETTLED · ${toSettle.length}`}),
+      toSettle.length>0&&t("div",{style:{display:"flex",flexDirection:"column",gap:10,marginBottom:settledUp.length>0?22:0},children:toSettle.map(personRow)}),
+      settledUp.length>0&&o(Fragment,{children:[
+        t("button",{onClick:()=>sSettledCollapsed(v=>!v),className:"act95 tr",style:{background:"transparent",border:"none",color:c.tm,fontFamily:F.mo,fontSize:10,letterSpacing:1.5,marginBottom:8,padding:0,display:"flex",alignItems:"center",gap:6},children:`✓ SETTLED UP · ${settledUp.length} ${settledCollapsed?"▶":"▼"}`}),
+        !settledCollapsed&&t("div",{style:{display:"flex",flexDirection:"column",gap:10,opacity:.7},children:settledUp.map(personRow)}),
+      ]}),
       t("div",{style:{fontSize:11,color:c.tm,marginTop:14,lineHeight:1.5,textAlign:"center"},children:"Record-only — this diary doesn't change your account balances."})
     ]}),
     addP&&t(Sht,{onClose:()=>sAddP(false),children:o(Fragment,{children:[
