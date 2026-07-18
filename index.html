@@ -585,9 +585,10 @@ async function collectStmtFiles(stmts){const out={};for(const s of (stmts||[])){
 async function restoreStmtFiles(map){if(!map)return;for(const k of Object.keys(map)){try{const f=map[k];if(f&&f.dataUrl)await idbPutFile(k,_dataUrlToBlob(f.dataUrl))}catch(e){}}}
 // === EXPENSE PHOTO STORAGE (IndexedDB — keeps receipt images out of the localStorage quota) ===
 async function collectPhotoFiles(expenses){const out={};for(const e of (expenses||[])){for(const p of ((e&&e.photos)||[])){if(p&&p.id&&!p.data&&!out[p.id]){try{const b=await idbGetFile(String(p.id));if(b)out[p.id]={name:p.name||"photo.jpg",type:b.type||"image/jpeg",dataUrl:await _blobToDataUrl(b)}}catch(err){}}}}return out}
+async function collectLedgerPhotoFiles(ledger){const out={};for(const p2 of (ledger||[])){const refs=[...(p2.photo?[p2.photo]:[]),...((p2.entries||[]).flatMap(en=>en.photos||[]))];for(const p of refs){if(p&&p.id&&!p.data&&!out[p.id]){try{const b=await idbGetFile(String(p.id));if(b)out[p.id]={name:p.name||"photo.jpg",type:b.type||"image/jpeg",dataUrl:await _blobToDataUrl(b)}}catch(err){}}}}return out}
 function usePhotoSrc(photos){const[map,sMap]=useState({});useEffect(()=>{let live=true;(async()=>{const need=(photos||[]).filter(p=>p&&p.id&&!p.data&&!map[p.id]);if(!need.length)return;const m={};for(const p of need){try{const b=await idbGetFile(String(p.id));if(b)m[p.id]=await _blobToDataUrl(b)}catch(e){}}if(live&&Object.keys(m).length)sMap(mm=>({...mm,...m}))})();return()=>{live=false}},[photos]);return p=>(p&&p.data)||map[p&&p.id]||null}
 function buildBackupObj(dd){let sidebarOrder=null;try{const s=localStorage.getItem(SB_ORDER_KEY);if(s)sidebarOrder=JSON.parse(s)}catch(e){}return{version:"v3.2",exportedAt:new Date().toISOString(),expenses:dd.expenses,recurring:dd.recurring,accounts:dd.accounts,profiles:dd.profiles,cards:dd.cards||[],cardStatements:dd.cardStatements||[],bills:dd.bills||[],goals:dd.goals||[],budgetLoans:dd.budgetLoans||[],ledger:dd.ledger||[],categoryBudgets:dd.categoryBudgets||{},monthlyRestrictionLogs:dd.monthlyRestrictionLogs||[],investments:dd.investments||[],planThreshold:dd.planThreshold??null,customExpenseCategories:dd.customExpenseCategories||[],customIncomeCategories:dd.customIncomeCategories||[],categoryOverrides:dd.categoryOverrides||{},categoryOrder:dd.categoryOrder||{expense:[],income:[]},sidebarOrder,budget:dd.budget,budgetPeriod:dd.budgetPeriod,morningEnabled:dd.morningEnabled||false,morningTime:dd.morningTime||"08:00",eveningEnabled:dd.eveningEnabled||false,eveningTime:dd.eveningTime||"21:00",currency:dd.currency,monthStartDay:dd.monthStartDay,aiProvider:gProv(),aiModel:gMdl()||null,merchantRules:dd.merchantRules||{},debtPlan:dd.debtPlan||null,las:dd.las||null}}
-async function buildBackupJSON(dd,withFiles=true){const j=buildBackupObj(dd);if(withFiles){try{j.statementFiles=await collectStmtFiles(j.cardStatements)}catch(e){j.statementFiles={}}try{j.expensePhotos=await collectPhotoFiles(j.expenses)}catch(e){j.expensePhotos={}}}return JSON.stringify(j,null,2)}
+async function buildBackupJSON(dd,withFiles=true){const j=buildBackupObj(dd);if(withFiles){try{j.statementFiles=await collectStmtFiles(j.cardStatements)}catch(e){j.statementFiles={}}try{j.expensePhotos=await collectPhotoFiles(j.expenses)}catch(e){j.expensePhotos={}}try{j.ledgerPhotos=await collectLedgerPhotoFiles(j.ledger)}catch(e){j.ledgerPhotos={}}}return JSON.stringify(j,null,2)}
 async function gdUpload(json){const token=localStorage.getItem("gd_token");if(!token)throw new Error("Not connected to Google Drive");const fname=`expense-backup-${new Date().toISOString().slice(0,10)}.json`;const meta=JSON.stringify({name:fname,mimeType:"application/json"});const form=new FormData();form.append("metadata",new Blob([meta],{type:"application/json"}));form.append("file",new Blob([json],{type:"application/json"}));const res=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{method:"POST",headers:{Authorization:"Bearer "+token},body:form});if(!res.ok){const txt=await res.text().catch(()=>res.status);throw new Error("Upload failed ("+res.status+"): "+txt)}}
 
 // === CSV EXPORT (card transactions) ===
@@ -1084,6 +1085,29 @@ function App(){
   if((i.investments||[]).length>0){const r=psip(i.investments);if(r.changed)i.investments=r.investments}
   // Migrate legacy inline photo attachments (base64 in localStorage) into IndexedDB — inline photos blow the ~5MB localStorage quota and silently lose data.
   try{if(i.expenses.some(e=>e&&e.photos&&e.photos.some(p=>p&&p.data))){const migrated=[];for(const e of i.expenses){if(e&&e.photos&&e.photos.some(p=>p&&p.data)){const nps=[];for(const p of e.photos){if(p&&p.data){try{await idbPutFile(String(p.id),_dataUrlToBlob(p.data));nps.push({id:p.id,name:p.name||null})}catch(err){nps.push(p)}}else nps.push(p)}migrated.push({...e,photos:nps})}else migrated.push(e)}i.expenses=migrated}}catch(e){}
+  // Migrate legacy single-photo lending entries (raw base64 string) into the multi-photo array format, then move any inline data into IndexedDB like expense photos.
+  try{
+    const needsLegacy=(i.ledger||[]).some(p2=>(p2.photo&&typeof p2.photo==="string")||(p2.entries||[]).some(en=>typeof en.photo==="string"));
+    const needsIdb=(i.ledger||[]).some(p2=>(p2.photo&&p2.photo.data)||(p2.entries||[]).some(en=>(en.photos||[]).some(p=>p&&p.data)));
+    if(needsLegacy||needsIdb){
+      const movePhoto=async p=>{if(!p)return null;if(p&&p.data){try{await idbPutFile(String(p.id),_dataUrlToBlob(p.data));return{id:p.id,name:p.name||null}}catch(err){return p}}return p};
+      const out=[];
+      for(const p2 of (i.ledger||[])){
+        let person={...p2};
+        if(typeof person.photo==="string"){person.photo=await movePhoto({id:"lgcy_"+person.id,data:person.photo})}
+        else if(person.photo&&person.photo.data){person.photo=await movePhoto(person.photo)}
+        const entries=[];
+        for(const en of (person.entries||[])){
+          let e2={...en};
+          if(typeof e2.photo==="string"){e2.photos=[await movePhoto({id:"lgcy_"+e2.id,data:e2.photo})];delete e2.photo}
+          else{if("photo" in e2)delete e2.photo;if(e2.photos&&e2.photos.some(p=>p&&p.data)){e2.photos=await Promise.all(e2.photos.map(movePhoto))}}
+          entries.push(e2);
+        }
+        person.entries=entries;out.push(person);
+      }
+      i.ledger=out;
+    }
+  }catch(e){}
   sD({...i,loading:false});
   try{await window.storage.set(dk,JSON.stringify(strip(i)))}catch{}
 })()},[]);
@@ -1148,11 +1172,11 @@ function App(){
   const payBL=(id,amount,note,date,linkedExpenseId)=>pst({budgetLoans:(d.budgetLoans||[]).map(l=>{if(l.id!==id)return l;const payments=[...(l.payments||[]),{id:"p_"+uid(),amount,date:date||Date.now(),note:(note||"").trim(),linkedExpenseId:linkedExpenseId||null}];return{...l,payments,status:blStatus(l,payments)}})});
   const delPayBL=(id,pid)=>pst({budgetLoans:(d.budgetLoans||[]).map(l=>{if(l.id!==id)return l;const payments=(l.payments||[]).filter(p=>p.id!==pid);return{...l,payments,status:blStatus(l,payments)}})});
   const editPayBL=(id,pid,patch)=>pst({budgetLoans:(d.budgetLoans||[]).map(l=>{if(l.id!==id)return l;const payments=(l.payments||[]).map(p=>p.id===pid?{...p,...patch}:p);return{...l,payments}})});
-  const addLedgerPerson=(p)=>{const id="ld_"+uid();pst({ledger:[{id,name:(p.name||"").trim()||"Unnamed",note:(p.note||"").trim(),dueDate:p.dueDate||null,createdAt:Date.now(),entries:[]},...(d.ledger||[])]});return id};
+  const addLedgerPerson=(p)=>{const id="ld_"+uid();pst({ledger:[{id,name:(p.name||"").trim()||"Unnamed",note:(p.note||"").trim(),dueDate:p.dueDate||null,photo:p.photo||null,createdAt:Date.now(),entries:[]},...(d.ledger||[])]});return id};
   const updLedgerPerson=(id,patch)=>pst({ledger:(d.ledger||[]).map(x=>x.id===id?{...x,...patch,name:(patch.name!=null?(patch.name.trim()||x.name):x.name)}:x)});
-  const delLedgerPerson=(id)=>pst({ledger:(d.ledger||[]).filter(x=>x.id!==id)});
-  const addLedgerEntry=(id,e)=>pst({ledger:(d.ledger||[]).map(x=>x.id!==id?x:{...x,entries:[{id:"le_"+uid(),kind:e.kind,amount:e.amount,date:e.date||Date.now(),note:(e.note||"").trim(),photo:e.photo||null},...(x.entries||[])]})});
-  const delLedgerEntry=(id,eid)=>pst({ledger:(d.ledger||[]).map(x=>x.id!==id?x:{...x,entries:(x.entries||[]).filter(en=>en.id!==eid)})});
+  const delLedgerPerson=(id)=>{const p=(d.ledger||[]).find(x=>x.id===id);try{if(p){if(p.photo&&p.photo.id)idbDelFile(String(p.photo.id));for(const en of(p.entries||[]))for(const ph of(en.photos||[]))if(ph&&ph.id)idbDelFile(String(ph.id))}}catch(e){}pst({ledger:(d.ledger||[]).filter(x=>x.id!==id)})};
+  const addLedgerEntry=(id,e)=>pst({ledger:(d.ledger||[]).map(x=>x.id!==id?x:{...x,entries:[{id:"le_"+uid(),kind:e.kind,amount:e.amount,date:e.date||Date.now(),note:(e.note||"").trim(),photos:e.photos||[]},...(x.entries||[])]})});
+  const delLedgerEntry=(id,eid)=>{const p=(d.ledger||[]).find(x=>x.id===id);const en=p&&(p.entries||[]).find(y=>y.id===eid);try{for(const ph of((en&&en.photos)||[]))if(ph&&ph.id)idbDelFile(String(ph.id))}catch(e){}pst({ledger:(d.ledger||[]).map(x=>x.id!==id?x:{...x,entries:(x.entries||[]).filter(en2=>en2.id!==eid)})})};
   const editLedgerEntry=(id,eid,patch)=>pst({ledger:(d.ledger||[]).map(x=>x.id!==id?x:{...x,entries:(x.entries||[]).map(en=>en.id===eid?{...en,...patch,note:(patch.note!=null?patch.note.trim():en.note)}:en)})});
   const aInv=(inv)=>pst({investments:[...(d.investments||[]),{...inv,id:"inv_"+uid(),createdAt:Date.now()}]});
   const uInv=(inv)=>pst({investments:(d.investments||[]).map(x=>x.id===inv.id?{...x,...inv}:x)});
@@ -3137,15 +3161,47 @@ function DocScan({data,onClose,onAddEntry,onAddInvestment}){
 }
 
 // === LENDING DIARY (who owes you / you owe — running per-person ledger) ===
+function Avatar({photo,name,size=40,radius=11,fontSize}){
+  const getSrc=usePhotoSrc(photo?[photo]:[]);
+  const src=photo?getSrc(photo):null;
+  return src?t("img",{src,alt:"",style:{width:size,height:size,borderRadius:radius,objectFit:"cover",flexShrink:0,border:`1px solid ${c.brs}`}}):t("div",{style:{width:size,height:size,borderRadius:radius,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:fontSize||size*0.4,fontWeight:600,color:c.td,flexShrink:0},children:(name||"?").slice(0,1).toUpperCase()});
+}
+function PhotoThumb({photos,size=38,onClick}){
+  const getSrc=usePhotoSrc(photos||[]);
+  const first=(photos||[])[0];
+  if(!first)return null;
+  const src=getSrc(first);
+  return o("div",{onClick,style:{position:"relative",width:size,height:size,borderRadius:8,flexShrink:0,cursor:"pointer"},children:[
+    src?t("img",{src,alt:"",style:{width:"100%",height:"100%",borderRadius:8,objectFit:"cover",border:`1px solid ${c.brs}`}}):t("div",{style:{width:"100%",height:"100%",borderRadius:8,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*0.4},children:"📷"}),
+    photos.length>1&&t("div",{style:{position:"absolute",bottom:-2,right:-2,background:c.ac,color:"#0a0a0a",fontSize:8.5,fontWeight:700,borderRadius:999,padding:"1px 4px",fontFamily:F.mo,border:`1px solid ${c.bg}`},children:"+"+(photos.length-1)})
+  ]})
+}
+function GalleryViewer({photos,idx,onClose,onNav}){
+  const getSrc=usePhotoSrc(photos||[]);
+  const cur=(photos||[])[idx];
+  if(!cur)return null;
+  const src=getSrc(cur);
+  return o("div",{onClick:onClose,className:"fx f fc ia jc",style:{inset:0,background:"rgba(0,0,0,.92)",zIndex:60,padding:20,gap:14},children:[
+    src?t("img",{src,alt:"",onClick:e=>e.stopPropagation(),style:{maxWidth:"100%",maxHeight:"78vh",borderRadius:12,objectFit:"contain"}}):t("div",{style:{color:"#fff",fontSize:13},children:"Loading…"}),
+    photos.length>1&&o("div",{onClick:e=>e.stopPropagation(),className:"f ia jc",style:{gap:16},children:[
+      t("button",{onClick:()=>onNav((idx-1+photos.length)%photos.length),style:{background:"rgba(255,255,255,.12)",border:"none",color:"#fff",width:40,height:40,borderRadius:999,display:"flex",alignItems:"center",justifyContent:"center"},children:t(CL,{size:18,color:"#fff"})}),
+      t("div",{style:{color:"#fff",fontFamily:F.mo,fontSize:12,alignSelf:"center"},children:(idx+1)+" / "+photos.length}),
+      t("button",{onClick:()=>onNav((idx+1)%photos.length),style:{background:"rgba(255,255,255,.12)",border:"none",color:"#fff",width:40,height:40,borderRadius:999,display:"flex",alignItems:"center",justifyContent:"center"},children:t(CR,{size:18,color:"#fff"})}),
+    ]})
+  ]})
+}
 function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,onAddEntry,onDeleteEntry,onEditEntry}){
   const{ledger=[],currency}=data;
   const kindLabel=k=>k==="gave"?"Lent":k==="borrow"?"Borrowed":k==="repaid"?"Repaid":"Received";
   const cashOut=k=>k==="gave"||k==="repaid";// money leaving you (shown red, −)
   const[sel,sSel]=useState(null);
-  const[addP,sAddP]=useState(false);const[pName,sPName]=useState("");const[pNote,sPNote]=useState("");const[pDue,sPDue]=useState("");
-  const[entryFor,sEntryFor]=useState(null);const[editEntryId,sEditEntryId]=useState(null);const[eKind,sEKind]=useState("gave");const[eAmt,sEAmt]=useState("");const[eNote,sENote]=useState("");const[eDate,sEDate]=useState("");const[ePhoto,sEPhoto]=useState(null);const[viewImg,sViewImg]=useState(null);const photoRef=useRef(null);
-  const[editP,sEditP]=useState(null);const[edName,sEdName]=useState("");const[edNote,sEdNote]=useState("");const[edDue,sEdDue]=useState("");
+  const[addP,sAddP]=useState(false);const[pName,sPName]=useState("");const[pNote,sPNote]=useState("");const[pDue,sPDue]=useState("");const[pPhoto,sPPhoto]=useState(null);const pPhotoRef=useRef(null);
+  const[entryFor,sEntryFor]=useState(null);const[editEntryId,sEditEntryId]=useState(null);const[eKind,sEKind]=useState("gave");const[eAmt,sEAmt]=useState("");const[eNote,sENote]=useState("");const[eDate,sEDate]=useState("");const[ePhotos,sEPhotos]=useState([]);const[gallery,sGallery]=useState(null);const photoRef=useRef(null);
+  const[editP,sEditP]=useState(null);const[edName,sEdName]=useState("");const[edNote,sEdNote]=useState("");const[edDue,sEdDue]=useState("");const[edPhoto,sEdPhoto]=useState(null);const edPhotoRef=useRef(null);
   const[delP,sDelP]=useState(null);
+  const entryPhotoSrc=usePhotoSrc(ePhotos);
+  const addAvatarSrc=usePhotoSrc(pPhoto?[pPhoto]:[]);
+  const editAvatarSrc=usePhotoSrc(edPhoto?[edPhoto]:[]);
   const today=()=>new Date().toISOString().slice(0,10);
   const bal=p=>(p.entries||[]).reduce((s,e)=>s+((e.kind==="gave"||e.kind==="repaid")?e.amount:-e.amount),0);
   const overdue=p=>bal(p)>0.005&&p.dueDate&&p.dueDate<Date.now();
@@ -3154,15 +3210,19 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
   const sorted=[...ledger].sort((a,b)=>{const oa=overdue(a)?1:0,ob=overdue(b)?1:0;if(oa!==ob)return ob-oa;return Math.abs(bal(b))-Math.abs(bal(a))});
   const selP=sel?ledger.find(p=>p.id===sel):null;
   const dueLabel=p=>{if(!p.dueDate)return null;const md=Math.ceil((p.dueDate-Date.now())/864e5);return md<0?`${Math.abs(md)}d overdue`:md===0?"due today":`due in ${md}d`};
-  const openEntry=(pid,kind)=>{sEntryFor(pid);sEditEntryId(null);sEKind(kind);sEAmt("");sENote("");sEDate(today());sEPhoto(null)};
-  const openEditEntry=(pid,en)=>{sEntryFor(pid);sEditEntryId(en.id);sEKind(en.kind);sEAmt(String(en.amount));sENote(en.note||"");sEDate(new Date(en.date).toISOString().slice(0,10));sEPhoto(en.photo||null)};
-  const pickEntryPhoto=async f=>{if(!f)return;try{sEPhoto(await resizeImg(f))}catch(e){}};
+  const photoPayload=p=>p?((p._idb||!p.data)?{id:p.id,name:p.name||null}:{id:p.id,name:p.name||null,data:p.data}):null;
+  const openEntry=(pid,kind)=>{sEntryFor(pid);sEditEntryId(null);sEKind(kind);sEAmt("");sENote("");sEDate(today());sEPhotos([])};
+  const openEditEntry=(pid,en)=>{sEntryFor(pid);sEditEntryId(en.id);sEKind(en.kind);sEAmt(String(en.amount));sENote(en.note||"");sEDate(new Date(en.date).toISOString().slice(0,10));sEPhotos(en.photos||[])};
+  const addEntryPhotos=async fs2=>{const ls=[];for(const f of fs2){if(!f||!f.type||!f.type.startsWith("image/"))continue;const d2=await resizeImg(f,1200,0.75);const pid="lph_"+uid();let stored=false;try{await idbPutFile(pid,_dataUrlToBlob(d2));stored=true}catch(e3){}ls.push({id:pid,data:d2,name:f.name,_idb:stored})}sEPhotos(p=>[...p,...ls])};
+  const removeEntryPhoto=pid2=>{idbDelFile(String(pid2));sEPhotos(ps2=>ps2.filter(x=>x.id!==pid2))};
+  const pickAvatar=async(f,current,setter)=>{if(!f||!f.type||!f.type.startsWith("image/"))return;if(current&&current.id)idbDelFile(String(current.id));const d2=await resizeImg(f,600,0.75);const pid="lav_"+uid();let stored=false;try{await idbPutFile(pid,_dataUrlToBlob(d2));stored=true}catch(e3){}setter({id:pid,data:d2,name:f.name,_idb:stored})};
+  const clearAvatar=(photo,setter)=>{if(photo&&photo.id)idbDelFile(String(photo.id));setter(null)};
   const balLine=(b)=>b>0.005?{txt:fm(b,currency)+" owes you",col:c.mt}:b<-0.005?{txt:fm(-b,currency)+" you owe",col:c.co}:{txt:"settled up",col:c.tm};
   // ---- DETAIL VIEW ----
   if(selP){const b=bal(selP),bl=balLine(b),od=overdue(selP);
     return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
       t(SH,{title:t("em",{children:selP.name}),onBack:()=>sSel(null),right:o("div",{className:"f ia",style:{gap:2},children:[
-        t("button",{onClick:()=>{sEditP(selP);sEdName(selP.name);sEdNote(selP.note||"");sEdDue(selP.dueDate?new Date(selP.dueDate).toISOString().slice(0,10):"")},style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:6},children:t(Pencil,{size:15})}),
+        t("button",{onClick:()=>{sEditP(selP);sEdName(selP.name);sEdNote(selP.note||"");sEdDue(selP.dueDate?new Date(selP.dueDate).toISOString().slice(0,10):"");sEdPhoto(selP.photo||null)},style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:6},children:t(Pencil,{size:15})}),
         t("button",{onClick:()=>sDelP(selP),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:6},children:t(Trash2,{size:15})})
       ]})}),
       o("div",{style:{background:`linear-gradient(135deg,${(b<-0.005?c.co:c.mt)}1f 0%,${c.sfg} 60%)`,borderRadius:20,border:`1px solid ${od?c.co:c.brs}`,padding:18,marginBottom:14},children:[
@@ -3188,7 +3248,7 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
       t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:"HISTORY"}),
       (selP.entries||[]).length===0?t("div",{style:{fontSize:13,color:c.tm,textAlign:"center",padding:"24px 0",background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`},children:"No entries yet. Use the buttons above."}):t("div",{style:{display:"flex",flexDirection:"column",gap:8},children:[...(selP.entries||[])].sort((a,b2)=>b2.date-a.date).map(en=>o("div",{key:en.id,className:"f ia jb",style:{background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,padding:"12px 14px",gap:8},children:[
         o("div",{className:"f1 f ia minw0",style:{gap:10},children:[
-          en.photo&&t("img",{src:en.photo,alt:"",onClick:()=>sViewImg(en.photo),style:{width:38,height:38,borderRadius:8,objectFit:"cover",cursor:"pointer",flexShrink:0,border:`1px solid ${c.brs}`}}),
+          (en.photos&&en.photos.length>0)&&t(PhotoThumb,{photos:en.photos,size:38,onClick:()=>sGallery({photos:en.photos,idx:0})}),
           o("div",{className:"minw0",children:[
             t("div",{style:{fontSize:13,color:c.tx,fontWeight:500},children:kindLabel(en.kind)}),
             t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:new Date(en.date).toLocaleDateString("en-US",{day:"numeric",month:"short",year:"numeric"})+(en.note?" · "+en.note:"")})
@@ -3196,8 +3256,8 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
         ]}),
         o("div",{className:"f ia",style:{gap:4,flexShrink:0},children:[
           t("div",{style:{fontFamily:F.mo,fontSize:14,color:cashOut(en.kind)?c.co:c.mt,marginRight:2},children:(cashOut(en.kind)?"−":"+")+fm(en.amount,currency)}),
-          t("button",{onClick:()=>openEditEntry(selP.id,en),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(Pencil,{size:13})}),
-          t("button",{onClick:()=>onDeleteEntry(selP.id,en.id),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(X,{size:13})})
+          t("button",{"aria-label":"Edit entry",onClick:()=>openEditEntry(selP.id,en),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(Pencil,{size:13})}),
+          t("button",{"aria-label":"Delete entry",onClick:()=>onDeleteEntry(selP.id,en.id),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(X,{size:13})})
         ]})
       ]}))}),
       entryFor&&t(Sht,{onClose:()=>{sEntryFor(null);sEditEntryId(null)},children:o(Fragment,{children:[
@@ -3216,27 +3276,25 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
         o("div",{style:{marginBottom:14},children:t(FI,{label:"Note (optional)",value:eNote,onChange:sENote,placeholder:"e.g., lunch, cash"})}),
         o("div",{style:{marginBottom:16},children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"DATE"}),t("input",{type:"date",value:eDate,max:today(),onChange:e=>sEDate(e.target.value),style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px",color:c.tx,fontSize:14,outline:"none",fontFamily:'var(--tf)',colorScheme:"dark"}})]}),
         o("div",{style:{marginBottom:18},children:[
-          t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"PROOF PHOTO (OPTIONAL)"}),
-          t("input",{ref:photoRef,type:"file",accept:"image/*",style:{display:"none"},onChange:e=>{pickEntryPhoto(e.target.files?.[0]);e.target.value=""}}),
-          ePhoto?o("div",{className:"f ia jb",style:{gap:10,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:10},children:[
-            o("div",{className:"f ia",style:{gap:10,minWidth:0},children:[
-              t("img",{src:ePhoto,alt:"",onClick:()=>sViewImg(ePhoto),style:{width:48,height:48,borderRadius:8,objectFit:"cover",cursor:"pointer",flexShrink:0}}),
-              t("div",{style:{fontSize:12,color:c.td},children:"Attached"})
-            ]}),
-            o("div",{className:"f ia",style:{gap:4,flexShrink:0},children:[
-              t("button",{onClick:()=>photoRef.current?.click(),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:6},children:t(Pencil,{size:14})}),
-              t("button",{onClick:()=>sEPhoto(null),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:6},children:t(X,{size:15})})
-            ]})
-          ]}):t("button",{onClick:()=>photoRef.current?.click(),className:"w100 act95 tr f ia jc",style:{gap:8,padding:"12px 0",background:c.sfg,border:`1px dashed ${c.brs}`,borderRadius:12,color:c.td,fontSize:13},children:[t(Camera,{size:16}),"Add a photo"]})
+          o("div",{className:"f jb",style:{marginBottom:6,fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1},children:[t("span",{children:"PROOF PHOTOS (OPTIONAL)"}),t("span",{children:ePhotos.length>0&&`${ePhotos.length} attached`})]}),
+          t("input",{ref:photoRef,type:"file",accept:"image/*",multiple:true,style:{display:"none"},onChange:e=>{addEntryPhotos(Array.from(e.target.files||[]));e.target.value=""}}),
+          ePhotos.length===0?o("button",{onClick:()=>photoRef.current?.click(),className:"w100 f ia jc act98 trt",style:{gap:8,padding:"16px 0",border:`1px dashed ${c.br}`,borderRadius:12,color:c.td,fontSize:13,background:"transparent"},children:[t(Camera,{size:14})," Tap to add photo(s)"]}):t("div",{className:"f sx",style:{gap:8,paddingBottom:4,overflowX:"auto"},children:[...ePhotos.map((p,pi)=>o("div",{key:p.id,style:{flexShrink:0,position:"relative",width:80,height:80,borderRadius:10,overflow:"hidden",border:`1px solid ${c.brs}`},children:[entryPhotoSrc(p)?t("img",{src:entryPhotoSrc(p),alt:"",onClick:()=>sGallery({photos:ePhotos,idx:pi}),style:{width:"100%",height:"100%",objectFit:"cover",cursor:"pointer"}}):t("div",{style:{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",background:c.sf2,fontSize:20},children:"📷"}),t("button",{onClick:()=>removeEntryPhoto(p.id),style:{position:"absolute",top:3,right:3,width:20,height:20,borderRadius:6,background:"rgba(0,0,0,.7)",border:"none",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff"},children:t(X,{size:11})})]})),t("button",{key:"add",onClick:()=>photoRef.current?.click(),className:"act95 trt",style:{flexShrink:0,width:80,height:80,borderRadius:10,border:`1px dashed ${c.br}`,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:c.tm},children:t(Plus,{size:20})})]})
         ]}),
-        t("button",{disabled:!parseFloat(eAmt)||parseFloat(eAmt)<=0,onClick:()=>{const payload={kind:eKind,amount:parseFloat(eAmt),note:eNote,date:eDate?new Date(eDate).getTime():Date.now(),photo:ePhoto||null};if(editEntryId)onEditEntry(entryFor,editEntryId,payload);else onAddEntry(entryFor,payload);sEntryFor(null);sEditEntryId(null)},className:"w100 act98 tr",style:{padding:"14px 0",background:parseFloat(eAmt)?c.ac:c.sf2,color:parseFloat(eAmt)?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:parseFloat(eAmt)?`${editEntryId?"Save":"Add"} ${kindLabel(eKind)} ${cashOut(eKind)?"−":"+"}${fm(parseFloat(eAmt),currency)}`:"Enter an amount"})
+        t("button",{disabled:!parseFloat(eAmt)||parseFloat(eAmt)<=0,onClick:()=>{try{const orig=selP&&editEntryId&&(selP.entries||[]).find(x=>x.id===editEntryId);((orig&&orig.photos)||[]).forEach(op=>{if(op&&op.id&&!ePhotos.some(p2=>p2.id===op.id))idbDelFile(String(op.id))})}catch(err){}const payload={kind:eKind,amount:parseFloat(eAmt),note:eNote,date:eDate?new Date(eDate).getTime():Date.now(),photos:ePhotos.map(photoPayload)};if(editEntryId)onEditEntry(entryFor,editEntryId,payload);else onAddEntry(entryFor,payload);sEntryFor(null);sEditEntryId(null)},className:"w100 act98 tr",style:{padding:"14px 0",background:parseFloat(eAmt)?c.ac:c.sf2,color:parseFloat(eAmt)?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:parseFloat(eAmt)?`${editEntryId?"Save":"Add"} ${kindLabel(eKind)} ${cashOut(eKind)?"−":"+"}${fm(parseFloat(eAmt),currency)}`:"Enter an amount"})
       ]})}),
       editP&&t(Sht,{onClose:()=>sEditP(null),children:o(Fragment,{children:[
         t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:14},children:"Edit person"}),
+        o("div",{style:{display:"flex",justifyContent:"center",marginBottom:16},children:[
+          t("input",{ref:edPhotoRef,type:"file",accept:"image/*",style:{display:"none"},onChange:e=>{pickAvatar(e.target.files&&e.target.files[0],edPhoto,sEdPhoto);e.target.value=""}}),
+          o("div",{onClick:()=>edPhotoRef.current&&edPhotoRef.current.click(),style:{position:"relative",cursor:"pointer"},children:[
+            edPhoto?t("img",{src:editAvatarSrc(edPhoto),alt:"",style:{width:72,height:72,borderRadius:999,objectFit:"cover",border:`1px solid ${c.brs}`}}):t("div",{style:{width:72,height:72,borderRadius:999,background:c.sf2,border:`1px dashed ${c.brs}`,display:"flex",alignItems:"center",justifyContent:"center"},children:t(Camera,{size:22,color:c.tm})}),
+            edPhoto&&t("button",{onClick:e=>{e.stopPropagation();clearAvatar(edPhoto,sEdPhoto)},style:{position:"absolute",top:-2,right:-2,width:22,height:22,borderRadius:999,background:c.co,border:`2px solid ${c.bg}`,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff"},children:t(X,{size:11})})
+          ]})
+        ]}),
         o("div",{style:{marginBottom:14},children:t(FI,{label:"Name",value:edName,onChange:sEdName,placeholder:"Name"})}),
         o("div",{style:{marginBottom:14},children:t(FI,{label:"Note (optional)",value:edNote,onChange:sEdNote,placeholder:"e.g., colleague"})}),
         o("div",{style:{marginBottom:20},children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"REMIND ME BY (OPTIONAL)"}),t("input",{type:"date",value:edDue,onChange:e=>sEdDue(e.target.value),style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px",color:c.tx,fontSize:14,outline:"none",fontFamily:'var(--tf)',colorScheme:"dark"}})]}),
-        t("button",{onClick:()=>{onUpdatePerson(editP.id,{name:edName,note:edNote,dueDate:edDue?new Date(edDue).getTime():null});sEditP(null)},className:"w100 act98 tr",style:{padding:"14px 0",background:c.ac,color:"#0a0a0a",borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:"Save changes"})
+        t("button",{onClick:()=>{onUpdatePerson(editP.id,{name:edName,note:edNote,dueDate:edDue?new Date(edDue).getTime():null,photo:photoPayload(edPhoto)});sEditP(null)},className:"w100 act98 tr",style:{padding:"14px 0",background:c.ac,color:"#0a0a0a",borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:"Save changes"})
       ]})}),
       delP&&t(Sht,{onClose:()=>sDelP(null),children:o(Fragment,{children:[
         t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:8},children:`Delete ${delP.name}?`}),
@@ -3246,13 +3304,13 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
           t("button",{onClick:()=>{onDeletePerson(delP.id);sDelP(null);sSel(null)},className:"f1 act98 tr",style:{padding:"13px 0",background:c.co,color:"#0a0a0a",border:"none",borderRadius:12,fontSize:14,fontWeight:600},children:"Delete"})
         ]})
       ]})}),
-      viewImg&&t("div",{onClick:()=>sViewImg(null),className:"fx f ia jc",style:{inset:0,background:"rgba(0,0,0,.92)",zIndex:60,padding:20},children:t("img",{src:viewImg,alt:"",style:{maxWidth:"100%",maxHeight:"100%",borderRadius:12,objectFit:"contain"}})})
+      gallery&&t(GalleryViewer,{photos:gallery.photos,idx:gallery.idx,onClose:()=>sGallery(null),onNav:i=>sGallery(g=>({...g,idx:i}))}),
     ]});
   }
   // ---- LIST VIEW ----
   return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
-    t(SH,{title:t("em",{children:"Lending Diary"}),onBack:onClose,right:t("button",{onClick:()=>{sAddP(true);sPName("");sPNote("");sPDue("")},className:"act95 trt",style:{padding:"8px 13px",background:c.ac,color:"#0a0a0a",borderRadius:10,fontSize:12,fontWeight:600,border:"none"},children:"+ Person"})}),
-    ledger.length===0?t(ES,{title:t("em",{children:"your diary is empty"}),subtitle:"Track who owes you and who you owe. Add a person, then log money you lend, borrow, or pay back — the running balance does the rest.",cta:"Add a person",onCta:()=>{sAddP(true);sPName("");sPNote("");sPDue("")}}):o(Fragment,{children:[
+    t(SH,{title:t("em",{children:"Lending Diary"}),onBack:onClose,right:t("button",{onClick:()=>{sAddP(true);sPName("");sPNote("");sPDue("");sPPhoto(null)},className:"act95 trt",style:{padding:"8px 13px",background:c.ac,color:"#0a0a0a",borderRadius:10,fontSize:12,fontWeight:600,border:"none"},children:"+ Person"})}),
+    ledger.length===0?t(ES,{title:t("em",{children:"your diary is empty"}),subtitle:"Track who owes you and who you owe. Add a person, then log money you lend, borrow, or pay back — the running balance does the rest.",cta:"Add a person",onCta:()=>{sAddP(true);sPName("");sPNote("");sPDue("");sPPhoto(null)}}):o(Fragment,{children:[
       o("div",{className:"g g2",style:{gap:10,marginBottom:16},children:[
         o("div",{style:{background:`linear-gradient(135deg,${c.mt}1f 0%,${c.sfg} 60%)`,borderRadius:16,border:`1px solid ${c.brs}`,padding:16},children:[
           t("div",{style:{fontFamily:F.mo,fontSize:9.5,color:c.tm,letterSpacing:1.2},children:"OWED TO YOU"}),
@@ -3265,7 +3323,7 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
       ]}),
       t("div",{style:{display:"flex",flexDirection:"column",gap:10},children:sorted.map(p=>{const b=bal(p),bl=balLine(b),od=overdue(p);return o("button",{key:p.id,onClick:()=>sSel(p.id),className:"w100 act98 trc f ia jb",style:{background:c.sfg,borderRadius:14,border:`1px solid ${od?c.co:c.brs}`,padding:"14px 16px",gap:10,textAlign:"left"},children:[
         o("div",{className:"f ia",style:{gap:12,minWidth:0},children:[
-          t("div",{style:{width:40,height:40,borderRadius:11,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:600,color:c.td,flexShrink:0},children:(p.name||"?").slice(0,1).toUpperCase()}),
+          t(Avatar,{photo:p.photo,name:p.name,size:40,radius:11,fontSize:16}),
           o("div",{className:"minw0",children:[
             t("div",{className:"tru",style:{fontSize:15,fontWeight:600,color:c.tx},children:p.name}),
             o("div",{className:"f ia",style:{gap:6,marginTop:2},children:[
@@ -3280,10 +3338,17 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
     ]}),
     addP&&t(Sht,{onClose:()=>sAddP(false),children:o(Fragment,{children:[
       t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:14},children:"Add a person"}),
+      o("div",{style:{display:"flex",justifyContent:"center",marginBottom:16},children:[
+        t("input",{ref:pPhotoRef,type:"file",accept:"image/*",style:{display:"none"},onChange:e=>{pickAvatar(e.target.files&&e.target.files[0],pPhoto,sPPhoto);e.target.value=""}}),
+        o("div",{onClick:()=>pPhotoRef.current&&pPhotoRef.current.click(),style:{position:"relative",cursor:"pointer"},children:[
+          pPhoto?t("img",{src:addAvatarSrc(pPhoto),alt:"",style:{width:72,height:72,borderRadius:999,objectFit:"cover",border:`1px solid ${c.brs}`}}):t("div",{style:{width:72,height:72,borderRadius:999,background:c.sf2,border:`1px dashed ${c.brs}`,display:"flex",alignItems:"center",justifyContent:"center"},children:t(Camera,{size:22,color:c.tm})}),
+          pPhoto&&t("button",{onClick:e=>{e.stopPropagation();clearAvatar(pPhoto,sPPhoto)},style:{position:"absolute",top:-2,right:-2,width:22,height:22,borderRadius:999,background:c.co,border:`2px solid ${c.bg}`,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff"},children:t(X,{size:11})})
+        ]})
+      ]}),
       o("div",{style:{marginBottom:14},children:t(FI,{label:"Name",value:pName,onChange:sPName,placeholder:"e.g., Rahul"})}),
       o("div",{style:{marginBottom:14},children:t(FI,{label:"Note (optional)",value:pNote,onChange:sPNote,placeholder:"e.g., flatmate"})}),
       o("div",{style:{marginBottom:20},children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"REMIND ME BY (OPTIONAL)"}),t("input",{type:"date",value:pDue,onChange:e=>sPDue(e.target.value),style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px",color:c.tx,fontSize:14,outline:"none",fontFamily:'var(--tf)',colorScheme:"dark"}})]}),
-      t("button",{disabled:!pName.trim(),onClick:()=>{const id=onAddPerson({name:pName,note:pNote,dueDate:pDue?new Date(pDue).getTime():null});sAddP(false);if(id)sSel(id)},className:"w100 act98 tr",style:{padding:"14px 0",background:pName.trim()?c.ac:c.sf2,color:pName.trim()?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:"Add person"})
+      t("button",{disabled:!pName.trim(),onClick:()=>{const id=onAddPerson({name:pName,note:pNote,dueDate:pDue?new Date(pDue).getTime():null,photo:photoPayload(pPhoto)});sAddP(false);sPPhoto(null);if(id)sSel(id)},className:"w100 act98 tr",style:{padding:"14px 0",background:pName.trim()?c.ac:c.sf2,color:pName.trim()?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:"Add person"})
     ]})})
   ]});
 }
@@ -5420,7 +5485,7 @@ const dl=async()=>{sMsg("Preparing backup (embedding statement PDFs)…");try{co
 const cp=async()=>{try{await navigator.clipboard.writeText(await exp());sMsg("Copied to clipboard (incl. statement PDFs)")}catch{alert("Clipboard blocked")}};
 const onFile=async e=>{const f=e.target.files?.[0];if(!f)return;const text=await f.text();sTxt(text)};
 const tryRestore=()=>{try{const o2=JSON.parse(txt);if(!o2.expenses||!Array.isArray(o2.expenses))throw new Error("Invalid format — missing expenses array");sConf(o2)}catch(err){sMsg("Error: "+err.message)}};
-const doRestore=async()=>{const o2=conf;try{await restoreStmtFiles(o2.statementFiles)}catch(e){}try{await restoreStmtFiles(o2.expensePhotos)}catch(e){}if(Array.isArray(o2.sidebarOrder)){try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2.sidebarOrder))}catch(e){}}persist({expenses:o2.expenses||[],recurring:o2.recurring||[],accounts:o2.accounts&&o2.accounts.length?o2.accounts:[DA],profiles:o2.profiles||[],cards:o2.cards||[],cardStatements:o2.cardStatements||[],bills:o2.bills||[],goals:o2.goals||[],budgetLoans:o2.budgetLoans||[],ledger:o2.ledger||[],categoryBudgets:o2.categoryBudgets||{},monthlyRestrictionLogs:o2.monthlyRestrictionLogs||[],investments:o2.investments||[],planThreshold:o2.planThreshold??null,customExpenseCategories:o2.customExpenseCategories||[],customIncomeCategories:o2.customIncomeCategories||[],categoryOverrides:o2.categoryOverrides||{},categoryOrder:o2.categoryOrder||{expense:[],income:[]},budget:o2.budget??null,budgetPeriod:o2.budgetPeriod||"monthly",...(o2.morningEnabled!=null?{morningEnabled:o2.morningEnabled,morningTime:o2.morningTime||"08:00",eveningEnabled:o2.eveningEnabled||false,eveningTime:o2.eveningTime||"21:00"}:{}),currency:o2.currency||"$",monthStartDay:o2.monthStartDay||1,merchantRules:o2.merchantRules||{},debtPlan:o2.debtPlan||null,las:o2.las||null});try{if(o2.aiProvider)sProv(o2.aiProvider);if("aiModel" in o2)sMdl(o2.aiModel||null);sAK(null)}catch(e){}sConf(null);sMsg("✓ Restored. Re-enter your AI API key in Settings (keys are never stored in backups)"+(o2.statementFiles?" (statement PDFs included)":""));sTxt("")};
+const doRestore=async()=>{const o2=conf;try{await restoreStmtFiles(o2.statementFiles)}catch(e){}try{await restoreStmtFiles(o2.expensePhotos)}catch(e){}try{await restoreStmtFiles(o2.ledgerPhotos)}catch(e){}if(Array.isArray(o2.sidebarOrder)){try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2.sidebarOrder))}catch(e){}}persist({expenses:o2.expenses||[],recurring:o2.recurring||[],accounts:o2.accounts&&o2.accounts.length?o2.accounts:[DA],profiles:o2.profiles||[],cards:o2.cards||[],cardStatements:o2.cardStatements||[],bills:o2.bills||[],goals:o2.goals||[],budgetLoans:o2.budgetLoans||[],ledger:o2.ledger||[],categoryBudgets:o2.categoryBudgets||{},monthlyRestrictionLogs:o2.monthlyRestrictionLogs||[],investments:o2.investments||[],planThreshold:o2.planThreshold??null,customExpenseCategories:o2.customExpenseCategories||[],customIncomeCategories:o2.customIncomeCategories||[],categoryOverrides:o2.categoryOverrides||{},categoryOrder:o2.categoryOrder||{expense:[],income:[]},budget:o2.budget??null,budgetPeriod:o2.budgetPeriod||"monthly",...(o2.morningEnabled!=null?{morningEnabled:o2.morningEnabled,morningTime:o2.morningTime||"08:00",eveningEnabled:o2.eveningEnabled||false,eveningTime:o2.eveningTime||"21:00"}:{}),currency:o2.currency||"$",monthStartDay:o2.monthStartDay||1,merchantRules:o2.merchantRules||{},debtPlan:o2.debtPlan||null,las:o2.las||null});try{if(o2.aiProvider)sProv(o2.aiProvider);if("aiModel" in o2)sMdl(o2.aiModel||null);sAK(null)}catch(e){}sConf(null);sMsg("✓ Restored. Re-enter your AI API key in Settings (keys are never stored in backups)"+(o2.statementFiles?" (statement PDFs included)":""));sTxt("")};
 const prebuild=async()=>{try{const s=await window.storage.get(KB);if(!s){alert("No prebuild snapshot found");return}sTxt(s.value);sMsg("Loaded prebuild backup — review then tap Restore")}catch{alert("Error loading snapshot")}};
 return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
   t(SH,{title:t("em",{children:"Backup & Restore"}),onBack:onClose}),
