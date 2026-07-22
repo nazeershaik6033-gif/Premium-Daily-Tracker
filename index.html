@@ -3628,8 +3628,7 @@ function MonthTools({data,yr,mo,onTx}){
           t("button",{type:"submit",disabled:busy||!input.trim(),className:"act95 tr f ia jc",style:{width:40,height:40,background:input.trim()&&!busy?c.ac:c.sf2,border:"none",borderRadius:10,color:input.trim()&&!busy?"#0a0a0a":c.tm,flexShrink:0},children:t(Send,{size:16})})
         ]}),
         msgs.length===0&&t("div",{style:{marginTop:8,fontSize:10.5,color:c.tm,fontFamily:F.mo,letterSpacing:.3,lineHeight:1.4},children:"Uses your AI key from Settings. Answers cover the selected period only."})
-      ]}),
-      t("div",{style:{height:96}})
+      ]})
     ]})
   ]});
 }
@@ -3641,7 +3640,7 @@ function Calend({data,onTx,presetAdd}){const{expenses,currency}=data;const[yr,sY
   const mst=useMemo(()=>{let to=0,ic=0,co2=0,mx=0;for(const cl of days){if(cl.other)continue;const x=fByD[cl.date.toDateString()];if(x){to+=x.total;ic+=x.income;co2+=x.items.length;if(x.total>mx)mx=x.total}}return{total:to,income:ic,max:mx,count:co2}},[days,fByD]);
   const tod=new Date().toDateString(),cl=fByD[sel],its=cl?.items||[],sp=cl?.total||0,inc=cl?.income||0,mn=new Date(yr,mo).toLocaleDateString("en-US",{month:"long",year:"numeric"}),selTs=useMemo(()=>{const d=new Date(sel);d.setHours(12,0,0,0);return d.getTime()},[sel]);
   const filterLabel=cf==="all"?"All":cf==="income"?"Income":cf==="expense"?"Expense":cf==="cards"?(cSub?(((data.cards||[]).find(x=>x.id===cSub)||{}).name||"Card"):"All cards"):cf==="accounts"?(cSub?(((data.accounts||[]).find(x=>x.id===cSub)||{}).name||"Account"):"All accounts"):cf==="reimbursable"?(cSub==="pending"?"To be reimbursed":cSub==="done"?"Reimbursed":"Reimbursable"):cf==="cardpay"?"Card Payments":"All";
-return o("div",{style:{padding:"8px 24px 0"},className:"st",children:[
+return o("div",{style:{padding:"8px 24px 48px"},className:"st",children:[
   o("div",{style:{marginTop:12},children:[t("div",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1.5,color:c.tm},children:"CALENDAR"}),o("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:38,lineHeight:1.1,marginTop:2},children:["day-by-",t("span",{style:{color:c.mt},children:"day"})]})]}),
   o("div",{style:{marginTop:14,background:`linear-gradient(135deg,${c.ac}12 0%,${c.sfg} 70%)`,border:`1px solid ${c.brs}`,borderRadius:14,padding:"12px 14px"},children:o("div",{className:"f ia jb",style:{gap:10},children:[
     o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1.2},children:"MONTH TOTAL · "+filterLabel.toUpperCase()}),t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,marginTop:3},children:mst.count+" txn"+(mst.count===1?"":"s")})]}),
