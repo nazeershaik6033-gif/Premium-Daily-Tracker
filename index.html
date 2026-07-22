@@ -485,7 +485,7 @@ const mss=(y,m,sd=1)=>new Date(y,m,sd,0,0,0,0).getTime();
 const mse=(y,m,sd=1)=>new Date(y,m+1,sd,0,0,0,0).getTime();
 const ws=(d=new Date())=>{const x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-x.getDay());return x.getTime()};
 const ys=(d=new Date())=>new Date(d.getFullYear(),0,1).getTime();
-const rd=ts=>{const d=new Date(ts),tt=ds(),tx=ds(new Date(ts)),df=(tt-tx)/864e5;if(df===0)return"Today";if(df===1)return"Yesterday";if(df===-1)return"Tomorrow";if(df>0&&df<7)return d.toLocaleDateString("en-US",{weekday:"long"});return d.toLocaleDateString("en-US",{month:"short",day:"numeric"})};
+const rd=ts=>{const d=new Date(ts),tt=ds(),tx=ds(new Date(ts)),df=(tt-tx)/864e5;if(df===0)return"Today";if(df===1)return"Yesterday";if(df===-1)return"Tomorrow";if(df>0&&df<7)return d.toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"});return d.toLocaleDateString("en-US",{month:"short",day:"numeric"})};
 const gt=()=>{const h=new Date().getHours();if(h<5)return"Still up";if(h<12)return"Good morning";if(h<17)return"Good afternoon";if(h<21)return"Good evening";return"Good night"};
 const dq=()=>{const dy=Math.floor((new Date()-new Date(new Date().getFullYear(),0,0))/864e5);return QQ[dy%QQ.length]};
 const ev=s=>{if(!s)return null;const k=String(s).replace(/×/g,"*").replace(/÷/g,"/").replace(/,/g,".").trim();if(!/^[\d.+\-*/() ]+$/.test(k))return null;if(!/[+\-*/]/.test(k)){const n=parseFloat(k);return isNaN(n)?null:n}try{let pos=0;const peek=()=>k[pos];const consume=()=>k[pos++];const skipWs=()=>{while(k[pos]===" ")pos++};const parseNum=()=>{skipWs();let neg=false;if(peek()==="-"){neg=true;pos++}skipWs();let num="";while(pos<k.length&&/[\d.]/.test(k[pos]))num+=consume();const val=parseFloat(num);return isNaN(val)?null:(neg?-val:val)};const parseExpr=()=>parsePlusMinus();const parsePlusMinus=()=>{let l=parseMulDiv();if(l==null)return null;skipWs();while(peek()==="+"||(peek()==="-"&&k[pos+1]&&/[\d.(]/.test(k[pos+1]))){const op=consume();const r=parseMulDiv();if(r==null)return null;l=op==="+"?l+r:l-r;skipWs()}return l};const parseMulDiv=()=>{let l=parsePrimary();if(l==null)return null;skipWs();while(peek()==="*"||peek()==="/"){const op=consume();const r=parsePrimary();if(r==null||( op==="/"&&r===0))return null;l=op==="*"?l*r:l/r;skipWs()}return l};const parsePrimary=()=>{skipWs();if(peek()==="("){pos++;const v=parseExpr();skipWs();if(peek()!==")")return null;pos++;return v}return parseNum()};const r=parseExpr();if(r==null||!isFinite(r)||pos<k.replace(/ /g,"").length)return null;return Math.round(r*100)/100}catch{}return null};
@@ -1371,7 +1371,10 @@ function Nav({view,setView,onQuickPick,onVoice}){const[open,sOpen]=useState(fals
 
 // === HOME ===
 const MX={daily:30,weekly:4.33,biweekly:2.17,monthly:1,yearly:0.0833};
+// Bottom sheet (not a full screen) — nests correctly under TxSht since it shares
+// the same _shtOpen counter and sits one z-index below the shared Sht layer.
 function FilteredTxSheet({title,items,accounts,cards,currency,onClose,onHome,onTx}){
+  useEffect(()=>{_shtOpen++;document.body.classList.add("sheet-open");return()=>{_shtOpen=Math.max(0,_shtOpen-1);if(_shtOpen===0)document.body.classList.remove("sheet-open")}},[]);
   const[sort,setSort]=useState("date-desc");
   const SORTS=[
     {id:"date-desc",l:"Date ↓"},
@@ -1386,28 +1389,33 @@ function FilteredTxSheet({title,items,accounts,cards,currency,onClose,onHome,onT
   const sorted=useMemo(()=>{const a=[...items];if(sort==="date-desc")a.sort((x,y)=>y.date-x.date);else if(sort==="date-asc")a.sort((x,y)=>x.date-y.date);else if(sort==="value-desc")a.sort((x,y)=>y.amount-x.amount);else if(sort==="value-asc")a.sort((x,y)=>x.amount-y.amount);else if(sort==="alpha")a.sort((x,y)=>label(x).localeCompare(label(y)));else if(sort==="type")a.sort((x,y)=>typeOrder(x)-typeOrder(y)||y.date-x.date);return a},[items,sort]);
   const exportXls=()=>exportTxnsXlsx(title,sorted,accounts,currency);
   const exportPdf=()=>exportTxnsPdf(title,sorted,accounts,currency);
-return o("div",{className:"fx f fc",style:{inset:0,background:c.bg,zIndex:45},children:[
-  o("div",{style:{padding:"max(env(safe-area-inset-top),14px) 14px 0",background:c.bg,borderBottom:`1px solid ${c.brs}`,flexShrink:0},children:[
-    o("div",{className:"f ia",style:{gap:10,paddingBottom:10},children:[
-      t("button",{onClick:onClose,className:"act90 trt f ia",style:{gap:4,background:"transparent",border:"none",color:"inherit",flexShrink:0},children:[t(CL,{size:18,color:c.tx}),t("div",{style:{fontFamily:F.mo,fontSize:9,letterSpacing:1,color:c.tm},children:"BACK"})]}),
-      t("div",{style:{fontFamily:c.hf,fontSize:20,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:c.tx},children:title}),
-      t("button",{onClick:()=>{onHome?onHome():onClose()},className:"act90 trt",style:{width:36,height:36,borderRadius:10,background:c.sfg,border:`1px solid ${c.brs}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(Hm,{size:16,color:c.tx})}),
+  const exportImg=()=>exportTxnsImage(title,sorted,accounts,currency);
+return t("div",{className:"fx f iend",style:{inset:0,background:"rgba(0,0,0,.6)",zIndex:45},onClick:onClose,children:
+  o("div",{onClick:e=>e.stopPropagation(),className:"w100",style:{maxWidth:440,margin:"0 auto",maxHeight:"85vh",display:"flex",flexDirection:"column",background:c.sfg,borderTopLeftRadius:24,borderTopRightRadius:24,borderTop:`1px solid ${c.br}`,boxSizing:"border-box",overflow:"hidden"},children:[
+    t("div",{style:{width:40,height:4,margin:"12px auto 2px",borderRadius:999,background:c.br,flexShrink:0}}),
+    o("div",{style:{padding:"10px 20px 0",flexShrink:0},children:[
+      o("div",{className:"f ia jb",style:{gap:10,marginBottom:12},children:[
+        t("div",{className:"tru",style:{fontFamily:c.hf,fontSize:19,color:c.tx,flex:1},children:title}),
+        o("div",{className:"f ia",style:{gap:6,flexShrink:0},children:[
+          t("button",{onClick:()=>{onHome?onHome():onClose()},className:"act90 trt",style:{width:32,height:32,borderRadius:9,background:c.sf2,border:`1px solid ${c.brs}`,display:"flex",alignItems:"center",justifyContent:"center"},children:t(Hm,{size:14,color:c.tx})}),
+          t("button",{onClick:onClose,className:"act90 trt",style:{width:32,height:32,borderRadius:9,background:c.sf2,border:`1px solid ${c.brs}`,display:"flex",alignItems:"center",justifyContent:"center"},children:t(X,{size:14,color:c.tx})}),
+        ]})
+      ]}),
+      t("div",{className:"f",style:{gap:6,paddingBottom:10,overflowX:"auto",WebkitOverflowScrolling:"touch"},children:SORTS.map(s=>t("button",{key:s.id,onClick:()=>setSort(s.id),className:"act95 tr",style:{padding:"5px 12px",background:sort===s.id?c.ac:c.sf2,border:`1px solid ${sort===s.id?"transparent":c.brs}`,borderRadius:999,fontSize:11,fontFamily:F.mo,color:sort===s.id?"#0a0a0a":c.td,whiteSpace:"nowrap",flexShrink:0},children:s.l}))}),
     ]}),
-    t("div",{className:"f",style:{gap:6,paddingBottom:10,overflowX:"auto",WebkitOverflowScrolling:"touch"},children:SORTS.map(s=>t("button",{key:s.id,onClick:()=>setSort(s.id),className:"act95 tr",style:{padding:"5px 12px",background:sort===s.id?c.ac:c.sf,border:`1px solid ${sort===s.id?"transparent":c.brs}`,borderRadius:999,fontSize:11,fontFamily:F.mo,color:sort===s.id?"#0a0a0a":c.td,whiteSpace:"nowrap",flexShrink:0},children:s.l}))}),
-  ]}),
-  o("div",{style:{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
-    t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,padding:"10px 20px 4px"},children:sorted.length+" TRANSACTIONS"}),
-    sorted.length===0
-      ?t("div",{style:{padding:"8px 20px"},children:t(ES,{title:t("em",{children:"nothing here"}),subtitle:"No transactions for this filter"})})
-      :t("div",{style:{margin:"8px 16px 100px",background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`},children:sorted.map((e,i)=>t(TX,{key:e.id,expense:e,accounts,cards,isLast:i===sorted.length-1,onClick:()=>onTx(e)}))})
-  ]}),
-  o("div",{style:{position:"absolute",bottom:0,left:0,right:0,padding:"12px 16px",paddingBottom:"max(env(safe-area-inset-bottom),12px)",background:`linear-gradient(0deg,${c.bg} 60%,transparent)`,pointerEvents:"none"},children:[
-    sorted.length>0&&o("div",{className:"f ia",style:{gap:8,pointerEvents:"auto"},children:[
-      t("button",{onClick:exportXls,className:"act90 trt f ia jc f1",style:{gap:8,padding:"14px 0",background:c.ac,border:"none",borderRadius:14,fontSize:13,fontFamily:F.mo,color:"#0a0a0a",letterSpacing:.5,fontWeight:600},children:[t(Dl,{size:14,color:"#0a0a0a"}),"EXCEL"]}),
-      t("button",{onClick:exportPdf,className:"act90 trt f ia jc f1",style:{gap:8,padding:"14px 0",background:c.sf3,border:`1px solid ${c.brs}`,borderRadius:14,fontSize:13,fontFamily:F.mo,color:c.tx,letterSpacing:.5,fontWeight:600},children:[t(Dl,{size:14,color:c.tx}),"PDF"]}),
+    o("div",{style:{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",padding:"0 20px"},children:[
+      t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,padding:"6px 0 8px"},children:sorted.length+" TRANSACTION"+(sorted.length===1?"":"S")}),
+      sorted.length===0
+        ?t(ES,{title:t("em",{children:"nothing here"}),subtitle:"No transactions for this filter"})
+        :t("div",{style:{background:c.sf2,borderRadius:18,border:`1px solid ${c.brs}`,marginBottom:14},children:sorted.map((e,i)=>t(TX,{key:e.id,expense:e,accounts,cards,isLast:i===sorted.length-1,onClick:()=>onTx(e)}))}),
     ]}),
-  ]}),
-]})}
+    sorted.length>0&&o("div",{style:{padding:"10px 20px",paddingBottom:"max(env(safe-area-inset-bottom),14px)",flexShrink:0,borderTop:`1px solid ${c.brs}`},children:o("div",{className:"f ia",style:{gap:6},children:[
+      t("button",{onClick:exportXls,className:"act90 trt f ia jc f1",style:{gap:5,padding:"11px 0",background:c.ac,border:"none",borderRadius:12,fontSize:10.5,fontFamily:F.mo,color:"#0a0a0a",letterSpacing:.3,fontWeight:600},children:[t(Dl,{size:12,color:"#0a0a0a"}),"EXCEL"]}),
+      t("button",{onClick:exportPdf,className:"act90 trt f ia jc f1",style:{gap:5,padding:"11px 0",background:c.sf3,border:`1px solid ${c.brs}`,borderRadius:12,fontSize:10.5,fontFamily:F.mo,color:c.tx,letterSpacing:.3,fontWeight:600},children:[t(Dl,{size:12,color:c.tx}),"PDF"]}),
+      t("button",{onClick:exportImg,className:"act90 trt f ia jc f1",style:{gap:5,padding:"11px 0",background:c.sf3,border:`1px solid ${c.brs}`,borderRadius:12,fontSize:10.5,fontFamily:F.mo,color:c.tx,letterSpacing:.3,fontWeight:600},children:[t(Camera,{size:12,color:c.tx}),"PHOTO"]}),
+    ]})}),
+  ]})
+})}
 function Home({data,onTx,onView,onFlt,onUseProfile,onTour,onAddExpenses}){const{expenses,recurring,bills=[]}=data;const[pr,sPr]=useState("month");const[spendFlt,setSpendFlt]=useState(()=>{try{const s=localStorage.getItem("etp-spend-flt");return s?JSON.parse(s):{from:"",to:""}}catch{return{from:"",to:""}}});const[askQ,setAskQ]=useState("");const[snapOpen,setSnapOpen]=useState(false);const[snapItems,setSnapItems]=useState(null);const[snapBusy,setSnapBusy]=useState(false);const[snapErr,setSnapErr]=useState(null);const[snapSel,setSnapSel]=useState({});const[snapEdit,setSnapEdit]=useState(null);const[snapMonthOk,setSnapMonthOk]=useState(false);const[snapPrompt,setSnapPrompt]=useState("");const[snapProgress,setSnapProgress]=useState(null);const[snapBulkPay,setSnapBulkPay]=useState("");const snapFileRef=useRef(null);const snapGallRef=useRef(null);const snapDocRef=useRef(null);const[nudge,setNudge]=useState(()=>{try{return JSON.parse(localStorage.getItem("etp-nudge-"+new Date().toISOString().slice(0,10)))||null}catch{return null}});const[nudgeLoading,setNudgeLoading]=useState(false);const q=useMemo(()=>dq(),[]);const msd=data.monthStartDay||1;
 const periodRange=useMemo(()=>{const n=new Date(),y=n.getFullYear(),m=n.getMonth();if(pr==="quarter"){const sm=Math.floor(m/3)*3;return{start:mss(y,sm,msd),end:mss(y,sm+3,msd)}}if(pr==="half"){const sm=m<6?0:6;return{start:mss(y,sm,msd),end:mss(y,sm+6,msd)}}if(pr==="year")return{start:mss(y,0,msd),end:mss(y+1,0,msd)};return{start:ps(n,msd),end:mse(y,m,msd)}},[pr,msd]);
 const periodStart=periodRange.start,periodEnd=periodRange.end;
@@ -3485,6 +3493,7 @@ function MonthTools({data,yr,mo,onTx}){
   const[fCard,sFCard]=useState("");const[fAcct,sFAcct]=useState("");
   const[typ,sTyp]=useState("all");const[sort,sSort]=useState("date-desc");
   const[showFilters,sShowFilters]=useState(false);
+  const[resultsOpen,sResultsOpen]=useState(false);
   const toggleCat=id=>{const n=new Set(fCats);n.has(id)?n.delete(id):n.add(id);sFCats(n);};
   const clearFilters=()=>{sFCats(new Set());sAmin("");sAmax("");sFCard("");sFAcct("");sTyp("all");sSort("date-desc");sDateMode("month");};
   const amtOf=e=>e.type==="expense"?netAmt(e):e.amount;
@@ -3589,14 +3598,16 @@ function MonthTools({data,yr,mo,onTx}){
           t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1},children:results.length+" RESULT"+(results.length===1?"":"S")}),
           o("div",{className:"f ia",style:{gap:8},children:[resSum.spend>0&&t("span",{style:{fontFamily:F.mo,fontSize:12,color:c.co},children:"−"+fs(resSum.spend,cur)}),resSum.income>0&&t("span",{style:{fontFamily:F.mo,fontSize:12,color:c.mt},children:"+"+fs(resSum.income,cur)})]})
         ]}),
-        results.length>0&&o("div",{className:"f ia",style:{gap:6,marginBottom:10},children:[
-          t("button",{onClick:()=>exportTxnsXlsx(rng.label+(activeFilters>0?" (filtered)":""),results,accounts,cur),className:"f1 act95 tr f ia jc",style:{gap:5,padding:"8px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:9,fontSize:10.5,fontWeight:600,color:c.td,letterSpacing:.3},children:[t(Dl,{size:12,color:c.td}),"EXCEL"]}),
-          t("button",{onClick:()=>exportTxnsPdf(rng.label+(activeFilters>0?" (filtered)":""),results,accounts,cur),className:"f1 act95 tr f ia jc",style:{gap:5,padding:"8px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:9,fontSize:10.5,fontWeight:600,color:c.td,letterSpacing:.3},children:[t(Dl,{size:12,color:c.td}),"PDF"]}),
-          t("button",{onClick:()=>exportTxnsImage(rng.label+(activeFilters>0?" (filtered)":""),results,accounts,cur),className:"f1 act95 tr f ia jc",style:{gap:5,padding:"8px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:9,fontSize:10.5,fontWeight:600,color:c.td,letterSpacing:.3},children:[t(Camera,{size:12,color:c.td}),"PHOTO"]}),
-        ]}),
         results.length===0
           ?t("div",{style:{padding:"28px 0",textAlign:"center",background:c.sfg,borderRadius:16,border:`1px solid ${c.brs}`,color:c.tm,fontSize:13},children:monthTx.length?"No matching transactions":"No transactions in this period"})
-          :t("div",{style:{background:c.sfg,borderRadius:16,border:`1px solid ${c.brs}`,maxHeight:440,overflowY:"auto"},children:results.slice(0,200).map((e,i)=>t(TX,{key:e.id,expense:e,accounts,cards:cards||[],isLast:i===Math.min(results.length,200)-1,onClick:()=>onTx(e)}))})
+          :t("button",{onClick:()=>sResultsOpen(true),className:"w100 act98 tr f ia jb",style:{padding:"13px 14px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,gap:10},children:o("div",{className:"f ia jb",style:{width:"100%",gap:10},children:[
+              o("div",{className:"f ia",style:{gap:10,minWidth:0},children:[
+                t("div",{style:{width:32,height:32,borderRadius:9,background:c.ac+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(Srch,{size:14,color:c.ac})}),
+                o("div",{style:{textAlign:"left",minWidth:0},children:[t("div",{style:{fontSize:13,fontWeight:600,color:c.tx},children:"View "+results.length+" transaction"+(results.length===1?"":"s")}),t("div",{className:"tru",style:{fontFamily:F.mo,fontSize:9.5,color:c.tm,marginTop:1},children:"Tap to browse, sort & export"})]})
+              ]}),
+              t(CR,{size:16,color:c.tm})
+            ]})}),
+        resultsOpen&&t(FilteredTxSheet,{title:rng.label+(activeFilters>0?" (filtered)":""),items:results,accounts,cards:cards||[],currency:cur,onClose:()=>sResultsOpen(false),onTx})
       ]}),
 
       tab==="insights"&&o("div",{style:{marginTop:12},children:[
@@ -3614,6 +3625,10 @@ function MonthTools({data,yr,mo,onTx}){
       ]}),
 
       tab==="ai"&&o("div",{style:{marginTop:12},children:[
+        msgs.length>0&&o("div",{className:"f ia jb",style:{marginBottom:8},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1},children:msgs.length+" MESSAGE"+(msgs.length===1?"":"S")}),
+          t("button",{onClick:()=>{sMsgs([]);sAiErr("")},className:"act95 tr f ia jc",style:{gap:4,padding:"4px 10px",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:999,fontSize:11,color:c.tm},children:[t(Trash2,{size:11,color:c.tm}),"Clear chat"]})
+        ]}),
         o("div",{ref:scrollRef,style:{maxHeight:300,overflowY:"auto",display:"flex",flexDirection:"column",gap:10,padding:"2px 2px"},children:[
           msgs.length===0&&o("div",{style:{padding:"4px 2px"},children:[
             o("div",{className:"f ia",style:{gap:8,marginBottom:12},children:[t("div",{style:{width:30,height:30,borderRadius:9,background:c.ac+"18",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(Sparkles,{size:15,color:c.ac})}),t("div",{style:{fontSize:13,color:c.td,lineHeight:1.4},children:"Ask anything about "+rng.short+"'s money."})]}),
