@@ -1271,7 +1271,7 @@ function App(){
       o("div",{ref:scrollRef,style:{paddingBottom:"calc(34px + env(safe-area-inset-bottom))",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
         v==="home"&&t(Home,{data:dv,onTx:sAtx,onView:sV,onSetBudget:b=>pst({budget:b}),onFlt:sFlt,onUseProfile:p=>sProfToUse(p),onTour:()=>sShowTour(true),onAddExpenses:aEMany}),
         v==="calendar"&&t(Calend,{data:dv,onTx:sAtx,onFlt:sFlt,presetAdd:(ts,k)=>{window.__pd=ts;window.__pt=k||"expense";sV("add")}}),
-        v==="stats"&&t(Stats,{data:dv,onTx:sAtx,onView:sV,onFlt:sFlt,persist:pst,onReimburse:(e)=>sReimbT(e),onUnreimburse:unReimburse}),
+        v==="stats"&&t(Stats,{data:dv,onTx:sAtx,onView:(id)=>{navFromRef.current="stats";sV(id)},onFlt:sFlt,persist:pst,onReimburse:(e)=>sReimbT(e),onUnreimburse:unReimburse}),
         v==="add"&&t(Editor,{data:d,onSave:sFE,onCancel:()=>sV("home"),persist:pst,onCardPayment:({cardId,accountId,amount,date})=>{aCP({cardId,accountId,amount,date});sV("home")},presetDate:window.__pd,presetType:window.__pt,presetMode:window.__pm,clearPreset:()=>{window.__pd=null;window.__pt=null;window.__pm=null}}),
         v==="edit"&&ed&&t(Editor,{data:d,onSave:({expense})=>uE({...ed,...expense}),onCancel:()=>{sEd(null);sV(navFromRef.current||"home")},editing:ed,persist:pst}),
         v==="more"&&t(More,{data:d,onClose:()=>sV("home"),onView:(id)=>{navFromRef.current="more";sV(id)}}),
@@ -1304,6 +1304,7 @@ function App(){
         v==="newInvestment"&&t(NewInvestment,{data:d,onSave:inv=>{aInv(inv);sV("investments")},onCancel:()=>sV("investments")}),
         v==="editInvestment"&&eInv&&t(NewInvestment,{data:d,editing:eInv,onSave:inv=>{uInv({...eInv,...inv});sEInv(null);sV("investments")},onCancel:()=>{sEInv(null);sV("investments")}}),
         v==="wealth"&&t(Wealth,{data:d,onClose:()=>sV(navFromRef.current)}),
+        v==="advStats"&&t(AdvancedStats,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"stats"),onTx:sAtx}),
         v==="monthlyReport"&&t(MReport,{data:d,onClose:()=>sV(navFromRef.current)}),
         v==="categoryBudgets"&&t(CatBud,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
         v==="settings"&&t(Settings,{data:d,persist:pst,onClose:()=>sV("home"),onBackup:()=>sV("backup"),onCategories:()=>{navFromRef.current="settings";sV("categories")},onView:sV,theme,onSetTheme:applyTheme}),
@@ -3806,6 +3807,7 @@ const goSec=(id)=>{const el=document.getElementById(id);if(!el){sSecQ("");return
 return o("div",{style:{padding:"8px 24px 0"},className:"st",children:[
   o("div",{style:{marginTop:12},children:[t("div",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1.5,color:c.tm},children:"ANALYTICS"}),o("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:38,lineHeight:1.1,marginTop:2},children:["where ",t("span",{style:{color:c.gd},children:"money"})," goes"]})]}),
   t("div",{className:"f",style:{gap:4,padding:4,marginTop:20,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`},children:["week","month","year"].map(r=>t("button",{key:r,onClick:()=>sRange(r),className:"f1 tr",style:{padding:"8px 0",background:range===r?c.ac:"transparent",color:range===r?"#0a0a0a":c.td,borderRadius:9,fontSize:12,fontWeight:range===r?700:400,border:"none",textTransform:"capitalize"},children:r}))}),
+  onView&&o("button",{onClick:()=>onView("advStats"),className:"w100 act98 trt f ia jb",style:{marginTop:12,padding:"14px 16px",background:`linear-gradient(135deg,${c.gd}14,${c.sfg})`,border:`1px solid ${c.gd}44`,borderRadius:16,gap:12,textAlign:"left"},children:[o("div",{className:"f ia",style:{gap:12,minWidth:0},children:[t("span",{style:{fontSize:20,flexShrink:0},children:"🎩"}),o("div",{className:"minw0",children:[t("div",{style:{fontFamily:c.hf,fontSize:15,fontWeight:700,color:c.tx},children:"Advanced (HNI) Statistics"}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:2},children:"Calendar & financial year · ITR filing & next-year planning"})]})]}),t("span",{style:{color:c.gd,fontSize:18,flexShrink:0},children:"→"})]}),
   o("div",{style:{marginTop:16,position:"relative"},children:[
     o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${q2?c.ac:c.brs}`,borderRadius:12,padding:"10px 14px"},children:[
       t("span",{style:{fontSize:13,opacity:.7},children:"🔍"}),
@@ -3972,7 +3974,7 @@ return o("div",{style:{padding:"8px 24px 0"},className:"st",children:[
 ]})}
 
 // === EDITOR ===
-function Editor({data,onSave,onCancel,onCardPayment,presetDate,presetType,presetMode,clearPreset,editing,persist}){const{accounts,currency,cards=[]}=data;const iE=!!editing;const[tp,sTp]=useState(iE?(editing.type==="income"?"income":"expense"):(presetType==="income"?"income":"expense"));const iI=tp==="income";const[md,sMd]=useState(presetMode||"manual");const[am,sAm]=useState(iE?String(editing.amount):"");const[ct,sCt]=useState(iE?editing.category:(presetType==="income"?"salary":"food"));const[sb,sSb]=useState(iE&&editing.subcategory||null);const[mc,sMc]=useState(iE&&editing.merchant||"");const[py,sPy]=useState(iE&&editing.payee||"");const[nt,sNt]=useState(iE&&editing.note||"");const[ph,sPh]=useState(iE?(editing.photos||[]):[]);const[aId,sAId]=useState(iE?editing.accountId:null);const[cId,sCId]=useState(iE&&editing.cardId||null);const[mop,sMop]=useState(iE?(editing.cardId?"card":"account"):"account");const[bk,sBk]=useState(iE&&editing.bank||"");const[ct2,sCt2]=useState(iE&&editing.cardType||"");const[c4,sC4]=useState(iE&&editing.cardLast4||"");const[dt,sDt]=useState(iE?editing.date:(presetDate||Date.now()));const[smsT,sSms]=useState("");const[ex,sEx]=useState(null);const[rc,sRc]=useState(false);const[fq,sFq]=useState("monthly");const[pf,sPf]=useState(false);const phR=useRef(null);const[payCardId,sPayCardId]=useState(null);const[nw,sNw]=useState(iE?(editing.needWant||catNW(editing.category)):catNW(presetType==="income"?"salary":"food"));const[catQ,sCatQ]=useState("");const[cardQ,sCardQ]=useState("");const[catGrp,sCatGrp]=useState(()=>iI?"all":catGroupId(iE?editing.category:"food"));const[catReo,sCatReo]=useState(false);const[catOrd,sCatOrd]=useState(null);const[catMove,sCatMove]=useState(false);const[reimb,sReimb]=useState(iE?!!(editing.reimbursable):false);
+function Editor({data,onSave,onCancel,onCardPayment,presetDate,presetType,presetMode,clearPreset,editing,persist}){const{accounts,currency,cards=[]}=data;const iE=!!editing;const[tp,sTp]=useState(iE?(editing.type==="income"?"income":"expense"):(presetType==="income"?"income":"expense"));const iI=tp==="income";const[md,sMd]=useState(presetMode||"manual");const[am,sAm]=useState(iE?String(editing.amount):"");const[ct,sCt]=useState(iE?editing.category:(presetType==="income"?"salary":"food"));const[sb,sSb]=useState(iE&&editing.subcategory||null);const[mc,sMc]=useState(iE&&editing.merchant||"");const[py,sPy]=useState(iE&&editing.payee||"");const[nt,sNt]=useState(iE&&editing.note||"");const[ph,sPh]=useState(iE?(editing.photos||[]):[]);const[aId,sAId]=useState(iE?editing.accountId:null);const[cId,sCId]=useState(iE&&editing.cardId||null);const[mop,sMop]=useState(iE?(editing.cardId?"card":"account"):"account");const[bk,sBk]=useState(iE&&editing.bank||"");const[ct2,sCt2]=useState(iE&&editing.cardType||"");const[c4,sC4]=useState(iE&&editing.cardLast4||"");const[dt,sDt]=useState(iE?editing.date:(presetDate||Date.now()));const[smsT,sSms]=useState("");const[ex,sEx]=useState(null);const[rc,sRc]=useState(false);const[fq,sFq]=useState("monthly");const[pf,sPf]=useState(false);const phR=useRef(null);const[payCardId,sPayCardId]=useState(null);const[nw,sNw]=useState(iE?(editing.needWant||catNW(editing.category)):catNW(presetType==="income"?"salary":"food"));const[catQ,sCatQ]=useState("");const[cardQ,sCardQ]=useState("");const[catGrp,sCatGrp]=useState(()=>iI?"all":catGroupId(iE?editing.category:"food"));const[catReo,sCatReo]=useState(false);const[catOrd,sCatOrd]=useState(null);const[catMove,sCatMove]=useState(false);const[reimb,sReimb]=useState(iE?!!(editing.reimbursable):false);const[isCardBill,sIsCardBill]=useState(iE?editing.type==="card-payment":false);const[billTargetCard,sBillTargetCard]=useState(iE&&editing.type==="card-payment"?(editing.cardId||null):null);const[ccTouched,sCcTouched]=useState(false);
 useEffect(()=>{if(presetDate&&clearPreset)clearPreset()},[]);
 const acc=accounts.find(a=>a.id===aId)||null,ev2=ev(am),iX=/[+\-*/×÷]/.test(am),va=ev2!=null&&ev2>0&&(mop==="card"?!!cId:!!aId);
 const dStr=ts=>{const d=new Date(ts);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
@@ -3985,12 +3987,14 @@ const pCl=async()=>{try{tSms(await navigator.clipboard.readText())}catch{alert("
 const op=s=>{if(!am)return;const l=am.slice(-1);if("+-*/×÷".includes(l))sAm(am.slice(0,-1)+s);else sAm(am+s)};
 const oPh=async fs2=>{const ls=[];for(const f of fs2){if(!f.type.startsWith("image/"))continue;let d2;if(f.size>2.5e6){d2=await resizeImg(f,1200,0.75);if(d2.length>3.35e6)d2=await resizeImg(f,900,0.6);if(d2.length>3.35e6)d2=await resizeImg(f,700,0.5);if(d2.length>3.35e6)d2=await resizeImg(f,500,0.4);}else{d2=await new Promise(r=>{const rd2=new FileReader();rd2.onload=()=>r(rd2.result);rd2.readAsDataURL(f)})}const pid="pht_"+uid();let stored=false;try{await idbPutFile(pid,_dataUrlToBlob(d2));stored=true}catch(e3){}ls.push({id:pid,data:d2,name:f.name,_idb:stored})}sPh([...ph,...ls])};
 const phSrc=usePhotoSrc(ph);
-const sv=()=>{if(!va)return;try{((iE&&editing.photos)||[]).forEach(op=>{if(op&&op.id&&!ph.some(p2=>p2.id===op.id))idbDelFile(String(op.id))})}catch(e){}onSave({expense:{type:tp,amount:ev2,accountId:aId,cardId:!iI&&mop==="card"?cId||null:null,payMode:iI?"account":mop,category:ct,subcategory:sb||null,needWant:iI?null:nw,merchant:mc.trim()||null,payee:py.trim()||null,note:nt.trim()||null,photos:ph.length?ph.map(p=>(p._idb||!p.data)?{id:p.id,name:p.name||null}:{id:p.id,name:p.name||null,data:p.data}):null,bank:bk.trim()||null,cardType:ct2.trim()||null,cardLast4:c4||null,date:dt,currency:ex?.currency||acc?.currency||currency,source:md==="paste"?"sms":(iE?editing.source:"manual"),reimbursable:!iI&&reimb?true:undefined},makeRecurring:rc,frequency:rc?fq:null,makeProfile:pf})};
+const sv=()=>{if(!va)return;try{((iE&&editing.photos)||[]).forEach(op=>{if(op&&op.id&&!ph.some(p2=>p2.id===op.id))idbDelFile(String(op.id))})}catch(e){}const isCB=!iI&&isCardBill;const photosOut=ph.length?ph.map(p=>(p._idb||!p.data)?{id:p.id,name:p.name||null}:{id:p.id,name:p.name||null,data:p.data}):null;onSave({expense:{type:isCB?"card-payment":tp,amount:ev2,accountId:aId,cardId:isCB?(billTargetCard||null):(!iI&&mop==="card"?cId||null:null),payMode:isCB?"account":(iI?"account":mop),category:ct,subcategory:sb||null,needWant:isCB?null:(iI?null:nw),merchant:mc.trim()||(isCB?"Credit card bill":null),payee:py.trim()||null,note:nt.trim()||null,photos:photosOut,bank:bk.trim()||null,cardType:ct2.trim()||null,cardLast4:c4||null,date:dt,currency:ex?.currency||acc?.currency||currency,source:isCB?"card-payment":(md==="paste"?"sms":(iE?editing.source:"manual")),reimbursable:!iI&&!isCB&&reimb?true:undefined,cardBill:isCB?true:undefined},makeRecurring:isCB?false:rc,frequency:(!isCB&&rc)?fq:null,makeProfile:isCB?false:pf})};
 const cs=iI?ciAll():ceAll(),mp=iI?{...MI,...Object.fromEntries(_custCI.map(x=>[x.id,x]))}:{...ME,...Object.fromEntries(_custCE.map(x=>[x.id,x]))},ucr=cards.filter(c2=>!c2.isExternal);
 const moveCatToGroup=(id,grp)=>{if(!persist)return;if((data.customExpenseCategories||[]).some(x=>x.id===id)){persist({customExpenseCategories:(data.customExpenseCategories||[]).map(x=>x.id===id?{...x,grp}:x)})}else{const ov=data.categoryOverrides||{};persist({categoryOverrides:{...ov,[id]:{...(ov[id]||{}),grp}}})}};
 const ccCards=cards.filter(x=>x.type==="credit");
+const bGuess=(!iI)?cardBillGuess({type:"expense",merchant:mc,payee:py,note:nt,category:ct},cards):{match:false,cardId:null};
+useEffect(()=>{if(iE||iI||ccTouched)return;if(bGuess.match){sIsCardBill(true);if(bGuess.cardId)sBillTargetCard(p=>p||bGuess.cardId)}else sIsCardBill(false)},[bGuess.match,bGuess.cardId,iE,iI,ccTouched]);
 const billGuess=(!iI&&mop==="account"&&onCardPayment)?cardBillGuess({type:"expense",merchant:mc,payee:py,note:nt,category:ct},cards):{match:false,cardId:null};
-const billLikely=billGuess.match&&ccCards.length>0;
+const billLikely=billGuess.match&&ccCards.length>0&&!isCardBill;
 const effPayCard=payCardId||billGuess.cardId||(ccCards[0]&&ccCards[0].id)||null;
 const recAsPay=()=>{if(!effPayCard||!aId||!(ev2>0))return;onCardPayment({cardId:effPayCard,accountId:aId,amount:ev2,date:dt})};
 return o("div",{className:"fi",style:{paddingTop:48,paddingBottom:32},children:[
@@ -4087,6 +4091,15 @@ return o("div",{className:"fi",style:{paddingTop:48,paddingBottom:32},children:[
   !iI&&o("div",{style:{padding:"0 24px",marginBottom:20},children:[
     t(TR,{icon:t(Rpt,{size:16}),label:"Reimbursable expense",subtitle:reimb?"Expecting to be paid back for this":null,active:reimb,onToggle:()=>sReimb(r=>!r)})
   ]}),
+  !iI&&o("div",{style:{padding:"0 24px",marginBottom:20},children:[
+    t(TR,{icon:t("span",{style:{fontSize:16},children:"💳"}),label:"Credit-card bill payment",subtitle:isCardBill?"Kept out of spending totals — settles a card":"Paying off a card bill? Don't double-count it",active:isCardBill,onToggle:()=>{sCcTouched(true);sIsCardBill(v=>!v)}}),
+    isCardBill&&bGuess.match&&!ccTouched&&t("div",{style:{marginTop:8,fontFamily:F.mo,fontSize:10,color:c.gd,letterSpacing:.3},children:"✨ AUTO-DETECTED AS A CARD BILL"}),
+    isCardBill&&ccCards.length>0&&o("div",{style:{marginTop:12},children:[
+      t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,marginBottom:8},children:"PAYS OFF WHICH CARD? (OPTIONAL)"}),
+      t("div",{className:"f sx",style:{gap:8,overflowX:"auto"},children:ccCards.map(cr=>{const on=billTargetCard===cr.id;return o("button",{key:cr.id,onClick:()=>sBillTargetCard(on?null:cr.id),className:"act95 tr f ia",style:{gap:6,padding:"8px 11px",background:on?c.sf3:c.sf,border:`1px solid ${on?c.ac:c.brs}`,borderRadius:10,flexShrink:0,fontSize:12.5,color:on?c.tx:c.td},children:[t("span",{children:"💳"}),t("span",{children:cr.name}),cr.last4&&o("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm},children:["··",cr.last4]})]})})}),
+    ]}),
+    isCardBill&&t("div",{style:{marginTop:10,fontSize:11.5,color:c.tm,lineHeight:1.5},children:"The purchases were already counted when you swiped. This entry only settles the balance, so it's excluded from your spending totals and analytics."}),
+  ]}),
   o("div",{style:{marginBottom:20},children:[
     o("div",{className:"f jb",style:{padding:"0 24px",marginBottom:8,fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1},children:[t("span",{children:"SUBCATEGORY"}),t("span",{children:"OPTIONAL"})]}),
     t("div",{className:"f fw",style:{padding:"0 24px",gap:6},children:(mp[ct]?.subs||[]).map(s=>{const ac2=sb===s,co2=iI?c.mt:c.ac;return t("button",{key:s,onClick:()=>sSb(ac2?null:s),className:"act95 tr",style:{padding:"6px 12px",background:ac2?c.sf3:c.sf,border:`1px solid ${ac2?co2:c.brs}`,borderRadius:999,fontSize:12,color:ac2?c.tx:c.td},children:s})})}),
@@ -4122,7 +4135,7 @@ return o("div",{className:"fi",style:{paddingTop:48,paddingBottom:32},children:[
 function KV({label,value,full}){return o("div",{style:full?{gridColumn:"1 / -1"}:{},children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:2},children:label.toUpperCase()}),t("div",{className:"tru",style:{fontSize:14},children:value})]})}
 
 // === MORE ===
-function More({data,onClose,onView}){const items=[{id:"chat",e:"✨",l:"AI Assistant",s:"Add or edit by chat",hi:true},{id:"billScan",e:"📸",l:"Snap a bill",s:"Auto-extract from receipt",hi:true},{id:"voiceAdd",e:"🎙️",l:"Voice log",s:"Say it, logged",hi:true},t("h",1),{id:"cards",e:"💳",l:"Cards",s:`${(data.cards||[]).length} ${(data.cards||[]).length===1?"card":"cards"}`,acc:true},{id:"cardPayFix",e:"🪙",l:"Fix card bill payments",s:(()=>{const n=(data.expenses||[]).filter(e=>isCardBillPayment(e,data.cards)).length;return n>0?`${n} suspected double-count${n===1?"":"s"}`:"Remove double-counted bills"})(),acc:true},{id:"bills",e:"🔔",l:"Bills & Reminders",s:`${(data.bills||[]).length} ${(data.bills||[]).length===1?"bill":"bills"}`,acc:true},{id:"goals",e:"🎯",l:"Goals & Debt",s:`${(data.goals||[]).length} active`,acc:true},{id:"budgetLoans",e:"🧾",l:"Budget Loans",s:(()=>{const n=(data.budgetLoans||[]).filter(l=>l.status!=="paid").length;return n>0?`${n} to repay`:"Repay past overspends"})(),acc:true},{id:"investments",e:"💼",l:"My Investments",s:`${(data.investments||[]).length} holding${(data.investments||[]).length!==1?"s":""}`,acc:true},{id:"wealth",e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},{id:"monthlyReport",e:"📰",l:"Monthly Report",s:"Print or share PDF",acc:true},t("h",2),{id:"search",e:"🔍",l:"Search",s:"Find any transaction"},{id:"accounts",e:"🏦",l:"Accounts",s:`${data.accounts.length} active`},{id:"reconcile",e:"⚖️",l:"Reconcile Accounts",s:"Monthly opening balance reset"},{id:"transfer",e:"↔️",l:"Transfer",s:"Move between accounts"},{id:"recurring",e:"🔁",l:"Recurring",s:`${data.recurring.length} subscriptions`},{id:"profiles",e:"⚡",l:"Quick profiles",s:`${data.profiles.length} saved`},{id:"categoryBudgets",e:"📏",l:"Category budgets",s:`${Object.keys(data.categoryBudgets||{}).filter(k=>data.categoryBudgets[k].limit>0).length} set`},{id:"annualExp",e:"📆",l:"Annual Variable Expenses",s:(()=>{const y=new Date().getFullYear();const n=((data.varExpensePlans||{})[y]||[]).length;return n>0?`${n} item${n===1?"":"s"} planned for ${y}`:"Plan yearly variable costs by month"})()},{id:"categories",e:"🏷️",l:"Categories",s:"Manage expense types"},{id:"tips",e:"💡",l:"Financial Health",s:"Scores, ratios & tips"},{id:"settings",e:"⚙️",l:"Settings",s:"Currency, budget, backup"}];return o("div",{style:{padding:"8px 24px 32px"},children:[
+function More({data,onClose,onView}){const items=[{id:"chat",e:"✨",l:"AI Assistant",s:"Add or edit by chat",hi:true},{id:"billScan",e:"📸",l:"Snap a bill",s:"Auto-extract from receipt",hi:true},{id:"voiceAdd",e:"🎙️",l:"Voice log",s:"Say it, logged",hi:true},t("h",1),{id:"cards",e:"💳",l:"Cards",s:`${(data.cards||[]).length} ${(data.cards||[]).length===1?"card":"cards"}`,acc:true},{id:"cardPayFix",e:"🪙",l:"Fix card bill payments",s:(()=>{const n=(data.expenses||[]).filter(e=>isCardBillPayment(e,data.cards)).length;return n>0?`${n} suspected double-count${n===1?"":"s"}`:"Remove double-counted bills"})(),acc:true},{id:"bills",e:"🔔",l:"Bills & Reminders",s:`${(data.bills||[]).length} ${(data.bills||[]).length===1?"bill":"bills"}`,acc:true},{id:"goals",e:"🎯",l:"Goals & Debt",s:`${(data.goals||[]).length} active`,acc:true},{id:"budgetLoans",e:"🧾",l:"Budget Loans",s:(()=>{const n=(data.budgetLoans||[]).filter(l=>l.status!=="paid").length;return n>0?`${n} to repay`:"Repay past overspends"})(),acc:true},{id:"investments",e:"💼",l:"My Investments",s:`${(data.investments||[]).length} holding${(data.investments||[]).length!==1?"s":""}`,acc:true},{id:"wealth",e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},{id:"advStats",e:"🎩",l:"Advanced (HNI) Stats",s:"Calendar & financial year · ITR & planning",acc:true},{id:"monthlyReport",e:"📰",l:"Monthly Report",s:"Print or share PDF",acc:true},t("h",2),{id:"search",e:"🔍",l:"Search",s:"Find any transaction"},{id:"accounts",e:"🏦",l:"Accounts",s:`${data.accounts.length} active`},{id:"reconcile",e:"⚖️",l:"Reconcile Accounts",s:"Monthly opening balance reset"},{id:"transfer",e:"↔️",l:"Transfer",s:"Move between accounts"},{id:"recurring",e:"🔁",l:"Recurring",s:`${data.recurring.length} subscriptions`},{id:"profiles",e:"⚡",l:"Quick profiles",s:`${data.profiles.length} saved`},{id:"categoryBudgets",e:"📏",l:"Category budgets",s:`${Object.keys(data.categoryBudgets||{}).filter(k=>data.categoryBudgets[k].limit>0).length} set`},{id:"annualExp",e:"📆",l:"Annual Variable Expenses",s:(()=>{const y=new Date().getFullYear();const n=((data.varExpensePlans||{})[y]||[]).length;return n>0?`${n} item${n===1?"":"s"} planned for ${y}`:"Plan yearly variable costs by month"})()},{id:"categories",e:"🏷️",l:"Categories",s:"Manage expense types"},{id:"tips",e:"💡",l:"Financial Health",s:"Scores, ratios & tips"},{id:"settings",e:"⚙️",l:"Settings",s:"Currency, budget, backup"}];return o("div",{style:{padding:"8px 24px 32px"},children:[
   t(SH,{title:t("em",{children:"More"}),onBack:onClose}),
   t("div",{style:{marginTop:16,background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden"},children:items.filter(x=>x.id).map((d2,i)=>{const last=i===items.filter(x=>x.id).length-1;return o("button",{key:d2.id,onClick:()=>onView(d2.id),className:"w100 f ia trc",style:{gap:12,padding:"14px 16px",background:"transparent",borderBottom:last?"none":`1px solid ${c.brs}`},children:[t("div",{style:{width:40,height:40,borderRadius:12,background:d2.hi?c.lv+"25":d2.acc?c.sk+"20":c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0},children:d2.e}),o("div",{className:"f1 tl",children:[t("div",{style:{fontFamily:c.hf,fontSize:14,fontWeight:600,color:d2.hi?c.lv:(d2.acc?c.sk:c.tx)},children:d2.l}),t("div",{style:{fontSize:12,color:c.tm,marginTop:2},children:d2.s})]}),t(CR,{size:15,color:c.tm})]})})}),
 ]})}
@@ -5893,6 +5906,178 @@ function CardFixRow({e,cards,currency,onConvert,onIgnore}){const guess=cardBillG
     t("button",{onClick:()=>onIgnore(e.id),className:"act95 trt",style:{padding:"11px 0",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:11,fontSize:13,color:c.td},children:"Not a card payment"}),
   ]}),
 ]})}
+
+// === ADVANCED HNI STATISTICS ===
+// Broad calendar-year vs financial-year picture for ITR filing and forward
+// expense planning, with fully manual control (custom line-items + auto-tags).
+const AS_FY_START=3; // April (0-indexed) — Indian financial year start
+const AS_ITR_HEADS=[
+  {id:"salary",label:"Salaries",emoji:"💼",cats:["salary","arrears"],note:"Salary, bonus & arrears (cross-check Form 16)"},
+  {id:"house",label:"House Property",emoji:"🏠",cats:["rental"],note:"Rent received (30% std. deduction applies at filing)"},
+  {id:"business",label:"Business / Profession",emoji:"🛠️",cats:["business"],note:"Freelance, consulting, side income"},
+  {id:"capgains",label:"Capital Gains",emoji:"📈",cats:["trading"],note:"Stocks, MF, F&O, crypto — verify STCG/LTCG split"},
+  {id:"othersrc",label:"Other Sources",emoji:"🏦",cats:["interest","cashback","gift","income_other"],note:"Interest, cashbacks, gifts & misc"},
+];
+const AS_DED_PRESETS=[
+  {section:"80C",label:"PPF / ELSS / LIC / EPF / tuition",limit:150000},
+  {section:"80CCD(1B)",label:"NPS (additional)",limit:50000},
+  {section:"80D",label:"Health insurance premium",limit:25000},
+  {section:"24(b)",label:"Home-loan interest",limit:200000},
+  {section:"80TTA",label:"Savings-account interest",limit:10000},
+  {section:"80E",label:"Education-loan interest",limit:0},
+  {section:"80G",label:"Donations",limit:0},
+];
+const AS_MONTH_MS=2629800000;
+function asFyBounds(a){return[new Date(a,AS_FY_START,1).getTime(),new Date(a+1,AS_FY_START,1).getTime()];}
+function asCyBounds(y){return[new Date(y,0,1).getTime(),new Date(y+1,0,1).getTime()];}
+function ASNum({value,onSave,placeholder,width,prefix,accent}){const[v,sv]=useState(value==null?"":String(value));useEffect(()=>{sv(value==null?"":String(value))},[value]);const commit=()=>{const n=v===""?null:Math.round(parseFloat(v)||0);onSave(n)};return o("div",{className:"f ia",style:{gap:4},children:[prefix&&t("span",{style:{fontFamily:F.mo,fontSize:12,color:c.tm},children:prefix}),t("input",{value:v,inputMode:"decimal",placeholder:placeholder||"0",onChange:e=>sv(e.target.value.replace(/[^\d.]/g,"")),onBlur:commit,onKeyDown:e=>{if(e.key==="Enter")e.target.blur()},style:{width:width||96,background:c.sf2,border:`1px solid ${accent?c.ac:c.brs}`,borderRadius:9,padding:"8px 10px",color:c.tx,fontSize:13,fontFamily:F.mo,textAlign:"right",outline:"none"}})]})}
+function AdvancedStats({data,persist,onClose,onTx}){
+  const cur=data.currency||"₹";
+  const exps=data.expenses||[];
+  const now=new Date();const nowTs=Date.now();
+  const AS=data.advStats||{};
+  const inflationPct=AS.inflationPct??8;
+  const autoTags=AS.autoTags||[];
+  const catPlan=AS.catPlan||{};
+  const periods=AS.periods||{};
+  const saveAS=(patch)=>persist({advStats:{inflationPct,autoTags,catPlan,periods,...AS,...patch}});
+  const[basis,sBasis]=useState("FY");
+  const curFy=now.getMonth()>=AS_FY_START?now.getFullYear():now.getFullYear()-1;
+  const[fyA,sFyA]=useState(curFy);
+  const[cyY,sCyY]=useState(now.getFullYear());
+  const anchor=basis==="FY"?fyA:cyY;
+  const[ps,pe]=basis==="FY"?asFyBounds(fyA):asCyBounds(cyY);
+  const pKey=basis+":"+anchor;
+  const pdata=periods[pKey]||{manualItems:[],deductions:[]};
+  const savePeriod=(patch)=>saveAS({periods:{...periods,[pKey]:{manualItems:pdata.manualItems||[],deductions:pdata.deductions||[],...patch}}});
+  const label=basis==="FY"?("FY "+fyA+"–"+String(fyA+1).slice(-2)):String(cyY);
+  const subLabel=basis==="FY"?("Apr "+fyA+" – Mar "+(fyA+1)):("Jan – Dec "+cyY);
+  const step=(d)=>{if(basis==="FY")sFyA(y=>y+d);else sCyY(y=>y+d);};
+  const isCurrent=ps<=nowTs&&nowTs<pe;const isFuture=ps>nowTs;
+  const effEnd=Math.min(pe,nowTs);const monthsElapsed=Math.max(1,Math.min(12,Math.round((effEnd-ps)/AS_MONTH_MS)));
+  const inPeriod=useMemo(()=>exps.filter(e=>e.date>=ps&&e.date<pe),[exps,ps,pe]);
+  const spendTxns=inPeriod.filter(e=>e.type==="expense");
+  const incomeTxns=inPeriod.filter(e=>e.type==="income");
+  const totalSpend=spendTxns.reduce((s,e)=>s+netAmt(e),0);
+  const savingsDep=incomeTxns.filter(e=>e.category==="savings_deposit").reduce((s,e)=>s+e.amount,0);
+  const txIncome=incomeTxns.filter(e=>e.category!=="savings_deposit").reduce((s,e)=>s+e.amount,0);
+  const mi=pdata.manualItems||[];
+  const miSum=(k)=>mi.filter(x=>x.kind===k).reduce((s,x)=>s+(+x.value||0),0);
+  const grossIncome=txIncome+miSum("income");
+  const grossExpense=totalSpend+miSum("expense");
+  const netSavings=grossIncome-grossExpense;
+  const savingsRate=grossIncome>0?(netSavings/grossIncome)*100:0;
+  const investTotal=savingsDep+miSum("savings");
+  const heads=AS_ITR_HEADS.map(h=>{const items=incomeTxns.filter(e=>h.cats.includes(e.category));const total=items.reduce((s,e)=>s+e.amount,0);return{...h,total,count:items.length,items};});
+  const headTotal=heads.reduce((s,h)=>s+h.total,0);
+  const byCat={};for(const e of spendTxns)byCat[e.category]=(byCat[e.category]||0)+netAmt(e);
+  const catRows=Object.entries(byCat).map(([cid,amt])=>{const annualized=Math.round(amt/monthsElapsed*12);const projBase=Math.round(annualized*(1+inflationPct/100));const plan=catPlan[cid]!=null?catPlan[cid]:projBase;return{cid,amt,annualized,projBase,plan,...co(cid)};}).sort((a,b)=>b.amt-a.amt);
+  const totalPlan=catRows.reduce((s,r)=>s+r.plan,0);
+  const annualizedSpend=Math.round(totalSpend/monthsElapsed*12);
+  const deds=pdata.deductions||[];
+  const dedTotal=deds.reduce((s,d)=>s+(+d.amount||0),0);
+  const tagAgg=autoTags.map(tg=>{const kw=(tg.keyword||"").toLowerCase();const ms=kw?inPeriod.filter(e=>{if(tg.kind==="income"&&e.type!=="income")return false;if(tg.kind==="expense"&&e.type!=="expense")return false;const hay=((e.merchant||"")+" "+(e.payee||"")+" "+(e.note||"")+" "+co(e.category).label).toLowerCase();return hay.includes(kw);}):[];const total=ms.reduce((s,e)=>s+(e.type==="expense"?netAmt(e):e.amount),0);return{...tg,total,count:ms.length,items:ms};});
+  const[miL,sMiL]=useState("");const[miV,sMiV]=useState("");const[miK,sMiK]=useState("expense");
+  const[tgL,sTgL]=useState("");const[tgKw,sTgKw]=useState("");const[tgK,sTgK]=useState("expense");
+  const[dedL,sDedL]=useState("");const[dedLim,sDedLim]=useState("");
+  const[copied,sCopied]=useState(false);
+  const[showTagTx,sShowTagTx]=useState(null);
+  const addMi=()=>{if(!miL.trim()&&!miV)return;savePeriod({manualItems:[...mi,{id:uid(),label:miL.trim()||"Item",value:Math.round(parseFloat(miV)||0),kind:miK}]});sMiL("");sMiV("");};
+  const updMi=(id,patch)=>savePeriod({manualItems:mi.map(x=>x.id===id?{...x,...patch}:x)});
+  const delMi=(id)=>savePeriod({manualItems:mi.filter(x=>x.id!==id)});
+  const addTag=()=>{if(!tgL.trim()||!tgKw.trim())return;saveAS({autoTags:[...autoTags,{id:uid(),label:tgL.trim(),keyword:tgKw.trim(),kind:tgK}]});sTgL("");sTgKw("");};
+  const delTag=(id)=>saveAS({autoTags:autoTags.filter(x=>x.id!==id)});
+  const addDedPreset=(p)=>{if(deds.some(d=>d.section===p.section&&d.label===p.label))return;savePeriod({deductions:[...deds,{id:uid(),section:p.section,label:p.label,limit:p.limit,amount:0}]});};
+  const addDedCustom=()=>{if(!dedL.trim())return;savePeriod({deductions:[...deds,{id:uid(),section:"Other",label:dedL.trim(),limit:Math.round(parseFloat(dedLim)||0),amount:0}]});sDedL("");sDedLim("");};
+  const updDed=(id,patch)=>savePeriod({deductions:deds.map(x=>x.id===id?{...x,...patch}:x)});
+  const delDed=(id)=>savePeriod({deductions:deds.filter(x=>x.id!==id)});
+  const updCatPlan=(cid,val)=>saveAS({catPlan:{...catPlan,[cid]:val==null?undefined:val}});
+  const copySummary=()=>{const L=[];L.push(label+" — Income & tax summary ("+cur+")");L.push("");heads.forEach(h=>{if(h.total>0)L.push(h.label+": "+Math.round(h.total).toLocaleString("en-IN"));});L.push("Total income: "+Math.round(headTotal).toLocaleString("en-IN"));if(deds.length){L.push("");L.push("Deductions:");deds.forEach(d=>L.push(d.section+" — "+d.label+": "+Math.round(d.amount||0).toLocaleString("en-IN")));L.push("Total deductions: "+Math.round(dedTotal).toLocaleString("en-IN"));}L.push("");L.push("Total spending: "+Math.round(grossExpense).toLocaleString("en-IN"));L.push("Net savings: "+Math.round(netSavings).toLocaleString("en-IN")+" ("+savingsRate.toFixed(0)+"%)");const txt=L.join("\n");try{navigator.clipboard.writeText(txt);sCopied(true);setTimeout(()=>sCopied(false),1800);}catch(e){}};
+  const tile=(lbl,val,col,sub)=>o("div",{style:{background:c.sf2,borderRadius:14,border:`1px solid ${c.brs}`,padding:"13px 14px"},children:[t("div",{style:{fontFamily:F.mo,fontSize:9,letterSpacing:1,color:c.tm},children:lbl}),t("div",{style:{fontFamily:'var(--nf)',fontSize:22,fontWeight:400,letterSpacing:-.5,color:col||c.tx,marginTop:4,lineHeight:1.1},children:val}),sub&&t("div",{style:{fontSize:10.5,color:c.tm,marginTop:3},children:sub})]});
+  const secHead=(txt,extra)=>o("div",{className:"f ib jb",style:{marginBottom:12},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:txt}),extra||null]});
+  return o("div",{style:{padding:"8px 24px 32px"},children:[
+    t(SH,{title:t("em",{children:"Advanced"}),onBack:onClose,right:t("div",{style:{width:38}})}),
+    o("div",{style:{marginTop:4},children:[t("div",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1.5,color:c.gd},children:"HNI · PREMIUM STATISTICS"}),o("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:30,lineHeight:1.1,marginTop:2},children:["the ",t("span",{style:{color:c.gd},children:"big"})," picture"]}),t("div",{style:{fontSize:12.5,color:c.tm,marginTop:6,lineHeight:1.5},children:"A broad, manually-controllable view for ITR filing and planning next year — calendar year and financial year, side by side."})]}),
+    // basis + year controls
+    o("div",{style:{marginTop:18,background:c.sfg,borderRadius:16,border:`1px solid ${c.brs}`,padding:14},children:[
+      t("div",{className:"f",style:{gap:4,padding:4,background:c.sf2,borderRadius:12,border:`1px solid ${c.brs}`},children:[["FY","CY"].map(b=>{const on=basis===b;return t("button",{key:b,onClick:()=>sBasis(b),className:"f1 tr",style:{padding:"9px 0",background:on?c.ac:"transparent",color:on?"#0a0a0a":c.td,borderRadius:9,fontSize:12.5,fontWeight:on?700:500,border:"none"},children:b==="FY"?"Financial Year":"Calendar Year"})})]}),
+      o("div",{className:"f ia jb",style:{marginTop:12,gap:10},children:[
+        t("button",{onClick:()=>step(-1),className:"act95 trt",style:{width:40,height:40,borderRadius:11,background:c.sf2,border:`1px solid ${c.brs}`,color:c.tx,fontSize:18,flexShrink:0},children:"‹"}),
+        o("div",{className:"tc f1",style:{textAlign:"center"},children:[t("div",{style:{fontFamily:c.hf,fontSize:22,fontWeight:700,color:c.tx},children:label}),t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:.5,marginTop:1},children:subLabel+(isCurrent?" · IN PROGRESS":isFuture?" · UPCOMING":" · COMPLETE")})]}),
+        t("button",{onClick:()=>step(1),className:"act95 trt",style:{width:40,height:40,borderRadius:11,background:c.sf2,border:`1px solid ${c.brs}`,color:c.tx,fontSize:18,flexShrink:0},children:"›"}),
+      ]}),
+    ]}),
+    // OVERVIEW
+    o("div",{style:{marginTop:16,background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18},children:[
+      secHead("BROAD OVERVIEW",t(Pl,{col:c.gd,children:label})),
+      o("div",{className:"g g2",style:{gap:8},children:[
+        tile("TOTAL INCOME",fs(grossIncome,cur),c.mt,miSum("income")>0?("incl. "+fs(miSum("income"),cur)+" manual"):(txIncome>0?"taxable sources":"—")),
+        tile("TOTAL SPENDING",fs(grossExpense,cur),c.co,isCurrent?("~"+fs(annualizedSpend,cur)+" annualized"):"card bills excluded"),
+        tile("NET SAVINGS",fs(netSavings,cur),netSavings>=0?c.mt:c.co,"income − spending"),
+        tile("SAVINGS RATE",savingsRate.toFixed(0)+"%",savingsRate>=20?c.mt:c.gd,"of income kept"),
+      ]}),
+      investTotal>0&&o("div",{className:"f ia jb",style:{marginTop:10,padding:"11px 14px",background:c.sf2,borderRadius:12,border:`1px solid ${c.brs}`},children:[o("div",{className:"f ia",style:{gap:8},children:[t("span",{style:{fontSize:15},children:"🐖"}),t("span",{style:{fontSize:12.5,color:c.td},children:"Invested / saved (SIP, FD, PPF…)"})]}),t("span",{style:{fontFamily:F.mo,fontSize:13,fontWeight:600,color:c.mt},children:fm(investTotal,cur)})]}),
+    ]}),
+    // ITR INCOME HEADS
+    o("div",{style:{marginTop:16,background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18},children:[
+      secHead("INCOME BY TAX HEAD",t("button",{onClick:copySummary,className:"act95 trt",style:{fontFamily:F.mo,fontSize:10,fontWeight:600,letterSpacing:.5,color:copied?"#0a0a0a":c.gd,background:copied?c.gd:c.gd+"1a",border:`1px solid ${c.gd}55`,borderRadius:8,padding:"6px 10px"},children:copied?"✓ COPIED":"COPY FOR ITR"})),
+      headTotal===0?t("div",{style:{padding:"20px 0",textAlign:"center",color:c.tm,fontSize:13},children:"No income recorded in this period."}):o(Fragment,{children:[
+        ...heads.filter(h=>h.total>0).map(h=>o("div",{key:h.id,style:{padding:"11px 0",borderBottom:`1px solid ${c.brs}`},children:[
+          o("div",{className:"f ia jb",style:{gap:10},children:[o("div",{className:"f ia",style:{gap:9},children:[t("span",{style:{fontSize:16},children:h.emoji}),o("div",{children:[t("div",{style:{fontSize:13.5,fontWeight:600,color:c.tx},children:h.label}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:h.count+" "+(h.count===1?"entry":"entries")})]})]}),t("span",{style:{fontFamily:F.mo,fontSize:14,fontWeight:600,color:c.tx},children:fm(h.total,cur)})]}),
+          t("div",{style:{fontSize:10.5,color:c.tm,marginTop:6,lineHeight:1.4},children:h.note}),
+        ]})),
+        o("div",{className:"f ia jb",style:{marginTop:12,paddingTop:12,borderTop:`2px solid ${c.brs}`},children:[t("span",{style:{fontSize:13,fontWeight:700,color:c.tx},children:"Gross total income"}),t("span",{style:{fontFamily:F.mo,fontSize:15,fontWeight:700,color:c.gd},children:fm(headTotal,cur)})]}),
+        t("div",{style:{fontSize:10.5,color:c.tm,marginTop:10,lineHeight:1.5,fontStyle:"italic"},children:"Figures are from your logged transactions — a planning aid, not tax advice. Reconcile with Form 16 / AIS / broker statements before filing."}),
+      ]}),
+    ]}),
+    // EXPENSE PLANNING
+    o("div",{style:{marginTop:16,background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18},children:[
+      secHead("EXPENSE PLANNING — NEXT YEAR",t(Pl,{col:c.ac,children:"EDITABLE"})),
+      o("div",{className:"f ia jb",style:{marginBottom:12,padding:"10px 14px",background:c.sf2,borderRadius:12,border:`1px solid ${c.brs}`,gap:10},children:[o("div",{children:[t("div",{style:{fontSize:12.5,color:c.td,fontWeight:600},children:"Inflation / buffer"}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:"Applied to annualized spend as the default plan"})]}),t(ASNum,{value:inflationPct,onSave:v=>saveAS({inflationPct:v==null?0:v}),prefix:"+",width:64,accent:true})]}),
+      catRows.length===0?t("div",{style:{padding:"18px 0",textAlign:"center",color:c.tm,fontSize:13},children:"No spending recorded in this period yet."}):o(Fragment,{children:[
+        o("div",{className:"f ia jb",style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:.5,padding:"0 2px 8px"},children:[t("span",{children:"CATEGORY"}),o("div",{className:"f ia",style:{gap:24},children:[t("span",{children:"THIS YR"}),t("span",{style:{width:96,textAlign:"right"},children:"PLAN NEXT YR"})]})]}),
+        ...catRows.map(r=>o("div",{key:r.cid,className:"f ia jb",style:{gap:10,padding:"9px 0",borderBottom:`1px solid ${c.brs}`},children:[
+          o("div",{className:"f ia minw0",style:{gap:9},children:[t("span",{style:{fontSize:15,flexShrink:0},children:r.emoji}),o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:13,fontWeight:500,color:c.tx},children:r.label}),t("div",{style:{fontSize:10,color:c.tm,fontFamily:F.mo,marginTop:1},children:"~"+fs(r.annualized,cur)+"/yr run-rate"})]})]}),
+          o("div",{className:"f ia",style:{gap:16,flexShrink:0},children:[t("span",{style:{fontFamily:F.mo,fontSize:12,color:c.td,width:64,textAlign:"right"},children:fs(r.amt,cur)}),t(ASNum,{value:r.plan,onSave:v=>updCatPlan(r.cid,v),prefix:cur,width:96})]}),
+        ]})),
+        o("div",{className:"f ia jb",style:{marginTop:12,paddingTop:12,borderTop:`2px solid ${c.brs}`},children:[o("div",{children:[t("div",{style:{fontSize:13,fontWeight:700,color:c.tx},children:"Planned budget · next year"}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:"≈ "+fm(totalPlan/12,cur)+" / month"})]}),t("span",{style:{fontFamily:F.mo,fontSize:16,fontWeight:700,color:c.ac},children:fm(totalPlan,cur)})]}),
+        t("div",{style:{fontSize:10.5,color:c.tm,marginTop:10,lineHeight:1.5},children:"Each plan defaults to this year's run-rate + your buffer. Type any value to override — it's saved per category."}),
+      ]}),
+    ]}),
+    // DEDUCTIONS
+    o("div",{style:{marginTop:16,background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18},children:[
+      secHead("DEDUCTIONS TRACKER",t("span",{style:{fontFamily:F.mo,fontSize:12,fontWeight:600,color:c.mt},children:fm(dedTotal,cur)})),
+      t("div",{style:{fontSize:11.5,color:c.tm,marginBottom:12,lineHeight:1.5},children:"Manually track deductible spends toward their limits for "+label+". Add a section, then type the amount you've committed."}),
+      deds.length>0&&o("div",{style:{marginBottom:12},children:deds.map(d=>{const pct=d.limit>0?Math.min(100,(( +d.amount||0)/d.limit)*100):0;return o("div",{key:d.id,style:{padding:"11px 0",borderBottom:`1px solid ${c.brs}`},children:[
+        o("div",{className:"f ia jb",style:{gap:10},children:[o("div",{className:"f ia minw0",style:{gap:8},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,fontWeight:700,color:c.gd,background:c.gd+"1a",borderRadius:6,padding:"3px 6px",flexShrink:0},children:d.section}),t("div",{className:"tru",style:{fontSize:12.5,color:c.tx},children:d.label})]}),o("div",{className:"f ia",style:{gap:8,flexShrink:0},children:[t(ASNum,{value:d.amount,onSave:v=>updDed(d.id,{amount:v==null?0:v}),prefix:cur,width:92}),t("button",{onClick:()=>delDed(d.id),className:"act90 trt",style:{background:"transparent",border:"none",color:c.tm,fontSize:16,padding:2},children:"×"})]})]}),
+        d.limit>0&&o("div",{style:{marginTop:8},children:[t("div",{style:{height:6,background:c.sf2,borderRadius:999,overflow:"hidden"},children:t("div",{style:{width:pct+"%",height:"100%",background:pct>=100?c.mt:c.gd,borderRadius:999,transition:"width .3s"}})}),t("div",{className:"f jb",style:{marginTop:4,fontFamily:F.mo,fontSize:9.5,color:c.tm},children:[t("span",{children:pct.toFixed(0)+"% of limit"}),t("span",{children:"limit "+fs(d.limit,cur)})]})]}),
+      ]})})}),
+      t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:8},children:"QUICK ADD SECTION"}),
+      t("div",{className:"f fw",style:{gap:6,marginBottom:12},children:AS_DED_PRESETS.map(p=>{const used=deds.some(d=>d.section===p.section&&d.label===p.label);return t("button",{key:p.section+p.label,disabled:used,onClick:()=>addDedPreset(p),className:"act95 trt",style:{padding:"7px 11px",background:used?c.sf:c.sf2,border:`1px solid ${used?c.brs:c.ac}44`,borderRadius:999,fontSize:11.5,color:used?c.tm:c.td,opacity:used?.55:1},children:(used?"✓ ":"+ ")+p.section})})}),
+      o("div",{className:"f ia",style:{gap:8},children:[t("input",{value:dedL,onChange:e=>sDedL(e.target.value),placeholder:"Custom deduction…",style:{flex:1,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px",color:c.tx,fontSize:13,outline:"none",fontFamily:'var(--tf)'}}),t("input",{value:dedLim,inputMode:"decimal",onChange:e=>sDedLim(e.target.value.replace(/[^\d.]/g,"")),placeholder:"Limit",style:{width:80,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px",color:c.tx,fontSize:13,outline:"none",fontFamily:F.mo}}),t("button",{onClick:addDedCustom,className:"act95 trt",style:{padding:"10px 14px",background:c.ac,color:"#0a0a0a",borderRadius:10,fontSize:13,fontWeight:600,border:"none"},children:"Add"})]}),
+    ]}),
+    // CUSTOM MANUAL LINE-ITEMS (variable fields)
+    o("div",{style:{marginTop:16,background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18},children:[
+      secHead("CUSTOM FIELDS — MANUAL",t(Pl,{col:c.lv,children:label})),
+      t("div",{style:{fontSize:11.5,color:c.tm,marginBottom:12,lineHeight:1.5},children:"Add your own variable line-items (e.g. advance tax paid, rental TDS, one-off bonus). Income & expense items adjust the totals above."}),
+      mi.length>0&&o("div",{style:{marginBottom:12},children:mi.map(x=>{const kc=x.kind==="income"?c.mt:x.kind==="expense"?c.co:x.kind==="savings"?c.sk:c.tm;return o("div",{key:x.id,className:"f ia jb",style:{gap:10,padding:"10px 0",borderBottom:`1px solid ${c.brs}`},children:[o("div",{className:"f ia minw0",style:{gap:8},children:[t("span",{style:{fontFamily:F.mo,fontSize:9,fontWeight:700,letterSpacing:.5,color:kc,background:kc+"1a",borderRadius:6,padding:"3px 6px",flexShrink:0,textTransform:"uppercase"},children:x.kind}),t("div",{className:"tru",style:{fontSize:13,color:c.tx},children:x.label})]}),o("div",{className:"f ia",style:{gap:8,flexShrink:0},children:[t(ASNum,{value:x.value,onSave:v=>updMi(x.id,{value:v==null?0:v}),prefix:cur,width:96}),t("button",{onClick:()=>delMi(x.id),className:"act90 trt",style:{background:"transparent",border:"none",color:c.tm,fontSize:16,padding:2},children:"×"})]})]})})}),
+      t("div",{className:"f",style:{gap:4,padding:4,marginBottom:8,background:c.sf2,borderRadius:11,border:`1px solid ${c.brs}`},children:[["income","expense","savings","note"].map(k=>{const on=miK===k;return t("button",{key:k,onClick:()=>sMiK(k),className:"f1 tr",style:{padding:"7px 0",background:on?c.ac:"transparent",color:on?"#0a0a0a":c.td,borderRadius:8,fontSize:11,fontWeight:on?700:400,border:"none",textTransform:"capitalize"},children:k})})]}),
+      o("div",{className:"f ia",style:{gap:8},children:[t("input",{value:miL,onChange:e=>sMiL(e.target.value),placeholder:"Label (e.g. Advance tax paid)",style:{flex:1,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px",color:c.tx,fontSize:13,outline:"none",fontFamily:'var(--tf)'}}),t("input",{value:miV,inputMode:"decimal",onChange:e=>sMiV(e.target.value.replace(/[^\d.]/g,"")),placeholder:"Amount",style:{width:88,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px",color:c.tx,fontSize:13,outline:"none",fontFamily:F.mo}}),t("button",{onClick:addMi,className:"act95 trt",style:{padding:"10px 14px",background:c.ac,color:"#0a0a0a",borderRadius:10,fontSize:13,fontWeight:600,border:"none"},children:"Add"})]}),
+    ]}),
+    // CUSTOM AUTO-TAGS (transaction roll-ups)
+    o("div",{style:{marginTop:16,background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18},children:[
+      secHead("CUSTOM FIELDS — AUTO-TAGS",t(Pl,{col:c.sk,children:"FROM TXNS"})),
+      t("div",{style:{fontSize:11.5,color:c.tm,marginBottom:12,lineHeight:1.5},children:"Define a keyword tag and it automatically totals every matching transaction (by merchant, note or category) for the selected period."}),
+      tagAgg.length>0&&o("div",{style:{marginBottom:12},children:tagAgg.map(tg=>o("div",{key:tg.id,style:{padding:"10px 0",borderBottom:`1px solid ${c.brs}`},children:[
+        o("div",{className:"f ia jb",style:{gap:10},children:[o("button",{onClick:()=>sShowTagTx(showTagTx===tg.id?null:tg.id),className:"f1 minw0 tl act99 trt",style:{background:"transparent",border:"none",color:"inherit"},children:[o("div",{className:"f ia",style:{gap:8},children:[t("span",{style:{fontFamily:F.mo,fontSize:9,fontWeight:700,letterSpacing:.5,color:c.sk,background:c.sk+"1a",borderRadius:6,padding:"3px 6px"},children:"#"+(tg.kind||"all")}),t("span",{style:{fontSize:13,fontWeight:600,color:c.tx},children:tg.label})]}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:3},children:'matches "'+tg.keyword+'" · '+tg.count+" txn"+(tg.count===1?"":"s")})]}),o("div",{className:"f ia",style:{gap:8,flexShrink:0},children:[t("span",{style:{fontFamily:F.mo,fontSize:14,fontWeight:600,color:c.tx},children:fm(tg.total,cur)}),t("button",{onClick:()=>delTag(tg.id),className:"act90 trt",style:{background:"transparent",border:"none",color:c.tm,fontSize:16,padding:2},children:"×"})]})]}),
+        showTagTx===tg.id&&tg.items.length>0&&o("div",{style:{marginTop:8,background:c.sf2,borderRadius:10,overflow:"hidden"},children:tg.items.slice(0,12).map((e,i)=>o("button",{key:e.id,onClick:()=>onTx&&onTx(e),className:"w100 f ia jb act98 trt",style:{gap:10,padding:"8px 12px",background:"transparent",border:"none",borderBottom:i<Math.min(12,tg.items.length)-1?`1px solid ${c.brs}`:"none",color:"inherit",textAlign:"left"},children:[t("span",{className:"tru",style:{fontSize:12,color:c.td},children:e.merchant||e.payee||co(e.category).label}),t("span",{style:{fontFamily:F.mo,fontSize:11.5,color:e.type==="income"?c.mt:c.td,flexShrink:0},children:(e.type==="income"?"+":"−")+fs(e.type==="expense"?netAmt(e):e.amount,cur)})]}))}),
+      ]}))}),
+      t("div",{className:"f",style:{gap:4,padding:4,marginBottom:8,background:c.sf2,borderRadius:11,border:`1px solid ${c.brs}`},children:[["expense","income","all"].map(k=>{const on=tgK===k;return t("button",{key:k,onClick:()=>sTgK(k),className:"f1 tr",style:{padding:"7px 0",background:on?c.ac:"transparent",color:on?"#0a0a0a":c.td,borderRadius:8,fontSize:11,fontWeight:on?700:400,border:"none",textTransform:"capitalize"},children:k})})]}),
+      o("div",{className:"f ia",style:{gap:8},children:[t("input",{value:tgL,onChange:e=>sTgL(e.target.value),placeholder:"Tag name",style:{flex:1,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px",color:c.tx,fontSize:13,outline:"none",fontFamily:'var(--tf)'}}),t("input",{value:tgKw,onChange:e=>sTgKw(e.target.value),placeholder:"keyword",style:{flex:1,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px",color:c.tx,fontSize:13,outline:"none",fontFamily:'var(--tf)'}}),t("button",{onClick:addTag,className:"act95 trt",style:{padding:"10px 14px",background:c.ac,color:"#0a0a0a",borderRadius:10,fontSize:13,fontWeight:600,border:"none"},children:"Add"})]}),
+    ]}),
+    t("div",{style:{marginTop:20,textAlign:"center",fontSize:10.5,color:c.tm,lineHeight:1.5,fontStyle:"italic"},children:"Everything here is manual & editable. Not tax advice — a personal planning aid to complement your ITR and next-year budget."}),
+  ]});
+}
 
 // === AI CHAT (simplified) ===
 function Chat({data,onAddExpense,onView,onClose}){
