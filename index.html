@@ -3663,11 +3663,11 @@ function MonthTools({data,yr,mo,onTx,onFlt}){
     ]})
   ]});
 }
-function Calend({data,onTx,onFlt,presetAdd}){const{expenses,currency}=data;const[yr,sYr]=useState(()=>_calState.yr??new Date().getFullYear()),[mo,sMo]=useState(()=>_calState.mo??new Date().getMonth()),[sel,sSel]=useState(()=>_calState.sel||new Date().toDateString());const[cf,sCf]=useState(()=>_calState.cf||"all");const[cSub,sCSub]=useState(()=>_calState.cSub??null);
+function Calend({data,onTx,onFlt,presetAdd}){const{expenses,currency}=data;const[yr,sYr]=useState(()=>_calState.yr??new Date().getFullYear()),[mo,sMo]=useState(()=>_calState.mo??new Date().getMonth()),[sel,sSel]=useState(()=>_calState.sel||new Date().toDateString());const[cf,sCf]=useState(()=>_calState.cf||"all");const[cSub,sCSub]=useState(()=>_calState.cSub??null);const[gnOpen,sGnOpen]=useState(false);
   useEffect(()=>{_calState={yr,mo,sel,cf,cSub}},[yr,mo,sel,cf,cSub]);
   const days=useMemo(()=>{const fd=new Date(yr,mo,1).getDay(),la=new Date(yr,mo+1,0).getDate(),x=[];for(let i=fd-1;i>=0;i--)x.push({date:new Date(yr,mo,-i),other:true});for(let d=1;d<=la;d++)x.push({date:new Date(yr,mo,d),other:false});while(x.length<42){const l=x[x.length-1].date,n=new Date(l);n.setDate(l.getDate()+1);x.push({date:n,other:true})}return x},[yr,mo]);
   const byD=useMemo(()=>{const pairs=txPairs(expenses);const m={};for(const e of expenses){if(e.type==="transfer-in")continue;const k=new Date(e.date).toDateString();if(!m[k])m[k]={total:0,income:0,items:[]};if(e.type==="expense"||e.type==="card-payment")m[k].total+=netAmt(e);else if(e.type==="income")m[k].income+=e.amount;m[k].items.push(enrichTx(e,pairs))}return m},[expenses]);
-  const fByD=useMemo(()=>{if(cf==="all")return byD;const fn=cf==="income"?e=>e.type==="income":cf==="expense"?e=>e.type==="expense":cf==="cards"?(cSub?e=>e.cardId===cSub:e=>!!e.cardId):cf==="reimbursable"?(cSub==="pending"?e=>!!(e.reimbursable)&&!e.reimbursedBy&&e.type==="expense":cSub==="done"?e=>!!(e.reimbursable)&&!!e.reimbursedBy&&e.type==="expense":e=>!!(e.reimbursable)&&e.type==="expense"):cf==="cardpay"?e=>e.type==="card-payment":(cSub?e=>e.accountId===cSub&&e.type==="expense"&&!e.cardId:e=>e.type==="expense"&&!e.cardId);const m={};for(const[k,v]of Object.entries(byD)){const fi=v.items.filter(fn);if(fi.length>0){const ft=fi.filter(e=>e.type==="expense"||e.type==="card-payment").reduce((s,e)=>s+netAmt(e),0),fin=fi.filter(e=>e.type==="income").reduce((s,e)=>s+e.amount,0);m[k]={total:ft,income:fin,items:fi}}}return m},[byD,cf,cSub]);
+  const fByD=useMemo(()=>{if(cf==="all")return byD;const fn=cf==="income"?e=>e.type==="income":cf==="expense"?e=>e.type==="expense":cf==="cards"?(cSub?e=>e.cardId===cSub&&e.type!=="card-payment":e=>!!e.cardId&&e.type!=="card-payment"):cf==="reimbursable"?(cSub==="pending"?e=>!!(e.reimbursable)&&!e.reimbursedBy&&e.type==="expense":cSub==="done"?e=>!!(e.reimbursable)&&!!e.reimbursedBy&&e.type==="expense":e=>!!(e.reimbursable)&&e.type==="expense"):cf==="cardpay"?e=>e.type==="card-payment":(cSub?e=>e.accountId===cSub&&e.type==="expense"&&!e.cardId:e=>e.type==="expense"&&!e.cardId);const m={};for(const[k,v]of Object.entries(byD)){const fi=v.items.filter(fn);if(fi.length>0){const ft=fi.filter(e=>e.type==="expense"||e.type==="card-payment").reduce((s,e)=>s+netAmt(e),0),fin=fi.filter(e=>e.type==="income").reduce((s,e)=>s+e.amount,0);m[k]={total:ft,income:fin,items:fi}}}return m},[byD,cf,cSub]);
   const mst=useMemo(()=>{let to=0,ic=0,co2=0,mx=0;for(const cl of days){if(cl.other)continue;const x=fByD[cl.date.toDateString()];if(x){to+=x.total;ic+=x.income;co2+=x.items.length;if(x.total>mx)mx=x.total}}return{total:to,income:ic,max:mx,count:co2}},[days,fByD]);
   // Gross vs Net expense for the visible month (shown only on the "All" filter).
   // Gross = every outflow, INCLUDING credit-card bill payments. Net strips two
@@ -3684,23 +3684,22 @@ return o("div",{style:{padding:"8px 24px 48px"},className:"st",children:[
     o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1.2},children:"MONTH TOTAL · "+filterLabel.toUpperCase()}),t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,marginTop:3},children:mst.count+" txn"+(mst.count===1?"":"s")})]}),
     o("div",{className:"trg",style:{flexShrink:0},children:[mst.total>0&&t("div",{style:{fontFamily:F.mo,fontSize:15,fontWeight:600,color:c.co},children:"−"+fm(mst.total,currency)}),mst.income>0&&t("div",{style:{fontFamily:F.mo,fontSize:15,fontWeight:600,color:c.mt,marginTop:mst.total>0?2:0},children:"+"+fm(mst.income,currency)}),mst.total===0&&mst.income===0&&t("div",{style:{fontFamily:F.mo,fontSize:15,color:c.tm},children:fm(0,currency)})]})
   ]})}),
-  cf==="all"&&(gn.gross>0||gn.net>0)&&o("div",{style:{marginTop:8},children:[
-    o("div",{className:"f",style:{gap:8},children:[
-      o("div",{className:"f1",style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"10px 12px"},children:[
-        t("div",{className:"tru",style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1},children:"GROSS EXPENSE"}),
-        t("div",{style:{fontFamily:F.mo,fontSize:15,fontWeight:600,color:c.tx,marginTop:3},children:fm(gn.gross,currency)}),
+  cf==="all"&&(gn.gross>0||gn.net>0)&&(()=>{
+    const hasBreak=gn.ccbill>0||gn.reimb>0;
+    const row=(lbl,val,col)=>o("div",{className:"f ia jb",children:[t("span",{style:{fontFamily:F.mo,fontSize:10.5,color:c.tm,letterSpacing:.4},children:lbl}),t("span",{style:{fontFamily:F.mo,fontSize:12.5,fontWeight:600,color:col},children:val})]});
+    return o("div",{style:{marginTop:8},children:t("button",{onClick:()=>{if(hasBreak)sGnOpen(v=>!v)},className:"w100 tl act95",style:{display:"block",background:`linear-gradient(135deg,${c.mt}14,${c.sfg})`,border:`1px solid ${c.mt}44`,borderRadius:14,padding:"12px 14px",cursor:hasBreak?"pointer":"default"},children:o("div",{children:[
+      o("div",{className:"f ia jb",children:[
+        t("div",{className:"tru",style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1.2},children:"NET EXPENSE"}),
+        hasBreak&&o("div",{className:"f ia",style:{gap:4,fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:.5},children:[gnOpen?"HIDE":"DETAILS",t("span",{style:{fontSize:11,display:"inline-block",transform:gnOpen?"rotate(180deg)":"none",transition:"transform .2s"},children:"▾"})]}),
       ]}),
-      o("div",{className:"f1",style:{background:`linear-gradient(135deg,${c.mt}14,${c.sfg})`,border:`1px solid ${c.mt}44`,borderRadius:12,padding:"10px 12px"},children:[
-        t("div",{className:"tru",style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1},children:"NET EXPENSE"}),
-        t("div",{style:{fontFamily:F.mo,fontSize:15,fontWeight:600,color:c.mt,marginTop:3},children:fm(gn.net,currency)}),
+      t("div",{style:{fontFamily:F.mo,fontSize:24,fontWeight:700,color:c.mt,marginTop:4,lineHeight:1.1},children:fm(gn.net,currency)}),
+      gnOpen&&hasBreak&&o("div",{style:{marginTop:12,paddingTop:12,borderTop:`1px solid ${c.brs}`,display:"flex",flexDirection:"column",gap:8},children:[
+        row("Gross expense",fm(gn.gross,currency),c.tx),
+        gn.ccbill>0&&row("💳 − Card bill pay","−"+fm(gn.ccbill,currency),c.co),
+        gn.reimb>0&&row("↩️ − Reimbursed","−"+fm(gn.reimb,currency),c.co),
       ]}),
-    ]}),
-    // Breakdown of what sits between Gross and Net.
-    o("div",{className:"f",style:{gap:8,marginTop:8},children:[
-      o("div",{className:"f1 f ia jb",style:{background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"8px 11px",gap:8},children:[t("span",{style:{fontFamily:F.mo,fontSize:9.5,color:c.tm,letterSpacing:.5},children:"💳 Card bill pay"}),t("span",{style:{fontFamily:F.mo,fontSize:12.5,fontWeight:600,color:gn.ccbill>0?c.co:c.td},children:(gn.ccbill>0?"−":"")+fm(gn.ccbill,currency)})]}),
-      o("div",{className:"f1 f ia jb",style:{background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"8px 11px",gap:8},children:[t("span",{style:{fontFamily:F.mo,fontSize:9.5,color:c.tm,letterSpacing:.5},children:"↩️ Reimbursed"}),t("span",{style:{fontFamily:F.mo,fontSize:12.5,fontWeight:600,color:gn.reimb>0?c.co:c.td},children:(gn.reimb>0?"−":"")+fm(gn.reimb,currency)})]}),
-    ]}),
-  ]}),
+    ]})})});
+  })(),
   t(MonthTools,{data,yr,mo,onTx,onFlt}),
   o("div",{className:"f ia jb",style:{marginTop:20},children:[
     t(IB,{onClick:()=>{if(mo===0){sMo(11);sYr(yr-1)}else sMo(mo-1)},children:t(CL,{size:18,color:c.tx})}),
