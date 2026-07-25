@@ -2920,14 +2920,14 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
     }
     try{await worker.terminate()}catch(e2){}
     if(!all.length){sCsvPhotoErr(firstErr||"Couldn't find any date+amount rows in the photo(s) — try a clearer or closer photo, or fall back to Paste CSV by hand.");sCsvPhotoBusy(false);sCsvPhotoProgress(null);return}
-    const seen=new Set();const deduped=[];let dupCount=0;
-    for(const tx of all){const key=Math.round(tx.date/864e5)+"|"+tx.amount.toFixed(2)+"|"+String(tx.merchant||"").trim().toLowerCase();if(seen.has(key)){dupCount++;continue}seen.add(key);deduped.push(tx)}
-    deduped.sort((a,b)=>a.date-b.date);
-    const csvLines=["Date,Description,Amount",...deduped.map(tx=>`${new Date(tx.date).toLocaleDateString("en-CA")},${String(tx.merchant||"Unknown").replace(/,/g,";")},${tx.amount.toFixed(2)}`)];
+    const seen=new Set();const marked=[];let dupCount=0;
+    for(const tx of all){const key=Math.round(tx.date/864e5)+"|"+tx.amount.toFixed(2)+"|"+String(tx.merchant||"").trim().toLowerCase();const isDup=seen.has(key);if(isDup)dupCount++;else seen.add(key);marked.push({...tx,dup:isDup})}
+    marked.sort((a,b)=>a.date-b.date);
+    const csvLines=["Date,Description,Amount",...marked.map(tx=>{const desc=String(tx.merchant||"Unknown")+(tx.dup?" [POSSIBLE DUPLICATE]":"");return `${new Date(tx.date).toLocaleDateString("en-CA")},${desc.replace(/,/g,";")},${tx.amount.toFixed(2)}`})];
     sCsvText(csvLines.join("\n"));
-    const notes=[];if(dupCount>0)notes.push(`Removed ${dupCount} likely-duplicate row${dupCount===1?"":"s"} (same date, amount & merchant appeared on more than one photo).`);
+    const notes=[];if(dupCount>0)notes.push(`Flagged ${dupCount} likely-duplicate row${dupCount===1?"":"s"} (same date, amount & merchant appeared on more than one photo) — look for "[POSSIBLE DUPLICATE]" below and delete any rows you don't want before tapping Parse CSV text.`);
     if(firstErr)notes.push(firstErr+" — other photos were still processed.");
-    sNote(notes.length?notes.join(" "):`Read ${deduped.length} transaction${deduped.length===1?"":"s"} from ${csvPhotos.length} photo${csvPhotos.length===1?"":"s"}. Review below, then tap Parse CSV text.`);
+    sNote(notes.length?notes.join(" "):`Read ${marked.length} transaction${marked.length===1?"":"s"} from ${csvPhotos.length} photo${csvPhotos.length===1?"":"s"}. Review below, then tap Parse CSV text.`);
     sCsvPhotoBusy(false);sCsvPhotoProgress(null);
   };
   const csvPhotoStatusText=()=>{if(!csvPhotoProgress)return"Reading the statement…";if(csvPhotoProgress.stage==="loading")return"Loading OCR engine…";return`Reading photo ${Math.min(csvPhotoProgress.done+1,csvPhotoProgress.total)}/${csvPhotoProgress.total} · ${csvPhotoProgress.pct||0}%…`};
