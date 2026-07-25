@@ -2754,12 +2754,12 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
     const fallbackYear=parseInt(csvYear,10)||new Date().getFullYear();
     sCsvPhotoBusy(true);sCsvPhotoProgress({done:0,total:csvPhotos.length,pct:0,stage:"loading"});
     let Tesseract;
-    try{Tesseract=await ensureTesseract()}catch(e2){sCsvPhotoErr(e2.message||"Could not load the OCR engine.");sCsvPhotoBusy(false);sCsvPhotoProgress(null);return}
+    try{Tesseract=await ensureTesseract()}catch(e2){console.error("ensureTesseract failed:",e2);sCsvPhotoErr(describeErr(e2)||"Could not load the OCR engine.");sCsvPhotoBusy(false);sCsvPhotoProgress(null);return}
     let worker=null,curIdx=0;
     try{
       worker=await Tesseract.createWorker("eng",1,{logger:msg=>{if(msg.status==="recognizing text")sCsvPhotoProgress({done:curIdx,total:csvPhotos.length,pct:Math.round((msg.progress||0)*100),stage:"reading"})}});
       await worker.setParameters({tessedit_pageseg_mode:"4"});
-    }catch(e2){sCsvPhotoErr("Could not start the OCR engine: "+(e2&&e2.message||"unknown error"));sCsvPhotoBusy(false);sCsvPhotoProgress(null);return}
+    }catch(e2){console.error("Tesseract createWorker/setParameters failed:",e2);sCsvPhotoErr("Could not start the OCR engine: "+describeErr(e2));try{await worker?.terminate()}catch(_){}sCsvPhotoBusy(false);sCsvPhotoProgress(null);return}
     const all=[];let firstErr=null;
     for(let i=0;i<csvPhotos.length;i++){
       curIdx=i;
@@ -2777,7 +2777,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
           const pd=new Date(year,month-1,day);const ts=isNaN(pd.getTime())?Date.now():pd.getTime();
           all.push({date:ts,amount:it.amount,merchant:String(it.name||"Unknown").slice(0,60)||"Unknown"});
         }
-      }catch(e2){if(!firstErr)firstErr=`Photo ${i+1}: ${e2.message||"could not read this photo"}`}
+      }catch(e2){console.error(`Photo ${i+1} OCR failed:`,e2);if(!firstErr)firstErr=`Photo ${i+1}: ${describeErr(e2)}`}
       sCsvPhotoProgress({done:i+1,total:csvPhotos.length,pct:100,stage:"reading"});
     }
     try{await worker.terminate()}catch(e2){}
@@ -3784,6 +3784,24 @@ async function grocScanBill(file){
   return parsed;
 }
 // Local (no-AI) OCR helpers for the Statement Analyzer's Paste-CSV photo scan — runs entirely in the browser.
+// Robust error text extraction — Worker/WASM failures often reject with things that
+// aren't a plain Error (bare strings, ErrorEvents, DOMExceptions, {} objects), which is
+// why a naive `e.message` fell back to a useless "unknown error".
+function describeErr(e){
+  try{
+    if(e==null)return"no error details were provided by the browser";
+    if(typeof e==="string")return e;
+    if(e instanceof Error)return(e.name?e.name+": ":"")+(e.message||String(e));
+    if(typeof ErrorEvent!=="undefined"&&e instanceof ErrorEvent)return"ErrorEvent: "+(e.message||(e.error&&describeErr(e.error))||e.type);
+    if(typeof Event!=="undefined"&&e instanceof Event)return"event: "+e.type;
+    if(typeof e==="object"){
+      if(e.message)return String(e.message);
+      try{const j=JSON.stringify(e);if(j&&j!=="{}")return j}catch(_){}
+      return Object.prototype.toString.call(e);
+    }
+    return String(e);
+  }catch(_){return"unrecognized error (see browser console)"}
+}
 const TESSERACT_CDNS=["https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js","https://unpkg.com/tesseract.js@5/dist/tesseract.min.js","https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js"];
 function _loadScriptOnce(src){return new Promise((resolve,reject)=>{const s=document.createElement("script");s.src=src;s.crossOrigin="anonymous";s.onload=()=>resolve();s.onerror=()=>reject(new Error("failed to load "+src));document.head.appendChild(s)})}
 let _tesseractLoading=null;
@@ -3794,7 +3812,7 @@ function ensureTesseract(){
     const reasons=[];
     for(const url of TESSERACT_CDNS){
       try{await _loadScriptOnce(url);if(window.Tesseract)return window.Tesseract;reasons.push(new URL(url).hostname+": loaded but didn't define the OCR library (version mismatch?)")}
-      catch(e){reasons.push(new URL(url).hostname+": "+(e&&e.message||"failed to load"))}
+      catch(e){reasons.push(new URL(url).hostname+": "+describeErr(e))}
     }
     _tesseractLoading=null;
     throw new Error("Could not load the OCR engine. "+reasons.join(" · "));
