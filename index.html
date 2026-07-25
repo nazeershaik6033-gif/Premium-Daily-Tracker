@@ -3,7 +3,7 @@
 <head>
   <!-- update -->
 <meta charset="UTF-8"/>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://unpkg.com https://cdn.sheetjs.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.anthropic.com https://api.deepseek.com https://api.openai.com https://openrouter.ai https://generativelanguage.googleapis.com https://accounts.google.com https://www.googleapis.com https://www.google-analytics.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://unpkg.com https://cdn.sheetjs.com https://cdn.jsdelivr.net; worker-src 'self' blob:; child-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.anthropic.com https://api.deepseek.com https://api.openai.com https://openrouter.ai https://generativelanguage.googleapis.com https://accounts.google.com https://www.googleapis.com https://www.google-analytics.com https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://tessdata.projectnaptha.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/>
 <meta name="theme-color" content="#1B1B1D"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -3791,11 +3791,13 @@ function ensureTesseract(){
   if(window.Tesseract)return Promise.resolve(window.Tesseract);
   if(_tesseractLoading)return _tesseractLoading;
   _tesseractLoading=(async()=>{
+    const reasons=[];
     for(const url of TESSERACT_CDNS){
-      try{await _loadScriptOnce(url);if(window.Tesseract)return window.Tesseract}catch(e){}
+      try{await _loadScriptOnce(url);if(window.Tesseract)return window.Tesseract;reasons.push(new URL(url).hostname+": loaded but didn't define the OCR library (version mismatch?)")}
+      catch(e){reasons.push(new URL(url).hostname+": "+(e&&e.message||"failed to load"))}
     }
     _tesseractLoading=null;
-    throw new Error("Could not load the OCR engine from any source — check your connection and try again.");
+    throw new Error("Could not load the OCR engine. "+reasons.join(" · "));
   })();
   return _tesseractLoading;
 }
