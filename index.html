@@ -829,8 +829,8 @@ function AppHeader({onMenu,onSearch,onToggleTheme,isDark,theme,onHome,onAI,onDia
   ]})})
 }
 const SB_ORDER_KEY="etp-sidebar-order";
-const DEFAULT_SB=["h:Money","accounts","groceries","monthHist","cards","transfer","investments","wealth","budgetTrack","annualExp","budgetLoans","autopilot","debtPlan","las","h:Plan & Track","bills","goals","diary","recurring","upcomingExp","categoryBudgets","h:Insights","breakdown","monthlyReport","tips","dailyLesson","wrapped","rules","h:Tools","expPlanner","investCalc","cardPayFix","profiles","h:AI","moneyChat","chat","subAudit","docScan","voiceAdd","billScan","stmtAnalyze","stmtImports","aiInsights","h:Settings & Data","categories","merchantRules","backup","userMgr","settings"];
-const SB_META={moneyChat:{e:"🧞",l:"Ask Your Money",s:"AI that sees your whole picture"},subAudit:{e:"🔍",l:"Subscription Auditor",s:"Recurring charges, hikes & cancels"},docScan:{e:"🪪",l:"Scan Payslip / Statement",s:"Log income & investments from a photo"},chat:{e:"✨",l:"AI Assistant",s:"Log expenses by chat"},voiceAdd:{e:"🎙️",l:"Voice Log",s:"Speak an expense to log it"},billScan:{e:"📸",l:"Snap a Bill",s:"Auto-extract from receipt"},stmtAnalyze:{e:"📊",l:"Statement Analyzer",s:"Find missing transactions & discrepancies"},stmtImports:{e:"📥",l:"Statement Imports",s:"Review transactions logged from statements"},aiInsights:{e:"💡",l:"AI Insights",s:"Spending patterns & AI suggestions"},userMgr:{e:"👥",l:"Switch User",s:"Manage profiles"},rules:{e:"📋",l:"Rules & Learnings",s:"Track your financial rules"},upcomingExp:{e:"📅",l:"Upcoming Expenses",s:"Plan & get alerts"},expPlanner:{e:"🧮",l:"Expense Planner",s:"Can I afford this EMI?"},investCalc:{e:"📈",l:"Investment Calculator",s:"Compound growth & SIP planner"},cards:{e:"💳",l:"Cards",acc:true},groceries:{e:"🛒",l:"Groceries",s:"Stores, items & price tracking",acc:true},cardPayFix:{e:"🪙",l:"Fix card bill payments",s:"Remove double-counted bills",acc:true},bills:{e:"🔔",l:"Bills & Reminders",acc:true},goals:{e:"🎯",l:"Goals & Debt",acc:true},diary:{e:"📖",l:"Lending Diary",s:"Who owes you & you owe"},investments:{e:"💼",l:"My Investments",s:"NPS, Funds, FDs",acc:true},wealth:{e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},monthlyReport:{e:"📰",l:"Monthly Report",s:"Print or share PDF"},budgetTrack:{e:"📉",l:"Budget Tracker",s:"Monthly over/under record"},budgetLoans:{e:"🧾",l:"Budget Loans",s:"Repay past overspends"},breakdown:{e:"⚖️",l:"Spending Breakdown",s:"Needs/Wants · 50-30-20"},accounts:{e:"🏦",l:"Accounts",acc:true},monthHist:{e:"🗓️",l:"Monthly History",s:"Reset & activity by month",acc:true},transfer:{e:"↔️",l:"Transfer",s:"Move funds",acc:true},recurring:{e:"🔁",l:"Recurring"},profiles:{e:"⚡",l:"Quick profiles"},categoryBudgets:{e:"📏",l:"Category budgets",s:"Set spending limits"},annualExp:{e:"📆",l:"Annual Variable Expenses",s:"Plan yearly variable costs by month"},categories:{e:"🏷️",l:"Categories",s:"Manage expense types"},backup:{e:"💾",l:"Backup & Restore",s:"Export or import data"},tips:{e:"💡",l:"Financial Health",s:"Tips & scores"},dailyLesson:{e:"📖",l:"Daily Money Lesson",s:"One finance lesson a day"},autopilot:{e:"🔮",l:"Autopilot Forecast",s:"30-day cash-flow projection",acc:true},debtPlan:{e:"⚔️",l:"Debt Destroyer",s:"Avalanche vs snowball payoff plan",acc:true},las:{e:"🏛️",l:"Loan Against Securities",s:"Zerodha LAS · LTV, pledge & unpledge"},wrapped:{e:"🎁",l:"Year in Review",s:"Wrapped, heatmap, badges"},merchantRules:{e:"🧠",l:"Merchant Memory",s:"Auto-fill rules per merchant"},settings:{e:"⚙️",l:"Settings",s:"Currency, budget, backup"}};
+const DEFAULT_SB=["h:Money","accounts","groceries","monthHist","cards","transfer","investments","wealth","budgetTrack","annualExp","budgetLoans","autopilot","debtPlan","las","h:Plan & Track","bills","goals","diary","recurring","upcomingExp","categoryBudgets","h:Insights","breakdown","monthlyReport","tips","dailyLesson","wrapped","rules","h:Tools","expPlanner","investCalc","cardPayFix","profiles","h:AI","moneyChat","subAudit","docScan","stmtAnalyze","stmtImports","aiInsights","h:Settings & Data","categories","merchantRules","backup","userMgr","settings"];
+const SB_META={moneyChat:{e:"🧞",l:"Ask Your Money",s:"AI that sees your whole picture"},subAudit:{e:"🔍",l:"Subscription Auditor",s:"Recurring charges, hikes & cancels"},docScan:{e:"🪪",l:"Scan Payslip / Statement",s:"Log income & investments from a photo"},stmtAnalyze:{e:"📊",l:"Statement Analyzer",s:"Find missing transactions & discrepancies"},stmtImports:{e:"📥",l:"Statement Imports",s:"Review transactions logged from statements"},aiInsights:{e:"💡",l:"AI Insights",s:"Spending patterns & AI suggestions"},userMgr:{e:"👥",l:"Switch User",s:"Manage profiles"},rules:{e:"📋",l:"Rules & Learnings",s:"Track your financial rules"},upcomingExp:{e:"📅",l:"Upcoming Expenses",s:"Plan & get alerts"},expPlanner:{e:"🧮",l:"Expense Planner",s:"Can I afford this EMI?"},investCalc:{e:"📈",l:"Investment Calculator",s:"Compound growth & SIP planner"},cards:{e:"💳",l:"Cards",acc:true},groceries:{e:"🛒",l:"Groceries",s:"Stores, items & price tracking",acc:true},cardPayFix:{e:"🪙",l:"Fix card bill payments",s:"Remove double-counted bills",acc:true},bills:{e:"🔔",l:"Bills & Reminders",acc:true},goals:{e:"🎯",l:"Goals & Debt",acc:true},diary:{e:"📖",l:"Lending Diary",s:"Who owes you & you owe"},investments:{e:"💼",l:"My Investments",s:"NPS, Funds, FDs",acc:true},wealth:{e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},monthlyReport:{e:"📰",l:"Monthly Report",s:"Print or share PDF"},budgetTrack:{e:"📉",l:"Budget Tracker",s:"Monthly over/under record"},budgetLoans:{e:"🧾",l:"Budget Loans",s:"Repay past overspends"},breakdown:{e:"⚖️",l:"Spending Breakdown",s:"Needs/Wants · 50-30-20"},accounts:{e:"🏦",l:"Accounts",acc:true},monthHist:{e:"🗓️",l:"Monthly History",s:"Reset & activity by month",acc:true},transfer:{e:"↔️",l:"Transfer",s:"Move funds",acc:true},recurring:{e:"🔁",l:"Recurring"},profiles:{e:"⚡",l:"Quick profiles"},categoryBudgets:{e:"📏",l:"Category budgets",s:"Set spending limits"},annualExp:{e:"📆",l:"Annual Variable Expenses",s:"Plan yearly variable costs by month"},categories:{e:"🏷️",l:"Categories",s:"Manage expense types"},backup:{e:"💾",l:"Backup & Restore",s:"Export or import data"},tips:{e:"💡",l:"Financial Health",s:"Tips & scores"},dailyLesson:{e:"📖",l:"Daily Money Lesson",s:"One finance lesson a day"},autopilot:{e:"🔮",l:"Autopilot Forecast",s:"30-day cash-flow projection",acc:true},debtPlan:{e:"⚔️",l:"Debt Destroyer",s:"Avalanche vs snowball payoff plan",acc:true},las:{e:"🏛️",l:"Loan Against Securities",s:"Zerodha LAS · LTV, pledge & unpledge"},wrapped:{e:"🎁",l:"Year in Review",s:"Wrapped, heatmap, badges"},merchantRules:{e:"🧠",l:"Merchant Memory",s:"Auto-fill rules per merchant"},settings:{e:"⚙️",l:"Settings",s:"Currency, budget, backup"}};
 function Sidebar({data,onClose,onView,activeUser,onUpdateUser,focusSection}){
   const go=(id)=>{onView(id);onClose()};
   const scRef=useRef(null);
@@ -2648,6 +2648,8 @@ function StmtImports({data,onClose,onTx}){
 function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
   const{expenses,currency,accounts}=data;
   const cards=data.cards||[];
+  const mm=useMemo(()=>buildMerchantMemory(expenses,data.merchantRules),[expenses,data.merchantRules]);
+  const guessCat=(merchant)=>{const g=mm(merchant);return(g&&g.category)?g.category:"other"};
   const[cmpCardId,sCmpCardId]=useState(null);
   const[man,sMan]=useState(null);
   const[quick,sQuick]=useState(null);
@@ -2669,6 +2671,8 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
   const[mode,sMode]=useState("file");
   const[csvText,sCsvText]=useState("");
   const[photoPrompt,sPhotoPrompt]=useState("");
+  const[stmtYear,sStmtYear]=useState(String(new Date().getFullYear()));
+  const[note,sNote]=useState(null);
   const fileRef=useRef(null);const photoRef=useRef(null);
   const rowsToTxns=(rows)=>{
     if(!rows||rows.length<2)return{err:"No data found."};
@@ -2687,7 +2691,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
       if(rawDate){const pd=new Date(rawDate);if(!isNaN(pd.getTime()))ts=pd.getTime()}
       if(!ts)continue;
       const merchant=mI>=0?String(row[mI]||"").trim().slice(0,60):"";
-      txns.push({date:ts,amount:amt,merchant:merchant||"Unknown"});
+      txns.push({date:ts,amount:amt,merchant:merchant||"Unknown",category:guessCat(merchant||"Unknown")});
     }
     if(!txns.length)return{err:"No valid transactions found. Check that Date and Amount columns have data."};
     txns.sort((a,b)=>b.date-a.date);return{txns};
@@ -2714,8 +2718,9 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
   const pickPhotos=async(files)=>{const arr=Array.from(files||[]).filter(Boolean);if(!arr.length)return;sErr(null);const tooBig=arr.find(f=>f.size>4.5e6);if(tooBig){sErr(`Each image must be under 4.5MB — "${tooBig.name||"one photo"}" is too large.`);return}const loaded=[];for(const f of arr){try{const b64=await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(f)});loaded.push({id:uid(),file:f,preview:b64})}catch(e2){}}sPhotos(p=>[...p,...loaded])};
   const removePhoto=(id)=>sPhotos(p=>p.filter(x=>x.id!==id));
   const extractPhoto=async()=>{
-    if(!photos.length){sErr("Pick at least one statement photo first.");return}sErr(null);sResult(null);
+    if(!photos.length){sErr("Pick at least one statement photo first.");return}sErr(null);sResult(null);sNote(null);
     if(!gAK()){sErr("Add an AI API key in Settings first.");return}
+    const fallbackYear=parseInt(stmtYear,10)||new Date().getFullYear();
     sAnalyzing(true);sPhotoProgress(photos.length>1?{done:0,total:photos.length}:null);
     const sys="You extract transactions from a bank or credit card statement image. Be thorough and accurate.";
     const all=[];let firstErr=null;
@@ -2723,18 +2728,31 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
       const ph=photos[i];
       try{
         const b64=ph.preview||await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(ph.file)});
-        const u=[{type:"image",source:{type:"base64",media_type:ph.file.type,data:b64.split(",")[1]}},{type:"text",text:(photoPrompt.trim()?photoPrompt.trim()+"\n\n":"")+'Extract ALL spending transactions visible. Return JSON only: {"transactions":[{"date":"YYYY-MM-DD","amount":N,"merchant":"name"}]}. Amounts as positive numbers.'}];
+        const u=[{type:"image",source:{type:"base64",media_type:ph.file.type,data:b64.split(",")[1]}},{type:"text",text:(photoPrompt.trim()?photoPrompt.trim()+"\n\n":"")+'Extract ALL spending transactions visible. For each, read the date exactly as printed: give day and month as numbers. Give year ONLY if a 4-digit year is actually printed next to that date — otherwise leave year null, do not guess it. Return JSON only: {"transactions":[{"day":D,"month":M,"year":Y_or_null,"amount":N,"merchant":"name"}]}. Amounts as positive numbers, day 1-31, month 1-12.'}];
         const r=await cAPI({max_tokens:3000,system:sys,messages:[{role:"user",content:u}]});
         const txt=r.content?.map(x=>x.text||"").join("")||"";
         const m=txt.match(/\{[\s\S]*\}/);if(!m)throw new Error("Could not read transactions");
         const arr=(JSON.parse(m[0]).transactions)||[];
-        for(const it of arr){const amt=parseFloat(String(it.amount).replace(/[^0-9.]/g,""));if(!amt||isNaN(amt)||amt<=0)continue;const pd=new Date(it.date);const ts=isNaN(pd.getTime())?Date.now():pd.getTime();all.push({date:ts,amount:amt,merchant:String(it.merchant||"Unknown").slice(0,60)})}
+        for(const it of arr){
+          const amt=parseFloat(String(it.amount).replace(/[^0-9.]/g,""));if(!amt||isNaN(amt)||amt<=0)continue;
+          const day=Math.min(Math.max(parseInt(it.day,10)||1,1),31);
+          const month=Math.min(Math.max(parseInt(it.month,10)||1,1),12);
+          const year=(it.year!=null&&!isNaN(parseInt(it.year,10)))?parseInt(it.year,10):fallbackYear;
+          const pd=new Date(year,month-1,day);const ts=isNaN(pd.getTime())?Date.now():pd.getTime();
+          all.push({date:ts,amount:amt,merchant:String(it.merchant||"Unknown").slice(0,60)});
+        }
       }catch(e2){if(!firstErr)firstErr=`Photo ${i+1}: ${e2.message}`}
       sPhotoProgress(photos.length>1?{done:i+1,total:photos.length}:null);
     }
     if(!all.length){sErr(firstErr||"No transactions found in the photo(s).");sAnalyzing(false);sPhotoProgress(null);return}
-    all.sort((a,b)=>b.date-a.date);sParsed(all);sFile({name:`${photos.length} photo${photos.length===1?"":"s"} · ${all.length} txns`});
-    if(firstErr)sErr(firstErr+" — other photos were still processed.");
+    const seen=new Set();const deduped=[];let dupCount=0;
+    for(const tx of all){const key=Math.round(tx.date/864e5)+"|"+tx.amount.toFixed(2)+"|"+String(tx.merchant||"").trim().toLowerCase();if(seen.has(key)){dupCount++;continue}seen.add(key);deduped.push(tx)}
+    deduped.sort((a,b)=>a.date-b.date);
+    const csvLines=["Date,Description,Amount",...deduped.map(tx=>`${new Date(tx.date).toLocaleDateString("en-CA")},${String(tx.merchant||"Unknown").replace(/,/g,";")},${tx.amount.toFixed(2)}`)];
+    sCsvText(csvLines.join("\n"));sParsed(null);sFile(null);sMode("paste");
+    const notes=[];if(dupCount>0)notes.push(`Removed ${dupCount} likely-duplicate row${dupCount===1?"":"s"} (same date, amount & merchant appeared on more than one photo).`);
+    if(firstErr)notes.push(firstErr+" — other photos were still processed.");
+    sNote(notes.length?notes.join(" "):`Read ${deduped.length} transaction${deduped.length===1?"":"s"} from ${photos.length} photo${photos.length===1?"":"s"}. Review below, then tap Parse CSV text.`);
     sAnalyzing(false);sPhotoProgress(null);
   };
   // Local deterministic reconciliation: match statement txns to app expenses by amount + date
@@ -2756,9 +2774,9 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
   },[parsed,expenses,win,cmpCardId]);
   const logged=recon.filter(r=>r.match);
   const unlogged=recon.filter(r=>!r.match);
-  const mkExp=(tx)=>({type:"expense",amount:tx.amount,currency,accountId:(accounts&&accounts[0]&&accounts[0].id)||null,cardId:cmpCardId||null,category:"other",merchant:tx.merchant||null,note:"From statement",date:tx.date,source:"statement"});
+  const mkExp=(tx)=>({type:"expense",amount:tx.amount,currency,accountId:(accounts&&accounts[0]&&accounts[0].id)||null,cardId:cmpCardId||null,category:tx.category||guessCat(tx.merchant),merchant:tx.merchant||null,note:"From statement",date:tx.date,source:"statement"});
   const logOne=(tx)=>onAddExpenses&&onAddExpenses([mkExp(tx)]);
-  const openManual=(tx)=>sMan({merchant:tx.merchant||"",amount:String(tx.amount),date:new Date(tx.date).toISOString().slice(0,10),category:"other",via:cmpCardId?"card":"account",accountId:(accounts&&accounts[0]&&accounts[0].id)||null,cardId:cmpCardId||(cards[0]&&cards[0].id)||null,note:"From statement"});
+  const openManual=(tx)=>sMan({merchant:tx.merchant||"",amount:String(tx.amount),date:new Date(tx.date).toISOString().slice(0,10),category:tx.category||guessCat(tx.merchant),via:cmpCardId?"card":"account",accountId:(accounts&&accounts[0]&&accounts[0].id)||null,cardId:cmpCardId||(cards[0]&&cards[0].id)||null,note:"From statement"});
   const saveManual=()=>{const amt=parseFloat(man.amount);if(!amt||amt<=0)return;const viaCard=man.via==="card";onAddExpenses&&onAddExpenses([{type:"expense",amount:amt,currency,accountId:viaCard?null:(man.accountId||null),cardId:viaCard?(man.cardId||null):null,category:man.category||"other",merchant:(man.merchant||"").trim()||null,note:(man.note||"").trim()||null,date:man.date?new Date(man.date).getTime():Date.now(),source:"statement"}]);sMan(null)};
   const logAll=()=>{if(unlogged.length&&onAddExpenses)onAddExpenses(unlogged.map(r=>mkExp(r.tx)))};
   const analyze=async()=>{
@@ -2791,6 +2809,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
       t("input",{ref:fileRef,type:"file",accept:".csv,.xlsx,.xls",style:{display:"none"},onChange:async e=>{const f=e.target.files?.[0];if(f)await parseFile(f);e.target.value=""}})
     ]}),
     mode==="paste"&&o("div",{style:{marginBottom:16},children:[
+      note&&t("div",{style:{background:c.mt+"15",border:`1px solid ${c.mt}40`,borderRadius:12,padding:"10px 14px",marginBottom:10,fontSize:12,color:c.mt,lineHeight:1.5},children:note}),
       t("textarea",{value:csvText,onChange:e=>sCsvText(e.target.value),placeholder:"Date,Description,Amount\n2026-06-01,Swiggy,450\n2026-06-02,Amazon,1299",rows:6,style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px",color:c.tx,fontSize:13,fontFamily:F.mo,outline:"none",boxSizing:"border-box",resize:"vertical",lineHeight:1.5}}),
       t("div",{style:{fontSize:11,color:c.tm,margin:"6px 2px 10px"},children:"Paste rows with a header line — needs a Date column and an Amount column (a Description/Merchant column is optional)."}),
       t("button",{onClick:parsePaste,disabled:!csvText.trim(),className:"w100 act98 tr",style:{padding:"12px 0",background:csvText.trim()?c.ac:c.sf2,color:csvText.trim()?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:14,border:"none"},children:"Parse CSV text"})
@@ -2811,8 +2830,14 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
         t("div",{key:"s",style:{fontSize:11,color:c.tm,marginTop:4},children:photos.length?"Great for multi-page statements — each photo is read in turn":"Choose one or more from gallery or camera"})
       ]}),
       t("input",{ref:photoRef,type:"file",accept:"image/*",multiple:true,style:{display:"none"},onChange:async e=>{await pickPhotos(e.target.files);e.target.value=""}}),
-      t("input",{value:photoPrompt,onChange:e=>sPhotoPrompt(e.target.value),placeholder:"Optional instructions — e.g. only debit transactions",style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 14px",color:c.tx,fontSize:13,fontFamily:'var(--tf)',outline:"none",boxSizing:"border-box",marginBottom:10}}),
-      t("button",{disabled:!photos.length||analyzing,onClick:extractPhoto,className:"w100 act98 tr f ia jc",style:{gap:8,padding:"14px 0",background:photos.length&&!analyzing?c.ac:c.sf2,color:photos.length&&!analyzing?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:analyzing?(photoProgress?`Reading ${photoProgress.done}/${photoProgress.total}…`:"Reading the statement…"):[t(Send,{key:"i",size:16}),photos.length>1?`Extract from ${photos.length} photos`:"Extract transactions"]})
+      photos.length>0&&o(Fragment,{children:[
+        t("input",{value:photoPrompt,onChange:e=>sPhotoPrompt(e.target.value),placeholder:"Optional instructions — e.g. only debit transactions",style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 14px",color:c.tx,fontSize:13,fontFamily:'var(--tf)',outline:"none",boxSizing:"border-box",marginBottom:10}}),
+        o("div",{style:{marginBottom:10},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:"YEAR (if dates on the statement don't show one)"}),
+          t("input",{value:stmtYear,inputMode:"numeric",onChange:e=>sStmtYear(e.target.value.replace(/[^\d]/g,"").slice(0,4)),placeholder:String(new Date().getFullYear()),style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 14px",color:c.tx,fontSize:14,fontFamily:F.mo,outline:"none",boxSizing:"border-box"}})
+        ]}),
+        t("button",{disabled:!photos.length||analyzing||String(stmtYear).length!==4,onClick:extractPhoto,className:"w100 act98 tr f ia jc",style:{gap:8,padding:"14px 0",background:photos.length&&!analyzing&&String(stmtYear).length===4?c.ac:c.sf2,color:photos.length&&!analyzing&&String(stmtYear).length===4?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:analyzing?(photoProgress?`Reading ${photoProgress.done}/${photoProgress.total}…`:"Reading the statement…"):[t(Send,{key:"i",size:16}),photos.length>1?`▶ Start — read ${photos.length} photos`:"▶ Start"]})
+      ]})
     ]}),
     parsed&&o("div",{style:{marginBottom:16},children:[
       t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:8},children:"COMPARE PERIOD"}),
@@ -2856,12 +2881,13 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
         o("div",{className:"f ia jb",style:{gap:8},children:[
           o("div",{className:"f1 minw0",children:[
             t("div",{className:"tru",style:{fontSize:14,color:c.tx,fontWeight:500},children:r.tx.merchant||"Unknown"}),
-            t("div",{style:{fontSize:11,color:c.tm,marginTop:3},children:new Date(r.tx.date).toLocaleDateString("en-US",{day:"numeric",month:"short",year:"numeric"})})
+            t("div",{style:{fontSize:11,color:c.tm,marginTop:3},children:new Date(r.tx.date).toLocaleDateString("en-US",{day:"numeric",month:"short",year:"numeric"})}),
+            !r.match&&t("div",{style:{fontSize:10.5,color:c.td,marginTop:3,fontFamily:F.mo},children:co(r.tx.category||guessCat(r.tx.merchant)).emoji+" "+co(r.tx.category||guessCat(r.tx.merchant)).label})
           ]}),
           o("div",{style:{textAlign:"right",flexShrink:0},children:[
             t("div",{style:{fontFamily:F.mo,fontSize:14,color:r.match?c.tx:c.co},children:"−"+fm(r.tx.amount,currency)}),
             r.match?t("div",{style:{fontSize:10,color:c.mt,marginTop:3,fontFamily:F.mo,letterSpacing:.3},children:"✓ LOGGED"}):o("div",{className:"f ia",style:{gap:6,marginTop:6,justifyContent:"flex-end"},children:[
-              t("button",{onClick:()=>sQuick(r.tx),className:"act95 tr",style:{padding:"5px 11px",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:999,fontSize:11,fontWeight:600},children:"+ Quick"}),
+              t("button",{onClick:()=>sQuick({...r.tx,category:r.tx.category||guessCat(r.tx.merchant)}),className:"act95 tr",style:{padding:"5px 11px",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:999,fontSize:11,fontWeight:600},children:"+ Quick"}),
               t("button",{onClick:()=>openManual(r.tx),className:"act95 tr",style:{padding:"5px 11px",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:999,fontSize:11,fontWeight:600},children:"Edit"})
             ]})
           ]})
@@ -2887,6 +2913,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
         o("div",{className:"f ia jb",style:{marginBottom:8},children:[t("div",{style:{fontSize:15,color:c.tx,fontWeight:600},children:quick.merchant||"Unknown"}),t("div",{style:{fontFamily:F.mo,fontSize:16,color:c.co},children:"−"+fm(quick.amount,currency)})]}),
         t("div",{style:{fontFamily:F.mo,fontSize:12,color:c.tm},children:new Date(quick.date).toLocaleDateString("en-US",{weekday:"short",day:"numeric",month:"short",year:"numeric"})})
       ]}),
+      o("div",{style:{marginBottom:18},children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"CATEGORY"}),t("select",{value:quick.category||"other",onChange:e=>sQuick({...quick,category:e.target.value}),style:{width:"100%",boxSizing:"border-box",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 12px",color:c.tx,fontSize:14,outline:"none",fontFamily:'var(--tf)'},children:ceAll().map(ct=>t("option",{key:ct.id,value:ct.id,children:(ct.emoji||"")+" "+ct.label}))})]}),
       o("div",{className:"f",style:{gap:10},children:[
         t("button",{onClick:()=>sQuick(null),className:"f1 act98 tr",style:{padding:"13px 0",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:12,fontSize:14,fontWeight:500},children:"Cancel"}),
         t("button",{onClick:()=>{logOne(quick);sQuick(null)},className:"f1 act98 tr",style:{padding:"13px 0",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:12,fontSize:14,fontWeight:600},children:"Add"})
@@ -5972,18 +5999,22 @@ if(showResetCur)return t(ResetCurrencies,{data,persist,onClose:()=>sShowResetCur
 return o("div",{style:{padding:"8px 24px 104px"},className:"st",children:[
   t(SH,{title:t("em",{children:"Settings"}),onBack:onClose,right:t("button",{onClick:save,className:"act95 trt",style:{padding:"8px 14px",background:c.ac,color:"#0a0a0a",borderRadius:10,fontSize:12,fontWeight:600,border:"none"},children:"Save"})}),
   o("button",{onClick:()=>onView&&onView("howToUse"),className:"w100 f ia trc act95",style:{gap:12,padding:"14px 18px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:18,marginBottom:12},children:[t("div",{style:{width:36,height:36,borderRadius:10,background:c.ac+"20",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(Help,{size:20,color:c.ac})}),o("div",{className:"f1 tl",children:[t("div",{style:{fontSize:14,color:c.tx,fontWeight:500},children:"How to use"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:"Guide, tips, and feature tour"})]}),t(CR,{size:14,color:c.tm})]}),
-  o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden",marginBottom:16},children:[
-    t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,padding:"14px 18px 10px"},children:"AI FEATURES"}),
-    o("button",{onClick:()=>{onClose();},className:"w100 f ia trc",style:{gap:12,padding:"12px 18px",background:"rgba(219,255,77,0.06)",border:"none",borderTop:`1px solid ${c.brs}`},onClick:()=>onView&&onView("chat"),children:[
-      t("div",{style:{width:36,height:36,borderRadius:10,background:c.ac+"20",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0,border:`1px solid ${c.ac}40`},children:"✨"}),
-      o("div",{className:"f1 tl",children:[t("div",{style:{fontSize:14,color:c.ac,fontWeight:500},children:"AI Assistant"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:"Add or edit expenses by chat"})]}),
-      t(CR,{size:14,color:c.ac}),
+  o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
+    t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:12},children:"AI ASSISTANT"}),
+    t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:8},children:"HOW TO USE AI"}),
+    o("div",{className:"f",style:{gap:4,padding:4,background:c.sf2,borderRadius:12,border:`1px solid ${c.brs}`,marginBottom:14},children:[{id:"api",l:"🔑 API key"},{id:"claudeapp",l:"💬 Claude app (free)"}].map(m=>{const on=aiMode===m.id;return t("button",{key:m.id,onClick:()=>{sAiMode(m.id);sAIMode(m.id)},className:"act95 tr f1",style:{padding:"9px 0",background:on?c.ac:"transparent",color:on?"#0a0a0a":c.td,borderRadius:9,fontSize:12.5,fontWeight:on?700:400,border:"none"},children:m.l})})}),
+    aiMode==="claudeapp"&&t("div",{style:{fontSize:11,color:c.tm,lineHeight:1.5,marginBottom:14},children:"No key needed — Ask AI, AI Insights, and the Coach report open claude.ai with your finance summary pre-filled. Bill/receipt scanning still needs an API key below since it reads photos."}),
+    t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:8},children:"PROVIDER"}),
+    t("div",{className:"g g2",style:{gap:6,marginBottom:14},children:Object.entries(AI_PROVIDERS).map(([id,pc])=>t("button",{key:id,onClick:()=>sPr(id),className:"act95 tr",style:{padding:"9px 6px",background:prov===id?c.sf3:c.sf2,border:`1px solid ${prov===id?c.ac:c.brs}`,borderRadius:9,fontSize:11,fontWeight:prov===id?600:400,color:prov===id?c.ac:c.td},children:pc.name}))}),
+    t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:"API KEY"}),
+    o("div",{className:"f ia",style:{gap:8,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:11,padding:"10px 12px",marginBottom:10},children:[
+      t(KeyI,{size:14,color:c.tm}),
+      t("input",{type:show?"text":"password",value:ak,onChange:e=>sAk(e.target.value),placeholder:(AI_PROVIDERS[prov]||AI_PROVIDERS.anthropic).ph,style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:13,fontFamily:F.mo}}),
+      t("button",{onClick:()=>sShow(!show),style:{background:"transparent",border:"none",color:c.tm},children:show?t(EyeOff,{size:14}):t(Eye,{size:14})})
     ]}),
-    o("button",{className:"w100 f ia trc",style:{gap:12,padding:"12px 18px",background:"rgba(219,255,77,0.06)",border:"none",borderTop:`1px solid ${c.brs}`},onClick:()=>onView&&onView("billScan"),children:[
-      t("div",{style:{width:36,height:36,borderRadius:10,background:c.ac+"20",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0,border:`1px solid ${c.ac}40`},children:"📸"}),
-      o("div",{className:"f1 tl",children:[t("div",{style:{fontSize:14,color:c.ac,fontWeight:500},children:"Snap a Bill"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:"Auto-extract from receipt photo"})]}),
-      t(CR,{size:14,color:c.ac}),
-    ]}),
+    t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:"MODEL (BLANK = DEFAULT)"}),
+    t("input",{value:mdl2,onChange:e=>sMdl2(e.target.value),placeholder:(AI_PROVIDERS[prov]||AI_PROVIDERS.anthropic).def,style:{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${c.brs}`,background:c.sf2,color:c.tx,fontSize:13,fontFamily:F.mo,boxSizing:"border-box",outline:"none",marginBottom:8}}),
+    t("div",{style:{fontSize:11,color:c.tm,lineHeight:1.5},children:"Key stored locally only · Photo/bill scan works on Anthropic, OpenAI & OpenRouter (auto-routes images to a vision model); DeepSeek is text-only"})
   ]}),
   o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:14},children:"BUDGET"}),
@@ -6065,23 +6096,6 @@ return o("div",{style:{padding:"8px 24px 104px"},className:"st",children:[
     ]}),
     t("button",{onClick:onBackup,className:"w100 act95 trt f ia jc",style:{gap:8,marginTop:10,padding:"12px 0",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:11,fontSize:13,color:c.tx},children:[t(Dl,{size:14,color:c.ac}),"Backup & Restore →"]}),
   ]})})(),
-  o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
-    t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:12},children:"AI ASSISTANT"}),
-    t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:8},children:"HOW TO USE AI"}),
-    o("div",{className:"f",style:{gap:4,padding:4,background:c.sf2,borderRadius:12,border:`1px solid ${c.brs}`,marginBottom:14},children:[{id:"api",l:"🔑 API key"},{id:"claudeapp",l:"💬 Claude app (free)"}].map(m=>{const on=aiMode===m.id;return t("button",{key:m.id,onClick:()=>{sAiMode(m.id);sAIMode(m.id)},className:"act95 tr f1",style:{padding:"9px 0",background:on?c.ac:"transparent",color:on?"#0a0a0a":c.td,borderRadius:9,fontSize:12.5,fontWeight:on?700:400,border:"none"},children:m.l})})}),
-    aiMode==="claudeapp"&&t("div",{style:{fontSize:11,color:c.tm,lineHeight:1.5,marginBottom:14},children:"No key needed — Ask AI, AI Insights, and the Coach report open claude.ai with your finance summary pre-filled. Bill/receipt scanning still needs an API key below since it reads photos."}),
-    t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:8},children:"PROVIDER"}),
-    t("div",{className:"g g2",style:{gap:6,marginBottom:14},children:Object.entries(AI_PROVIDERS).map(([id,pc])=>t("button",{key:id,onClick:()=>sPr(id),className:"act95 tr",style:{padding:"9px 6px",background:prov===id?c.sf3:c.sf2,border:`1px solid ${prov===id?c.ac:c.brs}`,borderRadius:9,fontSize:11,fontWeight:prov===id?600:400,color:prov===id?c.ac:c.td},children:pc.name}))}),
-    t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:"API KEY"}),
-    o("div",{className:"f ia",style:{gap:8,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:11,padding:"10px 12px",marginBottom:10},children:[
-      t(KeyI,{size:14,color:c.tm}),
-      t("input",{type:show?"text":"password",value:ak,onChange:e=>sAk(e.target.value),placeholder:(AI_PROVIDERS[prov]||AI_PROVIDERS.anthropic).ph,style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:13,fontFamily:F.mo}}),
-      t("button",{onClick:()=>sShow(!show),style:{background:"transparent",border:"none",color:c.tm},children:show?t(EyeOff,{size:14}):t(Eye,{size:14})})
-    ]}),
-    t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:"MODEL (BLANK = DEFAULT)"}),
-    t("input",{value:mdl2,onChange:e=>sMdl2(e.target.value),placeholder:(AI_PROVIDERS[prov]||AI_PROVIDERS.anthropic).def,style:{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${c.brs}`,background:c.sf2,color:c.tx,fontSize:13,fontFamily:F.mo,boxSizing:"border-box",outline:"none",marginBottom:8}}),
-    t("div",{style:{fontSize:11,color:c.tm,lineHeight:1.5},children:"Key stored locally only · Photo/bill scan works on Anthropic, OpenAI & OpenRouter (auto-routes images to a vision model); DeepSeek is text-only"})
-  ]}),
   o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:14},children:"FINANCE PROFILE"}),
     t("div",{style:{fontSize:11,color:c.tm,marginBottom:12},children:"Used to compute Financial Health scores on the Tips screen."}),
