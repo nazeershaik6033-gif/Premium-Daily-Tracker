@@ -2671,7 +2671,6 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
   const[mode,sMode]=useState("file");
   const[csvText,sCsvText]=useState("");
   const[photoPrompt,sPhotoPrompt]=useState("");
-  const[stmtYear,sStmtYear]=useState(String(new Date().getFullYear()));
   const[note,sNote]=useState(null);
   const fileRef=useRef(null);const photoRef=useRef(null);
   const rowsToTxns=(rows)=>{
@@ -2718,9 +2717,8 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
   const pickPhotos=async(files)=>{const arr=Array.from(files||[]).filter(Boolean);if(!arr.length)return;sErr(null);const tooBig=arr.find(f=>f.size>4.5e6);if(tooBig){sErr(`Each image must be under 4.5MB — "${tooBig.name||"one photo"}" is too large.`);return}const loaded=[];for(const f of arr){try{const b64=await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(f)});loaded.push({id:uid(),file:f,preview:b64})}catch(e2){}}sPhotos(p=>[...p,...loaded])};
   const removePhoto=(id)=>sPhotos(p=>p.filter(x=>x.id!==id));
   const extractPhoto=async()=>{
-    if(!photos.length){sErr("Pick at least one statement photo first.");return}sErr(null);sResult(null);sNote(null);
+    if(!photos.length){sErr("Pick at least one statement photo first.");return}sErr(null);sResult(null);
     if(!gAK()){sErr("Add an AI API key in Settings first.");return}
-    const fallbackYear=parseInt(stmtYear,10)||new Date().getFullYear();
     sAnalyzing(true);sPhotoProgress(photos.length>1?{done:0,total:photos.length}:null);
     const sys="You extract transactions from a bank or credit card statement image. Be thorough and accurate.";
     const all=[];let firstErr=null;
@@ -2728,7 +2726,41 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
       const ph=photos[i];
       try{
         const b64=ph.preview||await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(ph.file)});
-        const u=[{type:"image",source:{type:"base64",media_type:ph.file.type,data:b64.split(",")[1]}},{type:"text",text:(photoPrompt.trim()?photoPrompt.trim()+"\n\n":"")+'Extract ALL spending transactions visible. For each, read the date exactly as printed: give day and month as numbers. Give year ONLY if a 4-digit year is actually printed next to that date — otherwise leave year null, do not guess it. Return JSON only: {"transactions":[{"day":D,"month":M,"year":Y_or_null,"amount":N,"merchant":"name"}]}. Amounts as positive numbers, day 1-31, month 1-12.'}];
+        const u=[{type:"image",source:{type:"base64",media_type:ph.file.type,data:b64.split(",")[1]}},{type:"text",text:(photoPrompt.trim()?photoPrompt.trim()+"\n\n":"")+'Extract ALL spending transactions visible. Return JSON only: {"transactions":[{"date":"YYYY-MM-DD","amount":N,"merchant":"name"}]}. Amounts as positive numbers.'}];
+        const r=await cAPI({max_tokens:3000,system:sys,messages:[{role:"user",content:u}]});
+        const txt=r.content?.map(x=>x.text||"").join("")||"";
+        const m=txt.match(/\{[\s\S]*\}/);if(!m)throw new Error("Could not read transactions");
+        const arr=(JSON.parse(m[0]).transactions)||[];
+        for(const it of arr){const amt=parseFloat(String(it.amount).replace(/[^0-9.]/g,""));if(!amt||isNaN(amt)||amt<=0)continue;const pd=new Date(it.date);const ts=isNaN(pd.getTime())?Date.now():pd.getTime();all.push({date:ts,amount:amt,merchant:String(it.merchant||"Unknown").slice(0,60)})}
+      }catch(e2){if(!firstErr)firstErr=`Photo ${i+1}: ${e2.message}`}
+      sPhotoProgress(photos.length>1?{done:i+1,total:photos.length}:null);
+    }
+    if(!all.length){sErr(firstErr||"No transactions found in the photo(s).");sAnalyzing(false);sPhotoProgress(null);return}
+    all.sort((a,b)=>b.date-a.date);sParsed(all);sFile({name:`${photos.length} photo${photos.length===1?"":"s"} · ${all.length} txns`});
+    if(firstErr)sErr(firstErr+" — other photos were still processed.");
+    sAnalyzing(false);sPhotoProgress(null);
+  };
+  const[csvPhotos,sCsvPhotos]=useState([]);
+  const[csvPhotoProgress,sCsvPhotoProgress]=useState(null);
+  const[csvPhotoBusy,sCsvPhotoBusy]=useState(false);
+  const[csvPhotoErr,sCsvPhotoErr]=useState(null);
+  const[csvYear,sCsvYear]=useState(String(new Date().getFullYear()));
+  const[csvPhotoOpen,sCsvPhotoOpen]=useState(false);
+  const pickCsvPhotos=async(files)=>{const arr=Array.from(files||[]).filter(Boolean);if(!arr.length)return;sCsvPhotoErr(null);const tooBig=arr.find(f=>f.size>4.5e6);if(tooBig){sCsvPhotoErr(`Each image must be under 4.5MB — "${tooBig.name||"one photo"}" is too large.`);return}const loaded=[];for(const f of arr){try{const b64=await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(f)});loaded.push({id:uid(),file:f,preview:b64})}catch(e2){}}sCsvPhotos(p=>[...p,...loaded])};
+  const removeCsvPhoto=(id)=>sCsvPhotos(p=>p.filter(x=>x.id!==id));
+  const csvPhotoRef=useRef(null);
+  const extractPhotosToCsv=async()=>{
+    if(!csvPhotos.length){sCsvPhotoErr("Pick at least one statement photo first.");return}sCsvPhotoErr(null);sNote(null);
+    if(!gAK()){sCsvPhotoErr("Add an AI API key in Settings first.");return}
+    const fallbackYear=parseInt(csvYear,10)||new Date().getFullYear();
+    sCsvPhotoBusy(true);sCsvPhotoProgress(csvPhotos.length>1?{done:0,total:csvPhotos.length}:null);
+    const sys="You extract transactions from a bank or credit card statement image. Be thorough and accurate.";
+    const all=[];let firstErr=null;
+    for(let i=0;i<csvPhotos.length;i++){
+      const ph=csvPhotos[i];
+      try{
+        const b64=ph.preview||await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(ph.file)});
+        const u=[{type:"image",source:{type:"base64",media_type:ph.file.type,data:b64.split(",")[1]}},{type:"text",text:'Extract ALL spending transactions visible. For each, read the date exactly as printed: give day and month as numbers. Give year ONLY if a 4-digit year is actually printed next to that date — otherwise leave year null, do not guess it. Return JSON only: {"transactions":[{"day":D,"month":M,"year":Y_or_null,"amount":N,"merchant":"name"}]}. Amounts as positive numbers, day 1-31, month 1-12.'}];
         const r=await cAPI({max_tokens:3000,system:sys,messages:[{role:"user",content:u}]});
         const txt=r.content?.map(x=>x.text||"").join("")||"";
         const m=txt.match(/\{[\s\S]*\}/);if(!m)throw new Error("Could not read transactions");
@@ -2742,18 +2774,18 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
           all.push({date:ts,amount:amt,merchant:String(it.merchant||"Unknown").slice(0,60)});
         }
       }catch(e2){if(!firstErr)firstErr=`Photo ${i+1}: ${e2.message}`}
-      sPhotoProgress(photos.length>1?{done:i+1,total:photos.length}:null);
+      sCsvPhotoProgress(csvPhotos.length>1?{done:i+1,total:csvPhotos.length}:null);
     }
-    if(!all.length){sErr(firstErr||"No transactions found in the photo(s).");sAnalyzing(false);sPhotoProgress(null);return}
+    if(!all.length){sCsvPhotoErr(firstErr||"No transactions found in the photo(s).");sCsvPhotoBusy(false);sCsvPhotoProgress(null);return}
     const seen=new Set();const deduped=[];let dupCount=0;
     for(const tx of all){const key=Math.round(tx.date/864e5)+"|"+tx.amount.toFixed(2)+"|"+String(tx.merchant||"").trim().toLowerCase();if(seen.has(key)){dupCount++;continue}seen.add(key);deduped.push(tx)}
     deduped.sort((a,b)=>a.date-b.date);
     const csvLines=["Date,Description,Amount",...deduped.map(tx=>`${new Date(tx.date).toLocaleDateString("en-CA")},${String(tx.merchant||"Unknown").replace(/,/g,";")},${tx.amount.toFixed(2)}`)];
-    sCsvText(csvLines.join("\n"));sParsed(null);sFile(null);sMode("paste");
+    sCsvText(csvLines.join("\n"));
     const notes=[];if(dupCount>0)notes.push(`Removed ${dupCount} likely-duplicate row${dupCount===1?"":"s"} (same date, amount & merchant appeared on more than one photo).`);
     if(firstErr)notes.push(firstErr+" — other photos were still processed.");
-    sNote(notes.length?notes.join(" "):`Read ${deduped.length} transaction${deduped.length===1?"":"s"} from ${photos.length} photo${photos.length===1?"":"s"}. Review below, then tap Parse CSV text.`);
-    sAnalyzing(false);sPhotoProgress(null);
+    sNote(notes.length?notes.join(" "):`Read ${deduped.length} transaction${deduped.length===1?"":"s"} from ${csvPhotos.length} photo${csvPhotos.length===1?"":"s"}. Review below, then tap Parse CSV text.`);
+    sCsvPhotoBusy(false);sCsvPhotoProgress(null);
   };
   // Local deterministic reconciliation: match statement txns to app expenses by amount + date
   const recon=useMemo(()=>{
@@ -2809,6 +2841,33 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
       t("input",{ref:fileRef,type:"file",accept:".csv,.xlsx,.xls",style:{display:"none"},onChange:async e=>{const f=e.target.files?.[0];if(f)await parseFile(f);e.target.value=""}})
     ]}),
     mode==="paste"&&o("div",{style:{marginBottom:16},children:[
+      t("button",{onClick:()=>{sCsvPhotoOpen(v=>!v);sCsvPhotoErr(null)},className:"w100 act95 tr f ia jc",style:{gap:6,padding:"10px 0",background:csvPhotoOpen?c.sf3:c.sfg,border:`1px solid ${csvPhotoOpen?c.ac:c.brs}`,borderRadius:10,color:c.tx,fontSize:12.5,fontWeight:500,marginBottom:10},children:[t("span",{style:{fontSize:14},children:"📷"}),csvPhotoOpen?"Hide photo scan":"Or scan photo(s) into this box"]}),
+      csvPhotoOpen&&o("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:12,marginBottom:12},children:[
+        csvPhotos.length>0&&o("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(90px,1fr))",gap:8,marginBottom:12},children:csvPhotos.map((ph,i)=>o("div",{key:ph.id,style:{position:"relative",borderRadius:10,overflow:"hidden",border:`1px solid ${c.brs}`,aspectRatio:"1"},children:[
+          t("img",{src:ph.preview,alt:"",style:{width:"100%",height:"100%",objectFit:"cover",display:"block"}}),
+          t("div",{style:{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(transparent,rgba(0,0,0,.6))",color:"#fff",fontSize:10,fontFamily:F.mo,padding:"8px 6px 4px",textAlign:"left"},children:"#"+(i+1)}),
+          !csvPhotoBusy&&t("button",{onClick:()=>removeCsvPhoto(ph.id),className:"act90 trt",style:{position:"absolute",top:4,right:4,width:22,height:22,borderRadius:999,background:"rgba(0,0,0,.6)",color:"#fff",border:"none",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,lineHeight:1,padding:0},children:"×"})
+        ]}))}),
+        o("div",{style:{background:c.sf2,borderRadius:14,border:`2px dashed ${csvPhotos.length?c.mt:c.brs}`,padding:csvPhotos.length?12:18,textAlign:"center",cursor:csvPhotoBusy?"default":"pointer",marginBottom:10},onClick:()=>{if(!csvPhotoBusy)csvPhotoRef.current?.click()},children:csvPhotoBusy&&csvPhotoProgress?[
+          t("div",{key:"p",style:{fontSize:12.5,color:c.tm},children:`Reading statement ${csvPhotoProgress.done}/${csvPhotoProgress.total}…`})
+        ]:csvPhotoBusy?[
+          t("div",{key:"r",style:{fontSize:12.5,color:c.tm},children:"Reading the statement…"})
+        ]:[
+          t("div",{key:"e",style:{fontSize:24,marginBottom:6},children:csvPhotos.length?"➕":"📷"}),
+          t("div",{key:"t",style:{fontSize:13,color:c.tx,fontWeight:500},children:csvPhotos.length?`Add more photos (${csvPhotos.length} added)`:"Tap to snap or upload statement photos"}),
+          t("div",{key:"s",style:{fontSize:10.5,color:c.tm,marginTop:3},children:"Choose one or more from gallery or camera"})
+        ]}),
+        t("input",{ref:csvPhotoRef,type:"file",accept:"image/*",multiple:true,style:{display:"none"},onChange:async e=>{await pickCsvPhotos(e.target.files);e.target.value=""}}),
+        csvPhotos.length>0&&o(Fragment,{children:[
+          o("div",{style:{marginBottom:10},children:[
+            t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:"YEAR (if dates on the statement don't show one)"}),
+            t("input",{value:csvYear,inputMode:"numeric",onChange:e=>sCsvYear(e.target.value.replace(/[^\d]/g,"").slice(0,4)),placeholder:String(new Date().getFullYear()),style:{width:"100%",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px",color:c.tx,fontSize:14,fontFamily:F.mo,outline:"none",boxSizing:"border-box"}})
+          ]}),
+          csvPhotoErr&&t("div",{style:{fontSize:11.5,color:c.co,marginBottom:10,lineHeight:1.4},children:csvPhotoErr}),
+          t("button",{disabled:!csvPhotos.length||csvPhotoBusy||String(csvYear).length!==4,onClick:async()=>{await extractPhotosToCsv();sCsvPhotoOpen(false)},className:"w100 act98 tr f ia jc",style:{gap:8,padding:"13px 0",background:csvPhotos.length&&!csvPhotoBusy&&String(csvYear).length===4?c.ac:c.sf2,color:csvPhotos.length&&!csvPhotoBusy&&String(csvYear).length===4?"#0a0a0a":c.tm,borderRadius:11,fontWeight:600,fontSize:14,border:"none"},children:csvPhotoBusy?(csvPhotoProgress?`Reading ${csvPhotoProgress.done}/${csvPhotoProgress.total}…`:"Reading the statement…"):[t(Send,{key:"i",size:15}),csvPhotos.length>1?`▶ Start — read ${csvPhotos.length} photos`:"▶ Start"]})
+        ]})
+      ]}),
+      !csvPhotoOpen&&csvPhotoErr&&t("div",{style:{fontSize:11.5,color:c.co,marginBottom:10,lineHeight:1.4},children:csvPhotoErr}),
       note&&t("div",{style:{background:c.mt+"15",border:`1px solid ${c.mt}40`,borderRadius:12,padding:"10px 14px",marginBottom:10,fontSize:12,color:c.mt,lineHeight:1.5},children:note}),
       t("textarea",{value:csvText,onChange:e=>sCsvText(e.target.value),placeholder:"Date,Description,Amount\n2026-06-01,Swiggy,450\n2026-06-02,Amazon,1299",rows:6,style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px",color:c.tx,fontSize:13,fontFamily:F.mo,outline:"none",boxSizing:"border-box",resize:"vertical",lineHeight:1.5}}),
       t("div",{style:{fontSize:11,color:c.tm,margin:"6px 2px 10px"},children:"Paste rows with a header line — needs a Date column and an Amount column (a Description/Merchant column is optional)."}),
@@ -2830,14 +2889,8 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
         t("div",{key:"s",style:{fontSize:11,color:c.tm,marginTop:4},children:photos.length?"Great for multi-page statements — each photo is read in turn":"Choose one or more from gallery or camera"})
       ]}),
       t("input",{ref:photoRef,type:"file",accept:"image/*",multiple:true,style:{display:"none"},onChange:async e=>{await pickPhotos(e.target.files);e.target.value=""}}),
-      photos.length>0&&o(Fragment,{children:[
-        t("input",{value:photoPrompt,onChange:e=>sPhotoPrompt(e.target.value),placeholder:"Optional instructions — e.g. only debit transactions",style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 14px",color:c.tx,fontSize:13,fontFamily:'var(--tf)',outline:"none",boxSizing:"border-box",marginBottom:10}}),
-        o("div",{style:{marginBottom:10},children:[
-          t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:"YEAR (if dates on the statement don't show one)"}),
-          t("input",{value:stmtYear,inputMode:"numeric",onChange:e=>sStmtYear(e.target.value.replace(/[^\d]/g,"").slice(0,4)),placeholder:String(new Date().getFullYear()),style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 14px",color:c.tx,fontSize:14,fontFamily:F.mo,outline:"none",boxSizing:"border-box"}})
-        ]}),
-        t("button",{disabled:!photos.length||analyzing||String(stmtYear).length!==4,onClick:extractPhoto,className:"w100 act98 tr f ia jc",style:{gap:8,padding:"14px 0",background:photos.length&&!analyzing&&String(stmtYear).length===4?c.ac:c.sf2,color:photos.length&&!analyzing&&String(stmtYear).length===4?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:analyzing?(photoProgress?`Reading ${photoProgress.done}/${photoProgress.total}…`:"Reading the statement…"):[t(Send,{key:"i",size:16}),photos.length>1?`▶ Start — read ${photos.length} photos`:"▶ Start"]})
-      ]})
+      t("input",{value:photoPrompt,onChange:e=>sPhotoPrompt(e.target.value),placeholder:"Optional instructions — e.g. only debit transactions",style:{width:"100%",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 14px",color:c.tx,fontSize:13,fontFamily:'var(--tf)',outline:"none",boxSizing:"border-box",marginBottom:10}}),
+      t("button",{disabled:!photos.length||analyzing,onClick:extractPhoto,className:"w100 act98 tr f ia jc",style:{gap:8,padding:"14px 0",background:photos.length&&!analyzing?c.ac:c.sf2,color:photos.length&&!analyzing?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:analyzing?(photoProgress?`Reading ${photoProgress.done}/${photoProgress.total}…`:"Reading the statement…"):[t(Send,{key:"i",size:16}),photos.length>1?`Extract from ${photos.length} photos`:"Extract transactions"]})
     ]}),
     parsed&&o("div",{style:{marginBottom:16},children:[
       t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:8},children:"COMPARE PERIOD"}),
