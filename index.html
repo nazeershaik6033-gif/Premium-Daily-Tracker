@@ -2839,7 +2839,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
         sCsvPhotoProgress({done:i,total:csvPhotos.length,pct:0,stage:"reading"});
         const canvas=await preprocessImageForOCR(ph.file);
         const{data}=await worker.recognize(canvas);
-        const rows=stmtParseOCRText(data&&data.text,fallbackYear);
+        const rows=stmtParseOCRText(data&&data.text,fallbackYear,currency);
         for(const it of rows){
           if(!(it.amount>0))continue;
           const day=Math.min(Math.max(it.day||1,1),31);
@@ -3921,10 +3921,18 @@ function stmtFindDateToken(line){
   return null;
 }
 // Find an amount ANYWHERE in the line — same reasoning as above.
-function stmtFindAmountToken(line){
-  const m=line.match(/(?:₹|rs\.?|inr\.?|\$|€|£)?\s?-?\d[\d,]*\.\d{2}\b/i);
+// Tesseract's base "eng" model has no ₹ glyph in its trained character set at all (it's simply
+// never seen it), so on ₹-labelled photos it maps the symbol to whatever character looks closest —
+// commonly a stray "3" glued directly onto the real number with no space ("₹303.32" -> "3303.32"),
+// silently inflating the amount. When rupeeMode is on, a leading "3" immediately touching the digits
+// is treated as that misread symbol and captured separately so it never reaches the parsed number —
+// a real amount's digits always live in their own capture group, so a genuine "3" that's actually the
+// amount's own leading digit (e.g. a correctly-read ₹303.32, or a bare 350.00) is never touched.
+function stmtFindAmountToken(line,rupeeMode){
+  const re=rupeeMode?/(?:₹|rs\.?|inr\.?|\$|€|£|3(?=\d))?\s?(-?\d[\d,]*\.\d{2})\b/i:/(?:₹|rs\.?|inr\.?|\$|€|£)?\s?(-?\d[\d,]*\.\d{2})\b/i;
+  const m=line.match(re);
   if(!m)return null;
-  const num=parseFloat(m[0].replace(/[₹$€£,\s]/g,"").replace(/^rs\.?/i,"").replace(/^inr\.?/i,""));
+  const num=parseFloat(m[1].replace(/,/g,""));
   if(isNaN(num))return null;
   return{amount:Math.abs(num),match:m[0]};
 }
@@ -3940,19 +3948,20 @@ function stmtStripTokens(line,dt,am){
 // Heuristic reconstruction: handles both "one field per OCR line" (name / category / amount / date
 // each on their own line) and "name, amount and date all on one line" layouts. Closes a transaction
 // as soon as a date token is seen, using whatever amount/name text has been collected since the last one.
-function stmtParseOCRText(text,fallbackYear){
+function stmtParseOCRText(text,fallbackYear,currency){
+  const rupeeMode=currency==="₹";
   const lines=String(text||"").split(/\r?\n/).map(l=>l.trim()).filter(Boolean).filter(l=>!STMT_SKIP_RE.test(l));
   const out=[];let nameBuf=[],amt=null;
   const allDates=[],allAmounts=[],allNames=[];
   lines.forEach((line,idx)=>{
-    const dt=stmtFindDateToken(line);const am=stmtFindAmountToken(line);
+    const dt=stmtFindDateToken(line);const am=stmtFindAmountToken(line,rupeeMode);
     const rest=stmtStripTokens(line,dt,am);
     if(dt)allDates.push({idx,dt});
     if(am)allAmounts.push({idx,a:am.amount});
     if(rest&&!STMT_CATWORDS.has(rest.toLowerCase()))allNames.push({idx,line:rest});
   });
   for(const line of lines){
-    const dt=stmtFindDateToken(line);const am=stmtFindAmountToken(line);
+    const dt=stmtFindDateToken(line);const am=stmtFindAmountToken(line,rupeeMode);
     const rest=stmtStripTokens(line,dt,am);
     if(am)amt=am.amount;
     if(rest&&!STMT_CATWORDS.has(rest.toLowerCase()))nameBuf.push(rest);
