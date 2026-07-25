@@ -2751,32 +2751,29 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
   const csvPhotoRef=useRef(null);
   const extractPhotosToCsv=async()=>{
     if(!csvPhotos.length){sCsvPhotoErr("Pick at least one statement photo first.");return}sCsvPhotoErr(null);sNote(null);
-    if(!gAK()){sCsvPhotoErr("Add an AI API key in Settings first.");return}
     const fallbackYear=parseInt(csvYear,10)||new Date().getFullYear();
-    sCsvPhotoBusy(true);sCsvPhotoProgress(csvPhotos.length>1?{done:0,total:csvPhotos.length}:null);
-    const sys="You extract transactions from a bank or credit card statement image. Be thorough and accurate.";
+    sCsvPhotoBusy(true);sCsvPhotoProgress({done:0,total:csvPhotos.length,pct:0,stage:"loading"});
+    let Tesseract;
+    try{Tesseract=await ensureTesseract()}catch(e2){sCsvPhotoErr(e2.message||"Could not load the OCR engine.");sCsvPhotoBusy(false);sCsvPhotoProgress(null);return}
     const all=[];let firstErr=null;
     for(let i=0;i<csvPhotos.length;i++){
       const ph=csvPhotos[i];
       try{
-        const b64=ph.preview||await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(ph.file)});
-        const u=[{type:"image",source:{type:"base64",media_type:ph.file.type,data:b64.split(",")[1]}},{type:"text",text:'Extract ALL spending transactions visible. For each, read the date exactly as printed: give day and month as numbers. Give year ONLY if a 4-digit year is actually printed next to that date — otherwise leave year null, do not guess it. Return JSON only: {"transactions":[{"day":D,"month":M,"year":Y_or_null,"amount":N,"merchant":"name"}]}. Amounts as positive numbers, day 1-31, month 1-12.'}];
-        const r=await cAPI({max_tokens:3000,system:sys,messages:[{role:"user",content:u}]});
-        const txt=r.content?.map(x=>x.text||"").join("")||"";
-        const m=txt.match(/\{[\s\S]*\}/);if(!m)throw new Error("Could not read transactions");
-        const arr=(JSON.parse(m[0]).transactions)||[];
-        for(const it of arr){
-          const amt=parseFloat(String(it.amount).replace(/[^0-9.]/g,""));if(!amt||isNaN(amt)||amt<=0)continue;
-          const day=Math.min(Math.max(parseInt(it.day,10)||1,1),31);
-          const month=Math.min(Math.max(parseInt(it.month,10)||1,1),12);
-          const year=(it.year!=null&&!isNaN(parseInt(it.year,10)))?parseInt(it.year,10):fallbackYear;
+        sCsvPhotoProgress({done:i,total:csvPhotos.length,pct:0,stage:"reading"});
+        const{data}=await Tesseract.recognize(ph.file,"eng",{logger:msg=>{if(msg.status==="recognizing text")sCsvPhotoProgress({done:i,total:csvPhotos.length,pct:Math.round((msg.progress||0)*100),stage:"reading"})}});
+        const rows=stmtParseOCRText(data&&data.text,fallbackYear);
+        for(const it of rows){
+          if(!(it.amount>0))continue;
+          const day=Math.min(Math.max(it.day||1,1),31);
+          const month=Math.min(Math.max(it.month||1,1),12);
+          const year=it.year||fallbackYear;
           const pd=new Date(year,month-1,day);const ts=isNaN(pd.getTime())?Date.now():pd.getTime();
-          all.push({date:ts,amount:amt,merchant:String(it.merchant||"Unknown").slice(0,60)});
+          all.push({date:ts,amount:it.amount,merchant:String(it.name||"Unknown").slice(0,60)||"Unknown"});
         }
-      }catch(e2){if(!firstErr)firstErr=`Photo ${i+1}: ${e2.message}`}
-      sCsvPhotoProgress(csvPhotos.length>1?{done:i+1,total:csvPhotos.length}:null);
+      }catch(e2){if(!firstErr)firstErr=`Photo ${i+1}: ${e2.message||"could not read this photo"}`}
+      sCsvPhotoProgress({done:i+1,total:csvPhotos.length,pct:100,stage:"reading"});
     }
-    if(!all.length){sCsvPhotoErr(firstErr||"No transactions found in the photo(s).");sCsvPhotoBusy(false);sCsvPhotoProgress(null);return}
+    if(!all.length){sCsvPhotoErr(firstErr||"Couldn't find any date+amount rows in the photo(s) — try a clearer or closer photo, or fall back to Paste CSV by hand.");sCsvPhotoBusy(false);sCsvPhotoProgress(null);return}
     const seen=new Set();const deduped=[];let dupCount=0;
     for(const tx of all){const key=Math.round(tx.date/864e5)+"|"+tx.amount.toFixed(2)+"|"+String(tx.merchant||"").trim().toLowerCase();if(seen.has(key)){dupCount++;continue}seen.add(key);deduped.push(tx)}
     deduped.sort((a,b)=>a.date-b.date);
@@ -2787,6 +2784,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
     sNote(notes.length?notes.join(" "):`Read ${deduped.length} transaction${deduped.length===1?"":"s"} from ${csvPhotos.length} photo${csvPhotos.length===1?"":"s"}. Review below, then tap Parse CSV text.`);
     sCsvPhotoBusy(false);sCsvPhotoProgress(null);
   };
+  const csvPhotoStatusText=()=>{if(!csvPhotoProgress)return"Reading the statement…";if(csvPhotoProgress.stage==="loading")return"Loading OCR engine…";return`Reading photo ${Math.min(csvPhotoProgress.done+1,csvPhotoProgress.total)}/${csvPhotoProgress.total} · ${csvPhotoProgress.pct||0}%…`};
   // Local deterministic reconciliation: match statement txns to app expenses by amount + date
   const recon=useMemo(()=>{
     if(!parsed)return[];
@@ -2843,15 +2841,14 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
     mode==="paste"&&o("div",{style:{marginBottom:16},children:[
       t("button",{onClick:()=>{sCsvPhotoOpen(v=>!v);sCsvPhotoErr(null)},className:"w100 act95 tr f ia jc",style:{gap:6,padding:"10px 0",background:csvPhotoOpen?c.sf3:c.sfg,border:`1px solid ${csvPhotoOpen?c.ac:c.brs}`,borderRadius:10,color:c.tx,fontSize:12.5,fontWeight:500,marginBottom:10},children:[t("span",{style:{fontSize:14},children:"📷"}),csvPhotoOpen?"Hide photo scan":"Or scan photo(s) into this box"]}),
       csvPhotoOpen&&o("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:12,marginBottom:12},children:[
+        t("div",{style:{fontSize:11,color:c.tm,lineHeight:1.5,marginBottom:10},children:"Reads the photo(s) on your device using local OCR — no AI, no API key, nothing leaves your phone. Works best on clear, well-lit photos; always review the text below before parsing."}),
         csvPhotos.length>0&&o("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(90px,1fr))",gap:8,marginBottom:12},children:csvPhotos.map((ph,i)=>o("div",{key:ph.id,style:{position:"relative",borderRadius:10,overflow:"hidden",border:`1px solid ${c.brs}`,aspectRatio:"1"},children:[
           t("img",{src:ph.preview,alt:"",style:{width:"100%",height:"100%",objectFit:"cover",display:"block"}}),
           t("div",{style:{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(transparent,rgba(0,0,0,.6))",color:"#fff",fontSize:10,fontFamily:F.mo,padding:"8px 6px 4px",textAlign:"left"},children:"#"+(i+1)}),
           !csvPhotoBusy&&t("button",{onClick:()=>removeCsvPhoto(ph.id),className:"act90 trt",style:{position:"absolute",top:4,right:4,width:22,height:22,borderRadius:999,background:"rgba(0,0,0,.6)",color:"#fff",border:"none",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,lineHeight:1,padding:0},children:"×"})
         ]}))}),
-        o("div",{style:{background:c.sf2,borderRadius:14,border:`2px dashed ${csvPhotos.length?c.mt:c.brs}`,padding:csvPhotos.length?12:18,textAlign:"center",cursor:csvPhotoBusy?"default":"pointer",marginBottom:10},onClick:()=>{if(!csvPhotoBusy)csvPhotoRef.current?.click()},children:csvPhotoBusy&&csvPhotoProgress?[
-          t("div",{key:"p",style:{fontSize:12.5,color:c.tm},children:`Reading statement ${csvPhotoProgress.done}/${csvPhotoProgress.total}…`})
-        ]:csvPhotoBusy?[
-          t("div",{key:"r",style:{fontSize:12.5,color:c.tm},children:"Reading the statement…"})
+        o("div",{style:{background:c.sf2,borderRadius:14,border:`2px dashed ${csvPhotos.length?c.mt:c.brs}`,padding:csvPhotos.length?12:18,textAlign:"center",cursor:csvPhotoBusy?"default":"pointer",marginBottom:10},onClick:()=>{if(!csvPhotoBusy)csvPhotoRef.current?.click()},children:csvPhotoBusy?[
+          t("div",{key:"p",style:{fontSize:12.5,color:c.tm},children:csvPhotoStatusText()})
         ]:[
           t("div",{key:"e",style:{fontSize:24,marginBottom:6},children:csvPhotos.length?"➕":"📷"}),
           t("div",{key:"t",style:{fontSize:13,color:c.tx,fontWeight:500},children:csvPhotos.length?`Add more photos (${csvPhotos.length} added)`:"Tap to snap or upload statement photos"}),
@@ -2864,7 +2861,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
             t("input",{value:csvYear,inputMode:"numeric",onChange:e=>sCsvYear(e.target.value.replace(/[^\d]/g,"").slice(0,4)),placeholder:String(new Date().getFullYear()),style:{width:"100%",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px",color:c.tx,fontSize:14,fontFamily:F.mo,outline:"none",boxSizing:"border-box"}})
           ]}),
           csvPhotoErr&&t("div",{style:{fontSize:11.5,color:c.co,marginBottom:10,lineHeight:1.4},children:csvPhotoErr}),
-          t("button",{disabled:!csvPhotos.length||csvPhotoBusy||String(csvYear).length!==4,onClick:async()=>{await extractPhotosToCsv();sCsvPhotoOpen(false)},className:"w100 act98 tr f ia jc",style:{gap:8,padding:"13px 0",background:csvPhotos.length&&!csvPhotoBusy&&String(csvYear).length===4?c.ac:c.sf2,color:csvPhotos.length&&!csvPhotoBusy&&String(csvYear).length===4?"#0a0a0a":c.tm,borderRadius:11,fontWeight:600,fontSize:14,border:"none"},children:csvPhotoBusy?(csvPhotoProgress?`Reading ${csvPhotoProgress.done}/${csvPhotoProgress.total}…`:"Reading the statement…"):[t(Send,{key:"i",size:15}),csvPhotos.length>1?`▶ Start — read ${csvPhotos.length} photos`:"▶ Start"]})
+          t("button",{disabled:!csvPhotos.length||csvPhotoBusy||String(csvYear).length!==4,onClick:async()=>{await extractPhotosToCsv();sCsvPhotoOpen(false)},className:"w100 act98 tr f ia jc",style:{gap:8,padding:"13px 0",background:csvPhotos.length&&!csvPhotoBusy&&String(csvYear).length===4?c.ac:c.sf2,color:csvPhotos.length&&!csvPhotoBusy&&String(csvYear).length===4?"#0a0a0a":c.tm,borderRadius:11,fontWeight:600,fontSize:14,border:"none"},children:csvPhotoBusy?csvPhotoStatusText():[t(Send,{key:"i",size:15}),csvPhotos.length>1?`▶ Start — read ${csvPhotos.length} photos`:"▶ Start"]})
         ]})
       ]}),
       !csvPhotoOpen&&csvPhotoErr&&t("div",{style:{fontSize:11.5,color:c.co,marginBottom:10,lineHeight:1.4},children:csvPhotoErr}),
@@ -3777,6 +3774,76 @@ async function grocScanBill(file){
   const parsed=extractJSON(txt);
   if(!parsed||!Array.isArray(parsed.items)||parsed.items.length===0)throw new Error(parsed&&parsed.error?parsed.error:"Couldn't read any items from this bill — try a clearer photo.");
   return parsed;
+}
+// Local (no-AI) OCR helpers for the Statement Analyzer's Paste-CSV photo scan — runs entirely in the browser.
+let _tesseractLoading=null;
+function ensureTesseract(){
+  if(window.Tesseract)return Promise.resolve(window.Tesseract);
+  if(_tesseractLoading)return _tesseractLoading;
+  _tesseractLoading=new Promise((resolve,reject)=>{
+    const s=document.createElement("script");
+    s.src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+    s.crossOrigin="anonymous";
+    s.onload=()=>window.Tesseract?resolve(window.Tesseract):reject(new Error("OCR engine failed to load."));
+    s.onerror=()=>{_tesseractLoading=null;reject(new Error("Could not load the OCR engine — check your connection."))};
+    document.head.appendChild(s);
+  });
+  return _tesseractLoading;
+}
+const STMT_MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+function stmtParseDateToken(line){
+  let m;
+  if(m=line.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\.?,?\s*(\d{4})?$/)){const mon=STMT_MON[m[2].slice(0,3).toLowerCase()];if(mon)return{day:+m[1],month:mon,year:m[3]?+m[3]:null}}
+  if(m=line.match(/^([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s*(\d{4})?$/)){const mon=STMT_MON[m[1].slice(0,3).toLowerCase()];if(mon)return{day:+m[2],month:mon,year:m[3]?+m[3]:null}}
+  if(m=line.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?$/)){let y=m[3]?+m[3]:null;if(y!=null&&y<100)y+=2000;return{day:+m[1],month:+m[2],year:y}}
+  return null;
+}
+function stmtLineAmount(line){
+  const cleaned=line.replace(/[₹$€£]/g,"").replace(/,/g,"").trim();
+  const m=cleaned.match(/^-?\d+\.\d{2}$/);
+  return m?Math.abs(parseFloat(m[0])):null;
+}
+const STMT_SKIP_RE=/^(statement|summary|total|sub\s*total|balance|available|credit limit|minimum (amount )?due|due date|payment due|page\s*\d|opening balance|closing balance|transaction (history|details)|date\s+description\s+amount)\b/i;
+const STMT_CATWORDS=new Set(["grocery","groceries","shopping","food and drinks","food & drinks","medical","others","other","transport","bills","entertainment","subscriptions","subscription","health","travel","fuel","rent","emi","recharge","utilities","utility","insurance","salary","income","transfer","atm","cash withdrawal","refund","reversal"]);
+// Heuristic reconstruction: OCR gives lines in reading order, not columns — walk them and
+// close a transaction once we've seen name text, an amount, and a trailing date token.
+function stmtParseOCRText(text,fallbackYear){
+  const lines=String(text||"").split(/\r?\n/).map(l=>l.trim()).filter(Boolean).filter(l=>!STMT_SKIP_RE.test(l));
+  const out=[];let nameBuf=[],amt=null;
+  const allDates=[],allAmounts=[],allNames=[];
+  lines.forEach((line,idx)=>{
+    const dt=stmtParseDateToken(line);
+    if(dt){allDates.push({idx,dt});return}
+    const a=stmtLineAmount(line);
+    if(a!=null){allAmounts.push({idx,a});return}
+    if(STMT_CATWORDS.has(line.toLowerCase()))return;
+    allNames.push({idx,line});
+  });
+  for(const line of lines){
+    const dt=stmtParseDateToken(line);
+    if(dt){
+      if(amt!=null&&nameBuf.length)out.push({name:nameBuf.join(" ").trim(),amount:amt,day:dt.day,month:dt.month,year:dt.year!=null?dt.year:fallbackYear});
+      nameBuf=[];amt=null;continue;
+    }
+    const a=stmtLineAmount(line);
+    if(a!=null){amt=a;continue}
+    if(STMT_CATWORDS.has(line.toLowerCase()))continue;
+    nameBuf.push(line);
+  }
+  // Fallback for OCR that reads column-by-column instead of row-by-row: if the sequential
+  // walk above didn't produce one row per date found, pair amounts/dates/names by position instead.
+  if(out.length<allDates.length&&allAmounts.length===allDates.length&&allDates.length>0){
+    const fb=[];const namesLineUp=allNames.length===allDates.length;
+    for(let i=0;i<allDates.length;i++){
+      const{idx:dIdx,dt}=allDates[i];const{a}=allAmounts[i];
+      let name;
+      if(namesLineUp)name=allNames[i].line;
+      else{let nearest=null,bestDist=Infinity;for(const n of allNames){const dist=Math.abs(n.idx-dIdx);if(dist<bestDist){bestDist=dist;nearest=n}}name=(nearest&&nearest.line)||"Unknown"}
+      fb.push({name,amount:a,day:dt.day,month:dt.month,year:dt.year!=null?dt.year:fallbackYear});
+    }
+    if(fb.length>out.length)return fb;
+  }
+  return out;
 }
 // Local text-list parser: handles "Milk 64", "2 Milk 128", "Rice 5kg 250", "Maggi MRP 70 disc 6 64", bare names.
 function grocParseText(text){
