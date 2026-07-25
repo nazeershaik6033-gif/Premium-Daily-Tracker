@@ -868,9 +868,14 @@ function Sidebar({data,onClose,onView,activeUser,onUpdateUser,focusSection}){
   o("div",{style:{padding:"16px 16px 6px"},children:[t("div",{style:{fontFamily:F.mo,fontSize:9.5,letterSpacing:1.5,color:c.tm,fontWeight:600},children:"THREADS"})]}),
   ...(data.threads||[]).filter(th=>!sbQ.trim()||th.name.toLowerCase().includes(sbQ.trim().toLowerCase())).map(th=>{
     const tEntries=(data.expenses||[]).filter(e=>e.threadId===th.id);
-    const latest=tEntries.length?tEntries.reduce((a,b)=>a.date>b.date?a:b):null;
-    const preview=latest?(latest.note||latest.merchant||latest.payee||co(latest.category).label):"No entries yet";
-    const meta=tEntries.length?`${tEntries.length} entr${tEntries.length===1?"y":"ies"} · ${agoStr(latest.date)}`:"No entries yet";
+    const tNotes=th.notes||[];
+    const latestExp=tEntries.length?tEntries.reduce((a,b)=>a.date>b.date?a:b):null;
+    const latestNote=tNotes.length?tNotes[0]:null;
+    const useNote=latestNote&&(!latestExp||latestNote.createdAt>latestExp.date);
+    const latestTs=useNote?latestNote.createdAt:(latestExp?latestExp.date:null);
+    const totalCount=tEntries.length+tNotes.length;
+    const preview=latestTs==null?"No entries yet":(useNote?latestNote.text:(latestExp.note||latestExp.merchant||latestExp.payee||co(latestExp.category).label));
+    const meta=totalCount>0?`${totalCount} entr${totalCount===1?"y":"ies"} · ${agoStr(latestTs)}`:"No entries yet";
     return t("button",{key:"th_"+th.id,onClick:()=>go("thread:"+th.id),className:"w100 f ia trc",style:{gap:12,padding:"11px 16px",background:"transparent",border:"none",cursor:"pointer",textAlign:"left"},children:[
       t("div",{style:{width:36,height:36,borderRadius:10,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0},children:th.emoji||"🧵"}),
       o("div",{className:"f1 tl minw0",children:[t("div",{className:"tru",style:{fontSize:14,color:c.tx,fontWeight:400},children:th.name}),t("div",{className:"tru",style:{fontSize:11,color:c.tm,marginTop:1},children:preview}),t("div",{style:{fontFamily:F.mo,fontSize:9.5,color:c.td,marginTop:2},children:meta})]}),
@@ -1206,9 +1211,11 @@ function App(){
   const dPhoto=(expId,photoId)=>{const e=d.expenses.find(x=>x.id===expId);if(!e)return;try{idbDelFile(String(photoId))}catch(err){}const nPhotos=(e.photos||[]).filter(p=>p.id!==photoId);const L=d.expenses.map(x=>x.id===expId?{...x,photos:nPhotos}:x);pst({expenses:L});sAtx(a=>a&&a.id===expId?{...a,photos:nPhotos}:a)};
   const chE=(id,category)=>{const L=d.expenses.map(x=>x.id===id?{...x,category}:x);pst({expenses:L});sAtx(a=>a&&a.id===id?{...a,category}:a)};
   const chThread=(id,threadId)=>{const L=d.expenses.map(x=>x.id===id?{...x,threadId}:x);pst({expenses:L});sAtx(a=>a&&a.id===id?{...a,threadId}:a)};
-  const aTh=(th)=>{const id="th_"+uid();pst({threads:[{...th,id,createdAt:Date.now()},...(d.threads||[])]});return id};
+  const aTh=(th)=>{const id="th_"+uid();pst({threads:[{...th,id,notes:[],createdAt:Date.now()},...(d.threads||[])]});return id};
   const uTh=(id,patch)=>pst({threads:(d.threads||[]).map(x=>x.id===id?{...x,...patch}:x)});
   const dTh=(id)=>{pst({threads:(d.threads||[]).filter(x=>x.id!==id),expenses:d.expenses.map(e=>e.threadId===id?{...e,threadId:null}:e)});sThId(null);sV(navFromRef.current||"home")};
+  const addThNote=(threadId,text)=>pst({threads:(d.threads||[]).map(x=>x.id===threadId?{...x,notes:[{id:"n_"+uid(),text,createdAt:Date.now()},...(x.notes||[])]}:x)});
+  const delThNote=(threadId,noteId)=>pst({threads:(d.threads||[]).map(x=>x.id===threadId?{...x,notes:(x.notes||[]).filter(n=>n.id!==noteId)}:x)});
   const dE=(id)=>{const e=d.expenses.find(x=>x.id===id);try{(e?.photos||[]).forEach(p=>p&&p.id&&idbDelFile(String(p.id)))}catch(err){}let L;if(e?.transferId)L=d.expenses.filter(x=>x.transferId!==e.transferId);else if(e?.type==="reimbursement")L=d.expenses.filter(x=>x.id!==id).map(x=>x.id===e.reimbFor?{...x,reimbursedBy:null,reimbursedAt:null,reimbursedAmount:null}:x);else if(e?.reimbursedBy)L=d.expenses.filter(x=>x.id!==id&&x.id!==e.reimbursedBy);else L=d.expenses.filter(x=>x.id!==id);pst({expenses:L});sAtx(null);sV(v)};
   const dT=({fromId,toId,amount,currency,date,note})=>{const id=uid(),tid="xfer_"+id;const out={id:"xo_"+id,type:"transfer-out",amount,currency,accountId:fromId,category:"other",merchant:"Transfer",note:note||null,date,source:"transfer",transferId:tid};const inE={id:"xi_"+id,type:"transfer-in",amount,currency,accountId:toId,category:"other",merchant:"Transfer",note:note||null,date,source:"transfer",transferId:tid};pst({expenses:[out,inE,...d.expenses].sort((a,b)=>b.date-a.date)});sV("accounts")};
   const aCP=({cardId,accountId,amount,date})=>{const cr=(d.cards||[]).find(x=>x.id===cardId),id=uid();const p={id:"cp_"+id,type:"card-payment",amount,currency:d.currency,accountId,cardId,category:"other",merchant:`${cr?.name||"Card"} payment`,note:"Credit card bill payment",date,source:"card-payment"};pst({expenses:[p,...d.expenses].sort((a,b)=>b.date-a.date)})};
@@ -1337,7 +1344,7 @@ function App(){
         v==="goals"&&t(Goals,{data:d,onClose:()=>sV(navFromRef.current),onAdd:()=>{sEGo(null);sV("newGoal")},onEdit:g=>{sEGo(g);sV("editGoal")},onDelete:dGo,onContribute:(g,amt)=>uGo({...g,currentBalance:(g.currentBalance||0)+amt})}),
         v==="newGoal"&&t(NewGoal,{data:d,onSave:g=>{aGo(g);sV("goals")},onCancel:()=>sV("goals")}),
         v==="editGoal"&&eGo&&t(NewGoal,{data:d,editing:eGo,onSave:g=>{uGo({...eGo,...g});sEGo(null);sV("goals")},onCancel:()=>{sEGo(null);sV("goals")}}),
-        v==="threadDetail"&&thId&&t(ThreadDetail,{data:d,threadId:thId,onClose:()=>{sThId(null);sV(navFromRef.current||"home")},onEdit:th=>{sETh(th);sV("editThread")},onDelete:dTh,onSelectExpense:e=>sAtx(e)}),
+        v==="threadDetail"&&thId&&t(ThreadDetail,{data:d,threadId:thId,onClose:()=>{sThId(null);sV(navFromRef.current||"home")},onEdit:th=>{sETh(th);sV("editThread")},onDelete:dTh,onSelectExpense:e=>sAtx(e),onAddNote:addThNote,onDeleteNote:delThNote}),
         v==="newThread"&&t(NewThread,{data:d,onSave:th=>{const id=aTh(th);sThId(id);sV("threadDetail")},onCancel:()=>sV(navFromRef.current||"home")}),
         v==="editThread"&&eTh&&t(NewThread,{data:d,editing:eTh,onSave:th=>{uTh(eTh.id,th);sETh(null);sV("threadDetail")},onCancel:()=>{sETh(null);sV("threadDetail")}}),
         v==="investments"&&t(Investments,{data:d,onClose:()=>sV(navFromRef.current),onAdd:()=>{sEInv(null);sV("newInvestment")},onEdit:inv=>{sEInv(inv);sV("editInvestment")},onDelete:dInv,onUpdate:uInv,onAddExpense:aE,onView:sV}),
@@ -5543,24 +5550,34 @@ return o("div",{style:{padding:"8px 0 32px"},className:"st",children:[
   ]}),
 ]})}
 
-function ThreadDetail({data,threadId,onClose,onEdit,onDelete,onSelectExpense}){
+function ThreadDetail({data,threadId,onClose,onEdit,onDelete,onSelectExpense,onAddNote,onDeleteNote}){
   const th=(data.threads||[]).find(x=>x.id===threadId);
   const[delConfirm,sDelConfirm]=useState(false);
+  const[noteText,sNoteText]=useState("");
   if(!th)return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[t(SH,{title:t("em",{children:"Thread"}),onBack:onClose}),t(ES,{title:t("em",{children:"Thread not found"}),subtitle:"It may have been deleted."})]});
   const currency=data.currency;
   const entries=(data.expenses||[]).filter(e=>e.threadId===threadId).sort((a,b)=>b.date-a.date);
+  const notes=th.notes||[];
   const total=entries.filter(e=>e.type==="expense").reduce((s,e)=>s+netAmt(e),0);
   const pct=th.budget?Math.max(0,Math.min(100,(total/th.budget)*100)):null;
   const over=th.budget&&total>th.budget;
   const barCol=over?c.ro:c.ac;
+  const totalCount=entries.length+notes.length;
+  const submitNote=()=>{const v=noteText.trim();if(!v)return;onAddNote(threadId,v);sNoteText("")};
   return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
     t(SH,{title:t("em",{children:th.name}),onBack:onClose,right:o("div",{className:"f",style:{gap:4},children:[t("button",{onClick:()=>onEdit(th),className:"act90 trt",style:{padding:8,background:"transparent",border:"none",color:c.tm},children:t(Pencil,{size:16})}),t("button",{onClick:()=>sDelConfirm(true),className:"act90 trt",style:{padding:8,background:"transparent",border:"none",color:c.tm},children:t(Trash2,{size:16})})]})}),
     o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:20},children:[
-      o("div",{className:"f ia",style:{gap:12,marginBottom:14},children:[t("div",{style:{width:42,height:42,borderRadius:11,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0},children:th.emoji||"🧵"}),o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:16,fontWeight:600,color:c.tx},children:th.name}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:`${entries.length} entr${entries.length===1?"y":"ies"}`})]})]}),
+      o("div",{className:"f ia",style:{gap:12,marginBottom:14},children:[t("div",{style:{width:42,height:42,borderRadius:11,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0},children:th.emoji||"🧵"}),o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:16,fontWeight:600,color:c.tx},children:th.name}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:`${totalCount} entr${totalCount===1?"y":"ies"}`})]})]}),
       o("div",{className:"f ib jb",style:{marginBottom:th.budget?6:0},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:28,fontWeight:300,color:barCol,letterSpacing:-1},children:fm(total,currency)}),th.budget&&t("span",{style:{fontFamily:F.mo,fontSize:14,fontWeight:600,color:barCol},children:pct.toFixed(0)+"%"})]}),
       th.budget&&t("div",{style:{height:8,background:c.sf2,borderRadius:999,overflow:"hidden",marginBottom:8},children:t("div",{style:{width:pct+"%",height:"100%",background:`linear-gradient(90deg,${barCol} 0%,${barCol}cc 100%)`,transition:"width 600ms cubic-bezier(0.2,0.9,0.2,1)"}})}),
       th.budget&&t("div",{style:{fontSize:11,color:c.tm,fontFamily:F.mo,letterSpacing:.3},children:over?`${fm(total-th.budget,currency)} OVER BUDGET`:`${fm(th.budget-total,currency)} LEFT OF ${fm(th.budget,currency)}`}),
     ]}),
+    t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:"NOTES"}),
+    o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:14,marginBottom:12},children:[
+      o("div",{className:"f ia",style:{gap:8},children:[t("input",{type:"text",value:noteText,onChange:ev=>sNoteText(ev.target.value),onKeyDown:ev=>{if(ev.key==="Enter")submitNote()},placeholder:"Jot something down…",style:{flex:1,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px",color:c.tx,fontSize:13,outline:"none",fontFamily:'var(--tf)'}}),t("button",{disabled:!noteText.trim(),onClick:submitNote,className:"act95 tr",style:{padding:"10px 14px",background:noteText.trim()?c.ac:c.sf2,color:noteText.trim()?"#0a0a0a":c.tm,borderRadius:10,border:"none",fontSize:13,fontWeight:600,flexShrink:0},children:"Add"})]}),
+    ]}),
+    notes.length===0?t("div",{style:{fontSize:12,color:c.tm,textAlign:"center",padding:"8px 0 20px"},children:"No notes yet — jot down appointments, reminders, or anything worth remembering."}):o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden",marginBottom:20},children:notes.map((n,i)=>o("div",{key:n.id,className:"f ia jb",style:{padding:"12px 14px",borderBottom:i===notes.length-1?"none":`1px solid ${c.brs}`,gap:10},children:[o("div",{className:"f1 minw0",children:[t("div",{style:{fontSize:13,color:c.tx,lineHeight:1.4,wordBreak:"break-word"},children:n.text}),t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,marginTop:4},children:agoStr(n.createdAt)})]}),t("button",{onClick:()=>onDeleteNote(threadId,n.id),className:"act90 trt",style:{padding:6,background:"transparent",border:"none",color:c.tm,flexShrink:0},children:t(X,{size:14})})]}))}),
+    t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:"EXPENSES"}),
     entries.length===0?t(ES,{title:t("em",{children:"No entries yet"}),subtitle:"Tag an expense to this thread from its detail view to see it here."}):o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden"},children:entries.map((e,i)=>{const cat=co(e.category);return o("button",{key:e.id,onClick:()=>onSelectExpense(e),className:"w100 f ia act99 trt",style:{padding:"12px 14px",borderBottom:i===entries.length-1?"none":`1px solid ${c.brs}`,background:"transparent",border:"none",color:"inherit",gap:12,textAlign:"left"},children:[t("span",{style:{fontSize:18,flexShrink:0},children:cat.emoji}),o("div",{className:"f1 minw0",children:[t("div",{className:"tru",style:{fontSize:13,fontWeight:500,color:c.tx},children:e.merchant||e.payee||e.note||cat.label}),t("div",{style:{fontFamily:F.mo,fontSize:11,color:c.tm},children:rd(e.date)})]}),t("div",{style:{fontFamily:F.mo,fontSize:14,fontWeight:600,flexShrink:0},children:fm(e.amount,e.currency||currency)})]})})}),
     delConfirm&&t(CSht,{onClose:()=>sDelConfirm(false),title:"Delete this thread?",subtitle:"Entries stay in your expenses — they just won't be grouped under this thread anymore.",onConfirm:()=>{onDelete(threadId);sDelConfirm(false)},confirmLabel:"Delete"}),
   ]})}
