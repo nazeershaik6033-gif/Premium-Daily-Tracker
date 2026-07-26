@@ -6540,6 +6540,11 @@ return o("div",{style:{padding:"8px 24px 104px"},className:"st",children:[
     t("button",{onClick:onBackup,className:"w100 act95 trt f ia jc",style:{gap:8,marginTop:10,padding:"12px 0",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:11,fontSize:13,color:c.tx},children:[t(Dl,{size:14,color:c.ac}),"Backup & Restore →"]}),
   ]})})(),
   o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
+    t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:"APP UPDATES"}),
+    t("div",{style:{fontSize:11,color:c.tm,marginBottom:12,lineHeight:1.5},children:"If a feature you expect isn't showing up — especially on an app installed to your home screen — your device is likely showing a cached copy of an older version. Force reload clears it and re-downloads the latest app."}),
+    t("button",{onClick:async()=>{try{if('serviceWorker' in navigator){const regs=await navigator.serviceWorker.getRegistrations();await Promise.all(regs.map(r=>r.unregister()))}}catch(e){}try{if('caches' in window){const keys=await caches.keys();await Promise.all(keys.map(k=>caches.delete(k)))}}catch(e){}const u=new URL(location.href);u.searchParams.set('_r',Date.now());location.href=u.toString()},className:"w100 act95 trt f ia jc",style:{gap:8,padding:"12px 0",background:c.ac,border:"none",borderRadius:11,fontSize:13,fontWeight:600,color:"#0a0a0a"},children:"🔄 Force reload app"}),
+  ]}),
+  o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:14},children:"FINANCE PROFILE"}),
     t("div",{style:{fontSize:11,color:c.tm,marginBottom:12},children:"Used to compute Financial Health scores on the Tips screen."}),
     o("div",{style:{display:"flex",flexDirection:"column",gap:10},children:[
