@@ -6803,9 +6803,12 @@ function BudgetCalculator({data,persist,cur,spendFlt}){
   const leftout=income-outTotal;
   const pct=(n)=>income>0?n/income:0;
   const fp=(x)=>(x*100).toFixed(1)+"%";
-  const lineRow=(l,kind)=>{const linked=(links[l.id]||[]).length>0;const v=values[l.id];const a=linked?autoFor(l.id,kind):null;return o("div",{key:l.id,className:"f ia jb",style:{gap:8,padding:"6px 0",borderBottom:`1px solid ${c.brs}`},children:[
-    o("div",{className:"f ia",style:{gap:6,minWidth:0},children:[t("span",{className:"tru",style:{fontSize:12.5,color:c.td},children:l.label}),linked&&v==null&&t("span",{style:{fontFamily:F.mo,fontSize:8,color:c.mt,background:c.mt+"1a",borderRadius:5,padding:"2px 5px",letterSpacing:.5,flexShrink:0},children:"AUTO"})]}),
-    o("div",{className:"f ia",style:{gap:6,flexShrink:0},children:[t(ASNum,{value:v==null?null:v,placeholder:linked?String(a):"0",prefix:cur,width:96,onSave:(n)=>setVal(l.id,n)}),linked&&v!=null&&t("button",{onClick:()=>setVal(l.id,null),title:"Reset to auto",style:{background:"transparent",border:"none",color:c.tm,fontSize:14,padding:2,cursor:"pointer"},children:"↺"})]})
+  const lineRow=(l,kind)=>{const linked=(links[l.id]||[]).length>0;const v=values[l.id];const a=linked?autoFor(l.id,kind):null;const overridden=linked&&v!=null;return o("div",{key:l.id,style:{padding:"6px 0",borderBottom:`1px solid ${c.brs}`},children:[
+    o("div",{className:"f ia jb",style:{gap:8},children:[
+      o("div",{className:"f ia",style:{gap:6,minWidth:0},children:[t("span",{className:"tru",style:{fontSize:12.5,color:c.td},children:l.label}),linked&&v==null&&t("span",{style:{fontFamily:F.mo,fontSize:8,color:c.mt,background:c.mt+"1a",borderRadius:5,padding:"2px 5px",letterSpacing:.5,flexShrink:0},children:"AUTO"}),overridden&&t("span",{style:{fontFamily:F.mo,fontSize:8,color:c.gd,background:c.gd+"1a",borderRadius:5,padding:"2px 5px",letterSpacing:.5,flexShrink:0},children:"MANUAL"})]}),
+      o("div",{className:"f ia",style:{gap:6,flexShrink:0},children:[t(ASNum,{value:v==null?null:v,placeholder:linked?String(a):"0",prefix:cur,width:96,onSave:(n)=>setVal(l.id,n)}),overridden&&t("button",{onClick:()=>setVal(l.id,null),title:"Reset to auto",style:{background:"transparent",border:"none",color:c.tm,fontSize:14,padding:2,cursor:"pointer"},children:"↺"})]})
+    ]}),
+    overridden&&a!=null&&a!==v&&o("div",{style:{textAlign:"right",marginTop:2},children:t("span",{style:{fontFamily:F.mo,fontSize:9,color:c.tm},children:"Linked categories total "+fm(a,cur)+" — tap ↺ to use that"})})
   ]})};
   const secBlock=(sec)=>{const tot=secTotals[sec.id];return o("div",{key:sec.id,style:{marginTop:14},children:[
     o("div",{className:"f ia jb",style:{marginBottom:2},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1,color:sec.color},children:sec.emoji+" "+sec.label.toUpperCase()}),o("div",{className:"f ia",style:{gap:8},children:[t("span",{style:{fontFamily:F.mo,fontSize:9.5,color:c.tm},children:fp(pct(tot))}),t("span",{style:{fontFamily:F.mo,fontSize:12.5,fontWeight:700,color:c.tx},children:fm(tot,cur)})]})]}),
@@ -6815,6 +6818,8 @@ function BudgetCalculator({data,persist,cur,spendFlt}){
   const segTot=segs.reduce((s,x)=>s+x.v,0)||1;
   const statusRows=[...effSections.map(sec=>{const p=pct(secTotals[sec.id]);const ok=p<sec.thresh;const neutral=sec.id==="invest";return{label:sec.label,col:sec.color,val:secTotals[sec.id],p,ok,neutral,msg:ok?sec.good:sec.bad}}),(()=>{const p=pct(leftout);const ok=p>0.10;return{label:"Leftout for the month",col:c.mt,val:leftout,p,ok,neutral:true,msg:ok?"Move some funds to investment":"Fill the bucket of emergency fund"}})()];
   const linkGroups=[{id:"inflow",title:"INFLOWS",kind:"income",lines:effInflows},...effSections.map(s=>({id:s.id,title:s.label.toUpperCase(),kind:"expense",lines:s.lines}))];
+  const overriddenIds=[...effInflows.map(l=>l.id),...effSections.flatMap(s=>s.lines.map(l=>l.id))].filter(id=>(links[id]||[]).length>0&&values[id]!=null);
+  const resetAllOverrides=()=>{const nv={...values};overriddenIds.forEach(id=>{nv[id]=null});saveMonth(nv)};
   return t(Collapsible,{title:"🧮 MONTHLY BUDGET",badge:t(Pl,{col:c.gd,children:"CALCULATOR"}),summary:fm(leftout,cur),defaultOpen:false,children:o(Fragment,{children:[
     t("div",{style:{fontSize:11.5,color:c.tm,marginBottom:12,lineHeight:1.5},children:"A Money-Purse style monthly planner. Link any line to your categories and it auto-fills from actual transactions — or type to override."}),
     o("div",{className:"f ia jb",style:{marginBottom:10,gap:8},children:[
@@ -6824,6 +6829,10 @@ function BudgetCalculator({data,persist,cur,spendFlt}){
         synced&&t("div",{style:{fontFamily:F.mo,fontSize:8,color:c.ac,marginTop:1,letterSpacing:.4},children:"🔒 SYNCED · FILTER SPENDING BY DATE"})
       ]}),
       t(IB,{onClick:()=>sMonOff(v=>v+1),size:32,children:t(CR,{size:16,color:c.tx})}),
+    ]}),
+    overriddenIds.length>0&&o("div",{className:"f ia jb",style:{marginBottom:10,padding:"8px 11px",background:c.gd+"14",border:`1px solid ${c.gd}44`,borderRadius:10,gap:8},children:[
+      t("span",{style:{fontSize:11,color:c.tm},children:overriddenIds.length+" line"+(overriddenIds.length===1?"":"s")+" set to a manual number — ignoring linked categories"}),
+      t("button",{onClick:resetAllOverrides,className:"act95 trt",style:{flexShrink:0,background:"transparent",border:`1px solid ${c.gd}66`,borderRadius:8,padding:"5px 10px",color:c.gd,fontSize:10.5,fontWeight:600},children:"↺ Reset all"})
     ]}),
     o("div",{style:{marginTop:8},children:[
       o("div",{className:"f ia jb",style:{marginBottom:2},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1,color:c.mt},children:"💰 MONTHLY INFLOWS"}),t("span",{style:{fontFamily:F.mo,fontSize:12.5,fontWeight:700,color:c.tx},children:fm(inflowTotal,cur)})]}),
