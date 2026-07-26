@@ -1587,7 +1587,7 @@ return o("div",{className:"st",children:[
           o("div",{style:{fontFamily:F.mo,fontSize:11,color:c.tm},children:["−",fm(periodReimb,data.currency),t("span",{style:{color:c.mt,fontWeight:600},children:["  · net exp ",fm(netExp,data.currency)]})]}),
         ]}),
       ]}),
-      ...CALCULATORS.map(k=>t(k.component,{key:k.id,data,persist,cur:data.currency})),
+      o("div",{style:{marginBottom:8},children:CALCULATORS.map(k=>t(k.component,{key:k.id,data,persist,cur:data.currency,spendFlt}))}),
       monExp.length>0&&o("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,padding:"10px 14px",marginBottom:8},children:[
         o("div",{className:"f ia jb",style:{marginBottom:6},children:[
           o("div",{className:"f ia",style:{gap:5},children:[
@@ -6745,24 +6745,40 @@ const BUD_SECTIONS=[
     {id:"mf",label:"Mutual Funds"},{id:"stocks",label:"Stocks"},{id:"fd",label:"Fixed Deposits"},{id:"otherinvest",label:"Others"}
   ]},
 ];
-const BUD_PERIODS=[["month","This month"],["last","Last month"],["avg3","3-mo avg"]];
-function BudgetCalculator({data,persist,cur}){
+function BudgetCalculator({data,persist,cur,spendFlt}){
   const cals=data.calculators||{};
   const B=cals.budget||{};
-  const values=B.values||{};
   const links=B.links||{};
-  const period=B.period||"month";
-  const[showLinks,sShowLinks]=useState(false);
-  const[editId,sEditId]=useState(null);
-  const saveB=(patch)=>persist({calculators:{...cals,budget:{values,links,period,...B,...patch}}});
-  const setVal=(id,n)=>saveB({values:{...values,[id]:n}});
-  const toggleLink=(id,cid)=>{const cl=links[id]||[];const nx=cl.includes(cid)?cl.filter(x=>x!==cid):[...cl,cid];saveB({links:{...links,[id]:nx}})};
-  const exps=data.expenses||[];
+  const monthsMap=B.months||{};
   const msd=data.monthStartDay||1;
   const cs0=ps(new Date(),msd);
-  const bnd=(k)=>{const d=new Date(cs0);d.setMonth(d.getMonth()-k);d.setDate(msd);d.setHours(0,0,0,0);return d.getTime()};
-  const ranges=period==="last"?[[bnd(1),bnd(0)]]:period==="avg3"?[[bnd(3),bnd(2)],[bnd(2),bnd(1)],[bnd(1),bnd(0)]]:[[bnd(0),bnd(-1)]];
-  const autoFor=(id,kind)=>{const cids=links[id]||[];if(!cids.length)return null;let sum=0;for(const e of exps){if(kind==="income"?e.type!=="income":e.type!=="expense")continue;if(!cids.includes(e.category))continue;for(const r of ranges){if(e.date>=r[0]&&e.date<r[1]){sum+=kind==="income"?(e.amount||0):netAmt(e);break}}}return Math.round(sum/ranges.length)};
+  const[monOff,sMonOff]=useState(0);
+  const periodStart=useMemo(()=>{const d=new Date(cs0);d.setMonth(d.getMonth()+monOff);return d.getTime()},[cs0,monOff]);
+  const periodEnd=useMemo(()=>{const d=new Date(periodStart);d.setMonth(d.getMonth()+1);return d.getTime()},[periodStart]);
+  const pKey=useMemo(()=>new Date(periodStart).toISOString().slice(0,10),[periodStart]);
+  const monthLabel=new Date(periodStart).toLocaleDateString("en-US",{month:"long",year:"numeric"});
+  const alignedMonthStart=useMemo(()=>{
+    if(!spendFlt||!spendFlt.from||!spendFlt.to)return null;
+    const fromD=new Date(spendFlt.from);fromD.setHours(0,0,0,0);
+    const candidateStart=ps(fromD,msd);
+    if(fromD.getTime()!==candidateStart)return null;
+    const candidateEnd=new Date(candidateStart);candidateEnd.setMonth(candidateEnd.getMonth()+1);
+    const toD=new Date(spendFlt.to);toD.setHours(0,0,0,0);
+    if(toD.getTime()!==candidateEnd.getTime()-86400000)return null;
+    return candidateStart;
+  },[spendFlt,msd]);
+  useEffect(()=>{if(alignedMonthStart==null)return;const a=new Date(cs0),b=new Date(alignedMonthStart);const diff=(b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth());sMonOff(diff)},[alignedMonthStart,cs0]);
+  const synced=alignedMonthStart!=null&&alignedMonthStart===periodStart;
+  const legacyValues=monOff===0&&!monthsMap[pKey]&&B.values?B.values:null;
+  const values=(monthsMap[pKey]&&monthsMap[pKey].values)||legacyValues||{};
+  const[showLinks,sShowLinks]=useState(false);
+  const[editId,sEditId]=useState(null);
+  const saveMonth=(newValues)=>persist({calculators:{...cals,budget:{...B,links,months:{...monthsMap,[pKey]:{...(monthsMap[pKey]||{}),values:newValues}}}}});
+  const setVal=(id,n)=>saveMonth({...values,[id]:n});
+  const saveLinks=(newLinks)=>persist({calculators:{...cals,budget:{...B,links:newLinks,months:monthsMap}}});
+  const toggleLink=(id,cid)=>{const cl=links[id]||[];const nx=cl.includes(cid)?cl.filter(x=>x!==cid):[...cl,cid];saveLinks({...links,[id]:nx})};
+  const exps=data.expenses||[];
+  const autoFor=(id,kind)=>{const cids=links[id]||[];if(!cids.length)return null;let sum=0;for(const e of exps){if(kind==="income"?e.type!=="income":e.type!=="expense")continue;if(!cids.includes(e.category))continue;if(e.date>=periodStart&&e.date<periodEnd)sum+=kind==="income"?(e.amount||0):netAmt(e)}return Math.round(sum)};
   const effVal=(id,kind)=>{const v=values[id];if(v!=null)return v;const a=autoFor(id,kind);return a!=null?a:0};
   const inflowTotal=BUD_INFLOWS.reduce((s,l)=>s+effVal(l.id,"income"),0);
   const secTotals={};BUD_SECTIONS.forEach(sec=>{secTotals[sec.id]=sec.lines.reduce((s,l)=>s+effVal(l.id,"expense"),0)});
@@ -6783,9 +6799,16 @@ function BudgetCalculator({data,persist,cur}){
   const segTot=segs.reduce((s,x)=>s+x.v,0)||1;
   const statusRows=[...BUD_SECTIONS.map(sec=>{const p=pct(secTotals[sec.id]);const ok=p<sec.thresh;const neutral=sec.id==="invest";return{label:sec.label,col:sec.color,val:secTotals[sec.id],p,ok,neutral,msg:ok?sec.good:sec.bad}}),(()=>{const p=pct(leftout);const ok=p>0.10;return{label:"Leftout for the month",col:c.mt,val:leftout,p,ok,neutral:true,msg:ok?"Move some funds to investment":"Fill the bucket of emergency fund"}})()];
   const linkGroups=[{id:"inflow",title:"INFLOWS",kind:"income",lines:BUD_INFLOWS},...BUD_SECTIONS.map(s=>({id:s.id,title:s.label.toUpperCase(),kind:"expense",lines:s.lines}))];
-  return t(Collapsible,{title:"MONTHLY BUDGET",badge:t(Pl,{col:c.gd,children:"CALCULATOR"}),summary:fm(leftout,cur),defaultOpen:false,children:o(Fragment,{children:[
+  return t(Collapsible,{title:"🧮 MONTHLY BUDGET",badge:t(Pl,{col:c.gd,children:"CALCULATOR"}),summary:fm(leftout,cur),defaultOpen:false,children:o(Fragment,{children:[
     t("div",{style:{fontSize:11.5,color:c.tm,marginBottom:12,lineHeight:1.5},children:"A Money-Purse style monthly planner. Link any line to your categories and it auto-fills from actual transactions — or type to override."}),
-    t("div",{className:"f",style:{gap:4,padding:4,marginBottom:6,background:c.sf2,borderRadius:11,border:`1px solid ${c.brs}`},children:BUD_PERIODS.map(([k,lbl])=>{const on=period===k;return t("button",{key:k,onClick:()=>saveB({period:k}),className:"f1 tr",style:{padding:"7px 0",background:on?c.ac:"transparent",color:on?"#0a0a0a":c.td,borderRadius:8,fontSize:11,fontWeight:on?700:400,border:"none"},children:lbl})})}),
+    o("div",{className:"f ia jb",style:{marginBottom:10,gap:8},children:[
+      t(IB,{onClick:()=>sMonOff(v=>v-1),size:32,children:t(CL,{size:16,color:c.tx})}),
+      o("div",{className:"tc f1 minw0",children:[
+        t("div",{style:{fontFamily:c.hf,fontSize:15,color:c.tx},children:monthLabel}),
+        synced&&t("div",{style:{fontFamily:F.mo,fontSize:8,color:c.ac,marginTop:1,letterSpacing:.4},children:"🔒 SYNCED · FILTER SPENDING BY DATE"})
+      ]}),
+      t(IB,{onClick:()=>sMonOff(v=>v+1),size:32,children:t(CR,{size:16,color:c.tx})}),
+    ]}),
     o("div",{style:{marginTop:8},children:[
       o("div",{className:"f ia jb",style:{marginBottom:2},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1,color:c.mt},children:"💰 MONTHLY INFLOWS"}),t("span",{style:{fontFamily:F.mo,fontSize:12.5,fontWeight:700,color:c.tx},children:fm(inflowTotal,cur)})]}),
       ...BUD_INFLOWS.map(l=>lineRow(l,"income"))
@@ -6806,7 +6829,7 @@ function BudgetCalculator({data,persist,cur}){
     ]}),
     t("button",{onClick:()=>sShowLinks(v=>!v),className:"w100 act97 trt f ia jb",style:{marginTop:16,padding:"12px 14px",background:showLinks?c.ac+"14":c.sf2,border:`1px solid ${showLinks?c.ac+"55":c.brs}`,borderRadius:12},children:[o("div",{className:"f ia",style:{gap:8},children:[t("span",{style:{fontSize:15},children:"🔗"}),o("div",{className:"tl",children:[t("div",{style:{fontSize:13,fontWeight:600,color:c.tx},children:"Link categories"}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:"Auto-fill lines from your transactions"})]})]}),t("span",{style:{color:c.tm,fontSize:12,fontFamily:F.mo,transform:showLinks?"rotate(180deg)":"none",display:"inline-block",transition:"transform .2s"},children:"▾"})]}),
     showLinks&&o("div",{style:{marginTop:10,padding:14,background:c.sf2,borderRadius:14,border:`1px solid ${c.brs}`},children:[
-      t("div",{style:{fontSize:11,color:c.tm,marginBottom:12,lineHeight:1.5},children:"Tap a line, then pick the categories that feed it. Its amount becomes the total of those categories for the chosen period. Typing a value overrides the auto amount."}),
+      t("div",{style:{fontSize:11,color:c.tm,marginBottom:12,lineHeight:1.5},children:"Tap a line, then pick the categories that feed it. Its amount becomes the total of those categories for the month you're viewing. Typing a value overrides the auto amount — links apply to every month, manual overrides are saved per month."}),
       ...linkGroups.map(g=>o("div",{key:g.id,style:{marginBottom:12},children:[
         t("div",{style:{fontFamily:F.mo,fontSize:9,letterSpacing:1,color:g.kind==="income"?c.mt:c.tm,marginBottom:6},children:g.title}),
         ...g.lines.map(l=>{const linkedIds=links[l.id]||[];const open=editId===l.id;const cats=g.kind==="income"?ciAll():ceAll();return o("div",{key:l.id,style:{marginBottom:6,background:c.sf,borderRadius:10,border:`1px solid ${open?c.ac+"55":c.brs}`,padding:"9px 11px"},children:[
