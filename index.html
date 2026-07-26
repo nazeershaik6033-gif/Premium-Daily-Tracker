@@ -1316,7 +1316,7 @@ function App(){
     t(IOSTip,{}),
     o("div",{className:"r w100",style:{maxWidth:440,flex:1,minHeight:0,background:c.bg,borderLeft:`1px solid ${c.brs}`,borderRight:`1px solid ${c.brs}`,overflow:"hidden",display:"flex",flexDirection:"column"},children:[
       o("div",{ref:scrollRef,style:{paddingBottom:"calc(34px + env(safe-area-inset-bottom))",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
-        v==="home"&&t(Home,{data:dv,onTx:sAtx,onView:sV,onSetBudget:b=>pst({budget:b}),onFlt:sFlt,onUseProfile:p=>sProfToUse(p),onTour:()=>sShowTour(true),onAddExpenses:aEMany}),
+        v==="home"&&t(Home,{data:dv,persist:pst,onTx:sAtx,onView:sV,onSetBudget:b=>pst({budget:b}),onFlt:sFlt,onUseProfile:p=>sProfToUse(p),onTour:()=>sShowTour(true),onAddExpenses:aEMany}),
         v==="calendar"&&t(Calend,{data:dv,onTx:sAtx,onFlt:sFlt,presetAdd:(ts,k)=>{window.__pd=ts;window.__pt=k||"expense";sV("add")}}),
         v==="stats"&&t(Stats,{data:dv,onTx:sAtx,onView:(id)=>{navFromRef.current="stats";sV(id)},onFlt:sFlt,persist:pst,onReimburse:(e)=>sReimbT(e),onUnreimburse:unReimburse}),
         v==="add"&&t(Editor,{data:d,onSave:sFE,onCancel:()=>sV("home"),persist:pst,onCardPayment:({cardId,accountId,amount,date})=>{aCP({cardId,accountId,amount,date});sV("home")},presetDate:window.__pd,presetType:window.__pt,presetMode:window.__pm,clearPreset:()=>{window.__pd=null;window.__pt=null;window.__pm=null}}),
@@ -1469,7 +1469,7 @@ return t("div",{className:"fx f iend",style:{inset:0,background:"rgba(0,0,0,.6)"
     ]})}),
   ]})
 })}
-function Home({data,onTx,onView,onFlt,onUseProfile,onTour,onAddExpenses}){const{expenses,recurring,bills=[]}=data;const[pr,sPr]=useState("month");const[spendFlt,setSpendFlt]=useState(()=>{try{const s=localStorage.getItem("etp-spend-flt");return s?JSON.parse(s):{from:"",to:""}}catch{return{from:"",to:""}}});const[askQ,setAskQ]=useState("");const[snapOpen,setSnapOpen]=useState(false);const[snapItems,setSnapItems]=useState(null);const[snapBusy,setSnapBusy]=useState(false);const[snapErr,setSnapErr]=useState(null);const[snapSel,setSnapSel]=useState({});const[snapEdit,setSnapEdit]=useState(null);const[snapMonthOk,setSnapMonthOk]=useState(false);const[snapPrompt,setSnapPrompt]=useState("");const[snapProgress,setSnapProgress]=useState(null);const[snapBulkPay,setSnapBulkPay]=useState("");const snapFileRef=useRef(null);const snapGallRef=useRef(null);const snapDocRef=useRef(null);const[nudge,setNudge]=useState(()=>{try{return JSON.parse(localStorage.getItem("etp-nudge-"+new Date().toISOString().slice(0,10)))||null}catch{return null}});const[nudgeLoading,setNudgeLoading]=useState(false);const q=useMemo(()=>dq(),[]);const msd=data.monthStartDay||1;
+function Home({data,persist,onTx,onView,onFlt,onUseProfile,onTour,onAddExpenses}){const{expenses,recurring,bills=[]}=data;const[pr,sPr]=useState("month");const[spendFlt,setSpendFlt]=useState(()=>{try{const s=localStorage.getItem("etp-spend-flt");return s?JSON.parse(s):{from:"",to:""}}catch{return{from:"",to:""}}});const[askQ,setAskQ]=useState("");const[snapOpen,setSnapOpen]=useState(false);const[snapItems,setSnapItems]=useState(null);const[snapBusy,setSnapBusy]=useState(false);const[snapErr,setSnapErr]=useState(null);const[snapSel,setSnapSel]=useState({});const[snapEdit,setSnapEdit]=useState(null);const[snapMonthOk,setSnapMonthOk]=useState(false);const[snapPrompt,setSnapPrompt]=useState("");const[snapProgress,setSnapProgress]=useState(null);const[snapBulkPay,setSnapBulkPay]=useState("");const snapFileRef=useRef(null);const snapGallRef=useRef(null);const snapDocRef=useRef(null);const[nudge,setNudge]=useState(()=>{try{return JSON.parse(localStorage.getItem("etp-nudge-"+new Date().toISOString().slice(0,10)))||null}catch{return null}});const[nudgeLoading,setNudgeLoading]=useState(false);const q=useMemo(()=>dq(),[]);const msd=data.monthStartDay||1;
 const periodRange=useMemo(()=>{const n=new Date(),y=n.getFullYear(),m=n.getMonth();if(pr==="quarter"){const sm=Math.floor(m/3)*3;return{start:mss(y,sm,msd),end:mss(y,sm+3,msd)}}if(pr==="half"){const sm=m<6?0:6;return{start:mss(y,sm,msd),end:mss(y,sm+6,msd)}}if(pr==="year")return{start:mss(y,0,msd),end:mss(y+1,0,msd)};return{start:ps(n,msd),end:mse(y,m,msd)}},[pr,msd]);
 const periodStart=periodRange.start,periodEnd=periodRange.end;
 const periodLabel=useMemo(()=>{const n=new Date();if(pr==="quarter"){const q=Math.floor(n.getMonth()/3)+1;return `Q${q} ${n.getFullYear()}`}if(pr==="half")return (n.getMonth()<6?"H1":"H2")+" "+n.getFullYear();if(pr==="year")return String(n.getFullYear());return n.toLocaleDateString("en-US",{month:"long",year:"numeric"})},[pr]);
@@ -1586,6 +1586,7 @@ return o("div",{className:"st",children:[
           o("div",{style:{fontFamily:F.mo,fontSize:11,color:c.tm},children:["−",fm(periodReimb,data.currency),t("span",{style:{color:c.mt,fontWeight:600},children:["  · net exp ",fm(netExp,data.currency)]})]}),
         ]}),
       ]}),
+      ...CALCULATORS.map(k=>t(k.component,{key:k.id,data,persist,cur:data.currency})),
       monExp.length>0&&o("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,padding:"10px 14px",marginBottom:8},children:[
         o("div",{className:"f ia jb",style:{marginBottom:6},children:[
           o("div",{className:"f ia",style:{gap:5},children:[
@@ -6993,7 +6994,6 @@ function AdvancedStats({data,persist,onClose,onTx,onFlt}){
         t("button",{onClick:()=>step(1),className:"act95 trt",style:{width:40,height:40,borderRadius:11,background:c.sf2,border:`1px solid ${c.brs}`,color:c.tx,fontSize:18,flexShrink:0},children:"›"}),
       ]}),
     ]}),
-    ...CALCULATORS.map(k=>t(k.component,{key:k.id,data,persist,cur})),
     overviewCard,
     exportCard,
     ...(basis==="FY"?[itrCard,dedCard]:[cashflowCard,incSrcCard,spendCatCard,nwCard]),
