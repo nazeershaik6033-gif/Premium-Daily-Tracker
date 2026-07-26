@@ -1587,7 +1587,7 @@ return o("div",{className:"st",children:[
           o("div",{style:{fontFamily:F.mo,fontSize:11,color:c.tm},children:["−",fm(periodReimb,data.currency),t("span",{style:{color:c.mt,fontWeight:600},children:["  · net exp ",fm(netExp,data.currency)]})]}),
         ]}),
       ]}),
-      ...CALCULATORS.map(k=>t(k.component,{key:k.id,data,persist,cur:data.currency})),
+      o("div",{style:{marginBottom:8},children:CALCULATORS.map(k=>t(k.component,{key:k.id,data,persist,cur:data.currency}))}),
       monExp.length>0&&o("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,padding:"10px 14px",marginBottom:8},children:[
         o("div",{className:"f ia jb",style:{marginBottom:6},children:[
           o("div",{className:"f ia",style:{gap:5},children:[
@@ -6783,7 +6783,7 @@ function BudgetCalculator({data,persist,cur}){
   const segTot=segs.reduce((s,x)=>s+x.v,0)||1;
   const statusRows=[...BUD_SECTIONS.map(sec=>{const p=pct(secTotals[sec.id]);const ok=p<sec.thresh;const neutral=sec.id==="invest";return{label:sec.label,col:sec.color,val:secTotals[sec.id],p,ok,neutral,msg:ok?sec.good:sec.bad}}),(()=>{const p=pct(leftout);const ok=p>0.10;return{label:"Leftout for the month",col:c.mt,val:leftout,p,ok,neutral:true,msg:ok?"Move some funds to investment":"Fill the bucket of emergency fund"}})()];
   const linkGroups=[{id:"inflow",title:"INFLOWS",kind:"income",lines:BUD_INFLOWS},...BUD_SECTIONS.map(s=>({id:s.id,title:s.label.toUpperCase(),kind:"expense",lines:s.lines}))];
-  return t(Collapsible,{title:"MONTHLY BUDGET",badge:t(Pl,{col:c.gd,children:"CALCULATOR"}),summary:fm(leftout,cur),defaultOpen:false,children:o(Fragment,{children:[
+  return t(Collapsible,{title:"🧮 MONTHLY BUDGET",badge:t(Pl,{col:c.gd,children:"CALCULATOR"}),summary:fm(leftout,cur),defaultOpen:false,children:o(Fragment,{children:[
     t("div",{style:{fontSize:11.5,color:c.tm,marginBottom:12,lineHeight:1.5},children:"A Money-Purse style monthly planner. Link any line to your categories and it auto-fills from actual transactions — or type to override."}),
     t("div",{className:"f",style:{gap:4,padding:4,marginBottom:6,background:c.sf2,borderRadius:11,border:`1px solid ${c.brs}`},children:BUD_PERIODS.map(([k,lbl])=>{const on=period===k;return t("button",{key:k,onClick:()=>saveB({period:k}),className:"f1 tr",style:{padding:"7px 0",background:on?c.ac:"transparent",color:on?"#0a0a0a":c.td,borderRadius:8,fontSize:11,fontWeight:on?700:400,border:"none"},children:lbl})})}),
     o("div",{style:{marginTop:8},children:[
