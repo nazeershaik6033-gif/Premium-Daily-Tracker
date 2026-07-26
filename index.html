@@ -6773,6 +6773,8 @@ function BudgetCalculator({data,persist,cur,spendFlt}){
   const values=(monthsMap[pKey]&&monthsMap[pKey].values)||legacyValues||{};
   const[showLinks,sShowLinks]=useState(false);
   const[editId,sEditId]=useState(null);
+  const[justRefreshed,sJustRefreshed]=useState(false);
+  useEffect(()=>{if(!justRefreshed)return;const tm=setTimeout(()=>sJustRefreshed(false),1600);return()=>clearTimeout(tm)},[justRefreshed]);
   const[showManage,sShowManage]=useState(false);
   const[renameId,sRenameId]=useState(null);
   const[renameVal,sRenameVal]=useState("");
@@ -6826,7 +6828,8 @@ function BudgetCalculator({data,persist,cur,spendFlt}){
       t(IB,{onClick:()=>sMonOff(v=>v-1),size:32,children:t(CL,{size:16,color:c.tx})}),
       o("div",{className:"tc f1 minw0",children:[
         t("div",{style:{fontFamily:c.hf,fontSize:15,color:c.tx},children:monthLabel}),
-        synced&&t("div",{style:{fontFamily:F.mo,fontSize:8,color:c.ac,marginTop:1,letterSpacing:.4},children:"🔒 SYNCED · FILTER SPENDING BY DATE"})
+        synced&&t("div",{style:{fontFamily:F.mo,fontSize:8,color:c.ac,marginTop:1,letterSpacing:.4},children:"🔒 SYNCED · FILTER SPENDING BY DATE"}),
+        t("button",{onClick:()=>sJustRefreshed(true),className:"act95 trt",style:{marginTop:4,background:"transparent",border:"none",color:justRefreshed?c.mt:c.ac,fontSize:9,fontFamily:F.mo,letterSpacing:.4,padding:0,display:"inline-flex",alignItems:"center",gap:4},children:justRefreshed?"✓ Updated":"🔄 Refresh AUTO values"})
       ]}),
       t(IB,{onClick:()=>sMonOff(v=>v+1),size:32,children:t(CR,{size:16,color:c.tx})}),
     ]}),
