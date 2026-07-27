@@ -6750,6 +6750,7 @@ const BUD_SECTIONS=[
     {id:"mf",label:"Mutual Funds"},{id:"stocks",label:"Stocks"},{id:"fd",label:"Fixed Deposits"},{id:"otherinvest",label:"Others"}
   ]},
 ];
+const BUD_SECTION_PALETTE=["#4F8DFD","#F59E0B","#9CA3AF","#F5B301","#2FC59B","#FF6B9D","#A78BFA","#5EB1FF"];
 function BudgetCalculator({data,persist,cur,spendFlt,onView}){
   const cals=data.calculators||{};
   const B=cals.budget||{};
@@ -6789,6 +6790,11 @@ function BudgetCalculator({data,persist,cur,spendFlt,onView}){
   const[dragIdx,sDragIdx]=useState(null);
   const[overIdx,sOverIdx]=useState(null);
   const dragRef=useRef({active:false});
+  const[showAddSec,sShowAddSec]=useState(false);
+  const[newSecLabel,sNewSecLabel]=useState("");
+  const[newSecEmoji,sNewSecEmoji]=useState("📌");
+  const[newSecColor,sNewSecColor]=useState(BUD_SECTION_PALETTE[0]);
+  const[newSecThresh,sNewSecThresh]=useState("20");
   const saveMonth=(newValues)=>persist({calculators:{...cals,budget:{...B,links,months:{...monthsMap,[pKey]:{...(monthsMap[pKey]||{}),values:newValues}}}}});
   const setVal=(id,n)=>saveMonth({...values,[id]:n});
   const saveLinks=(newLinks)=>persist({calculators:{...cals,budget:{...B,links:newLinks,months:monthsMap}}});
@@ -6796,21 +6802,30 @@ function BudgetCalculator({data,persist,cur,spendFlt,onView}){
   const exps=data.expenses||[];
   const autoFor=(id,kind)=>{const cids=links[id]||[];if(!cids.length)return null;let sum=0;for(const e of exps){if(kind==="income"?e.type!=="income":e.type!=="expense")continue;if(!cids.includes(e.category))continue;if(e.date>=periodStart&&e.date<periodEnd)sum+=kind==="income"?(e.amount||0):netAmt(e)}return Math.round(sum)};
   const effVal=(id,kind)=>{const v=values[id];if(v!=null)return v;const a=autoFor(id,kind);return a!=null?a:0};
-  const lineConfig=B.lineConfig||{hidden:[],labels:{},customLines:[]};
-  const saveLineConfig=(patch)=>persist({calculators:{...cals,budget:{...B,lineConfig:{hidden:lineConfig.hidden||[],labels:lineConfig.labels||{},customLines:lineConfig.customLines||[],...patch}}}});
+  const lineConfig=B.lineConfig||{hidden:[],labels:{},customLines:[],customSections:[],order:{},sectionOrder:[]};
+  const saveLineConfig=(patch)=>persist({calculators:{...cals,budget:{...B,lineConfig:{hidden:lineConfig.hidden||[],labels:lineConfig.labels||{},customLines:lineConfig.customLines||[],customSections:lineConfig.customSections||[],order:lineConfig.order||{},sectionOrder:lineConfig.sectionOrder||[],...patch}}}});
   const renameLine=(id,label)=>saveLineConfig({labels:{...(lineConfig.labels||{}),[id]:label}});
   const hideLine=(id)=>saveLineConfig({hidden:[...new Set([...(lineConfig.hidden||[]),id])]});
   const unhideLine=(id)=>saveLineConfig({hidden:(lineConfig.hidden||[]).filter(x=>x!==id)});
   const addCustomLine=(label,section)=>{const id="custom_"+uid();saveLineConfig({customLines:[...(lineConfig.customLines||[]),{id,label,section}]});return id};
+  const addSection=()=>{const label=newSecLabel.trim();if(!label)return;const id="sect_"+uid();const thresh=Math.max(0,Math.min(100,parseFloat(newSecThresh)||20))/100;saveLineConfig({customSections:[...(lineConfig.customSections||[]),{id,label,emoji:newSecEmoji||"📌",color:newSecColor,thresh}]});sShowAddSec(false);sNewSecLabel("");sNewSecEmoji("📌");sNewSecColor(BUD_SECTION_PALETTE[0]);sNewSecThresh("20")};
   const rawLinesFor=(sectionId,defaultLines)=>{const customs=(lineConfig.customLines||[]).filter(l=>l.section===sectionId);return[...defaultLines.map(l=>({...l,custom:false})),...customs.map(l=>({...l,custom:true}))].map(l=>({...l,label:(lineConfig.labels||{})[l.id]||l.label}))};
-  const manageSections=[{id:"inflow",label:"Monthly Inflows",emoji:"💰",kind:"income",all:rawLinesFor("inflow",BUD_INFLOWS)},...BUD_SECTIONS.map(s=>({id:s.id,label:s.label,emoji:s.emoji,kind:"expense",all:rawLinesFor(s.id,s.lines)}))];
   const hiddenSet=new Set(lineConfig.hidden||[]);
   const orderMap=lineConfig.order||{};
   const applyOrder=(sectionId,list)=>{const ord=orderMap[sectionId];if(!ord||!ord.length)return list;const idxOf=id=>{const i=ord.indexOf(id);return i===-1?999+list.findIndex(l=>l.id===id):i};return[...list].sort((x,y)=>idxOf(x.id)-idxOf(y.id))};
   const saveOrder=(sectionId,orderedIds)=>saveLineConfig({order:{...orderMap,[sectionId]:orderedIds}});
-  const dragDrop=(sectionId,activeList)=>{const{startIdx,lastOver}=dragRef.current;dragRef.current={active:false};if(startIdx!=null&&lastOver!=null&&startIdx!==lastOver){const arr=[...activeList];const[itm]=arr.splice(startIdx,1);arr.splice(lastOver,0,itm);saveOrder(sectionId,arr.map(l=>l.id))}sDragSec(null);sDragIdx(null);sOverIdx(null)};
+  const saveSectionOrder=(orderedIds)=>saveLineConfig({sectionOrder:orderedIds});
+  const dragDrop=(scope,activeList)=>{const{startIdx,lastOver}=dragRef.current;dragRef.current={active:false};if(startIdx!=null&&lastOver!=null&&startIdx!==lastOver){const arr=[...activeList];const[itm]=arr.splice(startIdx,1);arr.splice(lastOver,0,itm);if(scope==="__sections__")saveSectionOrder(arr.map(s=>s.id));else saveOrder(scope,arr.map(l=>l.id))}sDragSec(null);sDragIdx(null);sOverIdx(null)};
+  const customSectionDefs=(lineConfig.customSections||[]).map(s=>{const thresh=s.thresh!=null?s.thresh:0.20;const pct2=Math.round(thresh*100);return{id:s.id,label:(lineConfig.labels||{})[s.id]||s.label,emoji:s.emoji||"📌",color:s.color||BUD_SECTION_PALETTE[0],thresh,good:"Under your "+pct2+"% threshold",bad:"Over your "+pct2+"% threshold",lines:[],custom:true}});
+  const builtinSectionDefs=BUD_SECTIONS.map(s=>({...s,label:(lineConfig.labels||{})[s.id]||s.label,custom:false}));
+  const sectionOrderArr=lineConfig.sectionOrder||[];
+  const orderSections=(list)=>{if(!sectionOrderArr.length)return list;const idxOf=id=>{const i=sectionOrderArr.indexOf(id);return i===-1?999+list.findIndex(s=>s.id===id):i};return[...list].sort((a,b)=>idxOf(a.id)-idxOf(b.id))};
+  const allSectionDefs=orderSections([...builtinSectionDefs,...customSectionDefs]);
+  const visibleSectionDefs=allSectionDefs.filter(sec=>!hiddenSet.has(sec.id));
+  const hiddenSectionDefs=allSectionDefs.filter(sec=>hiddenSet.has(sec.id));
+  const manageSections=[{id:"inflow",label:"Monthly Inflows",emoji:"💰",kind:"income",all:rawLinesFor("inflow",BUD_INFLOWS)},...visibleSectionDefs.map(sec=>({id:sec.id,label:sec.label,emoji:sec.emoji,kind:"expense",all:rawLinesFor(sec.id,sec.lines||[])}))];
   const effInflows=applyOrder("inflow",manageSections[0].all.filter(l=>!hiddenSet.has(l.id)));
-  const effSections=BUD_SECTIONS.map((sec,i)=>({...sec,lines:applyOrder(sec.id,manageSections[i+1].all.filter(l=>!hiddenSet.has(l.id)))}));
+  const effSections=visibleSectionDefs.map(sec=>({...sec,lines:applyOrder(sec.id,rawLinesFor(sec.id,sec.lines||[]).filter(l=>!hiddenSet.has(l.id)))}));
   const inflowTotal=effInflows.reduce((s,l)=>s+effVal(l.id,"income"),0);
   const secTotals={};effSections.forEach(sec=>{secTotals[sec.id]=sec.lines.reduce((s,l)=>s+effVal(l.id,"expense"),0)});
   const income=inflowTotal;
@@ -6871,6 +6886,39 @@ function BudgetCalculator({data,persist,cur,spendFlt,onView}){
     t("button",{onClick:()=>sShowManage(v=>!v),className:"w100 act97 trt f ia jb",style:{marginTop:16,padding:"12px 14px",background:showManage?c.sk+"14":c.sf2,border:`1px solid ${showManage?c.sk+"55":c.brs}`,borderRadius:12},children:[o("div",{className:"f ia",style:{gap:8},children:[t("span",{style:{fontSize:15},children:"📋"}),o("div",{className:"tl",children:[t("div",{style:{fontSize:13,fontWeight:600,color:c.tx},children:"Manage lines"}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:"Add, rename or remove budget lines"})]})]}),t("span",{style:{color:c.tm,fontSize:12,fontFamily:F.mo,transform:showManage?"rotate(180deg)":"none",display:"inline-block",transition:"transform .2s"},children:"▾"})]}),
     showManage&&o("div",{style:{marginTop:10,padding:14,background:c.sf2,borderRadius:14,border:`1px solid ${c.brs}`},children:[
       t("div",{style:{fontSize:11,color:c.tm,marginBottom:12,lineHeight:1.5},children:"Rename or hide any line — hidden lines keep their saved history and can be restored any time. Drag the grip to reorder within a section; the order shows up in the calculator too. Add new lines to any section, including Inflows."}),
+      o("div",{style:{marginBottom:18,paddingBottom:16,borderBottom:`1px solid ${c.brs}`},children:[
+        t("div",{style:{fontFamily:F.mo,fontSize:9,letterSpacing:1,color:c.tm,marginBottom:6},children:"SECTIONS · DRAG TO REORDER"}),
+        o("div",{onPointerDown:e=>{const g=e.target.closest('[data-grip-idx]');if(!g)return;e.currentTarget.setPointerCapture(e.pointerId);const idx=parseInt(g.getAttribute('data-grip-idx'));dragRef.current={active:true,startIdx:idx,lastOver:idx};sDragSec("__sections__");sDragIdx(idx);sOverIdx(idx)},onPointerMove:e=>{if(!dragRef.current.active||dragSec!=="__sections__")return;const its=e.currentTarget.querySelectorAll('[data-item-idx]');for(let k=0;k<its.length;k++){const r=its[k].getBoundingClientRect();if(e.clientY>=r.top&&e.clientY<=r.bottom){if(dragRef.current.lastOver!==k){dragRef.current.lastOver=k;sOverIdx(k)}break}}},onPointerUp:()=>dragDrop("__sections__",visibleSectionDefs),onPointerCancel:()=>{dragRef.current={active:false};sDragSec(null);sDragIdx(null);sOverIdx(null)},children:visibleSectionDefs.map((sec,i)=>{const editing=renameId===sec.id;const dragging=dragSec==="__sections__";return o("div",{key:sec.id,"data-item-idx":i,className:"f ia jb",style:{gap:8,padding:"7px 0",borderBottom:`1px solid ${c.brs}`,opacity:dragging&&dragIdx===i?0.4:1,background:dragging&&overIdx===i&&dragIdx!==i?c.ac+"15":"transparent",transition:"background .15s"},children:editing?[
+          t("input",{value:renameVal,onChange:e=>sRenameVal(e.target.value),autoFocus:true,style:{flex:1,background:c.sf,border:`1px solid ${c.ac}`,borderRadius:8,padding:"6px 9px",color:c.tx,fontSize:12.5,fontFamily:'var(--tf)',outline:"none"}}),
+          t("button",{onClick:()=>{if(renameVal.trim())renameLine(sec.id,renameVal.trim());sRenameId(null)},style:{background:c.ac,border:"none",borderRadius:8,padding:"6px 10px",color:"#0a0a0a",fontSize:11,fontWeight:600},children:"Save"}),
+          t("button",{onClick:()=>sRenameId(null),style:{background:"transparent",border:"none",color:c.tm,fontSize:11,padding:"6px 4px"},children:"Cancel"})
+        ]:[
+          t("div",{"data-grip-idx":i,style:{color:c.td,cursor:"grab",touchAction:"none",padding:"2px 6px 2px 0",display:"flex",flexShrink:0},children:t(GripV,{size:15})}),
+          t("span",{style:{fontSize:14,flexShrink:0},children:sec.emoji}),
+          t("span",{className:"tru",style:{fontSize:12.5,color:c.tx,flex:1,minWidth:0},children:sec.label}),
+          o("div",{className:"f ia",style:{gap:4,flexShrink:0},children:[
+            t("button",{onClick:()=>{sRenameId(sec.id);sRenameVal(sec.label)},"aria-label":"Rename",style:{background:c.sf,border:`1px solid ${c.brs}`,borderRadius:8,width:26,height:26,display:"flex",alignItems:"center",justifyContent:"center",color:c.td},children:t(Pencil,{size:12,color:c.td})}),
+            t("button",{onClick:()=>hideLine(sec.id),"aria-label":"Hide section",style:{background:"transparent",border:`1px solid ${c.co}40`,borderRadius:8,width:26,height:26,display:"flex",alignItems:"center",justifyContent:"center",color:c.co},children:t(EyeOff,{size:12,color:c.co})})
+          ]})
+        ]})})}),
+        showAddSec?o("div",{style:{marginTop:10,padding:11,background:c.sf,borderRadius:10,border:`1px solid ${c.ac}55`},children:[
+          t("input",{value:newSecLabel,onChange:e=>sNewSecLabel(e.target.value),autoFocus:true,placeholder:"Section name, e.g. Kids Expenses",style:{width:"100%",boxSizing:"border-box",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:8,padding:"8px 10px",color:c.tx,fontSize:12.5,fontFamily:'var(--tf)',outline:"none",marginBottom:8}}),
+          o("div",{className:"f ia",style:{gap:8,marginBottom:8},children:[
+            t("input",{value:newSecEmoji,onChange:e=>sNewSecEmoji(e.target.value.slice(0,4)),placeholder:"📌",style:{width:44,textAlign:"center",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:8,padding:"8px 0",color:c.tx,fontSize:16,fontFamily:'var(--tf)',outline:"none"}}),
+            o("div",{className:"f ia",style:{gap:4,flex:1},children:[t("input",{value:newSecThresh,inputMode:"decimal",onChange:e=>sNewSecThresh(e.target.value.replace(/[^\d.]/g,"")),placeholder:"20",style:{width:52,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:8,padding:"8px 8px",color:c.tx,fontSize:12.5,fontFamily:F.mo,outline:"none",textAlign:"center"}}),t("span",{style:{fontSize:10.5,color:c.tm},children:"% threshold"})]})
+          ]}),
+          t("div",{style:{fontFamily:F.mo,fontSize:8.5,color:c.tm,letterSpacing:.5,marginBottom:6},children:"COLOR"}),
+          o("div",{className:"f",style:{gap:6,marginBottom:10},children:BUD_SECTION_PALETTE.map(col=>t("button",{key:col,onClick:()=>sNewSecColor(col),style:{width:24,height:24,borderRadius:999,background:col,border:newSecColor===col?`2px solid ${c.tx}`:"2px solid transparent",flexShrink:0}}))}),
+          o("div",{className:"f ia",style:{gap:8},children:[
+            t("button",{onClick:addSection,disabled:!newSecLabel.trim(),style:{flex:1,background:newSecLabel.trim()?c.ac:c.sf2,border:"none",borderRadius:8,padding:"9px 0",color:newSecLabel.trim()?"#0a0a0a":c.tm,fontSize:12,fontWeight:600},children:"Add section"}),
+            t("button",{onClick:()=>sShowAddSec(false),style:{background:"transparent",border:"none",color:c.tm,fontSize:11,padding:"9px 10px"},children:"Cancel"})
+          ]})
+        ]}):t("button",{onClick:()=>sShowAddSec(true),className:"act95 trt f ia",style:{gap:6,marginTop:8,background:"transparent",border:"none",color:c.ac,fontSize:11.5,fontFamily:F.mo,padding:0},children:[t(Plus,{size:12,color:c.ac}),"Add section"]}),
+        hiddenSectionDefs.length>0&&o("div",{style:{marginTop:10},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:8.5,color:c.tm,letterSpacing:.5,marginBottom:6},children:"HIDDEN SECTIONS"}),
+          ...hiddenSectionDefs.map(sec=>o("div",{key:sec.id,className:"f ia jb",style:{gap:8,padding:"5px 0"},children:[t("span",{className:"tru",style:{fontSize:12,color:c.tm,flex:1,minWidth:0,textDecoration:"line-through"},children:sec.emoji+" "+sec.label}),t("button",{onClick:()=>unhideLine(sec.id),className:"act95 trt f ia",style:{gap:5,background:"transparent",border:`1px solid ${c.brs}`,borderRadius:8,padding:"4px 9px",color:c.td,fontSize:10.5},children:[t(Eye,{size:11,color:c.td}),"Restore"]})]}))
+        ]})
+      ]}),
       ...manageSections.map(ms=>{const active=applyOrder(ms.id,ms.all.filter(l=>!hiddenSet.has(l.id)));const hidden=ms.all.filter(l=>hiddenSet.has(l.id));const adding=addSec===ms.id;return o("div",{key:ms.id,style:{marginBottom:14},children:[
         t("div",{style:{fontFamily:F.mo,fontSize:9,letterSpacing:1,color:ms.kind==="income"?c.mt:c.tm,marginBottom:6},children:ms.emoji+" "+ms.label.toUpperCase()}),
         o("div",{onPointerDown:e=>{const g=e.target.closest('[data-grip-idx]');if(!g)return;e.currentTarget.setPointerCapture(e.pointerId);const idx=parseInt(g.getAttribute('data-grip-idx'));dragRef.current={active:true,startIdx:idx,lastOver:idx};sDragSec(ms.id);sDragIdx(idx);sOverIdx(idx)},onPointerMove:e=>{if(!dragRef.current.active||dragSec!==ms.id)return;const its=e.currentTarget.querySelectorAll('[data-item-idx]');for(let k=0;k<its.length;k++){const r=its[k].getBoundingClientRect();if(e.clientY>=r.top&&e.clientY<=r.bottom){if(dragRef.current.lastOver!==k){dragRef.current.lastOver=k;sOverIdx(k)}break}}},onPointerUp:()=>dragDrop(ms.id,active),onPointerCancel:()=>{dragRef.current={active:false};sDragSec(null);sDragIdx(null);sOverIdx(null)},children:active.map((l,i)=>{const editing=renameId===l.id;const dragging=dragSec===ms.id;return o("div",{key:l.id,"data-item-idx":i,className:"f ia jb",style:{gap:8,padding:"7px 0",borderBottom:`1px solid ${c.brs}`,opacity:dragging&&dragIdx===i?0.4:1,background:dragging&&overIdx===i&&dragIdx!==i?c.ac+"15":"transparent",transition:"background .15s"},children:editing?[
