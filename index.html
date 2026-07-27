@@ -6785,6 +6785,11 @@ function BudgetCalculator({data,persist,cur,spendFlt}){
   const[renameVal,sRenameVal]=useState("");
   const[addSec,sAddSec]=useState(null);
   const[addVal,sAddVal]=useState("");
+  const[showGrocCat,sShowGrocCat]=useState(false);
+  const[dragSec,sDragSec]=useState(null);
+  const[dragIdx,sDragIdx]=useState(null);
+  const[overIdx,sOverIdx]=useState(null);
+  const dragRef=useRef({active:false});
   const saveMonth=(newValues)=>persist({calculators:{...cals,budget:{...B,links,months:{...monthsMap,[pKey]:{...(monthsMap[pKey]||{}),values:newValues}}}}});
   const setVal=(id,n)=>saveMonth({...values,[id]:n});
   const saveLinks=(newLinks)=>persist({calculators:{...cals,budget:{...B,links:newLinks,months:monthsMap}}});
@@ -6801,8 +6806,12 @@ function BudgetCalculator({data,persist,cur,spendFlt}){
   const rawLinesFor=(sectionId,defaultLines)=>{const customs=(lineConfig.customLines||[]).filter(l=>l.section===sectionId);return[...defaultLines.map(l=>({...l,custom:false})),...customs.map(l=>({...l,custom:true}))].map(l=>({...l,label:(lineConfig.labels||{})[l.id]||l.label}))};
   const manageSections=[{id:"inflow",label:"Monthly Inflows",emoji:"💰",kind:"income",all:rawLinesFor("inflow",BUD_INFLOWS)},...BUD_SECTIONS.map(s=>({id:s.id,label:s.label,emoji:s.emoji,kind:"expense",all:rawLinesFor(s.id,s.lines)}))];
   const hiddenSet=new Set(lineConfig.hidden||[]);
-  const effInflows=manageSections[0].all.filter(l=>!hiddenSet.has(l.id));
-  const effSections=BUD_SECTIONS.map((sec,i)=>({...sec,lines:manageSections[i+1].all.filter(l=>!hiddenSet.has(l.id))}));
+  const orderMap=lineConfig.order||{};
+  const applyOrder=(sectionId,list)=>{const ord=orderMap[sectionId];if(!ord||!ord.length)return list;const idxOf=id=>{const i=ord.indexOf(id);return i===-1?999+list.findIndex(l=>l.id===id):i};return[...list].sort((x,y)=>idxOf(x.id)-idxOf(y.id))};
+  const saveOrder=(sectionId,orderedIds)=>saveLineConfig({order:{...orderMap,[sectionId]:orderedIds}});
+  const dragDrop=(sectionId,activeList)=>{const{startIdx,lastOver}=dragRef.current;dragRef.current={active:false};if(startIdx!=null&&lastOver!=null&&startIdx!==lastOver){const arr=[...activeList];const[itm]=arr.splice(startIdx,1);arr.splice(lastOver,0,itm);saveOrder(sectionId,arr.map(l=>l.id))}sDragSec(null);sDragIdx(null);sOverIdx(null)};
+  const effInflows=applyOrder("inflow",manageSections[0].all.filter(l=>!hiddenSet.has(l.id)));
+  const effSections=BUD_SECTIONS.map((sec,i)=>({...sec,lines:applyOrder(sec.id,manageSections[i+1].all.filter(l=>!hiddenSet.has(l.id)))}));
   const inflowTotal=effInflows.reduce((s,l)=>s+effVal(l.id,"income"),0);
   const secTotals={};effSections.forEach(sec=>{secTotals[sec.id]=sec.lines.reduce((s,l)=>s+effVal(l.id,"expense"),0)});
   const income=inflowTotal;
@@ -6812,7 +6821,7 @@ function BudgetCalculator({data,persist,cur,spendFlt}){
   const fp=(x)=>(x*100).toFixed(1)+"%";
   const lineRow=(l,kind)=>{const linked=(links[l.id]||[]).length>0;const v=values[l.id];const a=linked?autoFor(l.id,kind):null;const overridden=linked&&v!=null;return o("div",{key:l.id,style:{padding:"6px 0",borderBottom:`1px solid ${c.brs}`},children:[
     o("div",{className:"f ia jb",style:{gap:8},children:[
-      o("div",{className:"f ia",style:{gap:6,minWidth:0},children:[t("span",{className:"tru",style:{fontSize:12.5,color:c.td},children:l.label}),linked&&v==null&&t("span",{style:{fontFamily:F.mo,fontSize:8,color:c.mt,background:c.mt+"1a",borderRadius:5,padding:"2px 5px",letterSpacing:.5,flexShrink:0},children:"AUTO"}),overridden&&t("span",{style:{fontFamily:F.mo,fontSize:8,color:c.gd,background:c.gd+"1a",borderRadius:5,padding:"2px 5px",letterSpacing:.5,flexShrink:0},children:"MANUAL"})]}),
+      o("div",{className:"f ia",style:{gap:6,minWidth:0},children:[t("span",{className:"tru",style:{fontSize:12.5,color:c.td},children:l.label}),l.id==="groceries"&&t("button",{onClick:()=>sShowGrocCat(true),"aria-label":"Manage grocery categories",title:"Which categories count as groceries",style:{background:"transparent",border:"none",color:c.ac,display:"flex",padding:0,flexShrink:0},children:t(Gear,{size:11,color:c.ac})}),linked&&v==null&&t("span",{style:{fontFamily:F.mo,fontSize:8,color:c.mt,background:c.mt+"1a",borderRadius:5,padding:"2px 5px",letterSpacing:.5,flexShrink:0},children:"AUTO"}),overridden&&t("span",{style:{fontFamily:F.mo,fontSize:8,color:c.gd,background:c.gd+"1a",borderRadius:5,padding:"2px 5px",letterSpacing:.5,flexShrink:0},children:"MANUAL"})]}),
       o("div",{className:"f ia",style:{gap:6,flexShrink:0},children:[t(ASNum,{value:v==null?null:v,placeholder:linked?String(a):"0",prefix:cur,width:96,onSave:(n)=>setVal(l.id,n)}),overridden&&t("button",{onClick:()=>setVal(l.id,null),title:"Reset to auto",style:{background:"transparent",border:"none",color:c.tm,fontSize:14,padding:2,cursor:"pointer"},children:"↺"})]})
     ]}),
     overridden&&a!=null&&a!==v&&o("div",{style:{textAlign:"right",marginTop:2},children:t("span",{style:{fontFamily:F.mo,fontSize:9,color:c.tm},children:"Linked categories total "+fm(a,cur)+" — tap ↺ to use that"})})
@@ -6827,7 +6836,7 @@ function BudgetCalculator({data,persist,cur,spendFlt}){
   const linkGroups=[{id:"inflow",title:"INFLOWS",kind:"income",lines:effInflows},...effSections.map(s=>({id:s.id,title:s.label.toUpperCase(),kind:"expense",lines:s.lines}))];
   const overriddenIds=[...effInflows.map(l=>l.id),...effSections.flatMap(s=>s.lines.map(l=>l.id))].filter(id=>(links[id]||[]).length>0&&values[id]!=null);
   const resetAllOverrides=()=>{const nv={...values};overriddenIds.forEach(id=>{nv[id]=null});saveMonth(nv)};
-  return t(Collapsible,{title:"🧮 MONTHLY BUDGET",badge:t(Pl,{col:c.gd,children:"CALCULATOR"}),summary:fm(leftout,cur),defaultOpen:false,children:o(Fragment,{children:[
+  return o(Fragment,{children:[t(Collapsible,{title:"🧮 MONTHLY BUDGET",badge:t(Pl,{col:c.gd,children:"CALCULATOR"}),summary:fm(leftout,cur),defaultOpen:false,children:o(Fragment,{children:[
     t("div",{style:{fontSize:11.5,color:c.tm,marginBottom:12,lineHeight:1.5},children:"A Money-Purse style monthly planner. Link any line to your categories and it auto-fills from actual transactions — or type to override."}),
     o("div",{className:"f ia jb",style:{marginBottom:10,gap:8},children:[
       t(IB,{onClick:()=>sMonOff(v=>v-1),size:32,children:t(CL,{size:16,color:c.tx})}),
@@ -6862,20 +6871,21 @@ function BudgetCalculator({data,persist,cur,spendFlt}){
     ]}),
     t("button",{onClick:()=>sShowManage(v=>!v),className:"w100 act97 trt f ia jb",style:{marginTop:16,padding:"12px 14px",background:showManage?c.sk+"14":c.sf2,border:`1px solid ${showManage?c.sk+"55":c.brs}`,borderRadius:12},children:[o("div",{className:"f ia",style:{gap:8},children:[t("span",{style:{fontSize:15},children:"📋"}),o("div",{className:"tl",children:[t("div",{style:{fontSize:13,fontWeight:600,color:c.tx},children:"Manage lines"}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:"Add, rename or remove budget lines"})]})]}),t("span",{style:{color:c.tm,fontSize:12,fontFamily:F.mo,transform:showManage?"rotate(180deg)":"none",display:"inline-block",transition:"transform .2s"},children:"▾"})]}),
     showManage&&o("div",{style:{marginTop:10,padding:14,background:c.sf2,borderRadius:14,border:`1px solid ${c.brs}`},children:[
-      t("div",{style:{fontSize:11,color:c.tm,marginBottom:12,lineHeight:1.5},children:"Rename or hide any line — hidden lines keep their saved history and can be restored any time. Add new lines to any section, including Inflows."}),
-      ...manageSections.map(ms=>{const active=ms.all.filter(l=>!hiddenSet.has(l.id));const hidden=ms.all.filter(l=>hiddenSet.has(l.id));const adding=addSec===ms.id;return o("div",{key:ms.id,style:{marginBottom:14},children:[
+      t("div",{style:{fontSize:11,color:c.tm,marginBottom:12,lineHeight:1.5},children:"Rename or hide any line — hidden lines keep their saved history and can be restored any time. Drag the grip to reorder within a section; the order shows up in the calculator too. Add new lines to any section, including Inflows."}),
+      ...manageSections.map(ms=>{const active=applyOrder(ms.id,ms.all.filter(l=>!hiddenSet.has(l.id)));const hidden=ms.all.filter(l=>hiddenSet.has(l.id));const adding=addSec===ms.id;return o("div",{key:ms.id,style:{marginBottom:14},children:[
         t("div",{style:{fontFamily:F.mo,fontSize:9,letterSpacing:1,color:ms.kind==="income"?c.mt:c.tm,marginBottom:6},children:ms.emoji+" "+ms.label.toUpperCase()}),
-        ...active.map(l=>{const editing=renameId===l.id;return o("div",{key:l.id,className:"f ia jb",style:{gap:8,padding:"7px 0",borderBottom:`1px solid ${c.brs}`},children:editing?[
+        o("div",{onPointerDown:e=>{const g=e.target.closest('[data-grip-idx]');if(!g)return;e.currentTarget.setPointerCapture(e.pointerId);const idx=parseInt(g.getAttribute('data-grip-idx'));dragRef.current={active:true,startIdx:idx,lastOver:idx};sDragSec(ms.id);sDragIdx(idx);sOverIdx(idx)},onPointerMove:e=>{if(!dragRef.current.active||dragSec!==ms.id)return;const its=e.currentTarget.querySelectorAll('[data-item-idx]');for(let k=0;k<its.length;k++){const r=its[k].getBoundingClientRect();if(e.clientY>=r.top&&e.clientY<=r.bottom){if(dragRef.current.lastOver!==k){dragRef.current.lastOver=k;sOverIdx(k)}break}}},onPointerUp:()=>dragDrop(ms.id,active),onPointerCancel:()=>{dragRef.current={active:false};sDragSec(null);sDragIdx(null);sOverIdx(null)},children:active.map((l,i)=>{const editing=renameId===l.id;const dragging=dragSec===ms.id;return o("div",{key:l.id,"data-item-idx":i,className:"f ia jb",style:{gap:8,padding:"7px 0",borderBottom:`1px solid ${c.brs}`,opacity:dragging&&dragIdx===i?0.4:1,background:dragging&&overIdx===i&&dragIdx!==i?c.ac+"15":"transparent",transition:"background .15s"},children:editing?[
           t("input",{value:renameVal,onChange:e=>sRenameVal(e.target.value),autoFocus:true,style:{flex:1,background:c.sf,border:`1px solid ${c.ac}`,borderRadius:8,padding:"6px 9px",color:c.tx,fontSize:12.5,fontFamily:'var(--tf)',outline:"none"}}),
           t("button",{onClick:()=>{if(renameVal.trim())renameLine(l.id,renameVal.trim());sRenameId(null)},style:{background:c.ac,border:"none",borderRadius:8,padding:"6px 10px",color:"#0a0a0a",fontSize:11,fontWeight:600},children:"Save"}),
           t("button",{onClick:()=>sRenameId(null),style:{background:"transparent",border:"none",color:c.tm,fontSize:11,padding:"6px 4px"},children:"Cancel"})
         ]:[
+          t("div",{"data-grip-idx":i,style:{color:c.td,cursor:"grab",touchAction:"none",padding:"2px 6px 2px 0",display:"flex",flexShrink:0},children:t(GripV,{size:15})}),
           t("span",{className:"tru",style:{fontSize:12.5,color:c.tx,flex:1,minWidth:0},children:l.label}),
           o("div",{className:"f ia",style:{gap:4,flexShrink:0},children:[
             t("button",{onClick:()=>{sRenameId(l.id);sRenameVal(l.label)},"aria-label":"Rename",style:{background:c.sf,border:`1px solid ${c.brs}`,borderRadius:8,width:26,height:26,display:"flex",alignItems:"center",justifyContent:"center",color:c.td},children:t(Pencil,{size:12,color:c.td})}),
             t("button",{onClick:()=>hideLine(l.id),"aria-label":"Hide",style:{background:"transparent",border:`1px solid ${c.co}40`,borderRadius:8,width:26,height:26,display:"flex",alignItems:"center",justifyContent:"center",color:c.co},children:t(EyeOff,{size:12,color:c.co})})
           ]})
-        ]})}),
+        ]})})}),
         adding?o("div",{className:"f ia",style:{gap:8,marginTop:8},children:[
           t("input",{value:addVal,onChange:e=>sAddVal(e.target.value),autoFocus:true,placeholder:"New line name",style:{flex:1,background:c.sf,border:`1px solid ${c.ac}`,borderRadius:8,padding:"7px 10px",color:c.tx,fontSize:12.5,fontFamily:'var(--tf)',outline:"none"}}),
           t("button",{onClick:()=>{if(addVal.trim())addCustomLine(addVal.trim(),ms.id);sAddSec(null);sAddVal("")},style:{background:c.ac,border:"none",borderRadius:8,padding:"7px 12px",color:"#0a0a0a",fontSize:11,fontWeight:600},children:"Add"}),
@@ -6900,7 +6910,7 @@ function BudgetCalculator({data,persist,cur,spendFlt}){
       ]}))
     ]}),
     t("div",{style:{marginTop:14,fontSize:10,color:c.tm,lineHeight:1.5,fontStyle:"italic"},children:"Thresholds mirror the classic planner: essentials <40%, lifestyle <20%, EMIs <30%, investments ≥20%, and a healthy surplus >10% of income."})
-  ]})});
+  ]})}),showGrocCat&&t(GroceryCatSht,{data,persist,onClose:()=>sShowGrocCat(false)})]});
 }
 const CALCULATORS=[{id:"budget",label:"Monthly Budget",emoji:"🧮",component:BudgetCalculator}];
 function AdvancedStats({data,persist,onClose,onTx,onFlt}){
