@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
 <meta http-equiv="Pragma" content="no-cache"/>
 <meta http-equiv="Expires" content="0"/>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval' https://cdnjs.cloudflare.com https://unpkg.com https://cdn.sheetjs.com https://cdn.jsdelivr.net; worker-src 'self' blob: https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com; child-src 'self' blob: https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.anthropic.com https://api.deepseek.com https://api.openai.com https://openrouter.ai https://generativelanguage.googleapis.com https://accounts.google.com https://www.googleapis.com https://www.google-analytics.com https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://tessdata.projectnaptha.com; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval' https://cdnjs.cloudflare.com https://unpkg.com https://cdn.sheetjs.com https://cdn.jsdelivr.net; worker-src 'self' blob: https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com; child-src 'self' blob: https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.anthropic.com https://api.deepseek.com https://api.openai.com https://openrouter.ai https://generativelanguage.googleapis.com https://accounts.google.com https://www.googleapis.com https://www.google-analytics.com https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://tessdata.projectnaptha.com https://*.workers.dev https://*.vercel.app; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/>
 <meta name="theme-color" content="#1B1B1D"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -601,7 +601,7 @@ async function restoreStmtFiles(map){if(!map)return;for(const k of Object.keys(m
 async function collectPhotoFiles(expenses){const out={};for(const e of (expenses||[])){for(const p of ((e&&e.photos)||[])){if(p&&p.id&&!p.data&&!out[p.id]){try{const b=await idbGetFile(String(p.id));if(b)out[p.id]={name:p.name||"photo.jpg",type:b.type||"image/jpeg",dataUrl:await _blobToDataUrl(b)}}catch(err){}}}}return out}
 async function collectLedgerPhotoFiles(ledger){const out={};for(const p2 of (ledger||[])){const refs=[...(p2.photo?[p2.photo]:[]),...((p2.entries||[]).flatMap(en=>en.photos||[]))];for(const p of refs){if(p&&p.id&&!p.data&&!out[p.id]){try{const b=await idbGetFile(String(p.id));if(b)out[p.id]={name:p.name||"photo.jpg",type:b.type||"image/jpeg",dataUrl:await _blobToDataUrl(b)}}catch(err){}}}}return out}
 function usePhotoSrc(photos){const[map,sMap]=useState({});useEffect(()=>{let live=true;(async()=>{const need=(photos||[]).filter(p=>p&&p.id&&!p.data&&!map[p.id]);if(!need.length)return;const m={};for(const p of need){try{const b=await idbGetFile(String(p.id));if(b)m[p.id]=await _blobToDataUrl(b)}catch(e){}}if(live&&Object.keys(m).length)sMap(mm=>({...mm,...m}))})();return()=>{live=false}},[photos]);return p=>(p&&p.data)||map[p&&p.id]||null}
-function buildBackupObj(dd){let sidebarOrder=null;try{const s=localStorage.getItem(SB_ORDER_KEY);if(s)sidebarOrder=JSON.parse(s)}catch(e){}return{version:"v3.2",exportedAt:new Date().toISOString(),expenses:dd.expenses,recurring:dd.recurring,accounts:dd.accounts,profiles:dd.profiles,cards:dd.cards||[],cardStatements:dd.cardStatements||[],bills:dd.bills||[],goals:dd.goals||[],budgetLoans:dd.budgetLoans||[],ledger:dd.ledger||[],categoryBudgets:dd.categoryBudgets||{},monthlyRestrictionLogs:dd.monthlyRestrictionLogs||[],investments:dd.investments||[],planThreshold:dd.planThreshold??null,customExpenseCategories:dd.customExpenseCategories||[],customIncomeCategories:dd.customIncomeCategories||[],categoryOverrides:dd.categoryOverrides||{},categoryOrder:dd.categoryOrder||{expense:[],income:[]},sidebarOrder,budget:dd.budget,budgetPeriod:dd.budgetPeriod,morningEnabled:dd.morningEnabled||false,morningTime:dd.morningTime||"08:00",eveningEnabled:dd.eveningEnabled||false,eveningTime:dd.eveningTime||"21:00",currency:dd.currency,monthStartDay:dd.monthStartDay,aiProvider:gProv(),aiModel:gMdl()||null,merchantRules:dd.merchantRules||{},debtPlan:dd.debtPlan||null,las:dd.las||null,varExpensePlans:dd.varExpensePlans||{},advStats:dd.advStats||{},calculators:dd.calculators||{},groceryCategories:dd.groceryCategories||GROC_CATS_DEFAULT,threads:dd.threads||[]}}
+function buildBackupObj(dd){let sidebarOrder=null;try{const s=localStorage.getItem(SB_ORDER_KEY);if(s)sidebarOrder=JSON.parse(s)}catch(e){}return{version:"v3.2",exportedAt:new Date().toISOString(),expenses:dd.expenses,recurring:dd.recurring,accounts:dd.accounts,profiles:dd.profiles,cards:dd.cards||[],cardStatements:dd.cardStatements||[],bills:dd.bills||[],goals:dd.goals||[],budgetLoans:dd.budgetLoans||[],ledger:dd.ledger||[],categoryBudgets:dd.categoryBudgets||{},monthlyRestrictionLogs:dd.monthlyRestrictionLogs||[],investments:dd.investments||[],planThreshold:dd.planThreshold??null,customExpenseCategories:dd.customExpenseCategories||[],customIncomeCategories:dd.customIncomeCategories||[],categoryOverrides:dd.categoryOverrides||{},categoryOrder:dd.categoryOrder||{expense:[],income:[]},sidebarOrder,budget:dd.budget,budgetPeriod:dd.budgetPeriod,morningEnabled:dd.morningEnabled||false,morningTime:dd.morningTime||"08:00",eveningEnabled:dd.eveningEnabled||false,eveningTime:dd.eveningTime||"21:00",currency:dd.currency,monthStartDay:dd.monthStartDay,aiProvider:gProv(),aiModel:gMdl()||null,merchantRules:dd.merchantRules||{},debtPlan:dd.debtPlan||null,las:dd.las||null,varExpensePlans:dd.varExpensePlans||{},advStats:dd.advStats||{},calculators:dd.calculators||{},groceryCategories:dd.groceryCategories||GROC_CATS_DEFAULT,priceWatch:dd.priceWatch||PW_DEFAULT,threads:dd.threads||[]}}
 async function buildBackupJSON(dd,withFiles=true){const j=buildBackupObj(dd);if(withFiles){try{j.statementFiles=await collectStmtFiles(j.cardStatements)}catch(e){j.statementFiles={}}try{j.expensePhotos=await collectPhotoFiles(j.expenses)}catch(e){j.expensePhotos={}}try{j.ledgerPhotos=await collectLedgerPhotoFiles(j.ledger)}catch(e){j.ledgerPhotos={}}}return JSON.stringify(j,null,2)}
 async function gdUpload(json){const token=localStorage.getItem("gd_token");if(!token)throw new Error("Not connected to Google Drive");const fname=`expense-backup-${new Date().toISOString().slice(0,10)}.json`;const meta=JSON.stringify({name:fname,mimeType:"application/json"});const form=new FormData();form.append("metadata",new Blob([meta],{type:"application/json"}));form.append("file",new Blob([json],{type:"application/json"}));const res=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{method:"POST",headers:{Authorization:"Bearer "+token},body:form});if(!res.ok){const txt=await res.text().catch(()=>res.status);throw new Error("Upload failed ("+res.status+"): "+txt)}}
 
@@ -840,7 +840,7 @@ function AppHeader({onMenu,onSearch,onToggleTheme,isDark,theme,onHome,onAI,onDia
 }
 const SB_ORDER_KEY="etp-sidebar-order";
 const DEFAULT_SB=["h:Money","accounts","groceries","monthHist","cards","transfer","investments","wealth","budgetTrack","annualExp","budgetLoans","autopilot","debtPlan","las","h:Plan & Track","bills","goals","diary","recurring","upcomingExp","categoryBudgets","h:Insights","breakdown","monthlyReport","tips","dailyLesson","wrapped","rules","h:Tools","expPlanner","investCalc","cardPayFix","profiles","h:AI","moneyChat","subAudit","docScan","stmtAnalyze","stmtImports","aiInsights","h:Settings & Data","categories","merchantRules","backup","userMgr","settings"];
-const SB_META={moneyChat:{e:"🧞",l:"Ask Your Money",s:"AI that sees your whole picture"},subAudit:{e:"🔍",l:"Subscription Auditor",s:"Recurring charges, hikes & cancels"},docScan:{e:"🪪",l:"Scan Payslip / Statement",s:"Log income & investments from a photo"},stmtAnalyze:{e:"📥",l:"Statement Analyzer",s:"Find missing transactions & discrepancies"},stmtImports:{e:"📊",l:"Statement Imports",s:"Review transactions logged from statements"},aiInsights:{e:"💡",l:"AI Insights",s:"Spending patterns & AI suggestions"},userMgr:{e:"👥",l:"Switch User",s:"Manage profiles"},rules:{e:"📋",l:"Rules & Learnings",s:"Track your financial rules"},upcomingExp:{e:"📅",l:"Upcoming Expenses",s:"Plan & get alerts"},expPlanner:{e:"🧮",l:"Expense Planner",s:"Can I afford this EMI?"},investCalc:{e:"📈",l:"Investment Calculator",s:"Compound growth & SIP planner"},cards:{e:"💳",l:"Cards",acc:true},groceries:{e:"🛒",l:"Groceries",s:"Stores, items & price tracking",acc:true},cardPayFix:{e:"🪙",l:"Fix card bill payments",s:"Remove double-counted bills",acc:true},bills:{e:"🔔",l:"Bills & Reminders",acc:true},goals:{e:"🎯",l:"Goals & Debt",acc:true},diary:{e:"📖",l:"Lending Diary",s:"Who owes you & you owe"},investments:{e:"💼",l:"My Investments",s:"NPS, Funds, FDs",acc:true},wealth:{e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},monthlyReport:{e:"📰",l:"Monthly Report",s:"Print or share PDF"},budgetTrack:{e:"📉",l:"Budget Tracker",s:"Monthly over/under record"},budgetLoans:{e:"🧾",l:"Budget Loans",s:"Repay past overspends"},breakdown:{e:"⚖️",l:"Spending Breakdown",s:"Needs/Wants · 50-30-20"},accounts:{e:"🏦",l:"Accounts",acc:true},monthHist:{e:"🗓️",l:"Monthly History",s:"Reset & activity by month",acc:true},transfer:{e:"↔️",l:"Transfer",s:"Move funds",acc:true},recurring:{e:"🔁",l:"Recurring"},profiles:{e:"⚡",l:"Quick profiles"},categoryBudgets:{e:"📏",l:"Category budgets",s:"Set spending limits"},annualExp:{e:"📆",l:"Annual Variable Expenses",s:"Plan yearly variable costs by month"},categories:{e:"🏷️",l:"Categories",s:"Manage expense types"},backup:{e:"💾",l:"Backup & Restore",s:"Export or import data"},tips:{e:"💡",l:"Financial Health",s:"Tips & scores"},dailyLesson:{e:"📖",l:"Daily Money Lesson",s:"One finance lesson a day"},autopilot:{e:"🔮",l:"Autopilot Forecast",s:"30-day cash-flow projection",acc:true},debtPlan:{e:"⚔️",l:"Debt Destroyer",s:"Avalanche vs snowball payoff plan",acc:true},las:{e:"🏛️",l:"Loan Against Securities",s:"Zerodha LAS · LTV, pledge & unpledge"},wrapped:{e:"🎁",l:"Year in Review",s:"Wrapped, heatmap, badges"},merchantRules:{e:"🧠",l:"Merchant Memory",s:"Auto-fill rules per merchant"},settings:{e:"⚙️",l:"Settings",s:"Currency, budget, backup"}};
+const SB_META={moneyChat:{e:"🧞",l:"Ask Your Money",s:"AI that sees your whole picture"},subAudit:{e:"🔍",l:"Subscription Auditor",s:"Recurring charges, hikes & cancels"},docScan:{e:"🪪",l:"Scan Payslip / Statement",s:"Log income & investments from a photo"},stmtAnalyze:{e:"📥",l:"Statement Analyzer",s:"Find missing transactions & discrepancies"},stmtImports:{e:"📊",l:"Statement Imports",s:"Review transactions logged from statements"},aiInsights:{e:"💡",l:"AI Insights",s:"Spending patterns & AI suggestions"},userMgr:{e:"👥",l:"Switch User",s:"Manage profiles"},rules:{e:"📋",l:"Rules & Learnings",s:"Track your financial rules"},upcomingExp:{e:"📅",l:"Upcoming Expenses",s:"Plan & get alerts"},expPlanner:{e:"🧮",l:"Expense Planner",s:"Can I afford this EMI?"},investCalc:{e:"📈",l:"Investment Calculator",s:"Compound growth & SIP planner"},cards:{e:"💳",l:"Cards",acc:true},groceries:{e:"🛒",l:"Groceries",s:"Trips, items & live price watch",acc:true},cardPayFix:{e:"🪙",l:"Fix card bill payments",s:"Remove double-counted bills",acc:true},bills:{e:"🔔",l:"Bills & Reminders",acc:true},goals:{e:"🎯",l:"Goals & Debt",acc:true},diary:{e:"📖",l:"Lending Diary",s:"Who owes you & you owe"},investments:{e:"💼",l:"My Investments",s:"NPS, Funds, FDs",acc:true},wealth:{e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},monthlyReport:{e:"📰",l:"Monthly Report",s:"Print or share PDF"},budgetTrack:{e:"📉",l:"Budget Tracker",s:"Monthly over/under record"},budgetLoans:{e:"🧾",l:"Budget Loans",s:"Repay past overspends"},breakdown:{e:"⚖️",l:"Spending Breakdown",s:"Needs/Wants · 50-30-20"},accounts:{e:"🏦",l:"Accounts",acc:true},monthHist:{e:"🗓️",l:"Monthly History",s:"Reset & activity by month",acc:true},transfer:{e:"↔️",l:"Transfer",s:"Move funds",acc:true},recurring:{e:"🔁",l:"Recurring"},profiles:{e:"⚡",l:"Quick profiles"},categoryBudgets:{e:"📏",l:"Category budgets",s:"Set spending limits"},annualExp:{e:"📆",l:"Annual Variable Expenses",s:"Plan yearly variable costs by month"},categories:{e:"🏷️",l:"Categories",s:"Manage expense types"},backup:{e:"💾",l:"Backup & Restore",s:"Export or import data"},tips:{e:"💡",l:"Financial Health",s:"Tips & scores"},dailyLesson:{e:"📖",l:"Daily Money Lesson",s:"One finance lesson a day"},autopilot:{e:"🔮",l:"Autopilot Forecast",s:"30-day cash-flow projection",acc:true},debtPlan:{e:"⚔️",l:"Debt Destroyer",s:"Avalanche vs snowball payoff plan",acc:true},las:{e:"🏛️",l:"Loan Against Securities",s:"Zerodha LAS · LTV, pledge & unpledge"},wrapped:{e:"🎁",l:"Year in Review",s:"Wrapped, heatmap, badges"},merchantRules:{e:"🧠",l:"Merchant Memory",s:"Auto-fill rules per merchant"},settings:{e:"⚙️",l:"Settings",s:"Currency, budget, backup"}};
 function Sidebar({data,onClose,onView,activeUser,onUpdateUser,focusSection}){
   const go=(id)=>{onView(id);onClose()};
   const scRef=useRef(null);
@@ -1074,9 +1074,9 @@ function eveningBody(d){
 }
 function fireNotif(d,kind){
   if(typeof Notification==='undefined'||Notification.permission!=='granted')return;
-  const title=kind==='morning'?'🌅 Daily Money Wisdom':'💰 Expense Reminder';
-  const body=kind==='morning'?quoteOfDay():eveningBody(d);
-  const tag=kind==='morning'?'daily-quote':'daily-reminder';
+  const title=kind==='morning'?'🌅 Daily Money Wisdom':kind==='pricewatch'?'🎯 Price Watch check-in':'💰 Expense Reminder';
+  const body=kind==='morning'?quoteOfDay():kind==='pricewatch'?pwNotifBody(d):eveningBody(d);
+  const tag=kind==='morning'?'daily-quote':kind==='pricewatch'?'price-watch':'daily-reminder';
   if(navigator.serviceWorker?.controller){navigator.serviceWorker.controller.postMessage({type:'SHOW_REMINDER',title,body,tag})}
   else{try{new Notification(title,{body,tag,icon:'./manifest.json'})}catch{}}
 }
@@ -1169,8 +1169,8 @@ function App(){
   const cu=usrs.find(u=>u.id===auid)||usrs[0];
   setUsers(usrs);setActiveUser(cu);
   const dk="etp-data-"+cu.id;
-  let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],cardStatements:[],bills:[],goals:[],budgetLoans:[],ledger:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},categoryOrder:{expense:[],income:[]},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,expensePlans:[],investmentPlans:[],investments:[],planThreshold:null,monthlyRestrictionLogs:[],openingBalances:[],reminderEnabled:false,reminderTime:"21:00",rules:[],backupFreq:"off",backupGDrive:false,lastBackupAt:0,merchantRules:{},debtPlan:null,las:null,varExpensePlans:{},advStats:{},calculators:{},groceryCategories:GROC_CATS_DEFAULT,threads:[]};
-  try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,expenses:p.expenses||[],recurring:p.recurring||[],accounts:p.accounts&&p.accounts.length?p.accounts:[DA],profiles:p.profiles||[],cards:p.cards||[],cardStatements:p.cardStatements||[],bills:p.bills||[],goals:p.goals||[],budgetLoans:p.budgetLoans||[],ledger:p.ledger||[],categoryBudgets:p.categoryBudgets||{},customExpenseCategories:p.customExpenseCategories||[],customIncomeCategories:p.customIncomeCategories||[],categoryOverrides:p.categoryOverrides||{},categoryOrder:p.categoryOrder||{expense:[],income:[]},financeProfile:p.financeProfile||null,budget:p.budget??null,budgetPeriod:p.budgetPeriod||"monthly",currency:p.currency||"₹",monthStartDay:p.monthStartDay||1,fontSize:p.fontSize||"medium",upcomingExpenses:p.upcomingExpenses||[],alertThreshold:p.alertThreshold??null,expensePlans:p.expensePlans||[],investmentPlans:p.investmentPlans||[],investments:p.investments||[],planThreshold:p.planThreshold??null,monthlyRestrictionLogs:p.monthlyRestrictionLogs||[],openingBalances:p.openingBalances||[],reminderEnabled:p.reminderEnabled||false,reminderTime:p.reminderTime||"21:00",morningEnabled:p.morningEnabled||false,morningTime:p.morningTime||"08:00",eveningEnabled:p.eveningEnabled??(p.reminderEnabled||false),eveningTime:p.eveningTime||p.reminderTime||"21:00",rules:p.rules||[],backupFreq:p.backupFreq||"off",backupGDrive:p.backupGDrive||false,lastBackupAt:p.lastBackupAt||0,merchantRules:p.merchantRules||{},debtPlan:p.debtPlan||null,las:p.las||null,varExpensePlans:p.varExpensePlans||{},advStats:p.advStats||{},calculators:p.calculators||{},groceryCategories:p.groceryCategories||GROC_CATS_DEFAULT,threads:p.threads||[]};_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[];_catOv=i.categoryOverrides||{};_catOrder=i.categoryOrder||{expense:[],income:[]};_grocCats=i.groceryCategories||GROC_CATS_DEFAULT;
+  let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],cardStatements:[],bills:[],goals:[],budgetLoans:[],ledger:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},categoryOrder:{expense:[],income:[]},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,expensePlans:[],investmentPlans:[],investments:[],planThreshold:null,monthlyRestrictionLogs:[],openingBalances:[],reminderEnabled:false,reminderTime:"21:00",rules:[],backupFreq:"off",backupGDrive:false,lastBackupAt:0,merchantRules:{},debtPlan:null,las:null,varExpensePlans:{},advStats:{},calculators:{},groceryCategories:GROC_CATS_DEFAULT,priceWatch:PW_DEFAULT,threads:[]};
+  try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,expenses:p.expenses||[],recurring:p.recurring||[],accounts:p.accounts&&p.accounts.length?p.accounts:[DA],profiles:p.profiles||[],cards:p.cards||[],cardStatements:p.cardStatements||[],bills:p.bills||[],goals:p.goals||[],budgetLoans:p.budgetLoans||[],ledger:p.ledger||[],categoryBudgets:p.categoryBudgets||{},customExpenseCategories:p.customExpenseCategories||[],customIncomeCategories:p.customIncomeCategories||[],categoryOverrides:p.categoryOverrides||{},categoryOrder:p.categoryOrder||{expense:[],income:[]},financeProfile:p.financeProfile||null,budget:p.budget??null,budgetPeriod:p.budgetPeriod||"monthly",currency:p.currency||"₹",monthStartDay:p.monthStartDay||1,fontSize:p.fontSize||"medium",upcomingExpenses:p.upcomingExpenses||[],alertThreshold:p.alertThreshold??null,expensePlans:p.expensePlans||[],investmentPlans:p.investmentPlans||[],investments:p.investments||[],planThreshold:p.planThreshold??null,monthlyRestrictionLogs:p.monthlyRestrictionLogs||[],openingBalances:p.openingBalances||[],reminderEnabled:p.reminderEnabled||false,reminderTime:p.reminderTime||"21:00",morningEnabled:p.morningEnabled||false,morningTime:p.morningTime||"08:00",eveningEnabled:p.eveningEnabled??(p.reminderEnabled||false),eveningTime:p.eveningTime||p.reminderTime||"21:00",rules:p.rules||[],backupFreq:p.backupFreq||"off",backupGDrive:p.backupGDrive||false,lastBackupAt:p.lastBackupAt||0,merchantRules:p.merchantRules||{},debtPlan:p.debtPlan||null,las:p.las||null,varExpensePlans:p.varExpensePlans||{},advStats:p.advStats||{},calculators:p.calculators||{},groceryCategories:p.groceryCategories||GROC_CATS_DEFAULT,priceWatch:p.priceWatch||PW_DEFAULT,threads:p.threads||[]};_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[];_catOv=i.categoryOverrides||{};_catOrder=i.categoryOrder||{expense:[],income:[]};_grocCats=i.groceryCategories||GROC_CATS_DEFAULT;
   if(i.currency==="₹"){i.accounts=i.accounts.map(a=>a.currency==="$"?{...a,currency:"₹"}:a);const accMap=Object.fromEntries(i.accounts.map(a=>[a.id,a]));i.expenses=i.expenses.map(e=>e.currency==="$"?{...e,currency:accMap[e.accountId]?.currency||i.currency}:e)}
   if(!localStorage.getItem("etp-cash-unlinked")){const cashIds=new Set(i.accounts.filter(a=>a.id==="acc_default"||a.name==="Cash").map(a=>a.id));i.expenses=i.expenses.map(e=>cashIds.has(e.accountId)?{...e,accountId:null}:e);localStorage.setItem("etp-cash-unlinked","1")}}}catch(e){console.error("load",e)}
   if(i.recurring.length>0){const{newExpenses,updatedRecurring}=pr(i.recurring,i.expenses);if(newExpenses.length>0){i.expenses=[...newExpenses,...i.expenses].sort((a,b)=>b.date-a.date);i.recurring=updatedRecurring}}
@@ -1204,7 +1204,7 @@ function App(){
   try{await window.storage.set(dk,JSON.stringify(strip(i)))}catch{}
 })()},[]);
 
-  const strip=x=>({expenses:x.expenses,recurring:x.recurring,accounts:x.accounts,profiles:x.profiles,cards:x.cards||[],cardStatements:x.cardStatements||[],bills:x.bills||[],goals:x.goals||[],budgetLoans:x.budgetLoans||[],ledger:x.ledger||[],categoryBudgets:x.categoryBudgets||{},monthlyRestrictionLogs:x.monthlyRestrictionLogs||[],openingBalances:x.openingBalances||[],customExpenseCategories:x.customExpenseCategories||[],customIncomeCategories:x.customIncomeCategories||[],categoryOverrides:x.categoryOverrides||{},categoryOrder:x.categoryOrder||{expense:[],income:[]},financeProfile:x.financeProfile||null,budget:x.budget,budgetPeriod:x.budgetPeriod,currency:x.currency,monthStartDay:x.monthStartDay,fontSize:x.fontSize||"medium",upcomingExpenses:x.upcomingExpenses||[],alertThreshold:x.alertThreshold??null,expensePlans:x.expensePlans||[],investmentPlans:x.investmentPlans||[],investments:x.investments||[],planThreshold:x.planThreshold??null,reminderEnabled:x.reminderEnabled||false,reminderTime:x.reminderTime||"21:00",morningEnabled:x.morningEnabled||false,morningTime:x.morningTime||"08:00",eveningEnabled:x.eveningEnabled||false,eveningTime:x.eveningTime||"21:00",backupFreq:x.backupFreq||"off",backupGDrive:x.backupGDrive||false,lastBackupAt:x.lastBackupAt||0,merchantRules:x.merchantRules||{},debtPlan:x.debtPlan||null,las:x.las||null,threads:x.threads||[],varExpensePlans:x.varExpensePlans||{},advStats:x.advStats||{},calculators:x.calculators||{},groceryCategories:x.groceryCategories||GROC_CATS_DEFAULT});
+  const strip=x=>({expenses:x.expenses,recurring:x.recurring,accounts:x.accounts,profiles:x.profiles,cards:x.cards||[],cardStatements:x.cardStatements||[],bills:x.bills||[],goals:x.goals||[],budgetLoans:x.budgetLoans||[],ledger:x.ledger||[],categoryBudgets:x.categoryBudgets||{},monthlyRestrictionLogs:x.monthlyRestrictionLogs||[],openingBalances:x.openingBalances||[],customExpenseCategories:x.customExpenseCategories||[],customIncomeCategories:x.customIncomeCategories||[],categoryOverrides:x.categoryOverrides||{},categoryOrder:x.categoryOrder||{expense:[],income:[]},financeProfile:x.financeProfile||null,budget:x.budget,budgetPeriod:x.budgetPeriod,currency:x.currency,monthStartDay:x.monthStartDay,fontSize:x.fontSize||"medium",upcomingExpenses:x.upcomingExpenses||[],alertThreshold:x.alertThreshold??null,expensePlans:x.expensePlans||[],investmentPlans:x.investmentPlans||[],investments:x.investments||[],planThreshold:x.planThreshold??null,reminderEnabled:x.reminderEnabled||false,reminderTime:x.reminderTime||"21:00",morningEnabled:x.morningEnabled||false,morningTime:x.morningTime||"08:00",eveningEnabled:x.eveningEnabled||false,eveningTime:x.eveningTime||"21:00",backupFreq:x.backupFreq||"off",backupGDrive:x.backupGDrive||false,lastBackupAt:x.lastBackupAt||0,merchantRules:x.merchantRules||{},debtPlan:x.debtPlan||null,las:x.las||null,threads:x.threads||[],varExpensePlans:x.varExpensePlans||{},advStats:x.advStats||{},calculators:x.calculators||{},groceryCategories:x.groceryCategories||GROC_CATS_DEFAULT,priceWatch:x.priceWatch||PW_DEFAULT});
 
   const pst=async(p)=>{const n={...d,...p};_custCE=n.customExpenseCategories||[];_custCI=n.customIncomeCategories||[];_catOv=n.categoryOverrides||{};_catOrder=n.categoryOrder||{expense:[],income:[]};_grocCats=n.groceryCategories||GROC_CATS_DEFAULT;sD(n);const dk=activeUser?"etp-data-"+activeUser.id:KS;try{await window.storage.set(dk,JSON.stringify(strip(n)))}catch(e){console.error(e);try{if(!window.__pstErrWarned){window.__pstErrWarned=true;alert("⚠ Could not save your data — device storage looks full. Recent changes may disappear when the app closes. Free up space, then make any small edit to retry saving.")}}catch(e2){}}};
 
@@ -1297,9 +1297,9 @@ function App(){
   useEffect(()=>{if(scrollRef.current)scrollRef.current.scrollTop=0},[v]);
   useEffect(()=>{const s=document.documentElement.style;s.setProperty('--nf',gNF(d));s.setProperty('--tf',gTF(d));s.setProperty('--ns',gNS(d)+'px')},[d.fontPrefs]);
   useEffect(()=>{try{const p=new URLSearchParams(location.search);if(p.get('action')==='add'){history.replaceState(null,'','./');sV('add')}if(p.get('view')==='stats'){history.replaceState(null,'','./');sV('stats')}}catch{}},[]);
-  useEffect(()=>{if(typeof Notification==='undefined'||Notification.permission!=='granted')return;const timers=[];const sched=(time,kind,enabled)=>{if(!enabled||!time)return;const[hh,mm]=time.split(':').map(Number);const now=new Date(),next=new Date();next.setHours(hh,mm,0,0);if(next<=now)next.setDate(next.getDate()+1);timers.push(setTimeout(()=>fireNotif(dRef.current,kind),next-now))};sched(d.morningTime,'morning',d.morningEnabled);sched(d.eveningTime,'evening',d.eveningEnabled);return()=>timers.forEach(clearTimeout)},[d.morningEnabled,d.morningTime,d.eveningEnabled,d.eveningTime]);
+  useEffect(()=>{if(typeof Notification==='undefined'||Notification.permission!=='granted')return;const timers=[];const sched=(time,kind,enabled)=>{if(!enabled||!time)return;const[hh,mm]=time.split(':').map(Number);const now=new Date(),next=new Date();next.setHours(hh,mm,0,0);if(next<=now)next.setDate(next.getDate()+1);timers.push(setTimeout(()=>fireNotif(dRef.current,kind),next-now))};sched(d.morningTime,'morning',d.morningEnabled);sched(d.eveningTime,'evening',d.eveningEnabled);const pwc=pwOf(d).cfg;sched(pwc.remindAt,'pricewatch',pwc.remindOn);return()=>timers.forEach(clearTimeout)},[d.morningEnabled,d.morningTime,d.eveningEnabled,d.eveningTime,d.priceWatch]);
   // In-app catch-up (the reliable path on iOS, where closed-app scheduled push isn't possible)
-  useEffect(()=>{if(d.loading)return;const todayK=new Date().toDateString();const due=[];const chk=(kind,enabled,time)=>{if(!enabled||!time)return;const[hh,mm]=time.split(':').map(Number);const tt=new Date();tt.setHours(hh,mm,0,0);if(Date.now()<tt.getTime())return;const key='etp-notice-'+kind+'-'+(activeUser?.id||'');if(localStorage.getItem(key)===todayK)return;due.push({kind,key})};chk('morning',d.morningEnabled,d.morningTime);chk('evening',d.eveningEnabled,d.eveningTime);if(due.length){const it=due[due.length-1];try{localStorage.setItem(it.key,todayK)}catch{}sNotice(it.kind==='morning'?{title:'🌅 Daily Money Wisdom',body:quoteOfDay()}:{title:"💰 Log today's expenses",body:eveningBody(dRef.current)})}},[d.loading]);
+  useEffect(()=>{if(d.loading)return;const todayK=new Date().toDateString();const due=[];const chk=(kind,enabled,time)=>{if(!enabled||!time)return;const[hh,mm]=time.split(':').map(Number);const tt=new Date();tt.setHours(hh,mm,0,0);if(Date.now()<tt.getTime())return;const key='etp-notice-'+kind+'-'+(activeUser?.id||'');if(localStorage.getItem(key)===todayK)return;due.push({kind,key})};chk('morning',d.morningEnabled,d.morningTime);chk('evening',d.eveningEnabled,d.eveningTime);const pwc=pwOf(d).cfg;chk('pricewatch',pwc.remindOn,pwc.remindAt);if(due.length){const it=due[due.length-1];try{localStorage.setItem(it.key,todayK)}catch{}sNotice(it.kind==='morning'?{title:'🌅 Daily Money Wisdom',body:quoteOfDay()}:it.kind==='pricewatch'?{title:'🎯 Price Watch check-in',body:pwNotifBody(dRef.current)}:{title:"💰 Log today's expenses",body:eveningBody(dRef.current)})}},[d.loading]);
   useEffect(()=>{if(d.loading||d.backupFreq==="off")return;const interval=d.backupFreq==="weekly"?7*864e5:30*864e5;if(Date.now()-d.lastBackupAt<interval)return;const dd=dRef.current;(async()=>{const json=await buildBackupJSON(dd,true);const token=localStorage.getItem("gd_token");if(token){try{await gdUpload(json);pst({lastBackupAt:Date.now()});sNotice({title:"☁️ Auto-backup complete",body:"Data backed up to Google Drive"})}catch(e){sNotice({title:"⚠️ Auto-backup failed",body:"Drive upload failed — open Backup settings to reconnect"})}}else{const fname=`expense-backup-${new Date().toISOString().slice(0,10)}.json`;const blob=new Blob([json],{type:"application/json"});if(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([blob],fname,{type:"application/json"})]})){try{await navigator.share({title:"Expense Tracker Backup",files:[new File([blob],fname,{type:"application/json"})]});pst({lastBackupAt:Date.now()});return}catch(e){if(e.name==="AbortError")return}}const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=fname;document.body.appendChild(a);a.click();setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url)},500);pst({lastBackupAt:Date.now()})}})()},[d.loading]);
   useEffect(()=>{const run=()=>{const dd=dRef.current;if(!dd||dd.loading||!dd.recurring||!dd.recurring.length)return;const{newExpenses,updatedRecurring}=pr(dd.recurring,dd.expenses);if(newExpenses.length>0)pst({expenses:[...newExpenses,...dd.expenses].sort((a,b)=>b.date-a.date),recurring:updatedRecurring})};const onVis=()=>{if(document.visibilityState==="visible")run()};window.addEventListener("focus",run);document.addEventListener("visibilitychange",onVis);const iv=setInterval(run,6e4);return()=>{window.removeEventListener("focus",run);document.removeEventListener("visibilitychange",onVis);clearInterval(iv)}},[]);
 
@@ -1358,6 +1358,8 @@ function App(){
         v==="groceries"&&t(GroceriesView,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"home"),onView:(id)=>{navFromRef.current="groceries";sV(id)}}),
         v==="groceryAnalytics"&&t(GroceryAnalytics,{data:d,onClose:()=>sV("groceries")}),
         v==="groceryCalendar"&&t(GroceryCalendarView,{data:d,persist:pst,onClose:()=>sV("groceries")}),
+        v==="priceWatchCheckin"&&t(PriceWatchCheckin,{data:d,persist:pst,onClose:()=>sV("groceries")}),
+        v==="priceWatchLog"&&t(PriceWatchLog,{data:d,onClose:()=>sV("groceries")}),
         v==="wealth"&&t(Wealth,{data:d,onClose:()=>sV(navFromRef.current)}),
         v==="advStats"&&t(AdvancedStats,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"stats"),onTx:sAtx,onFlt:sFlt}),
         v==="monthlyReport"&&t(MReport,{data:d,onClose:()=>sV(navFromRef.current)}),
@@ -3919,6 +3921,113 @@ function grocLineSaved(it){const d=it&&it.disc;if(d!=null&&isFinite(Number(d)))r
 function grocSum(items){return (items||[]).reduce((s,it)=>s+grocLine(it),0)}
 function grocSumMrp(items){return (items||[]).reduce((s,it)=>s+grocLineMrp(it),0)}
 function grocSumSaved(items){return (items||[]).reduce((s,it)=>s+grocLineSaved(it),0)}
+// === PRICE WATCH — forward-looking watchlist over the quick-commerce apps ===
+// A product is something you want at a target price. Each product keeps a per-store price history,
+// captured by hand (deep-link + type), by OCR (screenshot), by paste, or by an optional proxy.
+// Any captured price strictly BELOW the target writes a dated entry into the drop log.
+// Unlike groceries this is genuinely new state, so it lives under data.priceWatch (see strip()).
+const PW_STORES=[
+  {id:"zepto",l:"Zepto",e:"⚡",col:"#7C3AED",url:q=>"https://www.zeptonow.com/search?query="+encodeURIComponent(q)},
+  {id:"instamart",l:"Swiggy Instamart",e:"🛵",col:"#FC8019",url:q=>"https://www.swiggy.com/instamart/search?custom_back=true&query="+encodeURIComponent(q)},
+  {id:"blinkit",l:"Blinkit",e:"🟡",col:"#EFC800",url:q=>"https://blinkit.com/s/?q="+encodeURIComponent(q)},
+  {id:"amazonnow",l:"Amazon Now",e:"📦",col:"#FF9900",url:q=>"https://www.amazon.in/s?k="+encodeURIComponent(q)+"&i=nowstore"},
+  {id:"fkminutes",l:"Flipkart Minutes",e:"🔵",col:"#2874F0",url:q=>"https://www.flipkart.com/search?q="+encodeURIComponent(q)+"&marketplace=GROCERY"}
+];
+const PW_STORE_BY_ID=Object.fromEntries(PW_STORES.map(s=>[s.id,s]));
+const PW_SRC_LABEL={manual:"typed",ocr:"scanned",paste:"pasted",live:"fetched"};
+const PW_HIST_MAX=90; // per store, per product — localStorage is ~5MB shared with everything else
+const PW_DEFAULT={products:[],logs:[],checkins:{},streak:{count:0,last:null},cfg:{pincode:"",remindAt:"19:00",remindOn:false,proxyUrl:""}};
+function pwOf(data){const p=data&&data.priceWatch;if(!p||typeof p!=="object")return PW_DEFAULT;return{products:Array.isArray(p.products)?p.products:[],logs:Array.isArray(p.logs)?p.logs:[],checkins:p.checkins||{},streak:p.streak||{count:0,last:null},cfg:{...PW_DEFAULT.cfg,...(p.cfg||{})}}}
+function pwDayKey(ts){const d=ts==null?new Date():new Date(ts);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function pwTodayKey(){return pwDayKey()}
+function pwProducts(data){return pwOf(data).products.filter(p=>p&&!p.archived)}
+function pwStoreState(p,sid){const s=(p&&p.stores&&p.stores[sid])||null;return{q:(s&&s.q)||"",last:(s&&s.last)||null,hist:Array.isArray(s&&s.hist)?s.hist:[]}}
+function pwFullName(p){const n=String((p&&p.name)||"").trim();const q=Number(p&&p.qty);const u=(p&&p.unit)||"";return (q>0&&u&&u!=="pc")?n+" "+(+q.toFixed(3))+u:n}
+function pwQuery(p,sid){return (pwStoreState(p,sid).q||"").trim()||pwFullName(p)}
+function pwTarget(p){const t=Number(p&&p.target);return isFinite(t)&&t>0?t:0}
+function pwIsDrop(price,target){return isFinite(price)&&price>0&&isFinite(target)&&target>0&&price<target}
+function pwLastPrice(p,sid){const l=pwStoreState(p,sid).last;const v=l&&Number(l.p);return isFinite(v)&&v>0?v:null}
+function pwBest(p){let best=null;for(const s of PW_STORES){const v=pwLastPrice(p,s.id);if(v==null)continue;if(!best||v<best.price)best={store:s.id,price:v,at:(pwStoreState(p,s.id).last||{}).at||0}}return best}
+// Stores cheapest-first; never-captured stores sink to the bottom so the medals read left-to-right.
+function pwRank(p){return PW_STORES.map(s=>({id:s.id,price:pwLastPrice(p,s.id),at:(pwStoreState(p,s.id).last||{}).at||0})).sort((a,b)=>a.price==null&&b.price==null?0:a.price==null?1:b.price==null?-1:a.price-b.price)}
+function pwDelta(p){const b=pwBest(p),tg=pwTarget(p);if(!b||!tg)return null;const diff=tg-b.price;return{abs:Math.abs(diff),pct:tg>0?Math.abs(diff)/tg*100:0,under:diff>0,store:b.store,price:b.price}}
+function pwLastSeen(p){let at=0;for(const s of PW_STORES){const l=pwStoreState(p,s.id).last;if(l&&l.at>at)at=l.at}return at}
+// Daily best-price series (oldest→newest) for the card sparkline. Days with no capture inherit the
+// previous day's price so the line reads as a real price curve, not a dotted scatter.
+function pwSeries(p,days){days=days||30;const start=new Date();start.setHours(0,0,0,0);start.setDate(start.getDate()-(days-1));const from=start.getTime();
+  const low=new Map();
+  for(const s of PW_STORES)for(const h of pwStoreState(p,s.id).hist){const v=Number(h&&h.p);if(!isFinite(v)||v<=0||!h.at||h.at<from)continue;const k=pwDayKey(h.at);const cur=low.get(k);if(cur==null||v<cur)low.set(k,v)}
+  const out=[];let carry=null;
+  for(let i=0;i<days;i++){const d=new Date(from);d.setDate(d.getDate()+i);const k=pwDayKey(d.getTime());if(low.has(k))carry=low.get(k);if(carry!=null)out.push({d:k,p:carry})}
+  return out}
+function pwCheckedToday(data,pid){const ck=pwOf(data).checkins[pwTodayKey()];return !!(ck&&Array.isArray(ck.done)&&ck.done.includes(pid))}
+function pwSavedSince(data,ts){return pwOf(data).logs.reduce((s,l)=>(l&&l.at>=ts)?s+Math.max(0,Number(l.target||0)-Number(l.price||0)):s,0)}
+function pwDropsOn(data,dayKey){return pwOf(data).logs.filter(l=>l&&pwDayKey(l.at)===dayKey)}
+// Same day = no-op, yesterday = +1, anything older (or first ever) = restart at 1.
+function pwStreakNext(streak,todayKey){const st=streak||{count:0,last:null};if(st.last===todayKey)return st;const y=new Date();y.setDate(y.getDate()-1);return{count:st.last===pwDayKey(y.getTime())?(st.count||0)+1:1,last:todayKey}}
+// Write one capture into a product: updates last, appends to hist (capped), and returns the
+// product plus a drop-log entry when the price came in under target. Pure — caller persists.
+function pwApplyCapture(p,sid,price,src){
+  const at=Date.now(),v=Math.round(Number(price)*100)/100;
+  const st=pwStoreState(p,sid);
+  const hist=[...st.hist,{p:v,at,src:src||"manual"}].slice(-PW_HIST_MAX);
+  const next={...p,stores:{...(p.stores||{}),[sid]:{q:st.q,last:{p:v,at,src:src||"manual"},hist}}};
+  const tg=pwTarget(p);
+  const log=pwIsDrop(v,tg)?{id:uid(),productId:p.id,name:pwFullName(p),store:sid,price:v,target:tg,savedPct:(tg-v)/tg*100,src:src||"manual",at}:null;
+  return{product:next,log};
+}
+// Pull candidate ₹ prices out of OCR'd or pasted text, best guess first. Quick-commerce prices are
+// usually whole rupees ("₹33"), so unlike stmtFindAmountToken (statements, always 2dp) integers
+// count too. Tesseract's "eng" model has no ₹ glyph and commonly renders it as a "3" glued onto the
+// number (₹33 -> "333") — see the note at stmtFindAmountToken — so on lines with no real symbol a
+// leading 3 is also offered as the stripped alternative rather than silently inflating the price.
+function pwExtractPrice(text){
+  const cands=[];
+  const push=(v,score)=>{if(!isFinite(v)||v<=0||v>100000)return;const r=Math.round(v*100)/100;const ex=cands.find(x=>x.v===r);if(ex){ex.score=Math.max(ex.score,score);return}cands.push({v:r,score})};
+  for(const raw of String(text||"").split(/[\n\r]+/)){
+    const line=raw.trim();if(!line)continue;
+    // Skip lines that are clearly about something other than the price the user wants.
+    if(/(%|\boff\b|\bsave[ds]?\b|\bdiscount\b|\bdelivery\b|\bcashback\b|\bcoupon\b|\bmins?\b)/i.test(line)&&!/₹/.test(line))continue;
+    // \d[\d,]* deliberately swallows the WHOLE digit run: capping it here instead would match the
+    // first 6 digits of an order number and then come back for its tail as if that were a price.
+    const re=/(₹|rs\.?|inr\b|mrp)?\s*(\d[\d,]*(?:\.\d{1,2})?)/gi;
+    let m;
+    while((m=re.exec(line))!==null){
+      const marked=!!m[1],s=m[2].replace(/,/g,"").replace(/\.$/,""),int=s.split(".")[0];
+      if(int.length>6||(!/\./.test(s)&&int.length>5))continue; // barcodes, pincodes, order ids
+      push(parseFloat(s),marked?3:1);
+      if(!marked&&!/₹/.test(line)&&/^3\d{2,4}(\.\d{1,2})?$/.test(s))push(parseFloat(s.slice(1)),2);
+    }
+  }
+  return cands.sort((a,b)=>b.score-a.score||a.v-b.v).slice(0,6).map(x=>x.v);
+}
+// Body for the daily Price Watch reminder — names what's still unchecked so the nudge is actionable.
+function pwNotifBody(d){
+  const prods=pwProducts(d);
+  if(!prods.length)return "Add a product to your watchlist to start tracking prices.";
+  const left=prods.filter(p=>!pwCheckedToday(d,p.id));
+  if(!left.length)return "All "+prods.length+" checked today — streak intact.";
+  return left.length+" still to check: "+left.slice(0,3).map(p=>p.name).join(", ")+(left.length>3?" +"+(left.length-3)+" more":"");
+}
+// Optional live price fetch. Returns {ok:false} until the user points cfg.proxyUrl at a scraping
+// proxy of their own — the browser cannot reach these stores directly (CORS + this page's CSP).
+// The proxy contract is: GET <proxyUrl>/price?store=&q=&pin= -> {price:Number, title?:String}.
+async function pwFetchLive(p,sid,cfg){
+  const base=String((cfg&&cfg.proxyUrl)||"").trim();
+  if(!base)return{ok:false,reason:"Live fetch is off — add a proxy URL in Price Watch settings."};
+  let u;
+  try{u=new URL(base.replace(/\/+$/,"")+"/price")}catch(e){return{ok:false,reason:"That proxy URL isn't valid."}}
+  u.searchParams.set("store",sid);u.searchParams.set("q",pwQuery(p,sid));
+  if(cfg.pincode)u.searchParams.set("pin",cfg.pincode);
+  try{
+    const r=await fetch(u.toString(),{headers:{Accept:"application/json"}});
+    if(!r.ok)return{ok:false,reason:"Proxy replied "+r.status+"."};
+    const j=await r.json();
+    const v=Number(j&&j.price);
+    if(!isFinite(v)||v<=0)return{ok:false,reason:"Proxy found no price for this product."};
+    return{ok:true,price:v,title:(j&&j.title)||null};
+  }catch(e){return{ok:false,reason:"Couldn't reach the proxy. If it isn't on workers.dev or vercel.app, this page's CSP blocks it."}}
+}
 // Load a File object for an expense's first attached photo (from IndexedDB or inline data).
 async function grocPhotoFile(e){const ph=(e&&e.photos||[])[0];if(!ph)return null;try{if(ph.data){const r=await fetch(ph.data);return new File([await r.blob()],ph.name||"bill.jpg",{type:(await r.blob()).type||"image/jpeg"})}if(ph.id){const b=await idbGetFile(String(ph.id));if(b)return new File([b],ph.name||"bill.jpg",{type:b.type||"image/jpeg"})}}catch(err){}return null}
 // AI bill parser: returns {store,date,items:[{name,qty,unit,mrp,final,discount}]}. Throws on failure.
@@ -4259,6 +4368,7 @@ function GroceriesView({data,persist,onClose,onView}){
   const[showFilters,sShowFilters]=useState(false);
   const[breakBy,sBreakBy]=useState("store");
   const[catF,sCatF]=useState(null);
+  const[gtab,sGtab]=useState("trips");
   const allGroc=useMemo(()=>(data.expenses||[]).filter(e=>grocIsExp(e)).sort((a,b)=>b.date-a.date),[data.expenses]);
   const periodStart=useMemo(()=>{const b=new Date(ps(new Date(),msd));b.setMonth(b.getMonth()+monOff);return b.getTime()},[monOff,msd]);
   const periodEnd=useMemo(()=>{const b=new Date(periodStart);b.setMonth(b.getMonth()+1);return b.getTime()},[periodStart]);
@@ -4294,8 +4404,10 @@ function GroceriesView({data,persist,onClose,onView}){
   const storeMgrEl=showStoreMgr&&t(StoreManagerSht,{allGroc,expenses:data.expenses,persist,cur,onClose:()=>sShowStoreMgr(false)});
   const catMgrEl=showCatMgr&&t(GroceryCatSht,{data,persist,onClose:()=>sShowCatMgr(false)});
   return o("div",{style:{padding:"8px 0 40px"},children:[
-    t(SH,{title:t("em",{children:"Groceries"}),onBack:onClose,right:headerRight}),
+    t(SH,{title:t("em",{children:"Groceries"}),onBack:onClose,right:gtab==="watch"?null:headerRight}),
     o("div",{style:{padding:"0 24px"},children:[
+      o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,marginBottom:12},children:[["trips","🧾 Trips"],["watch","🎯 Price watch"]].map(([k,lbl])=>{const on=gtab===k;return t("button",{key:k,onClick:()=>sGtab(k),className:"act95 tr",style:{flex:1,padding:"9px 0",background:on?c.mt:"transparent",color:on?"#0a0a0a":c.td,borderRadius:9,fontSize:12.5,fontWeight:on?700:400,border:"none"},children:lbl})})}),
+      gtab==="watch"?t(PriceWatchView,{data,persist,onView:onView||(()=>{})}):o(Fragment,{children:[
       o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,marginBottom:12},children:["month","all"].map(s=>{const on=scope===s;return t("button",{key:s,onClick:()=>sScope(s),className:"act95 tr",style:{flex:1,padding:"9px 0",background:on?c.ac:"transparent",color:on?"#0a0a0a":c.td,borderRadius:9,fontSize:12.5,fontWeight:on?700:400,border:"none"},children:s==="month"?"By month":"All time"})})}),
       scope==="month"&&o("div",{className:"f ia jb",style:{marginBottom:12},children:[t(IB,{onClick:()=>monShift(-1),children:t(CL,{size:18,color:c.tx})}),o("div",{className:"tc",children:[t("div",{style:{fontFamily:c.hf,fontSize:18,color:c.tx},children:monthLabel}),t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,marginTop:2},children:stat.trips+" trip"+(stat.trips===1?"":"s")})]}),t(IB,{onClick:()=>monShift(1),children:t(CR,{size:18,color:c.tx})})]}),
       o("div",{className:"f",style:{gap:8,marginBottom:8},children:[tile("SPENT",fm(stat.total,cur),c.mt),tile("TRIPS",String(stat.trips)),tile("AVG / TRIP",fm(stat.avg,cur))]}),
@@ -4316,6 +4428,7 @@ function GroceriesView({data,persist,onClose,onView}){
         o("div",{className:"f ia jb",style:{marginBottom:8,padding:"0 2px"},children:[o("div",{className:"f ia",style:{gap:6},children:[t("div",{style:{fontFamily:F.mo,fontSize:11,fontWeight:700,color:c.tx},children:g.label}),t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm},children:g.range}),t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm},children:"· "+g.items.length+" trip"+(g.items.length===1?"":"s")})]}),t("div",{style:{fontFamily:F.mo,fontSize:11.5,fontWeight:600,color:c.td},children:fm(g.total,cur)})]}),
         o("div",{className:"f fc",style:{gap:10},children:g.items.map(tripCard)})
       ]}))}):t("div",{className:"f fc",style:{gap:10},children:filtered.map(tripCard)}),
+      ]}),
     ]}),
     editorOpen&&t(GroceryEditor,{data,editing,stores,itemNames,onSave:saveEntry,onDelete:delEntry,onClose:()=>{sEditorOpen(false);sEditing(null)}}),
     delConfirmEl,storeMgrEl,catMgrEl
@@ -4349,6 +4462,439 @@ function GroceryAnalytics({data,onClose}){
       sug.length>0&&o("div",{className:"f sx",style:{gap:6,marginTop:8,overflowX:"auto"},children:sug.map((n,i)=>{const on=q.trim().toLowerCase()===n.toLowerCase();return t("button",{key:i,onClick:()=>sQ(n),className:"act95 tr",style:{flexShrink:0,padding:"6px 11px",background:on?c.ac+"22":c.sf2,border:`1px solid ${on?c.ac:c.brs}`,borderRadius:999,fontSize:11.5,color:on?c.tx:c.td,whiteSpace:"nowrap"},children:n})})}),
       sel&&sel.list.length>0&&o("div",{style:{marginTop:12,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:"12px 14px"},children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:10},children:sel.name.toUpperCase()+" · PRICE PER "+sel.unit.toUpperCase()+" BY STORE"}),...sel.list.map((s,i)=>{const best=i===0;return o("div",{key:i,className:"f ia jb",style:{padding:"8px 0",borderTop:i?`1px solid ${c.brs}`:"none"},children:[o("div",{className:"f ia",style:{gap:8,minWidth:0},children:[best&&t("span",{style:{fontFamily:F.mo,fontSize:8,color:c.mt,background:c.mt+"22",borderRadius:5,padding:"2px 6px",letterSpacing:.5,flexShrink:0},children:"CHEAPEST"}),t("div",{className:"tru",style:{fontSize:12.5,color:best?c.tx:c.td,fontWeight:best?600:400,minWidth:0},children:s.store})]}),o("div",{className:"trg",style:{flexShrink:0},children:[t("div",{style:{fontFamily:F.mo,fontSize:13.5,fontWeight:700,color:best?c.mt:c.tx},children:fm(s.latest,cur)+"/"+s.unit}),(s.min<s.max)&&t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,marginTop:1},children:"range "+fm(s.min,cur)+"–"+fm(s.max,cur)})]})]})}),sel.list.length>1&&(()=>{const cheap=sel.list[0],dear=sel.list[sel.list.length-1];const gap=dear.latest-cheap.latest;return gap>0.009&&t("div",{style:{marginTop:10,paddingTop:10,borderTop:`1px solid ${c.brs}`,fontSize:11.5,color:c.td,lineHeight:1.5},children:[t("span",{style:{color:c.mt,fontWeight:600},children:cheap.store})," is ",t("span",{style:{color:c.mt,fontWeight:600},children:fm(gap,cur)+"/"+cheap.unit})," cheaper than ",dear.store," for ",sel.name,"."]})})()]}),
       q.trim()&&(!sel||sel.list.length===0)&&t("div",{style:{marginTop:12,fontSize:12,color:c.tm,textAlign:"center",padding:"12px 0"},children:'No priced records for "'+q.trim()+'" yet'})
+    ]})
+  ]});
+}
+// ---------- PRICE WATCH — screens & sheets ----------
+const PW_MEDAL=["🥇","🥈","🥉"];
+const PW_STALE_MS=36*60*60*1000; // a price older than this is flagged as possibly out of date
+// Write one capture through to storage and return the drop-log entry, if the price beat the target.
+function pwSaveCapture(data,persist,productId,sid,price,src){
+  const pw=pwOf(data),idx=pw.products.findIndex(x=>x&&x.id===productId);
+  if(idx<0)return null;
+  const{product,log}=pwApplyCapture(pw.products[idx],sid,price,src);
+  persist({priceWatch:{...pw,products:pw.products.map((x,i)=>i===idx?product:x),logs:log?[log,...pw.logs].slice(0,500):pw.logs}});
+  return log;
+}
+// Sparkline drawn by hand rather than with Recharts: the CDN-failure stub at the top of this file
+// has no ReferenceLine, and the dashed target line is the whole point of this chart.
+function PWSpark({series,target,col,h}){
+  const H=h||34,W=100,pts=(series||[]).filter(x=>x&&isFinite(x.p));
+  if(pts.length<2)return null;
+  const vals=pts.map(x=>x.p).concat(target>0?[target]:[]);
+  const lo=Math.min(...vals),span=Math.max(.01,Math.max(...vals)-lo);
+  const px=i=>(i/(pts.length-1))*W, py=v=>H-3-((v-lo)/span)*(H-6);
+  const line=pts.map((p2,i)=>(i?"L":"M")+px(i).toFixed(2)+" "+py(p2.p).toFixed(2)).join(" ");
+  return t("svg",{viewBox:"0 0 "+W+" "+H,preserveAspectRatio:"none",style:{width:"100%",height:H,display:"block"},children:o("g",{children:[
+    t("path",{d:line+" L"+W+" "+H+" L0 "+H+" Z",fill:col+"1c",stroke:"none"}),
+    t("path",{d:line,fill:"none",stroke:col,strokeWidth:1.6,strokeLinejoin:"round",strokeLinecap:"round",vectorEffect:"non-scaling-stroke"}),
+    target>0&&t("line",{x1:0,x2:W,y1:py(target),y2:py(target),stroke:c.tm,strokeWidth:1,strokeDasharray:"3 3",opacity:.85,vectorEffect:"non-scaling-stroke"})
+  ]})});
+}
+function PWStoreChip({sid,price,cur,medal,best,stale,onClick}){
+  const s=PW_STORE_BY_ID[sid];if(!s)return null;
+  const has=price!=null;
+  return o("button",{onClick,className:"act95 tr f ia",style:{flexShrink:0,gap:7,padding:"7px 11px",borderRadius:11,textAlign:"left",background:best?c.mt+"1c":c.sf2,border:has?`1px solid ${best?c.mt+"88":c.brs}`:`1px dashed ${c.brs}`,opacity:has?1:.6},children:[
+    t("span",{style:{fontSize:12,lineHeight:1},children:medal||s.e}),
+    o("div",{children:[
+      t("div",{style:{fontSize:9.5,color:c.tm,lineHeight:1.2,whiteSpace:"nowrap"},children:s.l}),
+      o("div",{className:"f ia",style:{gap:4},children:[
+        t("div",{style:{fontFamily:F.mo,fontSize:12,fontWeight:600,color:has?(best?c.mt:c.tx):c.tm,lineHeight:1.3,whiteSpace:"nowrap"},children:has?fm(price,cur):"add"}),
+        stale&&has&&t("span",{style:{fontSize:8.5,color:c.co,lineHeight:1},children:"●"})
+      ]})
+    ]})
+  ]});
+}
+function PWCard({p,cur,checked,onCapture,onEdit}){
+  const tg=pwTarget(p),best=pwBest(p),dl=pwDelta(p),ranked=pwRank(p),seen=pwLastSeen(p);
+  const series=useMemo(()=>pwSeries(p,30),[p]);
+  const under=!!(dl&&dl.under),col=under?c.mt:(best?c.tx:c.tm);
+  let medalAt=0;
+  return o("div",{style:{background:under?`linear-gradient(135deg,${c.mt}12,${c.sfg})`:c.sfg,border:`1px solid ${under?c.mt+"55":c.brs}`,borderRadius:16,padding:"13px 14px"},children:[
+    o("div",{className:"f ia jb",style:{gap:10,marginBottom:8},children:[
+      o("button",{onClick:onEdit,className:"act98 f ia f1 minw0",style:{gap:9,background:"transparent",border:"none",padding:0,textAlign:"left"},children:[
+        t("span",{style:{fontSize:20,flexShrink:0},children:p.emoji||"🛒"}),
+        o("div",{className:"minw0",children:[
+          t("div",{className:"tru",style:{fontSize:14,fontWeight:600,color:c.tx},children:p.name||"Untitled"}),
+          o("div",{className:"f ia",style:{gap:6,marginTop:2},children:[
+            Number(p.qty)>0&&p.unit&&t("span",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,background:c.sf2,borderRadius:5,padding:"1px 5px"},children:(+Number(p.qty).toFixed(3))+" "+p.unit}),
+            tg>0&&t("span",{style:{fontFamily:F.mo,fontSize:9.5,color:c.tm},children:"target "+fm(tg,cur)}),
+            checked&&t("span",{style:{fontSize:9.5,color:c.mt},children:"✓ checked today"})
+          ]})
+        ]})
+      ]}),
+      o("div",{className:"trg",style:{flexShrink:0},children:[
+        t("div",{style:{fontFamily:F.mo,fontSize:21,fontWeight:700,color:col,lineHeight:1.1},children:best?fm(best.price,cur):"—"}),
+        dl?t("div",{style:{fontFamily:F.mo,fontSize:9.5,color:under?c.mt:c.co,marginTop:2,whiteSpace:"nowrap"},children:(under?"▼ ":"▲ ")+fm(dl.abs,cur)+" ("+dl.pct.toFixed(0)+"%) "+(under?"under":"over")}):t("div",{style:{fontSize:9.5,color:c.tm,marginTop:2},children:best?"no target set":"no price yet"})
+      ]})
+    ]}),
+    series.length>1&&t("div",{style:{margin:"2px 0 9px"},children:t(PWSpark,{series,target:tg,col:under?c.mt:c.ac})}),
+    o("div",{className:"f sx",style:{gap:6,overflowX:"auto",paddingBottom:2},children:ranked.map(r=>{
+      const medal=r.price!=null&&ranked.filter(x=>x.price!=null).length>1?PW_MEDAL[medalAt++]:null;
+      return t(PWStoreChip,{key:r.id,sid:r.id,price:r.price,cur,medal,best:r.price!=null&&best&&r.price===best.price,stale:r.at>0&&Date.now()-r.at>PW_STALE_MS,onClick:()=>onCapture(r.id)});
+    })}),
+    seen>0&&t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,marginTop:8},children:"last checked "+rd(seen)})
+  ]});
+}
+function PWProductSht({editing,itemNames,onSave,onDelete,onClose}){
+  const e=editing||{};
+  const[name,sName]=useState(e.name||"");
+  const[emoji,sEmoji]=useState(e.emoji||"🛒");
+  const[qty,sQty]=useState(e.qty!=null?String(e.qty):"1");
+  const[unit,sUnit]=useState(e.unit||"pc");
+  const[target,sTarget]=useState(e.target!=null?String(e.target):"");
+  const[showQ,sShowQ]=useState(false);
+  const[qs,sQs]=useState(()=>Object.fromEntries(PW_STORES.map(s=>[s.id,pwStoreState(e,s.id).q||""])));
+  const[del,sDel]=useState(false);
+  const[err,sErr]=useState("");
+  const save=()=>{
+    const n=name.trim();if(!n){sErr("Give the product a name.");return}
+    const tg=parseFloat(target);if(!isFinite(tg)||tg<=0){sErr("Set a target price above 0 — that's what drops are measured against.");return}
+    const stores={};
+    for(const s of PW_STORES){const st=pwStoreState(e,s.id);stores[s.id]={q:(qs[s.id]||"").trim(),last:st.last,hist:st.hist}}
+    onSave({id:e.id||("pw_"+uid()),name:n,emoji:emoji||"🛒",qty:parseFloat(qty)||0,unit,target:Math.round(tg*100)/100,stores,createdAt:e.createdAt||Date.now(),archived:false});
+  };
+  const fieldSt={width:"100%",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px",color:c.tx,fontSize:14,fontFamily:"var(--tf)",outline:"none"};
+  const lbl=s=>t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:s});
+  return t(Sht,{onClose,children:o(Fragment,{children:[
+    t("div",{style:{fontFamily:c.hf,fontSize:19,color:c.tx,marginBottom:14},children:e.id?"Edit product":"Track a product"}),
+    o("div",{className:"f",style:{gap:8,marginBottom:12},children:[
+      t("input",{value:emoji,onChange:ev=>sEmoji(ev.target.value.slice(0,2)),"aria-label":"Emoji",style:{...fieldSt,width:56,textAlign:"center",fontSize:20,flexShrink:0}}),
+      t("input",{value:name,list:"grocItemList",onChange:ev=>sName(ev.target.value),placeholder:"e.g. Amul Gold Milk",style:fieldSt})
+    ]}),
+    o("div",{className:"f",style:{gap:8,marginBottom:12},children:[
+      o("div",{className:"f1",children:[lbl("PACK SIZE"),t("input",{value:qty,inputMode:"decimal",onChange:ev=>sQty(ev.target.value.replace(/[^\d.]/g,"")),style:fieldSt})]}),
+      o("div",{style:{width:100,flexShrink:0},children:[lbl("UNIT"),t("select",{value:unit,onChange:ev=>sUnit(ev.target.value),style:{...fieldSt,padding:"10px 8px"},children:GROC_UNITS.map(u=>t("option",{key:u,value:u,children:u}))})]})
+    ]}),
+    o("div",{style:{marginBottom:12},children:[lbl("TARGET PRICE — drops are logged below this"),t("input",{value:target,inputMode:"decimal",onChange:ev=>sTarget(ev.target.value.replace(/[^\d.]/g,"")),placeholder:"33",style:{...fieldSt,fontFamily:F.mo,fontSize:17,fontWeight:600}})]}),
+    o("button",{onClick:()=>sShowQ(v=>!v),className:"w100 act95 tr f ia jb",style:{background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px",gap:10,marginBottom:12},children:[
+      o("div",{className:"tl",children:[t("div",{style:{fontSize:12.5,color:c.tx},children:"Per-store search text"}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:"Optional — defaults to the product name"})]}),
+      t("span",{style:{fontSize:14,color:c.tm,transform:showQ?"rotate(90deg)":"none",transition:"transform .2s",display:"inline-block"},children:"›"})
+    ]}),
+    showQ&&o("div",{style:{marginBottom:12},children:PW_STORES.map(s=>o("div",{key:s.id,className:"f ia",style:{gap:8,marginBottom:7},children:[
+      t("span",{style:{fontSize:13,width:20,flexShrink:0},children:s.e}),
+      t("input",{value:qs[s.id]||"",onChange:ev=>sQs(v=>({...v,[s.id]:ev.target.value})),placeholder:s.l,style:{...fieldSt,fontSize:12.5,padding:"8px 10px"}})
+    ]}))}),
+    err&&t("div",{style:{fontSize:11.5,color:c.cr,marginBottom:10},children:err}),
+    o("div",{className:"f",style:{gap:8},children:[
+      e.id&&t("button",{onClick:()=>sDel(true),className:"act95 tr f ia jc",style:{width:46,padding:"12px 0",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:12,color:c.cr,flexShrink:0},children:t(Trash2,{size:15,color:c.cr})}),
+      t("button",{onClick:save,className:"act95 tr f1",style:{padding:"12px 0",background:c.mt,border:"none",borderRadius:12,color:"#0a0a0a",fontSize:14,fontWeight:600},children:e.id?"Save changes":"Start tracking"})
+    ]}),
+    del&&t(CSht,{title:"Stop tracking this product?",subtitle:"Its price history and past drop-log entries are removed too. This can't be undone.",onClose:()=>sDel(false),onConfirm:()=>{sDel(false);onDelete(e.id)},confirmLabel:"Delete",danger:true})
+  ]})});
+}
+function PWCaptureSht({data,persist,product,storeId,onClose,onDrop}){
+  const cur=data.currency,cfg=pwOf(data).cfg,s=PW_STORE_BY_ID[storeId];
+  const prev=pwLastPrice(product,storeId),tg=pwTarget(product);
+  const[val,sVal]=useState(prev!=null?String(prev):"");
+  const[src,sSrc]=useState("manual");
+  const[cands,sCands]=useState([]);
+  const[busy,sBusy]=useState("");
+  const[err,sErr]=useState("");
+  const fileRef=useRef(null);
+  const setFrom=(v,how)=>{sVal(String(v));sSrc(how)};
+  const runOCR=async(file)=>{
+    if(!file)return;
+    sErr("");sCands([]);sBusy("Loading the OCR engine…");
+    let worker=null;
+    try{
+      const T=await ensureTesseract();
+      worker=await T.createWorker("eng",1,{logger:m=>{if(m.status==="recognizing text")sBusy("Reading the screenshot… "+Math.round((m.progress||0)*100)+"%")}});
+      await worker.setParameters({tessedit_pageseg_mode:"6"});
+      const canvas=await preprocessImageForOCR(file);
+      const{data:od}=await worker.recognize(canvas);
+      const found=pwExtractPrice(od&&od.text);
+      if(!found.length)sErr("Couldn't find a price in that screenshot — type it in instead.");
+      else{sCands(found);setFrom(found[0],"ocr")}
+    }catch(ex){sErr(describeErr(ex)||"Could not read that screenshot.")}
+    finally{try{await worker?.terminate()}catch(ex2){}sBusy("")}
+  };
+  const doPaste=async()=>{
+    sErr("");sCands([]);
+    try{
+      const txt=await navigator.clipboard.readText();
+      const found=pwExtractPrice(txt);
+      if(!found.length){sErr("Nothing that looks like a price in your clipboard.");return}
+      sCands(found);setFrom(found[0],"paste");
+    }catch(ex){sErr("Clipboard access was blocked — paste into the box instead.")}
+  };
+  const doLive=async()=>{
+    sErr("");sCands([]);sBusy("Asking your proxy…");
+    const r=await pwFetchLive(product,storeId,cfg);
+    sBusy("");
+    if(!r.ok){sErr(r.reason);return}
+    setFrom(r.price,"live");
+  };
+  const save=()=>{
+    const v=parseFloat(val);
+    if(!isFinite(v)||v<=0){sErr("Enter a price above 0.");return}
+    const log=pwSaveCapture(data,persist,product.id,storeId,v,src);
+    onClose();
+    if(log&&onDrop)onDrop(log);
+  };
+  const willDrop=pwIsDrop(parseFloat(val),tg);
+  const actBtn=(icon,label,onClick,dis)=>o("button",{onClick,disabled:!!dis,className:"act95 tr f fc ia jc f1",style:{gap:5,padding:"11px 4px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:11,opacity:dis?.5:1},children:[icon,t("span",{style:{fontSize:10.5,color:c.td},children:label})]});
+  return t(Sht,{onClose,children:o(Fragment,{children:[
+    o("div",{className:"f ia",style:{gap:9,marginBottom:4},children:[
+      t("span",{style:{fontSize:18},children:s.e}),
+      o("div",{className:"minw0",children:[
+        t("div",{style:{fontFamily:c.hf,fontSize:18,color:c.tx},children:s.l}),
+        t("div",{className:"tru",style:{fontSize:11.5,color:c.tm,marginTop:1},children:pwFullName(product)})
+      ]})
+    ]}),
+    tg>0&&t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,marginBottom:12},children:"TARGET "+fm(tg,cur)+(prev!=null?" · LAST "+fm(prev,cur):"")}),
+    t("button",{onClick:()=>{try{window.open(s.url(pwQuery(product,storeId)),"_blank","noopener")}catch(ex){}},className:"w100 act95 tr f ia jc",style:{gap:8,padding:"13px 0",background:s.col,border:"none",borderRadius:12,color:"#fff",fontSize:13.5,fontWeight:600,marginBottom:6},children:"Open "+s.l+" →"}),
+    t("div",{style:{fontSize:10.5,color:c.tm,textAlign:"center",marginBottom:14,lineHeight:1.45},children:"Opens the store's search for this product. If the app is installed it may open there; otherwise your browser."}),
+    t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:"PRICE YOU SEE"}),
+    o("div",{className:"f ia",style:{gap:8,background:c.sf2,border:`1px solid ${willDrop?c.mt+"88":c.brs}`,borderRadius:12,padding:"12px 14px",marginBottom:10},children:[
+      t("span",{style:{fontFamily:F.mo,fontSize:19,color:c.tm},children:cur||"₹"}),
+      t("input",{value:val,inputMode:"decimal",autoFocus:true,onChange:ev=>{sVal(ev.target.value.replace(/[^\d.]/g,""));sSrc("manual")},placeholder:"0",style:{flex:1,minWidth:0,background:"transparent",border:"none",outline:"none",color:c.tx,fontFamily:F.mo,fontSize:24,fontWeight:700}}),
+      willDrop&&t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.mt,background:c.mt+"22",borderRadius:6,padding:"3px 7px",whiteSpace:"nowrap"},children:"▼ "+((tg-parseFloat(val))/tg*100).toFixed(0)+"% UNDER"})
+    ]}),
+    cands.length>1&&o("div",{className:"f sx",style:{gap:6,marginBottom:10,overflowX:"auto"},children:[
+      t("span",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,alignSelf:"center",flexShrink:0},children:"ALSO FOUND"}),
+      ...cands.slice(1).map((v,i)=>t("button",{key:i,onClick:()=>sVal(String(v)),className:"act95 tr",style:{flexShrink:0,padding:"5px 10px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:999,fontFamily:F.mo,fontSize:11.5,color:c.td},children:fm(v,cur)}))
+    ]}),
+    o("div",{className:"f",style:{gap:8,marginBottom:10},children:[
+      actBtn(t(Camera,{size:15,color:c.td}),"Scan shot",()=>fileRef.current&&fileRef.current.click(),!!busy),
+      actBtn(t(Clp,{size:15,color:c.td}),"Paste",doPaste,!!busy),
+      cfg.proxyUrl?actBtn(t(Zap,{size:15,color:c.ac}),"Fetch live",doLive,!!busy):null
+    ]}),
+    t("input",{ref:fileRef,type:"file",accept:"image/*",style:{display:"none"},onChange:ev=>{const f=ev.target.files&&ev.target.files[0];ev.target.value="";runOCR(f)}}),
+    !cfg.proxyUrl&&t("div",{style:{fontSize:10.5,color:c.tm,marginBottom:10,lineHeight:1.45},children:"Automatic fetching is off. These stores block browser requests, so it needs a proxy of your own — add its URL in Price Watch settings."}),
+    busy&&t("div",{style:{fontSize:11.5,color:c.ac,marginBottom:10},children:busy}),
+    err&&t("div",{style:{fontSize:11.5,color:c.cr,marginBottom:10,lineHeight:1.45},children:err}),
+    t("button",{onClick:save,disabled:!!busy,className:"w100 act95 tr",style:{padding:"13px 0",background:willDrop?c.mt:c.ac,border:"none",borderRadius:12,color:"#0a0a0a",fontSize:14,fontWeight:600,opacity:busy?.6:1},children:willDrop?"Save — logs a price drop":"Save price"})
+  ]})});
+}
+function PWSettingsSht({data,persist,onClose}){
+  const pw=pwOf(data);
+  const[pin,sPin]=useState(pw.cfg.pincode||"");
+  const[on,sOn]=useState(!!pw.cfg.remindOn);
+  const[at,sAt]=useState(pw.cfg.remindAt||"19:00");
+  const[proxy,sProxy]=useState(pw.cfg.proxyUrl||"");
+  const[perm,sPerm]=useState(typeof Notification!=="undefined"?Notification.permission:"unsupported");
+  const fieldSt={width:"100%",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px",color:c.tx,fontSize:13.5,fontFamily:"var(--tf)",outline:"none"};
+  const lbl=(s,sub)=>o("div",{style:{marginBottom:6},children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1},children:s}),sub&&t("div",{style:{fontSize:10.5,color:c.tm,marginTop:3,lineHeight:1.45},children:sub})]});
+  const save=()=>{persist({priceWatch:{...pw,cfg:{pincode:pin.trim(),remindOn:on,remindAt:at,proxyUrl:proxy.trim()}}});onClose()};
+  return t(Sht,{onClose,children:o(Fragment,{children:[
+    t("div",{style:{fontFamily:c.hf,fontSize:19,color:c.tx,marginBottom:14},children:"Price Watch settings"}),
+    o("div",{style:{marginBottom:14},children:[lbl("PINCODE","Quick-commerce prices differ by area. Kept as a reminder of where your prices were captured, and sent to your proxy if you use one."),t("input",{value:pin,inputMode:"numeric",onChange:e=>sPin(e.target.value.replace(/[^\d]/g,"").slice(0,6)),placeholder:"500081",style:{...fieldSt,fontFamily:F.mo}})]}),
+    o("div",{style:{marginBottom:14},children:[
+      lbl("DAILY REMINDER"),
+      o("div",{className:"f ia jb",style:{gap:10,marginBottom:on?8:0},children:[
+        t("button",{onClick:()=>sOn(v=>!v),className:"act95 tr f1 f ia",style:{gap:9,padding:"10px 12px",background:on?c.mt+"18":c.sf2,border:`1px solid ${on?c.mt+"66":c.brs}`,borderRadius:10,color:c.tx,fontSize:13},children:[t("span",{style:{fontSize:14},children:on?"🔔":"🔕"}),on?"Remind me daily":"Reminder off"]}),
+        on&&t("input",{type:"time",value:at,onChange:e=>sAt(e.target.value),style:{...fieldSt,width:120,flexShrink:0,fontFamily:F.mo}})
+      ]}),
+      on&&perm!=="granted"&&perm!=="unsupported"&&t("button",{onClick:async()=>{try{sPerm(await Notification.requestPermission())}catch(e){}},className:"w100 act95 tr",style:{marginTop:8,padding:"10px 0",background:c.ac,border:"none",borderRadius:10,color:"#0a0a0a",fontSize:12.5,fontWeight:600},children:"Allow notifications"}),
+      on&&t("div",{style:{fontSize:10.5,color:c.tm,marginTop:8,lineHeight:1.45},children:"Reliable on Android and desktop. iOS suspends web-app timers in the background, so there you'll usually see the reminder as an in-app notice next time you open the app instead."})
+    ]}),
+    o("div",{style:{marginBottom:16},children:[lbl("LIVE FETCH PROXY","These stores have no public price API and block browser requests, so live fetching needs a small scraper you host yourself. It must answer GET /price?store=&q=&pin= with {\"price\":123}. Only *.workers.dev and *.vercel.app are reachable — any other host needs this page's CSP edited."),t("input",{value:proxy,onChange:e=>sProxy(e.target.value),placeholder:"https://my-prices.workers.dev",style:{...fieldSt,fontFamily:F.mo,fontSize:12}})]}),
+    t("button",{onClick:save,className:"w100 act95 tr",style:{padding:"12px 0",background:c.mt,border:"none",borderRadius:12,color:"#0a0a0a",fontSize:14,fontWeight:600},children:"Save settings"})
+  ]})});
+}
+// Main Price Watch surface — rendered inside GroceriesView's padded body, so no header of its own.
+function PriceWatchView({data,persist,onView}){
+  const cur=data.currency,pw=pwOf(data);
+  const products=useMemo(()=>pwProducts(data),[data.priceWatch]);
+  const[edit,sEdit]=useState(null);
+  const[cap,sCap]=useState(null);
+  const[showSet,sShowSet]=useState(false);
+  const[toast,sToast]=useState(null);
+  useEffect(()=>{if(!toast)return;const id=setTimeout(()=>sToast(null),3600);return()=>clearTimeout(id)},[toast]);
+  const today=pwTodayKey();
+  const doneToday=(pw.checkins[today]||{}).done||[];
+  const dropsToday=pwDropsOn(data,today);
+  const monthStart=(()=>{const b=new Date(ps(new Date(),data.monthStartDay||1));return b.getTime()})();
+  const savedMonth=pwSavedSince(data,monthStart);
+  const under=products.filter(p=>{const d=pwDelta(p);return d&&d.under});
+  const sorted=useMemo(()=>[...products].sort((a,b)=>{
+    const da=pwDelta(a),db=pwDelta(b);
+    const ua=da&&da.under?0:1,ub=db&&db.under?0:1;
+    if(ua!==ub)return ua-ub;
+    return pwLastSeen(a)-pwLastSeen(b);
+  }),[products]);
+  const saveProduct=(prod)=>{
+    const exists=pw.products.some(x=>x&&x.id===prod.id);
+    persist({priceWatch:{...pw,products:exists?pw.products.map(x=>x&&x.id===prod.id?prod:x):[...pw.products,prod]}});
+    sEdit(null);
+  };
+  const delProduct=(id)=>{persist({priceWatch:{...pw,products:pw.products.filter(x=>x&&x.id!==id),logs:pw.logs.filter(l=>l&&l.productId!==id)}});sEdit(null)};
+  const tile=(lbl,val,col)=>o("div",{className:"f1",style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"10px 11px"},children:[
+    t("div",{style:{fontFamily:F.mo,fontSize:8.5,color:c.tm,letterSpacing:1},children:lbl}),
+    t("div",{style:{fontFamily:F.mo,fontSize:15,fontWeight:700,color:col||c.tx,marginTop:4},children:val})
+  ]});
+  const rowBtn=(emoji,title,sub,onClick)=>o("button",{onClick,className:"w100 act95 tr f ia jb",style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 13px",gap:10,marginBottom:10},children:[
+    o("div",{className:"f ia",style:{gap:10,minWidth:0},children:[t("span",{style:{fontSize:15},children:emoji}),o("div",{className:"tl minw0",children:[t("div",{style:{fontSize:13,fontWeight:600,color:c.tx},children:title}),t("div",{className:"tru",style:{fontSize:10.5,color:c.tm,marginTop:1},children:sub})]})]}),
+    t(CR,{size:15,color:c.tm})
+  ]});
+  const pct=products.length?doneToday.length/products.length:0;
+  return o("div",{children:[
+    o("div",{className:"f",style:{gap:8,marginBottom:8},children:[
+      tile("TRACKING",String(products.length)),
+      tile("UNDER TARGET",String(under.length),under.length?c.mt:c.tx),
+      tile("SAVED THIS MONTH",fm(savedMonth,cur),savedMonth>0?c.mt:c.tx)
+    ]}),
+    (pw.streak.count>0||dropsToday.length>0)&&o("div",{className:"f ia jb",style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"9px 12px",marginBottom:12,gap:10},children:[
+      t("div",{style:{fontFamily:F.mo,fontSize:10.5,color:c.td},children:pw.streak.count>0?"🔥 "+pw.streak.count+"-day check-in streak":"No streak yet"}),
+      dropsToday.length>0&&t("div",{style:{fontFamily:F.mo,fontSize:10.5,color:c.mt},children:dropsToday.length+" drop"+(dropsToday.length===1?"":"s")+" today"})
+    ]}),
+    products.length>0&&o("button",{onClick:()=>onView("priceWatchCheckin"),className:"w100 act95 tr",style:{background:`linear-gradient(135deg,${c.mt}1c,${c.sfg})`,border:`1px solid ${c.mt}55`,borderRadius:14,padding:"13px 14px",marginBottom:12,textAlign:"left"},children:[
+      o("div",{className:"f ia jb",style:{gap:10,marginBottom:8},children:[
+        o("div",{className:"f ia",style:{gap:9,minWidth:0},children:[t("span",{style:{fontSize:17},children:pct>=1?"✅":"🎯"}),o("div",{className:"tl minw0",children:[
+          t("div",{style:{fontSize:13.5,fontWeight:600,color:c.tx},children:pct>=1?"Today's check-in is done":"Start today's check-in"}),
+          t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:doneToday.length+" of "+products.length+" checked"})
+        ]})]}),
+        t(CR,{size:16,color:c.mt})
+      ]}),
+      t("div",{style:{height:5,borderRadius:999,background:c.sf2,overflow:"hidden"},children:t("div",{style:{height:"100%",width:Math.round(pct*100)+"%",background:c.mt,borderRadius:999,transition:"width .3s"}})})
+    ]}),
+    products.length===0?o("div",{style:{textAlign:"center",padding:"40px 16px"},children:[
+      t("div",{style:{fontSize:40,marginBottom:10},children:"🎯"}),
+      t("div",{style:{fontSize:14,color:c.td,fontWeight:500,marginBottom:4},children:"Nothing on your watchlist"}),
+      t("div",{style:{fontSize:12,color:c.tm,marginBottom:16,lineHeight:1.5},children:"Add a product with the price you want to pay. Check Zepto, Instamart, Blinkit, Amazon Now and Flipkart Minutes each day — every price under your target gets logged with the date."}),
+      t("button",{onClick:()=>sEdit({}),className:"act95 tr",style:{padding:"11px 20px",background:c.mt,border:"none",borderRadius:12,color:"#0a0a0a",fontSize:13,fontWeight:600},children:"+ Track your first product"})
+    ]}):o(Fragment,{children:[
+      o("div",{className:"f fc",style:{gap:10,marginBottom:12},children:sorted.map(p=>t(PWCard,{key:p.id,p,cur,checked:doneToday.includes(p.id),onCapture:sid=>sCap({p,sid}),onEdit:()=>sEdit(p)}))}),
+      t("button",{onClick:()=>sEdit({}),className:"w100 act95 tr",style:{padding:"11px 0",background:"transparent",border:`1px dashed ${c.brs}`,borderRadius:12,color:c.td,fontSize:12.5,fontWeight:500,marginBottom:14},children:"+ Track another product"})
+    ]}),
+    rowBtn("📉","Price drop log",pw.logs.length?pw.logs.length+" logged drop"+(pw.logs.length===1?"":"s"):"Nothing under target yet",()=>onView("priceWatchLog")),
+    rowBtn("⚙️","Price Watch settings",(pw.cfg.remindOn?"Reminder "+pw.cfg.remindAt:"Reminder off")+" · "+(pw.cfg.proxyUrl?"live fetch on":"live fetch off"),()=>sShowSet(true)),
+    edit&&t(PWProductSht,{editing:edit,onSave:saveProduct,onDelete:delProduct,onClose:()=>sEdit(null)}),
+    cap&&t(PWCaptureSht,{data,persist,product:cap.p,storeId:cap.sid,onClose:()=>sCap(null),onDrop:l=>sToast(l)}),
+    showSet&&t(PWSettingsSht,{data,persist,onClose:()=>sShowSet(false)}),
+    toast&&t("div",{className:"fi",style:{position:"fixed",left:16,right:16,bottom:92,zIndex:70,background:c.mt,color:"#0a0a0a",borderRadius:14,padding:"12px 16px",boxShadow:"0 8px 28px rgba(0,0,0,.35)"},children:o("div",{className:"f ia jb",style:{gap:10},children:[
+      o("div",{className:"tl minw0",children:[t("div",{style:{fontSize:13,fontWeight:700},children:"🎉 Price drop logged"}),t("div",{className:"tru",style:{fontSize:11,marginTop:2},children:toast.name+" · "+(PW_STORE_BY_ID[toast.store]||{}).l+" · "+fm(toast.price,cur)})]}),
+      t("div",{style:{fontFamily:F.mo,fontSize:13,fontWeight:700,flexShrink:0},children:"−"+toast.savedPct.toFixed(0)+"%"})
+    ]})})
+  ]});
+}
+function PriceWatchCheckin({data,persist,onClose}){
+  const cur=data.currency,pw=pwOf(data);
+  const products=useMemo(()=>pwProducts(data),[data.priceWatch]);
+  const today=pwTodayKey();
+  const done=(pw.checkins[today]||{}).done||[];
+  const[idx,sIdx]=useState(()=>{const i=products.findIndex(p=>!done.includes(p.id));return i<0?products.length:i});
+  const[cap,sCap]=useState(null);
+  const p=products[idx]||null;
+  const mark=(pid)=>{
+    const cur2=pwOf(data),ck=cur2.checkins[today]||{done:[],at:Date.now()};
+    if(ck.done.includes(pid)){sIdx(i=>i+1);return}
+    const nextDone=[...ck.done,pid];
+    const all=pwProducts(data).every(x=>nextDone.includes(x.id));
+    persist({priceWatch:{...cur2,checkins:{...cur2.checkins,[today]:{done:nextDone,at:Date.now()}},streak:all?pwStreakNext(cur2.streak,today):cur2.streak}});
+    sIdx(i=>i+1);
+  };
+  const pct=products.length?Math.min(1,idx/products.length):0;
+  const R=26,CIRC=2*Math.PI*R;
+  const ring=t("svg",{width:62,height:62,viewBox:"0 0 64 64",style:{flexShrink:0},children:o("g",{children:[
+    t("circle",{cx:32,cy:32,r:R,fill:"none",stroke:c.sf2,strokeWidth:6}),
+    t("circle",{cx:32,cy:32,r:R,fill:"none",stroke:c.mt,strokeWidth:6,strokeLinecap:"round",strokeDasharray:CIRC,strokeDashoffset:CIRC*(1-pct),transform:"rotate(-90 32 32)",style:{transition:"stroke-dashoffset .35s"}}),
+    t("text",{x:32,y:36,textAnchor:"middle",style:{fontFamily:F.mo,fontSize:15,fontWeight:700,fill:c.tx},children:String(Math.min(idx,products.length))})
+  ]})});
+  const body=products.length===0?o("div",{style:{textAlign:"center",padding:"48px 20px"},children:[
+    t("div",{style:{fontSize:40,marginBottom:10},children:"🎯"}),
+    t("div",{style:{fontSize:13.5,color:c.td},children:"Add a product to your watchlist first."})
+  ]}):!p?o("div",{style:{textAlign:"center",padding:"40px 12px"},children:[
+    t("div",{style:{fontSize:46,marginBottom:12},children:"✅"}),
+    t("div",{style:{fontFamily:c.hf,fontSize:22,color:c.tx,marginBottom:6},children:"Check-in complete"}),
+    t("div",{style:{fontSize:12.5,color:c.tm,marginBottom:18,lineHeight:1.5},children:"You've been through every product on your watchlist today."}),
+    o("div",{className:"f",style:{gap:8,marginBottom:18},children:[
+      o("div",{className:"f1",style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 10px"},children:[
+        t("div",{style:{fontFamily:F.mo,fontSize:8.5,color:c.tm,letterSpacing:1},children:"STREAK"}),
+        t("div",{style:{fontFamily:F.mo,fontSize:19,fontWeight:700,color:c.mt,marginTop:4},children:"🔥 "+pwOf(data).streak.count})
+      ]}),
+      o("div",{className:"f1",style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 10px"},children:[
+        t("div",{style:{fontFamily:F.mo,fontSize:8.5,color:c.tm,letterSpacing:1},children:"DROPS TODAY"}),
+        t("div",{style:{fontFamily:F.mo,fontSize:19,fontWeight:700,color:c.tx,marginTop:4},children:String(pwDropsOn(data,today).length)})
+      ]})
+    ]}),
+    t("button",{onClick:onClose,className:"act95 tr",style:{padding:"12px 26px",background:c.mt,border:"none",borderRadius:12,color:"#0a0a0a",fontSize:13.5,fontWeight:600},children:"Back to Price Watch"})
+  ]}):o(Fragment,{children:[
+    o("div",{className:"f ia",style:{gap:14,marginBottom:16},children:[ring,o("div",{className:"minw0",children:[
+      t("div",{style:{fontFamily:F.mo,fontSize:9.5,color:c.tm,letterSpacing:1},children:"PRODUCT "+(idx+1)+" OF "+products.length}),
+      t("div",{className:"tru",style:{fontFamily:c.hf,fontSize:20,color:c.tx,marginTop:2},children:(p.emoji||"🛒")+" "+p.name}),
+      t("div",{style:{fontFamily:F.mo,fontSize:10.5,color:c.tm,marginTop:3},children:"target "+fm(pwTarget(p),cur)+" · best "+(pwBest(p)?fm(pwBest(p).price,cur):"—")})
+    ]})]}),
+    t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:8},children:"TAP A STORE TO RECORD TODAY'S PRICE"}),
+    o("div",{className:"f fc",style:{gap:8,marginBottom:16},children:PW_STORES.map(s=>{
+      const last=pwLastPrice(p,s.id),st=pwStoreState(p,s.id).last;
+      const fresh=st&&pwDayKey(st.at)===today;
+      const drop=last!=null&&pwIsDrop(last,pwTarget(p));
+      return o("button",{key:s.id,onClick:()=>sCap(s.id),className:"w100 act95 tr f ia jb",style:{gap:10,padding:"12px 13px",background:fresh?c.mt+"12":c.sfg,border:`1px solid ${fresh?c.mt+"55":c.brs}`,borderRadius:12},children:[
+        o("div",{className:"f ia",style:{gap:10,minWidth:0},children:[
+          t("span",{style:{fontSize:16,flexShrink:0},children:s.e}),
+          o("div",{className:"tl minw0",children:[
+            t("div",{style:{fontSize:13,fontWeight:600,color:c.tx},children:s.l}),
+            t("div",{style:{fontSize:10,color:c.tm,marginTop:1},children:fresh?"checked today":(st?"last "+rd(st.at):"never checked")})
+          ]})
+        ]}),
+        o("div",{className:"f ia",style:{gap:8,flexShrink:0},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:13.5,fontWeight:600,color:drop?c.mt:(last!=null?c.tx:c.tm)},children:last!=null?fm(last,cur):"—"}),
+          fresh?t(Check,{size:14,color:c.mt}):t(CR,{size:14,color:c.tm})
+        ]})
+      ]});
+    })}),
+    o("div",{className:"f",style:{gap:8},children:[
+      t("button",{onClick:()=>sIdx(i=>i+1),className:"act95 tr f1",style:{padding:"12px 0",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:12,color:c.td,fontSize:13},children:"Skip"}),
+      t("button",{onClick:()=>mark(p.id),className:"act95 tr f1",style:{padding:"12px 0",background:c.mt,border:"none",borderRadius:12,color:"#0a0a0a",fontSize:13.5,fontWeight:600},children:"Checked →"})
+    ]}),
+    idx>0&&t("button",{onClick:()=>sIdx(i=>Math.max(0,i-1)),className:"w100 act95 tr",style:{marginTop:10,padding:"10px 0",background:"transparent",border:"none",color:c.tm,fontSize:12},children:"← Previous product"})
+  ]});
+  return o("div",{style:{padding:"8px 0 40px"},children:[
+    t(SH,{title:t("em",{children:"Daily check-in"}),onBack:onClose}),
+    o("div",{style:{padding:"0 24px"},children:[body]}),
+    cap&&p&&t(PWCaptureSht,{data,persist,product:p,storeId:cap,onClose:()=>sCap(null)})
+  ]});
+}
+function PriceWatchLog({data,onClose}){
+  const cur=data.currency,pw=pwOf(data);
+  const[pF,sPF]=useState(null);
+  const[sF,sSF]=useState(null);
+  const logs=useMemo(()=>pw.logs.filter(l=>l&&(!pF||l.productId===pF)&&(!sF||l.store===sF)).sort((a,b)=>b.at-a.at),[pw.logs,pF,sF]);
+  const days=useMemo(()=>{const m=new Map();for(const l of logs){const k=pwDayKey(l.at);if(!m.has(k))m.set(k,[]);m.get(k).push(l)}return[...m.entries()]},[logs]);
+  const names=useMemo(()=>{const m=new Map();for(const l of pw.logs)if(l&&!m.has(l.productId))m.set(l.productId,l.name);return[...m.entries()]},[pw.logs]);
+  const storesUsed=useMemo(()=>[...new Set(pw.logs.map(l=>l&&l.store).filter(Boolean))],[pw.logs]);
+  const totalSaved=logs.reduce((s,l)=>s+Math.max(0,(l.target||0)-(l.price||0)),0);
+  const exportRows=()=>{const rows=[["Date","Time","Product","Store","Price","Target","Saved","% under","Source","Currency"]];
+    for(const l of logs)rows.push([new Date(l.at).toLocaleDateString("en-CA"),new Date(l.at).toLocaleTimeString("en-GB"),l.name||"",(PW_STORE_BY_ID[l.store]||{}).l||l.store,Number(l.price||0).toFixed(2),Number(l.target||0).toFixed(2),Math.max(0,(l.target||0)-(l.price||0)).toFixed(2),Number(l.savedPct||0).toFixed(1),PW_SRC_LABEL[l.src]||l.src||"",cur]);
+    dlCSV("price-drops.csv",rows)};
+  const chip=(on,label,onClick,key)=>t("button",{key,onClick,className:"act95 tr",style:{flexShrink:0,padding:"6px 12px",background:on?c.mt+"26":c.sf2,border:`1px solid ${on?c.mt:c.brs}`,borderRadius:999,fontSize:11.5,color:on?c.mt:c.td,fontWeight:on?600:400,whiteSpace:"nowrap"},children:label});
+  return o("div",{style:{padding:"8px 0 40px"},children:[
+    t(SH,{title:t("em",{children:"Price drop log"}),onBack:onClose}),
+    o("div",{style:{padding:"0 24px"},children:[
+      pw.logs.length===0?o("div",{style:{textAlign:"center",padding:"48px 20px"},children:[
+        t("div",{style:{fontSize:40,marginBottom:10},children:"📉"}),
+        t("div",{style:{fontSize:14,color:c.td,fontWeight:500,marginBottom:4},children:"No drops logged yet"}),
+        t("div",{style:{fontSize:12,color:c.tm,lineHeight:1.5},children:"Every time you record a price below a product's target, it lands here with the date, the store and how much you'd save."})
+      ]}):o(Fragment,{children:[
+        o("div",{className:"f ia jb",style:{background:`linear-gradient(135deg,${c.mt}14,${c.sfg})`,border:`1px solid ${c.mt}44`,borderRadius:12,padding:"11px 13px",marginBottom:12},children:[
+          o("div",{children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1},children:"TOTAL UNDER TARGET"}),t("div",{style:{fontFamily:F.mo,fontSize:17,fontWeight:700,color:c.mt,marginTop:3},children:fm(totalSaved,cur)})]}),
+          t("div",{style:{fontFamily:F.mo,fontSize:11,color:c.td},children:logs.length+" drop"+(logs.length===1?"":"s")})
+        ]}),
+        names.length>1&&o("div",{className:"f sx",style:{gap:6,marginBottom:8,overflowX:"auto"},children:[chip(!pF,"All products",()=>sPF(null),"all"),...names.map(([id,n])=>chip(pF===id,n,()=>sPF(pF===id?null:id),id))]}),
+        storesUsed.length>1&&o("div",{className:"f sx",style:{gap:6,marginBottom:14,overflowX:"auto"},children:[chip(!sF,"All stores",()=>sSF(null),"all"),...storesUsed.map(id=>chip(sF===id,((PW_STORE_BY_ID[id]||{}).e||"")+" "+((PW_STORE_BY_ID[id]||{}).l||id),()=>sSF(sF===id?null:id),id))]}),
+        t("button",{onClick:exportRows,className:"w100 act90 trt f ia jc noprint",style:{gap:6,padding:"11px 0",background:c.sf3||c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,fontSize:12,fontFamily:F.mo,color:c.tx,fontWeight:600,letterSpacing:.5,marginBottom:16},children:[t(Dl,{size:13,color:c.tx}),"EXPORT CSV"]}),
+        days.length===0?t("div",{style:{textAlign:"center",padding:"32px 0",fontSize:12.5,color:c.tm},children:"No drops match those filters."}):o("div",{className:"f fc",style:{gap:18},children:days.map(([day,items])=>o("div",{key:day,children:[
+          o("div",{className:"f ia jb",style:{marginBottom:8},children:[
+            t("div",{style:{fontFamily:F.mo,fontSize:11,fontWeight:700,color:c.tx},children:new Date(items[0].at).toLocaleDateString("en-US",{weekday:"short",day:"numeric",month:"short"})}),
+            t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.mt},children:"−"+fm(items.reduce((s,l)=>s+Math.max(0,(l.target||0)-(l.price||0)),0),cur)})
+          ]}),
+          o("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,overflow:"hidden"},children:items.map((l,i)=>{const st=PW_STORE_BY_ID[l.store]||{};return o("div",{key:l.id||i,className:"f ia jb",style:{gap:10,padding:"11px 13px",borderBottom:i===items.length-1?"none":`1px solid ${c.brs}`},children:[
+            o("div",{className:"f ia",style:{gap:9,minWidth:0},children:[
+              t("span",{style:{fontSize:14,flexShrink:0},children:st.e||"🛒"}),
+              o("div",{className:"tl minw0",children:[
+                t("div",{className:"tru",style:{fontSize:12.5,fontWeight:500,color:c.tx},children:l.name}),
+                t("div",{style:{fontSize:10,color:c.tm,marginTop:1},children:(st.l||l.store)+" · target "+fm(l.target,cur)+" · "+new Date(l.at).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})})
+              ]})
+            ]}),
+            o("div",{className:"trg",style:{flexShrink:0},children:[
+              t("div",{style:{fontFamily:F.mo,fontSize:13.5,fontWeight:700,color:c.mt},children:fm(l.price,cur)}),
+              t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.mt,marginTop:1},children:"▼ "+Number(l.savedPct||0).toFixed(0)+"%"})
+            ]})
+          ]})})})
+        ]}))})
+      ]})
     ]})
   ]});
 }
@@ -6566,7 +7112,7 @@ const dl=async()=>{sMsg("Preparing backup (embedding statement PDFs)…");try{co
 const cp=async()=>{try{await navigator.clipboard.writeText(await exp());sMsg("Copied to clipboard (incl. statement PDFs)")}catch{alert("Clipboard blocked")}};
 const onFile=async e=>{const f=e.target.files?.[0];if(!f)return;const text=await f.text();sTxt(text)};
 const tryRestore=()=>{try{const o2=JSON.parse(txt);if(!o2.expenses||!Array.isArray(o2.expenses))throw new Error("Invalid format — missing expenses array");sConf(o2)}catch(err){sMsg("Error: "+err.message)}};
-const doRestore=async()=>{const o2=conf;try{await restoreStmtFiles(o2.statementFiles)}catch(e){}try{await restoreStmtFiles(o2.expensePhotos)}catch(e){}try{await restoreStmtFiles(o2.ledgerPhotos)}catch(e){}if(Array.isArray(o2.sidebarOrder)){try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2.sidebarOrder))}catch(e){}}persist({expenses:o2.expenses||[],recurring:o2.recurring||[],accounts:o2.accounts&&o2.accounts.length?o2.accounts:[DA],profiles:o2.profiles||[],cards:o2.cards||[],cardStatements:o2.cardStatements||[],bills:o2.bills||[],goals:o2.goals||[],budgetLoans:o2.budgetLoans||[],ledger:o2.ledger||[],categoryBudgets:o2.categoryBudgets||{},monthlyRestrictionLogs:o2.monthlyRestrictionLogs||[],investments:o2.investments||[],planThreshold:o2.planThreshold??null,customExpenseCategories:o2.customExpenseCategories||[],customIncomeCategories:o2.customIncomeCategories||[],categoryOverrides:o2.categoryOverrides||{},categoryOrder:o2.categoryOrder||{expense:[],income:[]},budget:o2.budget??null,budgetPeriod:o2.budgetPeriod||"monthly",...(o2.morningEnabled!=null?{morningEnabled:o2.morningEnabled,morningTime:o2.morningTime||"08:00",eveningEnabled:o2.eveningEnabled||false,eveningTime:o2.eveningTime||"21:00"}:{}),currency:o2.currency||"$",monthStartDay:o2.monthStartDay||1,merchantRules:o2.merchantRules||{},debtPlan:o2.debtPlan||null,las:o2.las||null,varExpensePlans:o2.varExpensePlans||{},advStats:o2.advStats||{},calculators:o2.calculators||{},groceryCategories:o2.groceryCategories||GROC_CATS_DEFAULT,threads:o2.threads||[]});try{if(o2.aiProvider)sProv(o2.aiProvider);if("aiModel" in o2)sMdl(o2.aiModel||null);sAK(null)}catch(e){}sConf(null);sMsg("✓ Restored. Re-enter your AI API key in Settings (keys are never stored in backups)"+(o2.statementFiles?" (statement PDFs included)":""));sTxt("")};
+const doRestore=async()=>{const o2=conf;try{await restoreStmtFiles(o2.statementFiles)}catch(e){}try{await restoreStmtFiles(o2.expensePhotos)}catch(e){}try{await restoreStmtFiles(o2.ledgerPhotos)}catch(e){}if(Array.isArray(o2.sidebarOrder)){try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2.sidebarOrder))}catch(e){}}persist({expenses:o2.expenses||[],recurring:o2.recurring||[],accounts:o2.accounts&&o2.accounts.length?o2.accounts:[DA],profiles:o2.profiles||[],cards:o2.cards||[],cardStatements:o2.cardStatements||[],bills:o2.bills||[],goals:o2.goals||[],budgetLoans:o2.budgetLoans||[],ledger:o2.ledger||[],categoryBudgets:o2.categoryBudgets||{},monthlyRestrictionLogs:o2.monthlyRestrictionLogs||[],investments:o2.investments||[],planThreshold:o2.planThreshold??null,customExpenseCategories:o2.customExpenseCategories||[],customIncomeCategories:o2.customIncomeCategories||[],categoryOverrides:o2.categoryOverrides||{},categoryOrder:o2.categoryOrder||{expense:[],income:[]},budget:o2.budget??null,budgetPeriod:o2.budgetPeriod||"monthly",...(o2.morningEnabled!=null?{morningEnabled:o2.morningEnabled,morningTime:o2.morningTime||"08:00",eveningEnabled:o2.eveningEnabled||false,eveningTime:o2.eveningTime||"21:00"}:{}),currency:o2.currency||"$",monthStartDay:o2.monthStartDay||1,merchantRules:o2.merchantRules||{},debtPlan:o2.debtPlan||null,las:o2.las||null,varExpensePlans:o2.varExpensePlans||{},advStats:o2.advStats||{},calculators:o2.calculators||{},groceryCategories:o2.groceryCategories||GROC_CATS_DEFAULT,priceWatch:o2.priceWatch||PW_DEFAULT,threads:o2.threads||[]});try{if(o2.aiProvider)sProv(o2.aiProvider);if("aiModel" in o2)sMdl(o2.aiModel||null);sAK(null)}catch(e){}sConf(null);sMsg("✓ Restored. Re-enter your AI API key in Settings (keys are never stored in backups)"+(o2.statementFiles?" (statement PDFs included)":""));sTxt("")};
 const prebuild=async()=>{try{const s=await window.storage.get(KB);if(!s){alert("No prebuild snapshot found");return}sTxt(s.value);sMsg("Loaded prebuild backup — review then tap Restore")}catch{alert("Error loading snapshot")}};
 return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
   t(SH,{title:t("em",{children:"Backup & Restore"}),onBack:onClose}),
