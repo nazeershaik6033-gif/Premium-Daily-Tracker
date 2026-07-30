@@ -3921,6 +3921,74 @@ function grocLineSaved(it){const d=it&&it.disc;if(d!=null&&isFinite(Number(d)))r
 function grocSum(items){return (items||[]).reduce((s,it)=>s+grocLine(it),0)}
 function grocSumMrp(items){return (items||[]).reduce((s,it)=>s+grocLineMrp(it),0)}
 function grocSumSaved(items){return (items||[]).reduce((s,it)=>s+grocLineSaved(it),0)}
+// === GROCERY CATEGORY TAXONOMY — 26 shelf categories with hand-drawn art ===
+// Category tiles are illustrated; subcategories use emoji. That split is deliberate: 26 authored
+// illustrations is tractable, one per subcategory would be 500+.
+// Art is a compact shape table rather than raw <svg> markup so 26 illustrations cost ~120 lines
+// instead of ~2000, and so every icon is forced onto the same 64×64 grid and palette.
+//   ["c",cx,cy,r,fill] circle · ["e",cx,cy,rx,ry,fill,rot] ellipse
+//   ["r",x,y,w,h,fill,rx,rot] rect · ["p",d,fill] path      (rot = degrees about the shape's centre)
+const GC_ART={
+vegetables:[["p","M11 29 l8 -4 3 6 -8 4z","#66BB6A"],["p","M13 33 L23 30 L18 54 Z","#FB8C00"],["e",32,36,15,14,"#7CB342"],["e",31,33,10,9,"#AED581"],["e",28,30,4,5,"#DCEDC8"],["c",48,45,10,"#E53935"],["c",45,42,2.8,"#EF5350"],["p","M48 34 l4.5 4.5 -4.5 2.2 -4.5 -2.2z","#43A047"]],
+fruits:[["p","M11 28 a17 16 0 0 0 34 0z","#388E3C"],["p","M14.5 28 a13.5 12.5 0 0 0 27 0z","#EF5350"],["c",22,33,1.5,"#4E342E"],["c",28,36,1.5,"#4E342E"],["c",34,33,1.5,"#4E342E"],["c",46,43,12,"#FB8C00"],["c",42,38,3.5,"#FFA726"],["c",21,47,11,"#D32F2F"],["c",17,43,3,"#EF5350"],["p","M21 37 q3 -6 7 -6 q-4 3 -4 7z","#43A047"]],
+cookbake:[["r",7,42,11,4,"#6D4C41",2,-22],["r",12,46,11,4,"#8D6E63",2,14],["p","M4 56 q9 -15 18 0z","#EFEBE9"],["r",30,18,23,34,"#26C6DA",3],["p","M30 18 q11.5 -6 23 0z","#4DD0E1"],["r",35,27,13,13,"#FFFFFF",2],["p","M41.5 30 l5 8 -10 0z","#FF7043"]],
+eggdairy:[["p","M6 51 L20 28 L34 51 Z","#FFC107"],["c",18,44,2.6,"#E65100"],["c",25,48,2,"#E65100"],["c",21,37,1.8,"#E65100"],["r",41,12,6,10,"#90A4AE",2],["r",39,7,10,6,"#5D4037",2],["r",34,21,18,31,"#B0BEC5",5],["r",36,29,14,21,"#FFFFFF",4],["e",26,47,8.5,7,"#FFF8E1"],["e",24,45,3,2.5,"#FFFFFF"]],
+snacks:[["c",26,25,5,"#FFF8E1"],["c",33,21,5.5,"#FFF3E0"],["c",40,25,5,"#FFECB3"],["p","M20 27 L44 27 L40 54 L24 54 Z","#E53935"],["p","M26 27 L29 54 L33 54 L30.5 27 Z","#FFFFFF"],["p","M35 27 L38 54 L42 54 L39.5 27 Z","#FFFFFF"],["e",11,47,7,5,"#FDD835",-22],["e",16,52,7,5,"#FBC02D",14],["c",53,45,6,"#8D6E63"],["c",53,45,3,"#A1887F"]],
+grains:[["e",26,27,14,6,"#FFFFFF"],["p","M12 28 a14 15 0 0 0 28 0z","#37474F"],["e",26,28,14,4.5,"#FAFAFA"],["r",44,18,3,32,"#FDD835",1,6],["r",50,18,3,32,"#FBC02D",1,-4],["r",56,20,3,30,"#FDD835",1,10],["e",19,50,5,9,"#FFCA28",-28],["e",27,53,5,9,"#FFCA28",-10]],
+cereal:[["p","M9 30 a17 16 0 0 0 34 0z","#42A5F5"],["e",26,30,17,5.5,"#FFF3E0"],["e",20,29,3.6,2.6,"#F9A825"],["e",30,31,3.6,2.6,"#FB8C00"],["e",25,27,3.6,2.6,"#FFB300"],["r",48,8,3.5,26,"#B0BEC5",1,12],["e",52,39,5.5,7.5,"#CFD8DC",12]],
+oilvinegar:[["r",9,26,13,26,"#AED581",3],["r",13,16,5,11,"#AED581",2],["r",12,11,7,5,"#8D6E63",2],["r",26,32,12,20,"#4E342E",3],["r",29,24,6,9,"#4E342E",2],["r",28,19,8,5,"#A1887F",2],["r",42,22,13,30,"#FFEE58",3],["r",46,12,5,11,"#FFEE58",2],["r",45,7,7,5,"#66BB6A",2]],
+sauces:[["p","M7 28 a12 10 0 0 0 24 0z","#8D6E63"],["e",19,28,12,4,"#7CB342"],["p","M33 26 a12 10 0 0 0 24 0z","#A1887F"],["e",45,26,12,4,"#E53935"],["p","M23 44 q11 3 20 12 q-11 -3 -20 -7z","#E53935"],["p","M21 42 q5 0 5 5 q-5 -1 -5 -5z","#43A047"]],
+meats:[["e",22,38,15,13,"#E57373"],["e",22,38,9,8,"#EF9A9A"],["p","M13 31 q10 -6 18 2 q-9 4 -18 -2z","#FFF3E0"],["e",46,25,9,10,"#F5C396",20],["r",45,32,4,16,"#FFF8E1",2,-16],["c",49,51,3.6,"#FFF8E1"],["c",43,50,3.6,"#FFF8E1"]],
+fish:[["p","M7 40 l9 -7 0 14z","#78909C"],["e",30,40,18,9,"#90A4AE"],["e",30,38,14,5,"#B0BEC5"],["c",41,38,2,"#263238"],["e",28,19,11,8,"#FF8A65"],["e",28,19,5,4,"#FFAB91"],["p","M46 14 q7 -6 11 1 q-5 4 -11 -1z","#E53935"],["e",51,26,7,9,"#EF5350"]],
+canned:[["r",7,26,16,26,"#CFD8DC",3],["e",15,26,8,3,"#ECEFF1"],["r",7,32,16,13,"#FDD835",0],["r",44,29,15,23,"#CFD8DC",3],["e",51.5,29,7.5,3,"#ECEFF1"],["r",44,35,15,11,"#E53935",0],["r",25,19,17,33,"#CFD8DC",3],["e",33.5,19,8.5,3,"#ECEFF1"],["r",25,27,17,16,"#66BB6A",0]],
+sweets:[["p","M9 36 L27 36 L24 54 L12 54 Z","#5D4037"],["e",18,34,10,7,"#4DD0E1"],["e",18,28,7,6,"#80DEEA"],["c",18,22,3,"#E53935"],["p","M28 54 L44 54 L44 41 Z","#FFE0B2"],["p","M28 54 L44 47 L44 41 Z","#6D4C41"],["c",47,33,13,"#F48FB1"],["c",47,33,4.5,"#FFF8E1"],["r",43,27,3,1.6,"#FFEB3B",1],["r",51,30,3,1.6,"#4CAF50",1],["r",45,39,3,1.6,"#42A5F5",1]],
+frozen:[["r",18,12,19,19,"#E1F5FE",4],["r",7,26,20,20,"#B3E5FC",4],["r",25,34,20,20,"#81D4FA",4],["r",47,11,4,30,"#4FC3F7",2],["r",47,11,4,30,"#4FC3F7",2,60],["r",47,11,4,30,"#4FC3F7",2,-60]],
+bread:[["p","M19 30 L35 30 L37 53 L21 53 Z","#BCAAA4"],["p","M40 18 L59 43 L53 49 L34 24 Z","#D9A05B"],["p","M31 21 L50 47 L44 52 L25 26 Z","#E8B877"],["r",5,32,25,20,"#8D6E63",4],["r",5,32,25,7,"#A1887F",4]],
+beverages:[["r",7,28,14,24,"#FB8C00",3],["r",7,34,14,10,"#FFB74D",0],["e",14,28,7,2.5,"#B0BEC5"],["r",32,9,2.5,18,"#EF5350",1],["p","M25 27 L42 27 L39 54 L28 54 Z","#42A5F5"],["e",33.5,27,8.5,3.2,"#AB47BC"],["r",45,24,13,28,"#66BB6A",4],["r",49,13,5,12,"#66BB6A",2],["r",48,8,7,5,"#FDD835",2]],
+wine:[["r",7,26,13,26,"#8D6E63",3],["r",11,13,5,13,"#8D6E63",2],["r",10,8,7,5,"#5D4037",2],["r",8,34,11,12,"#D7A85B",1],["r",24,24,14,28,"#4E342E",4],["r",28,11,6,13,"#4E342E",2],["r",27,6,8,5,"#B71C1C",2],["r",25,32,12,10,"#C62828",1],["p","M43 26 L59 26 L56 52 L46 52 Z","#FFCA28"],["e",51,26,8,4,"#FFF8E1"]],
+baby:[["p","M14 10 q3 -5 6 0 q0 6 -6 6z","#FFCCBC"],["r",13,15,8,9,"#F48FB1",3],["r",9,23,16,29,"#F8BBD0",5],["r",11,31,12,14,"#FFFFFF",3],["c",35,23,5,"#A1887F"],["c",53,23,5,"#A1887F"],["c",44,33,13,"#8D6E63"],["c",40,31,2,"#3E2723"],["c",48,31,2,"#3E2723"],["e",44,38,5,4,"#D7CCC8"],["c",44,36,1.8,"#3E2723"],["c",29,50,5,"#42A5F5"],["c",29,50,2,"#FFFFFF"]],
+pets:[["r",25,15,18,6,"#FFCC80",3],["c",25,15,4,"#FFCC80"],["c",25,21,4,"#FFCC80"],["c",43,15,4,"#FFCC80"],["c",43,21,4,"#FFCC80"],["c",13,32,8,"#4DD0E1"],["c",10,29,2,"#80DEEA"],["c",16,34,2,"#80DEEA"],["p","M38 42 a10 9 0 0 0 20 0z","#EF6C00"],["e",48,42,10,3,"#FFB74D"],["p","M10 41 a14 12 0 0 0 28 0z","#42A5F5"],["e",24,41,14,4,"#8D6E63"],["c",20,39,2.4,"#6D4C41"],["c",26,40,2.4,"#6D4C41"],["c",30,38,2,"#6D4C41"]],
+cleaning:[["r",50,9,3,30,"#7E57C2",1],["p","M45 39 l13 0 2 13 -17 0z","#FDD835"],["p","M11 18 l0 -8 9 0 0 4 -5 0 0 4z","#1E88E5"],["r",7,25,14,27,"#42A5F5",3],["r",9,31,10,12,"#90CAF9",2],["p","M27 32 L47 32 L44 54 L30 54 Z","#66BB6A"],["e",37,32,10,3.5,"#A5D6A7"],["c",33,28,3,"#E1F5FE"],["c",40,26,2.4,"#E1F5FE"],["c",36,22,2,"#E1F5FE"]],
+bathbeauty:[["r",9,11,4,29,"#26C6DA",2,12],["p","M6 39 l9 2 -2 8 -9 -2z","#00ACC1"],["r",22,12,4,26,"#1E88E5",2,-10],["p","M17 7 l11 2 -1 6 -11 -2z","#B0BEC5"],["r",35,14,13,7,"#B0BEC5",2],["r",44,15,8,3,"#90A4AE",1],["r",37,20,8,10,"#E53935",2],["c",41,41,13,"#EF5350"],["c",37,36,3.5,"#E57373"]],
+household:[["c",23,23,14,"#81D4FA"],["c",18,18,4.5,"#B3E5FC"],["r",17,36,12,8,"#B0BEC5",2],["r",18,44,10,4,"#90A4AE",1],["r",42,9,12,23,"#37474F",3],["r",45,5,6,5,"#FFB300",1],["r",43,16,10,11,"#FFB300",1],["r",6,48,24,10,"#FFF176",3,-6],["r",24,44,22,10,"#CE93D8",3,5]],
+office:[["p","M6 43 L27 52 L25 58 L4 49 Z","#D7CCC8"],["r",41,9,4,34,"#1E88E5",1,10],["p","M40 43 l5 1 -3 6z","#3E2723"],["r",50,13,4,31,"#FDD835",1,-8],["p","M49 43 l5 -1 -1 6z","#3E2723"],["c",23,30,14,"#42A5F5"],["p","M12 24 q11 6 22 0 q-7 10 -15 8z","#66BB6A"],["p","M18 39 q9 4 17 -3 q-6 9 -17 6z","#66BB6A"]],
+clothing:[["e",46,15,14,5,"#FFB300"],["p","M38 15 a8 7 0 0 1 16 0z","#FFA000"],["p","M12 17 L25 17 L30 51 L8 51 Z","#E53935"],["r",9,31,20,4,"#B71C1C",0],["p","M33 23 L45 23 L50 31 L47 33 L47 52 L32 52 L32 33 L29 31 Z","#64B5F6"],["r",35,21,8,4,"#42A5F5",1]],
+carcare:[["r",7,17,7,30,"#78909C",3,32],["c",12,12,7.5,"#78909C"],["c",12,12,3.4,"#37474F"],["r",32,20,24,33,"#FDD835",4],["r",38,11,10,10,"#F9A825",2],["r",36,28,16,15,"#FFF59D",3],["p","M40 41 l4 -9 4 9 -3 0 0 5 -2 0 0 -5z","#1E88E5"]],
+pharmacy:[["r",25,9,6,31,"#FAFAFA",3,35],["r",25,9,6,9,"#E53935",3,35],["r",5,42,21,9,"#D7CCC8",3,-15],["r",11,44,8,6,"#4FC3F7",1,-15],["r",26,30,29,18,"#FB8C00",3,-12],["c",33,37,3,"#FFF3E0"],["c",41,35,3,"#FFF3E0"],["c",49,33,3,"#FFF3E0"],["c",35,44,3,"#FFF3E0"],["c",43,42,3,"#FFF3E0"],["c",51,40,3,"#FFF3E0"]]
+};
+const GC_CATS=[
+{id:"vegetables",l:"Vegetables",col:"#7CB342"},{id:"fruits",l:"Fruits",col:"#EF5350"},{id:"cookbake",l:"Cooking & Baking",col:"#26C6DA"},
+{id:"eggdairy",l:"Egg & Dairy",col:"#FDD835"},{id:"snacks",l:"Snacks & Chips",col:"#E53935"},{id:"grains",l:"Grains, Pasta & Sides",col:"#D4A017"},
+{id:"cereal",l:"Cereal & Breakfast",col:"#D9A05B"},{id:"oilvinegar",l:"Oil & Vinegar",col:"#AED581"},{id:"sauces",l:"Sauces, Spices & Condiments",col:"#8D6E63"},
+{id:"meats",l:"Meats",col:"#F5C396"},{id:"fish",l:"Fish & Seafood",col:"#90A4AE"},{id:"canned",l:"Canned, Jar",col:"#78909C"},
+{id:"sweets",l:"Sweets",col:"#F48FB1"},{id:"frozen",l:"Frozen Foods",col:"#81D4FA"},{id:"bread",l:"Bread & Bakery",col:"#D9A05B"},
+{id:"beverages",l:"Beverages",col:"#42A5F5"},{id:"wine",l:"Wine & Spirits",col:"#8D6E63"},{id:"baby",l:"Baby",col:"#F8BBD0"},
+{id:"pets",l:"Pets",col:"#4DD0E1"},{id:"cleaning",l:"Laundry & Cleaning",col:"#66BB6A"},{id:"bathbeauty",l:"Bath & Beauty",col:"#EF5350"},
+{id:"household",l:"Household & Kitchen",col:"#FFB300"},{id:"office",l:"Office & School Supplies",col:"#5C6BC0"},{id:"clothing",l:"Clothing & Fashion",col:"#EC407A"},
+{id:"carcare",l:"Car Care",col:"#90A4AE"},{id:"pharmacy",l:"Pharmacy",col:"#FB8C00"}
+];
+const GC_BY_ID=Object.fromEntries(GC_CATS.map(x=>[x.id,x]));
+// Subcategories as ["Label","emoji"]. Emoji rather than art — see the note above. An empty emoji
+// falls back to a lettered chip in the parent category's colour, so a name is never blocked on
+// there being a fitting emoji (Ryazhenka, Kalina, Bulgur…).
+const GC_SUBS={
+vegetables:[["Herbs","🌿"],["Mushrooms","🍄"],["Beet",""],["Black Olives","🫒"],["Broccoli","🥦"],["Cabbage","🥬"],["Cabbage Brussels",""],["Cabbage Peking",""],["Cabbage Red",""],["Carrots","🥕"],["Cauliflower",""],["Cherry Tomatoes","🍅"],["Chili","🌶️"],["Corn","🌽"],["Cucumber","🥒"],["Eggplant","🍆"],["Garlic","🧄"],["Ginger","🫚"],["Green Beans",""],["Mini Carrots","🥕"],["Olives","🫒"],["Onion","🧅"],["Onion Red","🧅"],["Onion Shallot",""],["Onion White","🧅"],["Peas","🫛"],["Pepper","🫑"],["Potatoes","🥔"],["Pumpkin","🎃"],["Radish",""],["Squash",""],["Tomato","🍅"],["Turnip",""],["Zacchini","🥒"]],
+fruits:[["Berries","🫐"],["Citrus","🍊"],["Tropically","🥭"],["Apple","🍎"],["Apricot","🍑"],["Avocado","🥑"],["Barberry",""],["Cherry","🍒"],["Currants White",""],["Figs",""],["Garnet",""],["Gooseberry",""],["Grapes","🍇"],["Kalina",""],["Kiwi","🥝"],["Mango","🥭"],["Melon","🍈"],["Merry","🍒"],["Peach","🍑"],["Pear","🍐"],["Persimmon",""],["Plum",""],["Raspberries",""],["Red Currants",""],["Watermelon","🍉"]],
+cookbake:[["Cinnamon",""],["Flour",""],["Gelatin",""],["Potato Starch",""],["Salt","🧂"],["Sugar",""],["Vanilla",""]],
+eggdairy:[["Cheese","🧀"],["Ayran",""],["Butter","🧈"],["Chicken Eggs","🥚"],["Cream",""],["Kefir",""],["Kumiss",""],["Mayonnaise",""],["Milk","🥛"],["Powdered Milk",""],["Quail Eggs","🥚"],["Ryazhenka",""],["Sour Cream",""],["Yogurt",""]],
+snacks:[["Dried Fruits",""],["Nuts","🥜"],["Chips",""],["Crackers","🍘"],["Popcorn","🍿"],["Pumpkin Seeds",""],["Seeds",""]],
+grains:[["Beans","🫘"],["Beans Red","🫘"],["Beans White","🫘"],["Buckwheat Grain",""],["Bulgur",""],["Corn Grits",""],["Couscous",""],["Fast Food Pasta","🍝"],["Noodles","🍜"],["Pearl Barley",""],["Ravioli","🥟"],["Rice","🍚"],["Rice Black",""],["Rice For Sushi","🍣"],["Rice Noodles","🍜"],["Semolina",""],["Spaghetti","🍝"],["Sprouted Wheat",""],["Wheat","🌾"]],
+cereal:[["Corn Flakes","🥣"],["Grits",""],["Honey","🍯"],["Jam",""],["Muesli","🥣"],["Pancake","🥞"]]
+};
+function GCArt({id,size}){
+  const sh=GC_ART[id]||[],s=size||46;
+  return t("svg",{width:s,height:s,viewBox:"0 0 64 64",style:{display:"block",flexShrink:0},children:o("g",{children:sh.map((v,i)=>{
+    if(v[0]==="c")return t("circle",{key:i,cx:v[1],cy:v[2],r:v[3],fill:v[4]});
+    if(v[0]==="e")return t("ellipse",{key:i,cx:v[1],cy:v[2],rx:v[3],ry:v[4],fill:v[5],transform:v[6]?`rotate(${v[6]} ${v[1]} ${v[2]})`:undefined});
+    if(v[0]==="r")return t("rect",{key:i,x:v[1],y:v[2],width:v[3],height:v[4],fill:v[5],rx:v[6]==null?2:v[6],transform:v[7]?`rotate(${v[7]} ${v[1]+v[3]/2} ${v[2]+v[4]/2})`:undefined});
+    return t("path",{key:i,d:v[1],fill:v[2]});
+  })})});
+}
 // === PRICE WATCH — forward-looking watchlist over the quick-commerce apps ===
 // A product is something you want at a target price. Each product keeps a per-store price history,
 // captured by hand (deep-link + type), by OCR (screenshot), by paste, or by an optional proxy.
