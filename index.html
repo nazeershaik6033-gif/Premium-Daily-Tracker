@@ -2399,21 +2399,26 @@ function DebtPlan({data,persist,onClose}){
 function BudgetBlock({data}){const{expenses,budget,budgetPeriod,currency,monthStartDay=1}=data;const now=new Date();const st=budgetPeriod==="weekly"?ws():budgetPeriod==="yearly"?ys():ps(now,monthStartDay);const en=budgetPeriod==="weekly"?st+7*864e5:budgetPeriod==="yearly"?new Date(now.getFullYear()+1,0,1).getTime():mse(now.getFullYear(),now.getMonth(),monthStartDay);const sp=useMemo(()=>expenses.filter(e=>e.type==="expense"&&e.date>=st&&e.date<en).reduce((s,e)=>s+e.amount,0),[expenses,st,en]);const reimb=useMemo(()=>expenses.filter(e=>e.type==="expense"&&e.date>=st&&e.date<en&&e.reimbursedBy).reduce((s,e)=>s+(e.reimbursedAmount??e.amount),0),[expenses,st,en]);const netSp=Math.max(0,sp-reimb);const re=budget?budget-netSp:null,barPct=budget?Math.min(100,(netSp/budget)*100):0,realPct=budget?Math.round((netSp/budget)*100):0,ov=budget&&netSp>budget;const dot=ov?c.co:c.ac;
 const isMonthly=budgetPeriod!=="weekly"&&budgetPeriod!=="yearly";
 const weekRows=useMemo(()=>{if(!isMonthly)return null;const wks=monthWeeks(st,en);const nowTs=Date.now();const todayS=ds(new Date());const remDays=Math.max(1,Math.round((en-todayS)/864e5));const remBudget=budget!=null?budget-netSp:null;const perDay=remBudget!=null?Math.max(0,remBudget)/remDays:null;return wks.map(w=>{const spent=expenses.filter(e=>e.type==="expense"&&e.date>=w.s&&e.date<w.e).reduce((s,e)=>s+netAmt(e),0);const days=Math.round((w.e-w.s)/864e5);const state=w.e<=nowTs?"past":(w.s<=nowTs&&nowTs<w.e?"current":"future");const left=perDay!=null?perDay*days:null;const sd=new Date(w.s),ed=new Date(w.e-864e5);const range=sd.toLocaleDateString("en-US",{month:"short",day:"numeric"})+(days>1?"–"+ed.toLocaleDateString("en-US",{day:"numeric"}):"");return{wk:w.wk,range,spent,left,state}})},[expenses,st,en,isMonthly,budget,netSp]);
+const[budOpen,sBudOpen]=useState(()=>{try{return JSON.parse(localStorage.getItem("home-budget-open"))||false}catch{return false}});const toggleBud=()=>{const nv=!budOpen;sBudOpen(nv);try{localStorage.setItem("home-budget-open",JSON.stringify(nv))}catch{}};
 return o("div",{style:{background:c.sfg,borderRadius:16,border:`1px solid ${ov?c.co+"50":c.brs}`,overflow:"hidden",marginBottom:10},children:[
-  o("div",{style:{padding:"12px 16px 10px",borderBottom:`1px solid ${c.brs}`,background:`linear-gradient(135deg,${dot}12 0%,transparent 60%)`},children:[
-    o("div",{className:"f ia jb",children:[
-      o("div",{className:"f ia",style:{gap:6},children:[
-        t("div",{style:{width:6,height:6,borderRadius:"50%",background:dot}}),
+  o("div",{style:{padding:"12px 16px 10px",borderBottom:budOpen?`1px solid ${c.brs}`:"none",background:`linear-gradient(135deg,${dot}12 0%,transparent 60%)`},children:[
+    t("button",{onClick:toggleBud,"aria-expanded":budOpen,className:"w100 tl act98 trt",style:{display:"block",background:"transparent",border:"none",padding:0,cursor:"pointer"},children:o("div",{className:"f ia jb",children:[
+      o("div",{className:"f ia",style:{gap:6,minWidth:0},children:[
+        t("div",{style:{width:6,height:6,borderRadius:"50%",background:dot,flexShrink:0}}),
         t("div",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1.5,color:dot,fontWeight:600},children:(budgetPeriod||"monthly").toUpperCase()+" BUDGET"}),
       ]}),
-      budget!=null&&t("div",{style:{fontFamily:F.mo,fontSize:10,color:ov?c.co:c.td,letterSpacing:.5,fontWeight:ov?700:400},children:realPct+"% USED"}),
-    ]}),
-    reimb>0&&o("div",{className:"f ia jb",style:{marginTop:8},children:[
+      o("div",{className:"f ia",style:{gap:8,flexShrink:0},children:[
+        budget!=null&&t("div",{style:{fontFamily:F.mo,fontSize:10,color:ov?c.co:c.td,letterSpacing:.5,fontWeight:ov?700:400},children:realPct+"% USED"}),
+        t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm},children:budOpen?"▼":"▶"}),
+      ]}),
+    ]})}),
+    !budOpen&&t("div",{style:{fontFamily:F.mo,fontSize:11,color:c.td,marginTop:8,letterSpacing:.2},children:budget!=null?("Spent "+fm(sp,currency)+" of "+fm(budget,currency)+" · "+((re??0)<0?"−"+fm(Math.abs(re??0),currency)+" over":fm(re??0,currency)+" left")):("Spent "+fm(sp,currency)+" · no limit set")}),
+    budOpen&&reimb>0&&o("div",{className:"f ia jb",style:{marginTop:8},children:[
       o("div",{className:"f ia",style:{gap:6},children:[t(Rpt,{size:11,color:c.mt}),t("div",{style:{fontFamily:F.mo,fontSize:9,letterSpacing:1,color:c.mt,fontWeight:600},children:"REIMBURSE"})]}),
       o("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:.3},children:["−",fm(reimb,currency),t("span",{style:{color:c.mt,fontWeight:600},children:["  · net ",fm(netSp,currency)]})]}),
     ]}),
   ]}),
-  o("div",{className:"g g3",style:{gap:0},children:[
+  budOpen&&o("div",{className:"g g3",style:{gap:0},children:[
     o("button",{className:"act95 trt",style:{padding:"14px 12px",borderRight:`1px solid ${c.brs}`,textAlign:"left"},children:[
       t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.co,letterSpacing:1,marginBottom:6},children:"SPENT"}),
       t("div",{style:{fontFamily:'var(--nf)',fontSize:'var(--ns)',fontWeight:500,color:c.co,letterSpacing:-0.5},children:fm(sp,currency)}),
@@ -2427,8 +2432,8 @@ return o("div",{style:{background:c.sfg,borderRadius:16,border:`1px solid ${ov?c
       t("div",{style:{fontFamily:'var(--nf)',fontSize:'var(--ns)',fontWeight:500,color:ov?c.co:budget==null?c.td:c.mt,letterSpacing:-0.5},children:budget!=null?((re??0)<0?"−":"")+fm(Math.abs(re??0),currency):"—"}),
     ]}),
   ]}),
-  budget!=null&&t("div",{style:{padding:"0 16px 14px"},children:t("div",{style:{height:6,background:c.sf2,borderRadius:999,overflow:"hidden"},children:t("div",{style:{width:barPct+"%",height:"100%",background:ov?`linear-gradient(90deg,${c.co},#FF3300)`:c.ac,transition:"width 600ms cubic-bezier(0.2,0.9,0.2,1)",boxShadow:ov?`0 0 10px ${c.co}60`:`0 0 6px ${c.ac}40`}})})}),
-  weekRows&&weekRows.length>0&&o("div",{style:{padding:"2px 16px 14px",borderTop:`1px solid ${c.brs}`},children:[
+  budOpen&&budget!=null&&t("div",{style:{padding:"0 16px 14px"},children:t("div",{style:{height:6,background:c.sf2,borderRadius:999,overflow:"hidden"},children:t("div",{style:{width:barPct+"%",height:"100%",background:ov?`linear-gradient(90deg,${c.co},#FF3300)`:c.ac,transition:"width 600ms cubic-bezier(0.2,0.9,0.2,1)",boxShadow:ov?`0 0 10px ${c.co}60`:`0 0 6px ${c.ac}40`}})})}),
+  budOpen&&weekRows&&weekRows.length>0&&o("div",{style:{padding:"2px 16px 14px",borderTop:`1px solid ${c.brs}`},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,margin:"10px 0 6px"},children:"THIS MONTH · BY WEEK"}),
     ...weekRows.map((w,i)=>{const stateLbl=w.state==="past"?"spent":w.state==="current"?"spent so far":"left to spend";const isFut=w.state==="future";const val=isFut?(w.left!=null?fm(w.left,currency):"—"):fm(w.spent,currency);const valCol=isFut?c.mt:w.state==="current"?c.tx:c.td;return o("div",{key:i,className:"f ia jb",style:{padding:"7px 0",borderTop:i?`1px solid ${c.brs}`:"none"},children:[
       o("div",{className:"f ia",style:{gap:8,minWidth:0},children:[t("span",{style:{fontFamily:F.mo,fontSize:11,color:w.state==="current"?dot:c.td,fontWeight:w.state==="current"?700:500,flexShrink:0},children:"W"+w.wk}),t("span",{className:"tru",style:{fontSize:11,color:c.tm},children:w.range}),w.state==="current"&&t("span",{style:{fontFamily:F.mo,fontSize:7.5,letterSpacing:.5,textTransform:"uppercase",padding:"1px 5px",borderRadius:999,color:dot,background:dot+"1a",flexShrink:0},children:"now"})]}),
