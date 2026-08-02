@@ -493,6 +493,12 @@ const wsMon=(d=new Date())=>{const x=new Date(d);x.setHours(0,0,0,0);const dow=x
 // Split [start,end) into Monday–Sunday weeks, clamped to the range (partial weeks at month edges kept).
 function monthWeeks(start,end){const out=[];let s=start,wk=1;while(s<end){const d=new Date(s);const dow=d.getDay();const daysToSun=dow===0?0:7-dow;const sun=new Date(d);sun.setDate(d.getDate()+daysToSun);sun.setHours(0,0,0,0);let e=sun.getTime()+864e5;if(e>end)e=end;out.push({wk,s,e});s=e;wk++}return out}
 const ys=(d=new Date())=>new Date(d.getFullYear(),0,1).getTime();
+// Per-section minimise/maximise defaults (true = maximised/open). Controlled from Settings → Sections.
+const SEC_META=[{id:"budget",label:"Monthly Budget",grp:"Home"},{id:"safe",label:"Safe to Spend",grp:"Home"},{id:"statsReimb",label:"Reimbursement expenses",grp:"Stats"},{id:"ldSettled",label:"Settled up",grp:"Lending diary"},{id:"lasCharges",label:"Charges breakdown",grp:"LAS Tracker"}];
+const SEC_KEY="etp-section-prefs";
+let _secPrefs=(()=>{try{return JSON.parse(localStorage.getItem(SEC_KEY))||{}}catch{return{}}})();
+const gSec=(id,def=false)=>_secPrefs[id]!=null?!!_secPrefs[id]:def;
+const sSec=(id,val)=>{_secPrefs={..._secPrefs,[id]:!!val};try{localStorage.setItem(SEC_KEY,JSON.stringify(_secPrefs))}catch{}};
 const rd=ts=>{const d=new Date(ts),tt=ds(),tx=ds(new Date(ts)),df=(tt-tx)/864e5;if(df===0)return"Today";if(df===1)return"Yesterday";if(df===-1)return"Tomorrow";if(df>0&&df<7)return d.toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"});return d.toLocaleDateString("en-US",{month:"short",day:"numeric"})};
 // AI vision/OCR (and native <input type=date>) hand back bare "YYYY-MM-DD" strings. `new Date(str)`
 // parses those as UTC midnight per spec, which then shows hours off in any non-UTC timezone (e.g.
@@ -1511,8 +1517,8 @@ const safeToday=useMemo(()=>{const DAY=864e5,now=Date.now();const periodDays=Mat
 const budgetOver=safeToday?safeToday.available<0:false;
 const catOver=useMemo(()=>{const cb=data.categoryBudgets||{},st2=ps(new Date(),data.monthStartDay||1),sps={};for(const e of expenses){if(e.type!=="expense"||e.date<st2)continue;sps[e.category]=(sps[e.category]||0)+netAmt(e)}return Object.entries(cb).filter(([cid,b])=>b.limit>0&&(sps[cid]||0)>b.limit).map(([cid])=>cid)},[expenses,data.categoryBudgets,data.monthStartDay]);
 const spendForecast=useMemo(()=>{if(!safeToday||!safeToday.income||safeToday.variableSpent<=0)return null;const projected=safeToday.spentPerDay*safeToday.periodDays+safeToday.fixedForPeriod;const overage=projected-safeToday.income;return{projected,overage}},[safeToday]);
-const[safeOpen,sSafeOpen]=useState(()=>{try{return JSON.parse(localStorage.getItem("home-safe-open"))||false}catch{return false}});
-const toggleSafe=()=>{const nv=!safeOpen;sSafeOpen(nv);try{localStorage.setItem("home-safe-open",JSON.stringify(nv))}catch{}};
+const[safeOpen,sSafeOpen]=useState(()=>gSec("safe",false));
+const toggleSafe=()=>{sSafeOpen(v=>{const nv=!v;sSec("safe",nv);return nv})};
 useEffect(()=>{if(spendFlt.from||spendFlt.to){try{localStorage.setItem("etp-spend-flt",JSON.stringify(spendFlt))}catch{}}else{try{localStorage.removeItem("etp-spend-flt")}catch{}}},[spendFlt]);
 useEffect(()=>{return;const k="etp-nudge-"+new Date().toISOString().slice(0,10);if(nudge||nudgeLoading)return;const eList=expenses.filter(x=>x.type==="expense"&&x.date>=periodStart);const tot=eList.reduce((s,e)=>s+e.amount,0);const byCat={};for(const e of eList){const lbl=co(e.category)?.label||e.category;byCat[lbl]=(byCat[lbl]||0)+e.amount}const ranked=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);const top=ranked.slice(0,5).map(([l,v])=>`${l}: ${v.toFixed(0)}`).join(", ");const cur=data.currency;const fb=()=>{if(!ranked.length)return`No spending logged this ${periodLabel} yet — a clean slate. Keep logging as you go to stay on track.`;const[tl,tv]=ranked[0];const pct=tot>0?Math.round((tv/tot)*100):0;const vs=[`${tl} is your biggest ${periodLabel} spend so far — ${fs(tv,cur)} (${pct}% of ${fs(tot,cur)}).`,`You've spent ${fs(tot,cur)} this ${periodLabel}; ${tl} leads at ${fs(tv,cur)}. Worth a second look.`,`Top category this ${periodLabel}: ${tl} at ${pct}% of total. Small trims here add up fast.`];return vs[new Date().getDate()%vs.length]};const fbText=fb();const cache=(txt)=>{try{localStorage.setItem(k,JSON.stringify(txt))}catch{}};if(!gAK()){setNudge(fbText);cache(fbText);return}
 // Show the local insight instantly, then silently upgrade with the AI one if/when it arrives.
@@ -2120,7 +2126,7 @@ function LASView({data,persist,onClose}){
   const accruedInt=daysSinceLoan!=null?dailyInt*daysSinceLoan:null;
   const UPAL=[c.mt,"#7FB8FF","#C9A6FF",c.gd,"#FF9F6B","#5EC8C8",c.co,"#F49BD0"];
   const usageDonut=[...usage.map((u,i)=>({value:Number(u.amount)||0,color:UPAL[i%UPAL.length],label:u.label})).filter(d=>d.value>0),...(remaining>0?[{value:remaining,color:c.sf2,label:"Unallocated"}]:[])];
-  const[chargesOpen,sChargesOpen]=useState(false);
+  const[chargesOpen,sChargesOpen]=useState(()=>gSec("lasCharges",false));
   const[uOpen,sUOpen]=useState(false);
   const[uLabel,sULabel]=useState(""),[uAmt2,sUAmt]=useState(""),[uInv,sUInv]=useState(false),[uCur,sUCur]=useState(""),[uNote,sUNote]=useState("");
   const[noteTxt,sNoteTxt]=useState("");
@@ -2293,7 +2299,7 @@ function LASView({data,persist,onClose}){
       ]})})}),
     ]}),
     (totalCharges>0||procFee>0||gstPct>0)&&o("div",{style:cardS,children:[
-      t("button",{onClick:()=>sChargesOpen(v=>!v),className:"w100 tl act98 trt",style:{display:"block",background:"transparent",border:"none",padding:0,cursor:"pointer"},children:o("div",{className:"f ia jb",children:[o("span",{className:"f ia",style:{gap:8},children:[t("span",{children:"💳"}),t("span",{style:{fontSize:13,fontWeight:600,color:c.tx},children:"Total charges to date"})]}),o("span",{className:"f ia",style:{gap:8},children:[t("span",{style:{fontFamily:F.mo,fontSize:15,fontWeight:700,color:c.gd},children:fm(totalCharges,currency)}),t("span",{style:{fontFamily:F.mo,fontSize:11,color:c.tm},children:chargesOpen?"▾":"▸"})]})]})}),
+      t("button",{onClick:()=>sChargesOpen(v=>{const nv=!v;sSec("lasCharges",nv);return nv}),className:"w100 tl act98 trt",style:{display:"block",background:"transparent",border:"none",padding:0,cursor:"pointer"},children:o("div",{className:"f ia jb",children:[o("span",{className:"f ia",style:{gap:8},children:[t("span",{children:"💳"}),t("span",{style:{fontSize:13,fontWeight:600,color:c.tx},children:"Total charges to date"})]}),o("span",{className:"f ia",style:{gap:8},children:[t("span",{style:{fontFamily:F.mo,fontSize:15,fontWeight:700,color:c.gd},children:fm(totalCharges,currency)}),t("span",{style:{fontFamily:F.mo,fontSize:11,color:c.tm},children:chargesOpen?"▾":"▸"})]})]})}),
       chargesOpen&&o("div",{style:{marginTop:11,paddingTop:11,borderTop:`1px solid ${c.brs}`,display:"flex",flexDirection:"column",gap:8},children:[
         o("div",{className:"f ia jb",children:[t("span",{style:{fontFamily:F.mo,fontSize:10.5,color:c.tm},children:"Processing / documentation"}),t("span",{style:{fontFamily:F.mo,fontSize:11.5,color:c.td},children:fm(procFee,currency)})]}),
         o("div",{className:"f ia jb",children:[t("span",{style:{fontFamily:F.mo,fontSize:10.5,color:c.tm},children:"Pledge fees · "+holdings.length+"×"+fm(scripFee,currency)}),t("span",{style:{fontFamily:F.mo,fontSize:11.5,color:c.td},children:fm(pledgeFees,currency)})]}),
@@ -2399,7 +2405,7 @@ function DebtPlan({data,persist,onClose}){
 function BudgetBlock({data}){const{expenses,budget,budgetPeriod,currency,monthStartDay=1}=data;const now=new Date();const st=budgetPeriod==="weekly"?ws():budgetPeriod==="yearly"?ys():ps(now,monthStartDay);const en=budgetPeriod==="weekly"?st+7*864e5:budgetPeriod==="yearly"?new Date(now.getFullYear()+1,0,1).getTime():mse(now.getFullYear(),now.getMonth(),monthStartDay);const sp=useMemo(()=>expenses.filter(e=>e.type==="expense"&&e.date>=st&&e.date<en).reduce((s,e)=>s+e.amount,0),[expenses,st,en]);const reimb=useMemo(()=>expenses.filter(e=>e.type==="expense"&&e.date>=st&&e.date<en&&e.reimbursedBy).reduce((s,e)=>s+(e.reimbursedAmount??e.amount),0),[expenses,st,en]);const netSp=Math.max(0,sp-reimb);const re=budget?budget-netSp:null,barPct=budget?Math.min(100,(netSp/budget)*100):0,realPct=budget?Math.round((netSp/budget)*100):0,ov=budget&&netSp>budget;const dot=ov?c.co:c.ac;
 const isMonthly=budgetPeriod!=="weekly"&&budgetPeriod!=="yearly";
 const weekRows=useMemo(()=>{if(!isMonthly)return null;const wks=monthWeeks(st,en);const nowTs=Date.now();const todayS=ds(new Date());const remDays=Math.max(1,Math.round((en-todayS)/864e5));const remBudget=budget!=null?budget-netSp:null;const perDay=remBudget!=null?Math.max(0,remBudget)/remDays:null;return wks.map(w=>{const spent=expenses.filter(e=>e.type==="expense"&&e.date>=w.s&&e.date<w.e).reduce((s,e)=>s+netAmt(e),0);const days=Math.round((w.e-w.s)/864e5);const state=w.e<=nowTs?"past":(w.s<=nowTs&&nowTs<w.e?"current":"future");const left=perDay!=null?perDay*days:null;const sd=new Date(w.s),ed=new Date(w.e-864e5);const range=sd.toLocaleDateString("en-US",{month:"short",day:"numeric"})+(days>1?"–"+ed.toLocaleDateString("en-US",{day:"numeric"}):"");return{wk:w.wk,range,spent,left,state}})},[expenses,st,en,isMonthly,budget,netSp]);
-const[budOpen,sBudOpen]=useState(()=>{try{return JSON.parse(localStorage.getItem("home-budget-open"))||false}catch{return false}});const toggleBud=()=>{const nv=!budOpen;sBudOpen(nv);try{localStorage.setItem("home-budget-open",JSON.stringify(nv))}catch{}};
+const[budOpen,sBudOpen]=useState(()=>gSec("budget",false));const toggleBud=()=>{sBudOpen(v=>{const nv=!v;sSec("budget",nv);return nv})};
 return o("div",{style:{background:c.sfg,borderRadius:16,border:`1px solid ${ov?c.co+"50":c.brs}`,overflow:"hidden",marginBottom:10},children:[
   o("div",{style:{padding:"12px 16px 10px",borderBottom:budOpen?`1px solid ${c.brs}`:"none",background:`linear-gradient(135deg,${dot}12 0%,transparent 60%)`},children:[
     t("button",{onClick:toggleBud,"aria-expanded":budOpen,className:"w100 tl act98 trt",style:{display:"block",background:"transparent",border:"none",padding:0,cursor:"pointer"},children:o("div",{className:"f ia jb",children:[
@@ -3627,8 +3633,8 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
   const[entryFor,sEntryFor]=useState(null);const[editEntryId,sEditEntryId]=useState(null);const[eKind,sEKind]=useState("gave");const[eAmt,sEAmt]=useState("");const[eNote,sENote]=useState("");const[eDate,sEDate]=useState("");const[ePhotos,sEPhotos]=useState([]);const[gallery,sGallery]=useState(null);const photoRef=useRef(null);
   const[editP,sEditP]=useState(null);const[edName,sEdName]=useState("");const[edNote,sEdNote]=useState("");const[edDue,sEdDue]=useState("");const[edPhoto,sEdPhoto]=useState(null);const edPhotoRef=useRef(null);
   const[delP,sDelP]=useState(null);
-  const[settledCollapsed,sSettledCollapsed]=useState(()=>{try{const v=localStorage.getItem("ld-settled-collapsed");return v===null?true:JSON.parse(v)}catch{return true}});
-  useEffect(()=>{try{localStorage.setItem("ld-settled-collapsed",JSON.stringify(settledCollapsed))}catch{}},[settledCollapsed]);
+  const[settledCollapsed,sSettledCollapsed]=useState(()=>!gSec("ldSettled",false));
+  useEffect(()=>{sSec("ldSettled",!settledCollapsed)},[settledCollapsed]);
   const entryPhotoSrc=usePhotoSrc(ePhotos);
   const addAvatarSrc=usePhotoSrc(pPhoto?[pPhoto]:[]);
   const editAvatarSrc=usePhotoSrc(edPhoto?[edPhoto]:[]);
@@ -5170,7 +5176,7 @@ const pendReimb=useMemo(()=>expenses.filter(e=>e.reimbursable&&!e.reimbursedBy&&
 const doneReimb=useMemo(()=>expenses.filter(e=>e.reimbursable&&e.reimbursedBy&&e.type==="expense"&&e.date>=st).sort((a,b)=>(b.reimbursedAt||b.date)-(a.reimbursedAt||a.date)),[expenses,st]);
 const ins=useMemo(()=>insights(expenses,monthStartDay,currency),[expenses,monthStartDay,currency]);
 const[secQ,sSecQ]=useState("");
-const[reimbCollapsed,sReimbCollapsed]=useState(()=>{try{const v=localStorage.getItem("stsec-reimb-collapsed");return v===null?true:JSON.parse(v)}catch{return true}});
+const[reimbCollapsed,sReimbCollapsed]=useState(()=>!gSec("statsReimb",false));
 const[reimbTab,sReimbTab]=useState("pending");
 const[editReimbE,sEditReimbE]=useState(null);
 const saveReimbDate=(exp,newTs)=>{persist({expenses:data.expenses.map(x=>{if(x.id===exp.id)return{...x,reimbursedAt:newTs};if(x.id===exp.reimbursedBy)return{...x,date:newTs};return x;})});sEditReimbE(null);};
@@ -5193,7 +5199,7 @@ return o("div",{style:{padding:"8px 24px 0"},className:"st",children:[
     q2&&secMatches.length===0&&t("div",{style:{marginTop:6,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 14px",color:c.tm,fontSize:12},children:"No matching section"}),
   ]}),
   (pendReimb.length>0||doneReimb.length>0)&&(()=>{const activeList=reimbTab==="done"?doneReimb:pendReimb;const headTotal=activeList.reduce((s,e)=>s+e.amount,0);return o("div",{id:"stsec-reimb",style:{marginTop:20,background:c.sfg,borderRadius:18,border:`1px solid ${c.ac}30`,padding:18},children:[
-    o("div",{className:"f ib jb",style:{marginBottom:reimbCollapsed?0:12,cursor:"pointer"},onClick:()=>{const nv=!reimbCollapsed;sReimbCollapsed(nv);try{localStorage.setItem("stsec-reimb-collapsed",JSON.stringify(nv))}catch{}},children:[
+    o("div",{className:"f ib jb",style:{marginBottom:reimbCollapsed?0:12,cursor:"pointer"},onClick:()=>{const nv=!reimbCollapsed;sReimbCollapsed(nv);sSec("statsReimb",!nv)},children:[
       o("div",{className:"f ia",style:{gap:6},children:[t("span",{style:{width:8,height:8,borderRadius:999,background:c.co,display:"inline-block"}}),t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:"REIMBURSEMENT EXPENSES"}),t("span",{style:{fontFamily:F.mo,fontSize:11,color:c.tm,marginLeft:4},children:reimbCollapsed?"▶":"▼"})]}),
       t("span",{style:{fontFamily:F.mo,fontSize:13,fontWeight:600,color:c.ac},children:fm(headTotal,currency)})
     ]}),
@@ -7183,7 +7189,7 @@ return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
       ]}),
 ]});
 }
-function Settings({data,persist,onClose,onBackup,onCategories,onView,theme,onSetTheme}){const{budget,budgetPeriod,currency,monthStartDay,financeProfile}=data;const fp=financeProfile||{};const[b,sB]=useState(budget==null?"":String(budget));const[bp,sBp]=useState(budgetPeriod||"monthly");const[cu,sCu]=useState(currency||"₹");const[ms,sMs]=useState(monthStartDay||1);const[ak,sAk]=useState(gAK()||"");const[show,sShow]=useState(false);const[prov,sPr]=useState(gProv());const[mdl2,sMdl2]=useState(gMdl()||"");const[aiMode,sAiMode]=useState(gAIMode());const[fz,sFz]=useState(data.fontSize||"medium");const[at,sAt]=useState(data.alertThreshold!=null?String(data.alertThreshold):"");
+function Settings({data,persist,onClose,onBackup,onCategories,onView,theme,onSetTheme}){const{budget,budgetPeriod,currency,monthStartDay,financeProfile}=data;const fp=financeProfile||{};const[b,sB]=useState(budget==null?"":String(budget));const[bp,sBp]=useState(budgetPeriod||"monthly");const[cu,sCu]=useState(currency||"₹");const[ms,sMs]=useState(monthStartDay||1);const[ak,sAk]=useState(gAK()||"");const[show,sShow]=useState(false);const[prov,sPr]=useState(gProv());const[mdl2,sMdl2]=useState(gMdl()||"");const[aiMode,sAiMode]=useState(gAIMode());const[fz,sFz]=useState(data.fontSize||"medium");const[at,sAt]=useState(data.alertThreshold!=null?String(data.alertThreshold):"");const[secSt,sSecSt]=useState(()=>Object.fromEntries(SEC_META.map(s=>[s.id,gSec(s.id,false)])));
 const[showResetCur,sShowResetCur]=useState(false);
 const[mEn,sMEn]=useState(data.morningEnabled||false);const[mTime,sMTime]=useState(data.morningTime||"08:00");const[eEn,sEEn]=useState(data.eveningEnabled??(data.reminderEnabled||false));const[eTime,sETime]=useState(data.eveningTime||data.reminderTime||"21:00");const[notifPerm,sNotifPerm]=useState(typeof Notification!=='undefined'?Notification.permission:'unsupported');
 const fpx=data.fontPrefs||{};
@@ -7230,6 +7236,14 @@ return o("div",{style:{padding:"8px 24px 104px"},className:"st",children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:12},children:"TEXT SIZE"}),
     t("div",{className:"g g3",style:{gap:6},children:["small","medium","large"].map(sz=>t("button",{key:sz,onClick:()=>sFz(sz),className:"act95 tr",style:{padding:"10px 0",background:fz===sz?c.sf3:c.sf2,border:`1px solid ${fz===sz?c.ac:c.brs}`,borderRadius:9,fontSize:sz==="small"?11:sz==="large"?15:13,color:fz===sz?c.tx:c.td,textTransform:"capitalize"},children:sz}))}),
     t("div",{style:{fontSize:11,color:c.tm,marginTop:8,textAlign:"center"},children:"Save to apply · affects entire app"}),
+  ]}),
+  o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
+    t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:6},children:"SECTIONS"}),
+    t("div",{style:{fontSize:11.5,color:c.tm,marginBottom:6,lineHeight:1.5},children:"Set how each collapsible section opens by default. Applies next time you open that screen; you can still tap a section's arrow anytime."}),
+    ...SEC_META.map((s,i)=>o("div",{key:s.id,className:"f ia jb",style:{gap:10,padding:"9px 0",borderTop:`1px solid ${c.brs}`},children:[
+      o("div",{className:"minw0",children:[t("div",{style:{fontSize:13,color:c.tx},children:s.label}),t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,marginTop:2,letterSpacing:.3},children:s.grp})]}),
+      o("div",{className:"f",style:{gap:3,padding:3,background:c.sf2,borderRadius:9,border:`1px solid ${c.brs}`,flexShrink:0},children:[["Min",false],["Max",true]].map(([lb,val])=>{const on=!!secSt[s.id]===val;return t("button",{key:lb,onClick:()=>{sSec(s.id,val);sSecSt(m=>({...m,[s.id]:val}))},className:"act95 tr",style:{padding:"6px 13px",background:on?c.ac:"transparent",color:on?"#0a0a0a":c.td,border:"none",borderRadius:7,fontSize:11,fontWeight:on?700:500},children:lb})})}),
+    ]})),
   ]}),
   o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:14},children:"THEME"}),
