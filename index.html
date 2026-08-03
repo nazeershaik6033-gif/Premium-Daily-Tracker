@@ -766,8 +766,12 @@ async function aiSuggestSubs(label,existing){
   const usr=`Category: "${label}". Current subcategories: ${JSON.stringify(existing||[])}. Improve & expand.`;
   const r=await cAPI({system:sys,max_tokens:400,messages:[{role:"user",content:usr}]});
   const txt=(r.content&&r.content[0]&&r.content[0].text)||"";
-  const m=txt.match(/\[[\s\S]*\]/);
-  const arr=JSON.parse(m?m[0]:txt);
+  let s=txt.replace(/<think>[\s\S]*?<\/think>/gi,"").replace(/<thinking>[\s\S]*?<\/thinking>/gi,"");
+  const fence=s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if(fence)s=fence[1];
+  const m=s.match(/\[[\s\S]*\]/);
+  let arr;
+  try{arr=JSON.parse(m?m[0]:s)}catch{throw new Error("AI returned an unexpected format — try again.")}
   if(!Array.isArray(arr))throw new Error("AI returned an unexpected format.");
   return[...new Set(arr.map(s=>String(s).trim()).filter(Boolean))];
 }
