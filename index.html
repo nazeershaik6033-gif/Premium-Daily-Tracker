@@ -3059,9 +3059,15 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
       let match=null;
       for(const p of pool){
         if(p.used)continue;
-        const amtOk=Math.abs(p.e.amount-tx.amount)<=0.01;
+        const cmpAmt=p.e.splitId?(p.e.splitTotal??p.e.amount):p.e.amount;
+        const amtOk=Math.abs(cmpAmt-tx.amount)<=0.01;
         const dayDiff=Math.abs(ds(new Date(p.e.date))-ds(new Date(tx.date)))/864e5;
-        if(amtOk&&dayDiff<=2){p.used=true;match=p.e;break}
+        if(amtOk&&dayDiff<=2){
+          match=p.e;
+          if(p.e.splitId)for(const p2 of pool){if(p2.e.splitId===p.e.splitId)p2.used=true}
+          else p.used=true;
+          break;
+        }
       }
       return{tx,match};
     });
@@ -5393,7 +5399,7 @@ const billGuess=(!iI&&mop==="account"&&onCardPayment)?cardBillGuess({type:"expen
 const billLikely=billGuess.match&&ccCards.length>0&&!isCardBill&&!split;
 const effPayCard=payCardId||billGuess.cardId||(ccCards[0]&&ccCards[0].id)||null;
 const recAsPay=()=>{if(!effPayCard||!aId||!(ev2>0))return;onCardPayment({cardId:effPayCard,accountId:aId,amount:ev2,date:dt})};
-return o("div",{className:"fi",style:{paddingTop:48,paddingBottom:32},children:[
+return o(Fragment,{children:[o("div",{className:"fi",style:{paddingTop:48,paddingBottom:32},children:[
   t(SH,{title:t("em",{children:iE?(iI?"Edit income":"Edit expense"):(iI?"New income":"New expense")}),onBack:onCancel}),
   !iE&&t("div",{style:{padding:"0 24px",marginBottom:20},children:o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`},children:[
     o("button",{onClick:()=>{sTp("expense");sCt("food");sSb(null)},className:"act95 tr f ia jc",style:{flex:1,padding:"10px 0",gap:6,background:iI?"transparent":c.sf3,color:iI?c.td:c.co,border:iI?"1px solid transparent":`1px solid ${c.co}50`,borderRadius:9,fontSize:13,fontWeight:iI?400:600},children:[t(ADR,{size:14})," Expense"]}),
@@ -5570,11 +5576,12 @@ return o("div",{className:"fi",style:{paddingTop:48,paddingBottom:32},children:[
     ]}),
   ]}),
   t("div",{style:{padding:"0 24px",marginTop:billLikely?12:24},children:t("button",{disabled:!canSave,onClick:()=>{split?svSplit():sv()},className:"w100 act98 tr",style:{padding:"16px 0",background:canSave?(billLikely?"transparent":(iI?c.mt:c.ac)):c.sf2,color:canSave?(billLikely?c.td:"#0a0a0a"):c.tm,borderRadius:14,fontWeight:600,fontSize:15,letterSpacing:.3,border:billLikely?`1px solid ${c.brs}`:"none"},children:!canSave?(split&&ev2>0?(remaining<0?"Split exceeds the total":(remaining>0?`${fm(remaining,acc?.currency||currency)} left to assign`:"Add at least 2 categories")):"Enter an amount"):(split?`Save split · ${lines.length} entries`:(iE?"Save changes":(billLikely?"Save as expense anyway":(rc?"Save & start recurring":(iI?"Save income":"Save expense")))))})}),
+]}),
   splitPickFor&&(()=>{const q2=splitCatQ.trim().toLowerCase();const fc=q2?cs.filter(x=>x.label.toLowerCase().includes(q2)||x.emoji.includes(splitCatQ.trim())):cs;return t(Sht,{onClose:()=>{sSplitPickFor(null);sSplitCatQ("")},children:o(Fragment,{children:[
     t("div",{style:{fontFamily:c.hf,fontSize:18,fontWeight:700,color:c.tx,marginBottom:14},children:"Pick a category"}),
     o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${splitCatQ?c.ac+"66":c.brs}`,borderRadius:10,padding:"9px 12px",marginBottom:12},children:[t(Srch,{size:14,color:splitCatQ?c.ac:c.tm}),t("input",{value:splitCatQ,onChange:e=>sSplitCatQ(e.target.value),placeholder:"Search categories…",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:13.5,fontFamily:'var(--tf)',minWidth:0}}),splitCatQ&&t("button",{onClick:()=>sSplitCatQ(""),style:{background:"transparent",border:"none",color:c.tm,display:"flex",flexShrink:0},children:t(X,{size:13})})]}),
     fc.length===0?t("div",{style:{padding:"20px 0",textAlign:"center",color:c.tm,fontSize:12.5},children:`No categories match "${splitCatQ.trim()}"`}):t("div",{className:"g g3",style:{gap:8,maxHeight:"52vh",overflowY:"auto"},children:fc.map(x=>o("button",{key:x.id,onClick:()=>{updLine(splitPickFor,{cat:x.id});sSplitPickFor(null);sSplitCatQ("")},className:"act95 tr f fc ia",style:{gap:4,padding:"12px 0",background:c.sf,border:`1px solid ${c.brs}`,borderRadius:12},children:[t("span",{style:{fontSize:20},children:x.emoji}),t("span",{style:{fontSize:10.5,color:c.td,fontWeight:400,textAlign:"center",lineHeight:1.2},children:x.label})]}))})
-  ]})})})(),
+  ]})})})()
 ]})}
 function KV({label,value,full}){return o("div",{style:full?{gridColumn:"1 / -1"}:{},children:[t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:2},children:label.toUpperCase()}),t("div",{className:"tru",style:{fontSize:14},children:value})]})}
 
@@ -7230,16 +7237,36 @@ return o("div",{style:{padding:"8px 24px 32px"},className:"st",children:[
 }
 function Settings({data,persist,onClose,onBackup,onCategories,onView,theme,onSetTheme}){const{budget,budgetPeriod,currency,monthStartDay,financeProfile}=data;const fp=financeProfile||{};const[b,sB]=useState(budget==null?"":String(budget));const[bp,sBp]=useState(budgetPeriod||"monthly");const[cu,sCu]=useState(currency||"₹");const[ms,sMs]=useState(monthStartDay||1);const[ak,sAk]=useState(gAK()||"");const[show,sShow]=useState(false);const[prov,sPr]=useState(gProv());const[mdl2,sMdl2]=useState(gMdl()||"");const[aiMode,sAiMode]=useState(gAIMode());const[fz,sFz]=useState(data.fontSize||"medium");const[at,sAt]=useState(data.alertThreshold!=null?String(data.alertThreshold):"");const[secSt,sSecSt]=useState(()=>Object.fromEntries(SEC_META.map(s=>[s.id,gSec(s.id,false)])));
 const[showResetCur,sShowResetCur]=useState(false);
+const[stgQ,sStgQ]=useState("");
 const[mEn,sMEn]=useState(data.morningEnabled||false);const[mTime,sMTime]=useState(data.morningTime||"08:00");const[eEn,sEEn]=useState(data.eveningEnabled??(data.reminderEnabled||false));const[eTime,sETime]=useState(data.eveningTime||data.reminderTime||"21:00");const[notifPerm,sNotifPerm]=useState(typeof Notification!=='undefined'?Notification.permission:'unsupported');
 const fpx=data.fontPrefs||{};
 const[numFont,sNumFont]=useState(fpx.numFont||'sfmono');
 const[numSize,sNumSize]=useState(fpx.numSize||14);
 const[txtFont,sTxtFont]=useState(fpx.txtFont||'system');const[inc,sInc]=useState(String(fp.monthlyIncome||""));const[fxE,sFxE]=useState(String(fp.fixedExpenses||""));const[spg,sSpg]=useState(String(fp.savingsGoalPct||"20"));const[efm,sEfm]=useState(String(fp.emergencyFundMonths||"6"));const[dbt,sDbt]=useState(String(fp.totalDebt||""));const save=()=>{persist({budget:parseFloat(b)||null,budgetPeriod:bp,currency:cu,monthStartDay:parseInt(ms)||1,fontSize:fz,alertThreshold:parseFloat(at)||null,fontPrefs:{numFont,numSize,txtFont},morningEnabled:mEn,morningTime:mTime,eveningEnabled:eEn,eveningTime:eTime,reminderEnabled:eEn,reminderTime:eTime,financeProfile:{monthlyIncome:parseFloat(inc)||null,fixedExpenses:parseFloat(fxE)||null,savingsGoalPct:parseFloat(spg)||20,emergencyFundMonths:parseFloat(efm)||6,totalDebt:parseFloat(dbt)||null}});sAK(ak.trim()||null);sProv(prov);sMdl(mdl2.trim()||null);if((mEn||eEn)&&notifPerm==='granted'){try{navigator.serviceWorker?.ready.then(reg=>reg.periodicSync?.register('expense-reminder',{minInterval:86400000}).catch(()=>{}))}catch{}}onClose()};
 if(showResetCur)return t(ResetCurrencies,{data,persist,onClose:()=>sShowResetCur(false)});
+const stgWords=stgQ.trim().toLowerCase().split(/\s+/).filter(Boolean);
+const stgHit=(...kws)=>{if(!stgWords.length)return true;const hay=kws.join(" ").toLowerCase();return stgWords.every(w=>hay.includes(w))};
+const showHowTo=stgHit("how to use","guide","tips","feature tour","help");
+const showAI=stgHit("ai assistant","provider","api key","model","claude","anthropic","openai","deepseek","gemini","openrouter");
+const showBudget=stgHit("budget","monthly","weekly","yearly","limit","amount");
+const showCurrency=stgHit("currency","inr","usd","rupee","dollar","reset currencies");
+const showAlert=stgHit("big expense alert","threshold","upcoming expense");
+const showTextSize=stgHit("text size","small","medium","large","font size");
+const showSections=stgHit("sections","minimise","maximise","minimize","maximize","collapse","expand","home","stats","lending diary","las tracker","reimbursement");
+const showTheme=stgHit("theme","luxe","navy","light","dark","mode","color","colour");
+const showFonts=stgHit("number font","number size","text font","amounts","labels","sf mono");
+const showMonthStart=stgHit("month starts on day","pay cycle","calendar month");
+const showNotif=stgHit("notifications","reminder","morning quote","evening log","push","alerts");
+const showBackup=stgHit("backup","restore","google drive","schedule","auto download","json");
+const showAppUpdates=stgHit("app updates","force reload","cache","refresh","service worker");
+const showFinance=stgHit("finance profile","income","fixed expenses","savings goal","emergency fund","debt");
+const stgNoneVisible=stgWords.length>0&&![showHowTo,showAI,showBudget,showCurrency,showAlert,showTextSize,showSections,showTheme,showFonts,showMonthStart,showNotif,showBackup,showAppUpdates,showFinance].some(Boolean);
 return o("div",{style:{padding:"8px 24px 104px"},className:"st",children:[
   t(SH,{title:t("em",{children:"Settings"}),onBack:onClose,right:t("button",{onClick:save,className:"act95 trt",style:{padding:"8px 14px",background:c.ac,color:"#0a0a0a",borderRadius:10,fontSize:12,fontWeight:600,border:"none"},children:"Save"})}),
-  o("button",{onClick:()=>onView&&onView("howToUse"),className:"w100 f ia trc act95",style:{gap:12,padding:"14px 18px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:18,marginBottom:12},children:[t("div",{style:{width:36,height:36,borderRadius:10,background:c.ac+"20",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(Help,{size:20,color:c.ac})}),o("div",{className:"f1 tl",children:[t("div",{style:{fontSize:14,color:c.tx,fontWeight:500},children:"How to use"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:"Guide, tips, and feature tour"})]}),t(CR,{size:14,color:c.tm})]}),
-  o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
+  o("div",{style:{marginBottom:14},children:[o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${stgQ?c.ac+"66":c.brs}`,borderRadius:12,padding:"10px 14px"},children:[t(Srch,{size:14,color:stgQ?c.ac:c.tm}),t("input",{value:stgQ,onChange:e=>sStgQ(e.target.value),placeholder:"Search settings…",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:13.5,fontFamily:'var(--tf)',minWidth:0}}),stgQ&&t("button",{onClick:()=>sStgQ(""),style:{background:"transparent",border:"none",color:c.tm,display:"flex",flexShrink:0},children:t(X,{size:13})})]})]}),
+  stgNoneVisible&&t("div",{style:{padding:"20px 0",textAlign:"center",color:c.tm,fontSize:13},children:`No settings match "${stgQ.trim()}"`}),
+  showHowTo&&o("button",{onClick:()=>onView&&onView("howToUse"),className:"w100 f ia trc act95",style:{gap:12,padding:"14px 18px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:18,marginBottom:12},children:[t("div",{style:{width:36,height:36,borderRadius:10,background:c.ac+"20",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(Help,{size:20,color:c.ac})}),o("div",{className:"f1 tl",children:[t("div",{style:{fontSize:14,color:c.tx,fontWeight:500},children:"How to use"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:"Guide, tips, and feature tour"})]}),t(CR,{size:14,color:c.tm})]}),
+  showAI&&o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:12},children:"AI ASSISTANT"}),
     t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:8},children:"HOW TO USE AI"}),
     o("div",{className:"f",style:{gap:4,padding:4,background:c.sf2,borderRadius:12,border:`1px solid ${c.brs}`,marginBottom:14},children:[{id:"api",l:"🔑 API key"},{id:"claudeapp",l:"💬 Claude app (free)"}].map(m=>{const on=aiMode===m.id;return t("button",{key:m.id,onClick:()=>{sAiMode(m.id);sAIMode(m.id)},className:"act95 tr f1",style:{padding:"9px 0",background:on?c.ac:"transparent",color:on?"#0a0a0a":c.td,borderRadius:9,fontSize:12.5,fontWeight:on?700:400,border:"none"},children:m.l})})}),
@@ -7256,27 +7283,27 @@ return o("div",{style:{padding:"8px 24px 104px"},className:"st",children:[
     t("input",{value:mdl2,onChange:e=>sMdl2(e.target.value),placeholder:(AI_PROVIDERS[prov]||AI_PROVIDERS.anthropic).def,style:{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${c.brs}`,background:c.sf2,color:c.tx,fontSize:13,fontFamily:F.mo,boxSizing:"border-box",outline:"none",marginBottom:8}}),
     t("div",{style:{fontSize:11,color:c.tm,lineHeight:1.5},children:"Key stored locally only · Photo/bill scan works on Anthropic, OpenAI & OpenRouter (auto-routes images to a vision model); DeepSeek is text-only"})
   ]}),
-  o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
+  showBudget&&o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:14},children:"BUDGET"}),
     o("div",{className:"f ia",style:{gap:8,background:c.sf2,borderRadius:11,border:`1px solid ${c.brs}`,padding:"10px 12px",marginBottom:10},children:[t("span",{style:{color:c.td,fontFamily:F.mo,fontSize:16},children:cu}),t("input",{type:"text",inputMode:"decimal",value:b,onChange:e=>sB(e.target.value.replace(/[^\d.]/g,"")),placeholder:"0",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:16,fontFamily:F.mo}})]}),
     t("div",{className:"g g3",style:{gap:6},children:["weekly","monthly","yearly"].map(p=>t("button",{key:p,onClick:()=>sBp(p),className:"act95 tr",style:{padding:"8px 0",background:bp===p?c.sf3:c.sf2,border:`1px solid ${bp===p?c.ac:c.brs}`,borderRadius:9,fontSize:12,color:bp===p?c.tx:c.td,textTransform:"capitalize"},children:p}))}),
   ]}),
-  o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
+  showCurrency&&o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:12},children:"CURRENCY"}),t("div",{className:"g g5",style:{gap:6},children:CUR.map(x=>t("button",{key:x,onClick:()=>sCu(x),style:{padding:"10px 0",background:cu===x?c.sf3:c.sf2,border:`1px solid ${cu===x?c.ac:c.brs}`,borderRadius:10,color:c.tx,fontFamily:F.mo,fontSize:14,fontWeight:500},children:x}))}),
     t("div",{style:{fontSize:11,color:c.tm,marginTop:8,textAlign:"center"},children:"Default for all new entries and smart paste"}),
     t("button",{onClick:()=>sShowResetCur(true),className:"act90 trt w100",style:{marginTop:12,padding:"11px 14px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,color:c.td,fontFamily:F.mo,fontSize:12,letterSpacing:.5,display:"flex",alignItems:"center",justifyContent:"space-between"},children:[t("span",{children:"RESET ALL CURRENCIES TO ₹"}),t("span",{style:{color:c.ac,fontSize:14},children:"→"})]}),
   ]}),
-  t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:8,marginTop:20},children:"BIG EXPENSE ALERT"}),
-  o("div",{style:{background:c.sfg,borderRadius:14,padding:16,border:`1px solid ${c.brs}`,marginBottom:4},children:[
+  showAlert&&t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:8,marginTop:20},children:"BIG EXPENSE ALERT"}),
+  showAlert&&o("div",{style:{background:c.sfg,borderRadius:14,padding:16,border:`1px solid ${c.brs}`,marginBottom:4},children:[
     t("div",{style:{fontSize:13,color:c.td,marginBottom:10},children:"Alert when upcoming expense exceeds:"}),
     t("input",{value:at,onChange:e=>sAt(e.target.value),type:"number",placeholder:"e.g. 10000 (leave blank to disable)",style:{width:"100%",padding:"10px 12px",borderRadius:10,border:`1px solid ${c.brs}`,background:c.sf2,color:c.tx,fontSize:14,fontFamily:F.mo,boxSizing:"border-box",outline:"none"}}),
   ]}),
-  o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
+  showTextSize&&o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:12},children:"TEXT SIZE"}),
     t("div",{className:"g g3",style:{gap:6},children:["small","medium","large"].map(sz=>t("button",{key:sz,onClick:()=>sFz(sz),className:"act95 tr",style:{padding:"10px 0",background:fz===sz?c.sf3:c.sf2,border:`1px solid ${fz===sz?c.ac:c.brs}`,borderRadius:9,fontSize:sz==="small"?11:sz==="large"?15:13,color:fz===sz?c.tx:c.td,textTransform:"capitalize"},children:sz}))}),
     t("div",{style:{fontSize:11,color:c.tm,marginTop:8,textAlign:"center"},children:"Save to apply · affects entire app"}),
   ]}),
-  o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
+  showSections&&o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:6},children:"SECTIONS"}),
     t("div",{style:{fontSize:11.5,color:c.tm,marginBottom:6,lineHeight:1.5},children:"Set how each collapsible section opens by default. Applies next time you open that screen; you can still tap a section's arrow anytime."}),
     ...SEC_META.map((s,i)=>o("div",{key:s.id,className:"f ia jb",style:{gap:10,padding:"9px 0",borderTop:`1px solid ${c.brs}`},children:[
@@ -7284,7 +7311,7 @@ return o("div",{style:{padding:"8px 24px 104px"},className:"st",children:[
       o("div",{className:"f",style:{gap:3,padding:3,background:c.sf2,borderRadius:9,border:`1px solid ${c.brs}`,flexShrink:0},children:[["Min",false],["Max",true]].map(([lb,val])=>{const on=!!secSt[s.id]===val;return t("button",{key:lb,onClick:()=>{sSec(s.id,val);sSecSt(m=>({...m,[s.id]:val}))},className:"act95 tr",style:{padding:"6px 13px",background:on?c.ac:"transparent",color:on?"#0a0a0a":c.td,border:"none",borderRadius:7,fontSize:11,fontWeight:on?700:500},children:lb})})}),
     ]})),
   ]}),
-  o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
+  showTheme&&o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:14},children:"THEME"}),
     t("div",{className:"g g3",style:{gap:8},children:[
       {id:"dark",label:"Luxe",emoji:"👑",desc:"Gold & jewel"},
@@ -7296,7 +7323,7 @@ return o("div",{style:{padding:"8px 24px 104px"},className:"st",children:[
       t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:.3},children:th.desc}),
     ]}))})
   ]}),
-  o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
+  showFonts&&o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
   t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:4},children:"NUMBER FONT"}),
   t("div",{style:{fontSize:11,color:c.tm,marginBottom:12},children:"Font used for amounts & balances"}),
   t("div",{className:"f sx",style:{gap:8,overflowX:"auto",paddingBottom:4},children:FONT_OPT.map(f=>o("button",{key:f.id,onClick:()=>sNumFont(f.id),style:{flexShrink:0,padding:"8px 10px",background:numFont===f.id?c.sf3:c.sf2,border:`1px solid ${numFont===f.id?c.ac:c.brs}`,borderRadius:10,textAlign:"center",minWidth:72,color:numFont===f.id?c.tx:c.td},children:[t("div",{style:{fontFamily:f.f,fontSize:15,fontWeight:500,marginBottom:3,letterSpacing:-0.3},children:"1,234"}),t("div",{style:{fontFamily:F.mo,fontSize:8,letterSpacing:0.5},children:f.l})]}))}),
@@ -7307,10 +7334,10 @@ return o("div",{style:{padding:"8px 24px 104px"},className:"st",children:[
   t("div",{className:"f sx",style:{gap:8,overflowX:"auto",paddingBottom:4},children:FONT_OPT.map(f=>o("button",{key:f.id,onClick:()=>sTxtFont(f.id),style:{flexShrink:0,padding:"8px 10px",background:txtFont===f.id?c.sf3:c.sf2,border:`1px solid ${txtFont===f.id?c.ac:c.brs}`,borderRadius:10,textAlign:"center",minWidth:72,color:txtFont===f.id?c.tx:c.td},children:[t("div",{style:{fontFamily:f.f,fontSize:15,fontWeight:500,marginBottom:3},children:"Aa"}),t("div",{style:{fontFamily:F.mo,fontSize:8,letterSpacing:0.5},children:f.l})]}))}),
   t("div",{style:{fontSize:11,color:c.tm,marginTop:8,textAlign:"center"},children:"Save to apply · affects entire app"}),
   ]}),
-  o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
+  showMonthStart&&o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:12},children:"MONTH STARTS ON DAY"}),t("input",{type:"number",min:"1",max:"28",value:ms,onChange:e=>sMs(e.target.value),style:{width:"100%",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:11,padding:"10px 12px",color:c.tx,fontSize:14,outline:"none",fontFamily:F.mo,textAlign:"center"}}),t("div",{style:{fontSize:11,color:c.tm,marginTop:6,textAlign:"center"},children:"e.g., 1 = calendar month, 25 = pay-cycle month"}),
   ]}),
-  o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
+  showNotif&&o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:14},children:"NOTIFICATIONS & REMINDER"}),
     notifPerm==='unsupported'?t("div",{style:{fontSize:12,color:c.tm,marginBottom:12,padding:"10px 12px",background:c.sf2,borderRadius:10},children:"Notifications not supported in this browser."}):null,
     notifPerm==='denied'&&t("div",{style:{fontSize:12,color:c.ro,marginBottom:12,padding:"10px 12px",background:c.ro+"15",borderRadius:10,border:`1px solid ${c.ro}30`},children:"Notifications are blocked. Enable in browser/OS settings."}),
@@ -7330,6 +7357,7 @@ return o("div",{style:{padding:"8px 24px 104px"},className:"st",children:[
     t("div",{style:{fontSize:10,color:c.tm,marginTop:10,lineHeight:1.5},children:"On iPhone, scheduled alerts can't fire while the app is closed — these show when you open the app, or as live notifications when it's open. Install as a PWA for the best chance of background delivery on Android."}),
   ]}),
   (()=>{const[bkFreq,sBkFreq]=useState(data.backupFreq||"off");const[bkGD,setBkGD]=useState(data.backupGDrive||false);const gdConnected=!!localStorage.getItem("gd_token");const saveBackupSettings=()=>persist({backupFreq:bkFreq,backupGDrive:bkGD});const doManualBackup=async()=>{const json=await buildBackupJSON(data,true);const fname=`expense-backup-${new Date().toISOString().slice(0,10)}.json`;if(gdConnected){try{await gdUpload(json);persist({lastBackupAt:Date.now()});alert("✓ Backed up to Google Drive!")}catch(e){alert("Drive upload failed: "+(e.message||e)+"\n\nTry reconnecting Google Drive.");}}else{const blob=new Blob([json],{type:"application/json"});if(navigator.share&&navigator.canShare&&navigator.canShare({files:[new File([blob],fname,{type:"application/json"})]})){try{await navigator.share({title:"Expense Tracker Backup",files:[new File([blob],fname,{type:"application/json"})]});persist({lastBackupAt:Date.now()});return}catch(e){if(e.name==="AbortError")return}}const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=fname;document.body.appendChild(a);a.click();setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url)},500);persist({lastBackupAt:Date.now()});alert("Backup downloaded (incl. statement PDFs)!")}};const connectGD=()=>{const existing=localStorage.getItem("gd_client_id")||"";const id=prompt("Enter your Google OAuth2 Client ID (Web application type):",existing);if(!id)return;localStorage.setItem("gd_client_id",id.trim());const cid=id.trim();const w=window.open(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${cid}&redirect_uri=${encodeURIComponent(location.origin+location.pathname)}&response_type=token&scope=https://www.googleapis.com/auth/drive.file&prompt=consent`,"_blank","width=500,height=600");const poll=setInterval(()=>{try{if(w&&w.closed){clearInterval(poll);const h=localStorage.getItem("gd_token");if(h)alert("Google Drive connected!")}else if(w){const p=new URLSearchParams(w.location.hash.slice(1));const tk=p.get("access_token");if(tk){localStorage.setItem("gd_token",tk);w.close();clearInterval(poll);persist({backupGDrive:true});alert("Google Drive connected!")}}}catch{}},500)};
+  if(!showBackup)return null;
   return o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:14},children:"BACKUP"}),
     t("div",{style:{fontSize:12,color:c.td,marginBottom:10},children:"Auto-download a JSON backup on a schedule."}),
@@ -7344,12 +7372,12 @@ return o("div",{style:{padding:"8px 24px 104px"},className:"st",children:[
     ]}),
     t("button",{onClick:onBackup,className:"w100 act95 trt f ia jc",style:{gap:8,marginTop:10,padding:"12px 0",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:11,fontSize:13,color:c.tx},children:[t(Dl,{size:14,color:c.ac}),"Backup & Restore →"]}),
   ]})})(),
-  o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
+  showAppUpdates&&o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:"APP UPDATES"}),
     t("div",{style:{fontSize:11,color:c.tm,marginBottom:12,lineHeight:1.5},children:"If a feature you expect isn't showing up — especially on an app installed to your home screen — your device is likely showing a cached copy of an older version. Force reload clears it and re-downloads the latest app."}),
     t("button",{onClick:async()=>{try{if('serviceWorker' in navigator){const regs=await navigator.serviceWorker.getRegistrations();await Promise.all(regs.map(r=>r.unregister()))}}catch(e){}try{if('caches' in window){const keys=await caches.keys();await Promise.all(keys.map(k=>caches.delete(k)))}}catch(e){}const u=new URL(location.href);u.searchParams.set('_r',Date.now());location.href=u.toString()},className:"w100 act95 trt f ia jc",style:{gap:8,padding:"12px 0",background:c.ac,border:"none",borderRadius:11,fontSize:13,fontWeight:600,color:"#0a0a0a"},children:"🔄 Force reload app"}),
   ]}),
-  o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
+  showFinance&&o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:14},children:"FINANCE PROFILE"}),
     t("div",{style:{fontSize:11,color:c.tm,marginBottom:12},children:"Used to compute Financial Health scores on the Tips screen."}),
     o("div",{style:{display:"flex",flexDirection:"column",gap:10},children:[
