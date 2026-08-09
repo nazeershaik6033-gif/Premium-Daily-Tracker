@@ -1241,7 +1241,7 @@ function App(){
   setUsers(usrs);setActiveUser(cu);
   const dk="etp-data-"+cu.id;
   let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],cardStatements:[],bills:[],goals:[],budgetLoans:[],ledger:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},categoryOrder:{expense:[],income:[]},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,thresholdRules:[],expensePlans:[],investmentPlans:[],investments:[],planThreshold:null,monthlyRestrictionLogs:[],openingBalances:[],reminderEnabled:false,reminderTime:"21:00",rules:[],backupFreq:"off",backupGDrive:false,lastBackupAt:0,merchantRules:{},debtPlan:null,las:null,varExpensePlans:{},varIncomePlans:{},varSavingsPlans:{},advStats:{},calculators:{},groceryCategories:GROC_CATS_DEFAULT,priceWatch:PW_DEFAULT,threads:[]};
-  try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,expenses:p.expenses||[],recurring:p.recurring||[],accounts:p.accounts&&p.accounts.length?p.accounts:[DA],profiles:p.profiles||[],cards:p.cards||[],cardStatements:p.cardStatements||[],bills:p.bills||[],goals:p.goals||[],budgetLoans:p.budgetLoans||[],ledger:p.ledger||[],categoryBudgets:p.categoryBudgets||{},customExpenseCategories:p.customExpenseCategories||[],customIncomeCategories:p.customIncomeCategories||[],categoryOverrides:p.categoryOverrides||{},categoryOrder:p.categoryOrder||{expense:[],income:[]},financeProfile:p.financeProfile||null,budget:p.budget??null,budgetPeriod:p.budgetPeriod||"monthly",currency:p.currency||"₹",monthStartDay:p.monthStartDay||1,fontSize:p.fontSize||"medium",upcomingExpenses:p.upcomingExpenses||[],alertThreshold:p.alertThreshold??null,thresholdRules:p.thresholdRules||[],expensePlans:p.expensePlans||[],investmentPlans:p.investmentPlans||[],investments:p.investments||[],planThreshold:p.planThreshold??null,monthlyRestrictionLogs:p.monthlyRestrictionLogs||[],openingBalances:p.openingBalances||[],reminderEnabled:p.reminderEnabled||false,reminderTime:p.reminderTime||"21:00",morningEnabled:p.morningEnabled||false,morningTime:p.morningTime||"08:00",eveningEnabled:p.eveningEnabled??(p.reminderEnabled||false),eveningTime:p.eveningTime||p.reminderTime||"21:00",rules:p.rules||[],backupFreq:p.backupFreq||"off",backupGDrive:p.backupGDrive||false,lastBackupAt:p.lastBackupAt||0,merchantRules:p.merchantRules||{},debtPlan:p.debtPlan||null,las:p.las||null,varExpensePlans:p.varExpensePlans||{},varIncomePlans:p.varIncomePlans||{},varSavingsPlans:p.varSavingsPlans||{},advStats:p.advStats||{},calculators:p.calculators||{},groceryCategories:p.groceryCategories||GROC_CATS_DEFAULT,priceWatch:p.priceWatch||PW_DEFAULT,threads:p.threads||[]};_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[];_catOv=i.categoryOverrides||{};_catOrder=i.categoryOrder||{expense:[],income:[]};_grocCats=i.groceryCategories||GROC_CATS_DEFAULT;
+  try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,expenses:p.expenses||[],recurring:p.recurring||[],accounts:p.accounts&&p.accounts.length?p.accounts:[DA],profiles:p.profiles||[],cards:p.cards||[],cardStatements:p.cardStatements||[],bills:p.bills||[],goals:p.goals||[],budgetLoans:p.budgetLoans||[],ledger:p.ledger||[],categoryBudgets:p.categoryBudgets||{},customExpenseCategories:p.customExpenseCategories||[],customIncomeCategories:p.customIncomeCategories||[],categoryOverrides:p.categoryOverrides||{},categoryOrder:p.categoryOrder||{expense:[],income:[]},financeProfile:p.financeProfile||null,budget:p.budget??null,budgetPeriod:p.budgetPeriod||"monthly",currency:p.currency||"₹",monthStartDay:p.monthStartDay||1,fontSize:p.fontSize||"medium",upcomingExpenses:p.upcomingExpenses||[],alertThreshold:p.alertThreshold??null,thresholdRules:p.thresholdRules||[],expensePlans:p.expensePlans||[],investmentPlans:p.investmentPlans||[],investments:p.investments||[],planThreshold:p.planThreshold??null,monthlyRestrictionLogs:p.monthlyRestrictionLogs||[],openingBalances:p.openingBalances||[],reminderEnabled:p.reminderEnabled||false,reminderTime:p.reminderTime||"21:00",morningEnabled:p.morningEnabled||false,morningTime:p.morningTime||"08:00",eveningEnabled:p.eveningEnabled??(p.reminderEnabled||false),eveningTime:p.eveningTime||p.reminderTime||"21:00",rules:p.rules||[],backupFreq:p.backupFreq||"off",backupGDrive:p.backupGDrive||false,lastBackupAt:p.lastBackupAt||0,merchantRules:p.merchantRules||{},debtPlan:p.debtPlan||null,las:p.las||null,varExpensePlans:p.varExpensePlans||{},varIncomePlans:p.varIncomePlans||{},varSavingsPlans:p.varSavingsPlans||{},advStats:p.advStats||{},calculators:p.calculators||{},incomeTracker:p.incomeTracker||{},groceryCategories:p.groceryCategories||GROC_CATS_DEFAULT,priceWatch:p.priceWatch||PW_DEFAULT,threads:p.threads||[]};_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[];_catOv=i.categoryOverrides||{};_catOrder=i.categoryOrder||{expense:[],income:[]};_grocCats=i.groceryCategories||GROC_CATS_DEFAULT;
   if(i.currency==="₹"){i.accounts=i.accounts.map(a=>a.currency==="$"?{...a,currency:"₹"}:a);const accMap=Object.fromEntries(i.accounts.map(a=>[a.id,a]));i.expenses=i.expenses.map(e=>e.currency==="$"?{...e,currency:accMap[e.accountId]?.currency||i.currency}:e)}
   if(!localStorage.getItem("etp-cash-unlinked")){const cashIds=new Set(i.accounts.filter(a=>a.id==="acc_default"||a.name==="Cash").map(a=>a.id));i.expenses=i.expenses.map(e=>cashIds.has(e.accountId)?{...e,accountId:null}:e);localStorage.setItem("etp-cash-unlinked","1")}}}catch(e){console.error("load",e)}
   if(i.recurring.length>0){const{newExpenses,updatedRecurring}=pr(i.recurring,i.expenses);if(newExpenses.length>0){i.expenses=[...newExpenses,...i.expenses].sort((a,b)=>b.date-a.date);i.recurring=updatedRecurring}}
@@ -7810,7 +7810,10 @@ const AS_DED_PRESETS=[
 const AS_MONTH_MS=2629800000;
 function asFyBounds(a){return[new Date(a,AS_FY_START,1).getTime(),new Date(a+1,AS_FY_START,1).getTime()];}
 function asCyBounds(y){return[new Date(y,0,1).getTime(),new Date(y+1,0,1).getTime()];}
-function ASNum({value,onSave,placeholder,width,prefix,accent}){const[v,sv]=useState(value==null?"":String(value));useEffect(()=>{sv(value==null?"":String(value))},[value]);const commit=()=>{const n=v===""?null:Math.round(parseFloat(v)||0);onSave(n)};return o("div",{className:"f ia",style:{gap:4},children:[prefix&&t("span",{style:{fontFamily:F.mo,fontSize:12,color:c.tm},children:prefix}),t("input",{value:v,inputMode:"decimal",placeholder:placeholder||"0",onChange:e=>sv(e.target.value.replace(/[^\d.]/g,"")),onBlur:commit,onKeyDown:e=>{if(e.key==="Enter")e.target.blur()},style:{width:width||96,background:c.sf2,border:`1px solid ${accent?c.ac:c.brs}`,borderRadius:9,padding:"8px 10px",color:c.tx,fontSize:13,fontFamily:F.mo,textAlign:"right",outline:"none"}})]})}
+// `neg` opts the field into accepting negative numbers (salary deductions etc).
+// A lone "-" is kept while typing so the minus can be entered before the digits.
+const asNumClean=(s,neg)=>{let x=String(s).replace(neg?/[^\d.\-]/g:/[^\d.]/g,"");if(neg){const m=x.startsWith("-");x=(m?"-":"")+x.replace(/-/g,"")}return x};
+function ASNum({value,onSave,placeholder,width,prefix,accent,neg,color,readOnly}){const[v,sv]=useState(value==null?"":String(value));useEffect(()=>{sv(value==null?"":String(value))},[value]);const commit=()=>{if(readOnly)return;const n=(v===""||v==="-")?null:Math.round(parseFloat(v)||0);sv(n==null?"":String(n));onSave(n)};return o("div",{className:"f ia",style:{gap:4},children:[prefix&&t("span",{style:{fontFamily:F.mo,fontSize:12,color:c.tm},children:prefix}),t("input",{value:v,inputMode:neg?"text":"decimal",readOnly:!!readOnly,placeholder:placeholder||"0",onChange:e=>{if(!readOnly)sv(asNumClean(e.target.value,neg))},onBlur:commit,onKeyDown:e=>{if(e.key==="Enter")e.target.blur()},style:{width:width||96,background:readOnly?"transparent":c.sf2,border:`1px solid ${readOnly?"transparent":accent?c.ac:c.brs}`,borderRadius:9,padding:"8px 10px",color:color||c.tx,fontSize:13,fontFamily:F.mo,textAlign:"right",outline:"none"}})]})}
 // report-level exports (summary + transactions) for the Advanced section
 function exportAdvXlsx(label,basis,ctx){const X=window.XLSX;if(!X){alert("Excel library isn't loaded — check your connection and reload.");return}const wb=X.utils.book_new();const summary=[{Metric:"Period",Value:label},{Metric:"Basis",Value:basis==="FY"?"Financial year (Apr–Mar)":"Calendar year (Jan–Dec)"},{Metric:"Total income",Value:Math.round(ctx.grossIncome)},{Metric:"Total spending",Value:Math.round(ctx.grossExpense)},{Metric:"Net savings",Value:Math.round(ctx.netSavings)},{Metric:"Savings rate %",Value:Number(ctx.savingsRate.toFixed(1))},{Metric:"Invested / saved",Value:Math.round(ctx.investTotal)}];X.utils.book_append_sheet(wb,X.utils.json_to_sheet(summary),"Summary");if(basis==="FY"){const heads=ctx.heads.filter(h=>h.total>0).map(h=>({"Tax head":h.label,Amount:Math.round(h.total),Entries:h.count}));if(heads.length)X.utils.book_append_sheet(wb,X.utils.json_to_sheet(heads),"Income by tax head");const deds=(ctx.deds||[]).map(d=>({Section:d.section,Item:d.label,Amount:Math.round(+d.amount||0),Limit:d.limit||""}));if(deds.length)X.utils.book_append_sheet(wb,X.utils.json_to_sheet(deds),"Deductions")}else{const months=ctx.months.filter(m=>m.hasData).map(m=>({Month:m.label,Income:Math.round(m.income),Expense:Math.round(m.expense),Net:Math.round(m.net)}));if(months.length)X.utils.book_append_sheet(wb,X.utils.json_to_sheet(months),"Monthly cashflow")}const cats=ctx.catRows.map(r=>({Category:r.label,"This year":Math.round(r.amt),Annualized:r.annualized,"Plan next year":r.plan}));if(cats.length)X.utils.book_append_sheet(wb,X.utils.json_to_sheet(cats),"By category");const rows=_txnExportRows(ctx.inPeriod,ctx.accounts,ctx.currency).map(r=>({Date:r.date,Type:r.type,"Merchant / Payee":r.merchant,Category:r.category,Account:r.account,Amount:r.amount,Currency:r.currency,Note:r.note}));if(rows.length)X.utils.book_append_sheet(wb,X.utils.json_to_sheet(rows),"Transactions");X.writeFile(wb,_safeName("Advanced_"+label)+".xlsx")}
 function exportAdvPdf(label,basis,ctx){const cu=ctx.currency||"";const fmt=n=>cu+Number(Math.round(n||0)).toLocaleString("en-US");const now=new Date().toLocaleString("en-US");const kv=(k,v)=>`<div class="kv"><span>${_htmlEsc(k)}</span><b>${_htmlEsc(v)}</b></div>`;let mid="";if(basis==="FY"){const hrows=ctx.heads.filter(h=>h.total>0).map(h=>`<tr><td>${_htmlEsc(h.label)}</td><td class="r">${fmt(h.total)}</td><td class="r">${h.count}</td></tr>`).join("");mid+=`<h2>Income by tax head</h2><table><thead><tr><th>Head</th><th class="r">Amount</th><th class="r">Entries</th></tr></thead><tbody>${hrows||'<tr><td colspan="3">No income.</td></tr>'}</tbody><tfoot><tr><td>Gross total income</td><td class="r">${fmt(ctx.headTotal)}</td><td></td></tr></tfoot></table>`;if((ctx.deds||[]).length){const drows=ctx.deds.map(d=>`<tr><td>${_htmlEsc(d.section)}</td><td>${_htmlEsc(d.label)}</td><td class="r">${fmt(d.amount||0)}</td><td class="r">${d.limit?fmt(d.limit):"—"}</td></tr>`).join("");mid+=`<h2>Deductions</h2><table><thead><tr><th>Section</th><th>Item</th><th class="r">Claimed</th><th class="r">Limit</th></tr></thead><tbody>${drows}</tbody><tfoot><tr><td colspan="2">Total deductions</td><td class="r">${fmt(ctx.dedTotal)}</td><td></td></tr></tfoot></table>`}}else{const mrows=ctx.months.filter(m=>m.hasData).map(m=>`<tr><td>${_htmlEsc(m.label)}</td><td class="r pos">${fmt(m.income)}</td><td class="r neg">${fmt(m.expense)}</td><td class="r ${m.net<0?"neg":"pos"}">${fmt(m.net)}</td></tr>`).join("");mid+=`<h2>Monthly cashflow</h2><table><thead><tr><th>Month</th><th class="r">Income</th><th class="r">Spending</th><th class="r">Net</th></tr></thead><tbody>${mrows||'<tr><td colspan="4">No data.</td></tr>'}</tbody></table>`}const crows=ctx.catRows.map(r=>`<tr><td>${_htmlEsc(r.label)}</td><td class="r">${fmt(r.amt)}</td><td class="r">${fmt(r.plan)}</td></tr>`).join("");const catTable=ctx.catRows.length?`<h2>Spending by category</h2><table><thead><tr><th>Category</th><th class="r">This year</th><th class="r">Plan next year</th></tr></thead><tbody>${crows}</tbody><tfoot><tr><td>Total</td><td class="r">${fmt(ctx.grossExpense)}</td><td class="r">${fmt(ctx.totalPlan)}</td></tr></tfoot></table>`:"";const html=`<!doctype html><html><head><meta charset="utf-8"><title>Advanced — ${_htmlEsc(label)}</title><style>*{box-sizing:border-box}body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111;margin:24px;font-size:12px}h1{font-size:20px;margin:0 0 2px}h2{font-size:13px;margin:20px 0 6px;text-transform:uppercase;letter-spacing:.5px;color:#333}.sub{color:#666;font-size:11px;margin-bottom:14px}.grid{display:flex;flex-wrap:wrap;gap:8px 26px;margin:10px 0 4px}.kv{min-width:150px}.kv span{color:#666;font-size:10px;text-transform:uppercase;letter-spacing:.5px;display:block}.kv b{font-size:16px}table{width:100%;border-collapse:collapse;margin-top:4px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #e6e6e6}th{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#555;border-bottom:2px solid #999}td.r,th.r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}td.neg{color:#b3261e}td.pos{color:#1a7f37}tfoot td{font-weight:700;border-top:2px solid #999}@media print{body{margin:12mm}tr{break-inside:avoid}}</style></head><body><h1>Advanced report — ${_htmlEsc(label)}</h1><div class="sub">${basis==="FY"?"Financial year (Apr–Mar) · ITR view":"Calendar year (Jan–Dec) · personal finance"} · exported ${_htmlEsc(now)}</div><div class="grid">${kv("Total income",fmt(ctx.grossIncome))}${kv("Total spending",fmt(ctx.grossExpense))}${kv("Net savings",fmt(ctx.netSavings))}${kv("Savings rate",ctx.savingsRate.toFixed(0)+"%")}${kv("Invested / saved",fmt(ctx.investTotal))}</div>${mid}${catTable}<p style="color:#888;font-size:10px;margin-top:20px">Figures are from your logged transactions — a personal planning aid, not tax advice. Reconcile with Form 16 / AIS / broker statements before filing.</p></body></html>`;_printHTML(html)}
@@ -8300,71 +8303,146 @@ function AdvancedStats({data,persist,onClose,onTx,onFlt,initialBasis}){
     basis!=="PLAN"&&asTab==="salary"&&t(SalaryTracker,{data,persist,basis,ps,pe,pKey,label,subLabel,cur}),
   ]});
 }
-const SALARY_COLS_DEFAULT=[{id:"basic",label:"Basic"},{id:"hra",label:"HRA"},{id:"special",label:"Special Allowance"},{id:"bonus",label:"Bonus"},{id:"other_allow",label:"Other Allowances"},{id:"deductions",label:"Deductions"},{id:"net",label:"Net Pay"}];
+// Salary components carry a `kind`: "earning" adds, "deduction" subtracts (values
+// are stored signed-negative), "net" is derived and never typed.
+const SALARY_COLS_DEFAULT=[{id:"basic",label:"Basic",kind:"earning"},{id:"hra",label:"HRA",kind:"earning"},{id:"special",label:"Special Allowance",kind:"earning"},{id:"bonus",label:"Bonus",kind:"earning"},{id:"other_allow",label:"Other Allowances",kind:"earning"},{id:"deductions",label:"Deductions",kind:"deduction"},{id:"net",label:"Net Pay",kind:"net"}];
+// Columns saved before kinds existed are inferred from their id, then written back
+// on the next save so the migration is one-way and self-healing.
+const salKind=(x)=>x.kind||(x.id==="net"?"net":x.id==="deductions"?"deduction":"earning");
+const SAL_KINDS=[["earning","Earning","＋"],["deduction","Deduction","−"],["net","Net (auto)","="]];
 function SalaryTracker({data,persist,basis,ps,pe,pKey,label,subLabel,cur}){
   const IT=data.incomeTracker||{};
-  const columns=(IT.columns&&IT.columns.length)?IT.columns:SALARY_COLS_DEFAULT;
-  const cells=IT.cells||{};const notes=IT.notes||{};
-  const saveIT=(patch)=>persist({incomeTracker:{columns,cells,notes,...patch}});
-  const[manage,sManage]=useState(false);const[newCol,sNewCol]=useState("");const[noteText,sNoteText]=useState("");const[delCol,sDelCol]=useState(null);
-  const months=useMemo(()=>{const arr=[];let s=ps;while(s<pe){const d=new Date(s);arr.push({key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`,label:d.toLocaleDateString("en-US",{month:"short",year:"2-digit"})});s=new Date(d.getFullYear(),d.getMonth()+1,1).getTime()}return arr},[ps,pe]);
+  const columns=useMemo(()=>((IT.columns&&IT.columns.length)?IT.columns:SALARY_COLS_DEFAULT).map(x=>({...x,kind:salKind(x)})),[IT.columns]);
+  const cells=IT.cells||{};const notes=IT.notes||{};const orient=IT.orient==="mr"?"mr":"mc";
+  const saveIT=(patch)=>persist({incomeTracker:{...IT,columns,cells,notes,orient,...patch}});
+  const[manage,sManage]=useState(false);const[newCol,sNewCol]=useState("");const[noteText,sNoteText]=useState("");const[delCol,sDelCol]=useState(null);const[showAll,sShowAll]=useState(false);
+  const allMonths=useMemo(()=>{const arr=[];let s=ps;while(s<pe){const d=new Date(s);arr.push({key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`,label:d.toLocaleDateString("en-US",{month:"short",year:"2-digit"}),short:d.toLocaleDateString("en-US",{month:"short"})});s=new Date(d.getFullYear(),d.getMonth()+1,1).getTime()}return arr},[ps,pe]);
+  const inputCols=useMemo(()=>columns.filter(x=>x.kind!=="net"),[columns]);
   const cellVal=(mk,cid)=>{const r=cells[mk];return r&&r[cid]!=null?r[cid]:null};
-  const setCell=(mk,cid,n)=>{const row={...(cells[mk]||{})};if(n==null)delete row[cid];else row[cid]=n;const nc={...cells};if(Object.keys(row).length)nc[mk]=row;else delete nc[mk];saveIT({cells:nc})};
-  const colTotal=(cid)=>months.reduce((s,m)=>s+(cellVal(m.key,cid)||0),0);
-  const addCol=()=>{const l=newCol.trim();if(!l)return;saveIT({columns:[...columns,{id:"col_"+uid(),label:l}]});sNewCol("")};
+  const hasData=(mk)=>{const r=cells[mk];return !!r&&inputCols.some(x=>r[x.id]!=null)};
+  // Net is derived: deduction cells are already stored negative, so this is a plain sum.
+  const netOf=(mk)=>hasData(mk)?inputCols.reduce((s,x)=>s+(cellVal(mk,x.id)||0),0):null;
+  const valOf=(mk,col)=>col.kind==="net"?netOf(mk):cellVal(mk,col.id);
+  // Rows run to the last month that actually has entries — which may be ahead of
+  // today when future months are pre-filled — never stopping short of the current
+  // month so there is always somewhere to type.
+  const{months,hidden}=useMemo(()=>{
+    if(showAll)return{months:allMonths,hidden:0};
+    let last=-1;for(let i=0;i<allMonths.length;i++)if(hasData(allMonths[i].key))last=i;
+    const now=new Date();const nk=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+    const cur=allMonths.findIndex(m=>m.key===nk);
+    if(last<0&&cur<0)return{months:allMonths,hidden:0};
+    const end=Math.max(last,cur,0);
+    return{months:allMonths.slice(0,end+1),hidden:allMonths.length-(end+1)};
+  },[allMonths,cells,inputCols,showAll]);
+  const filledCount=useMemo(()=>allMonths.filter(m=>hasData(m.key)).length,[allMonths,cells,inputCols]);
+  const setCell=(mk,col,n)=>{
+    if(col.kind==="net")return;
+    const v=n==null?null:(col.kind==="deduction"?-Math.abs(n):n);
+    const row={...(cells[mk]||{})};if(v==null)delete row[col.id];else row[col.id]=v;
+    const nc={...cells};if(Object.keys(row).length)nc[mk]=row;else delete nc[mk];saveIT({cells:nc});
+  };
+  const colTotal=(col)=>col.kind==="net"?allMonths.reduce((s,m)=>s+(netOf(m.key)||0),0):allMonths.reduce((s,m)=>s+(cellVal(m.key,col.id)||0),0);
+  const addCol=()=>{const l=newCol.trim();if(!l)return;saveIT({columns:[...columns,{id:"col_"+uid(),label:l,kind:"earning"}]});sNewCol("")};
   const renameCol=(id,lbl)=>saveIT({columns:columns.map(x=>x.id===id?{...x,label:lbl}:x)});
+  // Switching a component to/from "deduction" re-signs the values already entered
+  // for it, so the sign always matches the component's role.
+  const setKind=(id,kind)=>{
+    const nc={};for(const[mk,row]of Object.entries(cells)){const cp={...row};if(cp[id]!=null){if(kind==="deduction")cp[id]=-Math.abs(cp[id]);else if(kind==="net")delete cp[id];else cp[id]=Math.abs(cp[id])}if(Object.keys(cp).length)nc[mk]=cp}
+    saveIT({columns:columns.map(x=>x.id===id?{...x,kind}:x),cells:nc});
+  };
   const removeCol=(id)=>{const nc={};for(const[mk,row]of Object.entries(cells)){const cp={...row};delete cp[id];if(Object.keys(cp).length)nc[mk]=cp}saveIT({columns:columns.filter(x=>x.id!==id),cells:nc});sDelCol(null)};
   const moveCol=(idx,dir)=>{const ni=idx+dir;if(ni<0||ni>=columns.length)return;const arr=[...columns];[arr[idx],arr[ni]]=[arr[ni],arr[idx]];saveIT({columns:arr})};
-  const hasData=(mk)=>cells[mk]&&Object.keys(cells[mk]).length>0;
-  const changes=useMemo(()=>{const out=[];for(let i=1;i<months.length;i++){const prev=months[i-1],cm=months[i];if(!hasData(prev.key))continue;const diffs=[];for(const col of columns){const a=cellVal(prev.key,col.id)||0,b=cellVal(cm.key,col.id)||0;if(a!==b)diffs.push({label:col.label,from:a,to:b,delta:b-a})}if(diffs.length)out.push({month:cm.label,prev:prev.label,diffs})}return out.reverse()},[months,columns,cells]);
+  const changes=useMemo(()=>{const out=[];for(let i=1;i<allMonths.length;i++){const prev=allMonths[i-1],cm=allMonths[i];if(!hasData(prev.key)||!hasData(cm.key))continue;const diffs=[];for(const col of columns){const a=valOf(prev.key,col)||0,b=valOf(cm.key,col)||0;if(a!==b)diffs.push({label:col.label,from:a,to:b,delta:b-a})}if(diffs.length)out.push({month:cm.label,prev:prev.label,diffs})}return out.reverse()},[allMonths,columns,cells]);
   const noteList=notes[pKey]||[];
   const addNote=()=>{const v=noteText.trim();if(!v)return;saveIT({notes:{...notes,[pKey]:[{id:"n_"+uid(),text:v,createdAt:Date.now()},...noteList]}});sNoteText("")};
   const delNote=(id)=>saveIT({notes:{...notes,[pKey]:noteList.filter(n=>n.id!==id)}});
-  const exportCSV=()=>{const header=["Month",...columns.map(x=>x.label)];const rows=[header,...months.map(m=>[m.label,...columns.map(x=>{const v=cellVal(m.key,x.id);return v==null?"":v})]),["Total",...columns.map(x=>colTotal(x.id))]];dlCSV("salary-"+String(label).replace(/\s+/g,"_")+".csv",rows)};
-  const gridCols=`84px repeat(${columns.length},minmax(94px,1fr))`;
+  const exportCSV=()=>{
+    const cell=(m,col)=>{const v=valOf(m.key,col);return v==null?"":v};
+    const rows=orient==="mc"
+      ?[["Component",...months.map(m=>m.label),"Total"],...columns.map(col=>[col.label,...months.map(m=>cell(m,col)),colTotal(col)])]
+      :[["Month",...columns.map(x=>x.label)],...months.map(m=>[m.label,...columns.map(col=>cell(m,col))]),["Total",...columns.map(col=>colTotal(col))]];
+    dlCSV("salary-"+String(label).replace(/\s+/g,"_")+".csv",rows);
+  };
   const sticky={position:"sticky",left:0,zIndex:2,background:c.sfg};
+  // Salary figures are whole rupees, so the ".00" from fm() is noise that pushes
+  // totals past the column width. Negatives read as -₹1,234 rather than ₹-1,234.
+  const fmS=(n)=>{const v=Math.round(n||0);return (v<0?"-":"")+cur+Math.abs(v).toLocaleString("en-US",{maximumFractionDigits:0})};
   const hCell=(txt,extra)=>t("div",{style:{fontFamily:F.mo,fontSize:9.5,color:c.tm,letterSpacing:.3,padding:"9px 8px",textAlign:"right",whiteSpace:"nowrap",...extra},children:txt});
+  const kindColor=(k)=>k==="deduction"?c.co:k==="net"?c.ac:c.tx;
+  const numCell=(mk,col)=>{
+    if(col.kind==="net"){const v=netOf(mk);return t("div",{style:{padding:"8px 10px",textAlign:"right",fontFamily:F.mo,fontSize:13,fontWeight:600,color:v==null?c.tm:c.ac,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"},children:v==null?"—":fmS(v)})}
+    return t(ASNum,{value:cellVal(mk,col.id),onSave:n=>setCell(mk,col,n),width:"100%",placeholder:"—",neg:true,color:col.kind==="deduction"?c.co:c.tx});
+  };
+  const totCell=(col)=>{const v=colTotal(col);return t("div",{style:{padding:"9px 8px",textAlign:"right",fontFamily:F.mo,fontSize:11.5,fontWeight:600,color:v<0?c.co:c.tx,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"},children:fmS(v)})};
+  // Months-as-columns: components down the frozen left edge, months scrolling across.
+  const gridMC=`126px repeat(${months.length},minmax(104px,1fr)) 112px`;
+  const tableMC=o("div",{style:{minWidth:"fit-content"},children:[
+    o("div",{style:{display:"grid",gridTemplateColumns:gridMC,borderBottom:`1px solid ${c.brs}`},children:[hCell("COMPONENT",{...sticky,textAlign:"left",color:c.td}),...months.map(m=>hCell(m.label,{key:m.key})),hCell("TOTAL",{color:c.td})]}),
+    ...columns.map((col,ri)=>o("div",{key:col.id,style:{display:"grid",gridTemplateColumns:gridMC,borderBottom:ri===columns.length-1?"none":`1px solid ${c.brs}`,background:col.kind==="net"?c.sf2:"transparent"},children:[
+      o("div",{style:{...sticky,background:col.kind==="net"?c.sf2:c.sfg,padding:"6px 8px",display:"flex",alignItems:"center",gap:5,borderRight:`1px solid ${c.brs}`,minWidth:0},children:[
+        t("span",{style:{fontFamily:F.mo,fontSize:10,color:kindColor(col.kind),flexShrink:0},children:col.kind==="deduction"?"−":col.kind==="net"?"=":"＋"}),
+        t("span",{className:"tru",style:{fontSize:11.5,color:col.kind==="net"?c.tx:c.td,fontWeight:col.kind==="net"?700:500},children:col.label}),
+      ]}),
+      ...months.map(m=>t("div",{key:m.key,style:{padding:"4px 5px",display:"flex",alignItems:"center",justifyContent:"flex-end"},children:numCell(m.key,col)})),
+      totCell(col),
+    ]})),
+  ]});
+  // Months-as-rows: the original orientation, kept behind the swap toggle.
+  const gridMR=`84px repeat(${columns.length},minmax(94px,1fr))`;
+  const tableMR=o("div",{style:{minWidth:"fit-content"},children:[
+    o("div",{style:{display:"grid",gridTemplateColumns:gridMR,borderBottom:`1px solid ${c.brs}`},children:[hCell("MONTH",{...sticky,textAlign:"left",color:c.td}),...columns.map(col=>hCell((col.kind==="deduction"?"− ":col.kind==="net"?"= ":"")+col.label,{key:col.id,color:col.kind==="net"?c.ac:c.tm}))]}),
+    ...months.map((m,ri)=>o("div",{key:m.key,style:{display:"grid",gridTemplateColumns:gridMR,borderBottom:ri===months.length-1?"none":`1px solid ${c.brs}`},children:[
+      t("div",{style:{...sticky,fontFamily:F.mo,fontSize:11.5,color:c.td,padding:"6px 8px",display:"flex",alignItems:"center",borderRight:`1px solid ${c.brs}`},children:m.label}),
+      ...columns.map(col=>t("div",{key:col.id,style:{padding:"4px 5px",display:"flex",alignItems:"center",justifyContent:"flex-end"},children:numCell(m.key,col)})),
+    ]})),
+    o("div",{style:{display:"grid",gridTemplateColumns:gridMR,borderTop:`2px solid ${c.brs}`,background:c.sf2},children:[t("div",{style:{...sticky,background:c.sf2,fontFamily:F.mo,fontSize:9.5,color:c.tm,letterSpacing:.5,padding:"9px 8px",display:"flex",alignItems:"center"},children:"TOTAL"}),...columns.map(col=>t("div",{key:col.id,children:totCell(col)}))]}),
+  ]});
   return o("div",{style:{marginTop:14},children:[
     o("div",{className:"f ia jb",style:{marginBottom:4},children:[
       o("div",{className:"minw0",children:[t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:20,color:c.tx},children:"Salary tracker"}),t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,marginTop:1},children:label+" · "+subLabel})]}),
       o("div",{className:"f ia",style:{gap:6,flexShrink:0},children:[
+        t("button",{onClick:()=>saveIT({orient:orient==="mc"?"mr":"mc"}),title:orient==="mc"?"Switch to months as rows":"Switch to months as columns",className:"act95 tr",style:{padding:"6px 9px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:9,fontSize:10.5,fontFamily:F.mo,color:c.td},children:"⇄"}),
         t("button",{onClick:exportCSV,className:"act95 tr",style:{padding:"6px 10px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:9,fontSize:10.5,fontFamily:F.mo,color:c.td},children:"⤓ CSV"}),
         t("button",{onClick:()=>sManage(v=>!v),className:"act95 tr",style:{padding:"6px 10px",background:manage?c.ac:c.sf2,border:`1px solid ${manage?c.ac:c.brs}`,borderRadius:9,fontSize:10.5,fontFamily:F.mo,color:manage?"#0a0a0a":c.td,fontWeight:600},children:manage?"Done":"Columns"}),
       ]}),
     ]}),
-    t("div",{style:{fontSize:11.5,color:c.tm,lineHeight:1.5,marginBottom:12},children:"Track each salary component month by month. Values are yours to enter — add, rename, remove or reorder the columns to match your payslip."}),
+    t("div",{style:{fontSize:11.5,color:c.tm,lineHeight:1.5,marginBottom:10},children:"Track each salary component month by month. Mark a component as a deduction and it is stored negative and subtracted; Net Pay is worked out for you. Use ⇄ to flip months between columns and rows."}),
+    o("div",{className:"f ia",style:{gap:10,flexWrap:"wrap",marginBottom:12,fontFamily:F.mo,fontSize:9.5,color:c.tm,letterSpacing:.3},children:[
+      t("span",{children:"＋ EARNING"}),t("span",{style:{color:c.co},children:"− DEDUCTION"}),t("span",{style:{color:c.ac},children:"= NET · AUTO"}),
+      t("span",{children:filledCount+" / "+allMonths.length+" MONTHS FILLED"}),
+    ]}),
     manage&&o("div",{style:{marginBottom:12,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:12},children:[
       t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:8},children:"COMPONENTS"}),
-      ...columns.map((col,idx)=>o("div",{key:col.id,className:"f ia",style:{gap:6,marginBottom:6},children:[
-        t("input",{value:col.label,onChange:e=>renameCol(col.id,e.target.value),style:{flex:1,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:8,padding:"7px 10px",color:c.tx,fontSize:12.5,outline:"none",fontFamily:"var(--tf)"}}),
-        t("button",{onClick:()=>moveCol(idx,-1),disabled:idx===0,style:{width:30,height:30,borderRadius:8,background:c.sf2,border:`1px solid ${c.brs}`,color:idx===0?c.tm:c.td,fontSize:13,flexShrink:0},children:"↑"}),
-        t("button",{onClick:()=>moveCol(idx,1),disabled:idx===columns.length-1,style:{width:30,height:30,borderRadius:8,background:c.sf2,border:`1px solid ${c.brs}`,color:idx===columns.length-1?c.tm:c.td,fontSize:13,flexShrink:0},children:"↓"}),
-        t("button",{onClick:()=>sDelCol(col),style:{width:30,height:30,borderRadius:8,background:c.sf2,border:`1px solid ${c.brs}`,color:c.co,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(X,{size:13})}),
+      ...columns.map((col,idx)=>o("div",{key:col.id,style:{marginBottom:8},children:[
+        o("div",{className:"f ia",style:{gap:6},children:[
+          t("input",{value:col.label,onChange:e=>renameCol(col.id,e.target.value),style:{flex:1,minWidth:0,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:8,padding:"7px 10px",color:c.tx,fontSize:12.5,outline:"none",fontFamily:"var(--tf)"}}),
+          t("button",{onClick:()=>moveCol(idx,-1),disabled:idx===0,style:{width:30,height:30,borderRadius:8,background:c.sf2,border:`1px solid ${c.brs}`,color:idx===0?c.tm:c.td,fontSize:13,flexShrink:0},children:"↑"}),
+          t("button",{onClick:()=>moveCol(idx,1),disabled:idx===columns.length-1,style:{width:30,height:30,borderRadius:8,background:c.sf2,border:`1px solid ${c.brs}`,color:idx===columns.length-1?c.tm:c.td,fontSize:13,flexShrink:0},children:"↓"}),
+          t("button",{onClick:()=>sDelCol(col),style:{width:30,height:30,borderRadius:8,background:c.sf2,border:`1px solid ${c.brs}`,color:c.co,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(X,{size:13})}),
+        ]}),
+        t("div",{className:"f",style:{gap:4,marginTop:5,padding:3,background:c.sf2,borderRadius:9,border:`1px solid ${c.brs}`},children:SAL_KINDS.map(([k,lbl,sym])=>{const on=col.kind===k;return t("button",{key:k,onClick:()=>setKind(col.id,k),className:"f1 tr",style:{padding:"6px 2px",background:on?(k==="deduction"?c.co:k==="net"?c.ac:c.tx):"transparent",color:on?"#0a0a0a":c.td,borderRadius:7,fontSize:10.5,fontFamily:F.mo,fontWeight:on?700:500,border:"none",whiteSpace:"nowrap"},children:sym+" "+lbl})})}),
       ]})),
       o("div",{className:"f ia",style:{gap:6,marginTop:8},children:[
-        t("input",{value:newCol,onChange:e=>sNewCol(e.target.value),onKeyDown:e=>{if(e.key==="Enter")addCol()},placeholder:"Add component…",style:{flex:1,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:8,padding:"7px 10px",color:c.tx,fontSize:12.5,outline:"none",fontFamily:"var(--tf)"}}),
+        t("input",{value:newCol,onChange:e=>sNewCol(e.target.value),onKeyDown:e=>{if(e.key==="Enter")addCol()},placeholder:"Add component…",style:{flex:1,minWidth:0,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:8,padding:"7px 10px",color:c.tx,fontSize:12.5,outline:"none",fontFamily:"var(--tf)"}}),
         t("button",{onClick:addCol,className:"act95 tr",style:{padding:"7px 14px",background:c.ac,border:"none",borderRadius:8,fontSize:12,fontFamily:F.mo,color:"#0a0a0a",fontWeight:600},children:"Add"}),
       ]}),
     ]}),
-    columns.length===0?t("div",{style:{textAlign:"center",padding:"32px 0",color:c.tm,fontSize:12.5},children:"Add a salary component to start — tap “Columns”."}):o("div",{style:{overflowX:"auto",WebkitOverflowScrolling:"touch",border:`1px solid ${c.brs}`,borderRadius:12,background:c.sfg},children:o("div",{style:{minWidth:"fit-content"},children:[
-      o("div",{style:{display:"grid",gridTemplateColumns:gridCols,borderBottom:`1px solid ${c.brs}`},children:[hCell("MONTH",{...sticky,textAlign:"left",color:c.td}),...columns.map(col=>hCell(col.label,{}))]}),
-      ...months.map((m,ri)=>o("div",{key:m.key,style:{display:"grid",gridTemplateColumns:gridCols,borderBottom:ri===months.length-1?"none":`1px solid ${c.brs}`,background:hasData(m.key)?"transparent":"transparent"},children:[
-        t("div",{style:{...sticky,fontFamily:F.mo,fontSize:11.5,color:c.td,padding:"6px 8px",display:"flex",alignItems:"center",borderRight:`1px solid ${c.brs}`},children:m.label}),
-        ...columns.map(col=>t("div",{key:col.id,style:{padding:"4px 5px",display:"flex",alignItems:"center",justifyContent:"flex-end"},children:t(ASNum,{value:cellVal(m.key,col.id),onSave:n=>setCell(m.key,col.id,n),width:"100%",placeholder:"—"})})),
-      ]})),
-      o("div",{style:{display:"grid",gridTemplateColumns:gridCols,borderTop:`2px solid ${c.brs}`,background:c.sf2},children:[t("div",{style:{...sticky,background:c.sf2,fontFamily:F.mo,fontSize:9.5,color:c.tm,letterSpacing:.5,padding:"9px 8px",display:"flex",alignItems:"center"},children:"TOTAL"}),...columns.map(col=>t("div",{key:col.id,style:{padding:"9px 8px",textAlign:"right",fontFamily:F.mo,fontSize:11.5,fontWeight:600,color:c.tx,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"},children:fm(colTotal(col.id),cur)}))]}),
-    ]})}),
+    columns.length===0?t("div",{style:{textAlign:"center",padding:"32px 0",color:c.tm,fontSize:12.5},children:"Add a salary component to start — tap “Columns”."}):o(Fragment,{children:[
+      t("div",{style:{overflowX:"auto",WebkitOverflowScrolling:"touch",border:`1px solid ${c.brs}`,borderRadius:12,background:c.sfg},children:orient==="mc"?tableMC:tableMR}),
+      (hidden>0||showAll)&&t("button",{onClick:()=>sShowAll(v=>!v),className:"act95 tr",style:{width:"100%",marginTop:8,padding:"9px 0",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:10,fontFamily:F.mo,fontSize:10.5,color:c.td},children:showAll?"Hide empty months ahead":"Show all "+allMonths.length+" months ("+hidden+" empty ahead)"}),
+    ]}),
     o("div",{style:{marginTop:18},children:[
       t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,marginBottom:8},children:"WHAT CHANGED · MONTH ON MONTH"}),
       changes.length===0?t("div",{style:{fontSize:12,color:c.tm,padding:"8px 0"},children:"No month-on-month changes yet. Enter values across consecutive months to see what moved."}):o("div",{style:{display:"flex",flexDirection:"column",gap:8},children:changes.map((ch,i)=>o("div",{key:i,style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"10px 12px"},children:[
         t("div",{style:{fontFamily:F.mo,fontSize:10.5,color:c.td,marginBottom:6},children:ch.prev+" → "+ch.month}),
-        o("div",{style:{display:"flex",flexDirection:"column",gap:4},children:ch.diffs.map((d,j)=>{const up=d.delta>0;return o("div",{key:j,className:"f ia jb",style:{fontSize:11.5},children:[t("span",{style:{color:c.tm},children:d.label}),o("div",{className:"f ia",style:{gap:8},children:[t("span",{style:{fontFamily:F.mo,fontSize:10.5,color:c.tm},children:fm(d.from,cur)+" → "+fm(d.to,cur)}),t("span",{style:{fontFamily:F.mo,fontSize:11,fontWeight:600,color:up?c.mt:c.co},children:(up?"▲ +":"▼ −")+fm(Math.abs(d.delta),cur)})]})]})})}),
+        o("div",{style:{display:"flex",flexDirection:"column",gap:4},children:ch.diffs.map((d,j)=>{const up=d.delta>0;return o("div",{key:j,className:"f ia jb",style:{fontSize:11.5},children:[t("span",{style:{color:c.tm},children:d.label}),o("div",{className:"f ia",style:{gap:8},children:[t("span",{style:{fontFamily:F.mo,fontSize:10.5,color:c.tm},children:fmS(d.from)+" → "+fmS(d.to)}),t("span",{style:{fontFamily:F.mo,fontSize:11,fontWeight:600,color:up?c.mt:c.co},children:(up?"▲ +":"▼ −")+fmS(Math.abs(d.delta))})]})]})})}),
       ]}))}),
     ]}),
     o("div",{style:{marginTop:18},children:[
       t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,marginBottom:8},children:"NOTES · "+label}),
       o("div",{className:"f ia",style:{gap:8,marginBottom:noteList.length?12:0},children:[
-        t("input",{value:noteText,onChange:e=>sNoteText(e.target.value),onKeyDown:e=>{if(e.key==="Enter")addNote()},placeholder:"Jot a note for "+label+"…",style:{flex:1,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px",color:c.tx,fontSize:13,outline:"none",fontFamily:"var(--tf)"}}),
+        t("input",{value:noteText,onChange:e=>sNoteText(e.target.value),onKeyDown:e=>{if(e.key==="Enter")addNote()},placeholder:"Jot a note for "+label+"…",style:{flex:1,minWidth:0,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px",color:c.tx,fontSize:13,outline:"none",fontFamily:"var(--tf)"}}),
         t("button",{onClick:addNote,disabled:!noteText.trim(),className:"act95 tr",style:{padding:"10px 14px",background:noteText.trim()?c.ac:c.sf2,color:noteText.trim()?"#0a0a0a":c.tm,border:"none",borderRadius:10,fontSize:12.5,fontWeight:600},children:"Add"}),
       ]}),
       o("div",{style:{display:"flex",flexDirection:"column",gap:6},children:noteList.map(n=>o("div",{key:n.id,className:"f ia jb",style:{gap:8,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:10,padding:"9px 12px"},children:[
@@ -8372,7 +8450,7 @@ function SalaryTracker({data,persist,basis,ps,pe,pKey,label,subLabel,cur}){
         t("button",{onClick:()=>delNote(n.id),style:{background:"transparent",border:"none",color:c.tm,display:"flex",flexShrink:0,padding:2},children:t(X,{size:14})}),
       ]}))}),
     ]}),
-    delCol&&t(CSht,{title:"Remove “"+delCol.label+"”?",subtitle:"This deletes the column and its values across every month. This can't be undone.",confirmLabel:"Remove",danger:true,onConfirm:()=>removeCol(delCol.id),onClose:()=>sDelCol(null)}),
+    delCol&&t(CSht,{title:"Remove “"+delCol.label+"”?",subtitle:"This deletes the component and its values across every month. This can't be undone.",confirmLabel:"Remove",danger:true,onConfirm:()=>removeCol(delCol.id),onClose:()=>sDelCol(null)}),
   ]});
 }
 
