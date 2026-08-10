@@ -8315,7 +8315,7 @@ function SalaryTracker({data,persist,basis,ps,pe,pKey,label,subLabel,cur}){
   const columns=useMemo(()=>((IT.columns&&IT.columns.length)?IT.columns:SALARY_COLS_DEFAULT).map(x=>({...x,kind:salKind(x)})),[IT.columns]);
   const cells=IT.cells||{};const notes=IT.notes||{};const orient=IT.orient==="mr"?"mr":"mc";
   const saveIT=(patch)=>persist({incomeTracker:{...IT,columns,cells,notes,orient,...patch}});
-  const[manage,sManage]=useState(false);const[newCol,sNewCol]=useState("");const[noteText,sNoteText]=useState("");const[delCol,sDelCol]=useState(null);const[showAll,sShowAll]=useState(false);
+  const[manage,sManage]=useState(false);const[newCol,sNewCol]=useState("");const[noteText,sNoteText]=useState("");const[delCol,sDelCol]=useState(null);const[showAll,sShowAll]=useState(false);const[mSht,sMSht]=useState(null);const[cfm,sCfm]=useState(null);
   const allMonths=useMemo(()=>{const arr=[];let s=ps;while(s<pe){const d=new Date(s);arr.push({key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`,label:d.toLocaleDateString("en-US",{month:"short",year:"2-digit"}),short:d.toLocaleDateString("en-US",{month:"short"})});s=new Date(d.getFullYear(),d.getMonth()+1,1).getTime()}return arr},[ps,pe]);
   const inputCols=useMemo(()=>columns.filter(x=>x.kind!=="net"),[columns]);
   const cellVal=(mk,cid)=>{const r=cells[mk];return r&&r[cid]!=null?r[cid]:null};
@@ -8342,6 +8342,15 @@ function SalaryTracker({data,persist,basis,ps,pe,pKey,label,subLabel,cur}){
     const row={...(cells[mk]||{})};if(v==null)delete row[col.id];else row[col.id]=v;
     const nc={...cells};if(Object.keys(row).length)nc[mk]=row;else delete nc[mk];saveIT({cells:nc});
   };
+  // Pay repeats verbatim until a hike, so a month can be copied across the rest of
+  // the year in one action. Filled months are left alone unless overwrite is asked
+  // for, which keeps a re-fill after a raise from silently eating earlier edits.
+  const rowOf=(mk)=>{const r=cells[mk]||{};const out={};for(const col of inputCols)if(r[col.id]!=null)out[col.id]=r[col.id];return out};
+  const applyRows=(ups)=>{const nc={...cells};for(const[k,v]of Object.entries(ups)){if(v&&Object.keys(v).length)nc[k]=v;else delete nc[k]}saveIT({cells:nc})};
+  const copyPrev=(idx)=>{const p=allMonths[idx-1];if(!p)return;applyRows({[allMonths[idx].key]:rowOf(p.key)})};
+  const fillFwd=(idx,overwrite)=>{const src=rowOf(allMonths[idx].key);if(!Object.keys(src).length)return;const ups={};for(let i=idx+1;i<allMonths.length;i++){const k=allMonths[i].key;if(!overwrite&&hasData(k))continue;ups[k]={...src}}applyRows(ups)};
+  const clearMonth=(mk)=>applyRows({[mk]:null});
+  const laterCounts=(idx)=>{let empty=0,filled=0;for(let i=idx+1;i<allMonths.length;i++){if(hasData(allMonths[i].key))filled++;else empty++}return{empty,filled}};
   const colTotal=(col)=>col.kind==="net"?allMonths.reduce((s,m)=>s+(netOf(m.key)||0),0):allMonths.reduce((s,m)=>s+(cellVal(m.key,col.id)||0),0);
   const addCol=()=>{const l=newCol.trim();if(!l)return;saveIT({columns:[...columns,{id:"col_"+uid(),label:l,kind:"earning"}]});sNewCol("")};
   const renameCol=(id,lbl)=>saveIT({columns:columns.map(x=>x.id===id?{...x,label:lbl}:x)});
@@ -8370,6 +8379,8 @@ function SalaryTracker({data,persist,basis,ps,pe,pKey,label,subLabel,cur}){
   const fmS=(n)=>{const v=Math.round(n||0);return (v<0?"-":"")+cur+Math.abs(v).toLocaleString("en-US",{maximumFractionDigits:0})};
   const hCell=(txt,extra)=>t("div",{style:{fontFamily:F.mo,fontSize:9.5,color:c.tm,letterSpacing:.3,padding:"9px 8px",textAlign:"right",whiteSpace:"nowrap",...extra},children:txt});
   const kindColor=(k)=>k==="deduction"?c.co:k==="net"?c.ac:c.tx;
+  // `months` is always a head-slice of `allMonths`, so the two share indices.
+  const mBtn=(m,idx,extra)=>t("button",{key:m.key,onClick:()=>sMSht(idx),className:"act95 tr",style:{fontFamily:F.mo,fontSize:9.5,color:hasData(m.key)?c.td:c.tm,letterSpacing:.3,padding:"9px 8px",textAlign:"right",whiteSpace:"nowrap",background:"transparent",border:"none",width:"100%",...extra},children:m.label+" ▾"});
   const numCell=(mk,col)=>{
     if(col.kind==="net"){const v=netOf(mk);return t("div",{style:{padding:"8px 10px",textAlign:"right",fontFamily:F.mo,fontSize:13,fontWeight:600,color:v==null?c.tm:c.ac,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"},children:v==null?"—":fmS(v)})}
     return t(ASNum,{value:cellVal(mk,col.id),onSave:n=>setCell(mk,col,n),width:"100%",placeholder:"—",neg:true,color:col.kind==="deduction"?c.co:c.tx});
@@ -8378,7 +8389,7 @@ function SalaryTracker({data,persist,basis,ps,pe,pKey,label,subLabel,cur}){
   // Months-as-columns: components down the frozen left edge, months scrolling across.
   const gridMC=`126px repeat(${months.length},minmax(104px,1fr)) 112px`;
   const tableMC=o("div",{style:{minWidth:"fit-content"},children:[
-    o("div",{style:{display:"grid",gridTemplateColumns:gridMC,borderBottom:`1px solid ${c.brs}`},children:[hCell("COMPONENT",{...sticky,textAlign:"left",color:c.td}),...months.map(m=>hCell(m.label,{key:m.key})),hCell("TOTAL",{color:c.td})]}),
+    o("div",{style:{display:"grid",gridTemplateColumns:gridMC,borderBottom:`1px solid ${c.brs}`},children:[hCell("COMPONENT",{...sticky,textAlign:"left",color:c.td}),...months.map((m,i)=>mBtn(m,i)),hCell("TOTAL",{color:c.td})]}),
     ...columns.map((col,ri)=>o("div",{key:col.id,style:{display:"grid",gridTemplateColumns:gridMC,borderBottom:ri===columns.length-1?"none":`1px solid ${c.brs}`,background:col.kind==="net"?c.sf2:"transparent"},children:[
       o("div",{style:{...sticky,background:col.kind==="net"?c.sf2:c.sfg,padding:"6px 8px",display:"flex",alignItems:"center",gap:5,borderRight:`1px solid ${c.brs}`,minWidth:0},children:[
         t("span",{style:{fontFamily:F.mo,fontSize:10,color:kindColor(col.kind),flexShrink:0},children:col.kind==="deduction"?"−":col.kind==="net"?"=":"＋"}),
@@ -8393,7 +8404,7 @@ function SalaryTracker({data,persist,basis,ps,pe,pKey,label,subLabel,cur}){
   const tableMR=o("div",{style:{minWidth:"fit-content"},children:[
     o("div",{style:{display:"grid",gridTemplateColumns:gridMR,borderBottom:`1px solid ${c.brs}`},children:[hCell("MONTH",{...sticky,textAlign:"left",color:c.td}),...columns.map(col=>hCell((col.kind==="deduction"?"− ":col.kind==="net"?"= ":"")+col.label,{key:col.id,color:col.kind==="net"?c.ac:c.tm}))]}),
     ...months.map((m,ri)=>o("div",{key:m.key,style:{display:"grid",gridTemplateColumns:gridMR,borderBottom:ri===months.length-1?"none":`1px solid ${c.brs}`},children:[
-      t("div",{style:{...sticky,fontFamily:F.mo,fontSize:11.5,color:c.td,padding:"6px 8px",display:"flex",alignItems:"center",borderRight:`1px solid ${c.brs}`},children:m.label}),
+      t("button",{onClick:()=>sMSht(ri),className:"act95 tr",style:{...sticky,fontFamily:F.mo,fontSize:11.5,color:hasData(m.key)?c.td:c.tm,padding:"6px 8px",display:"flex",alignItems:"center",borderRight:`1px solid ${c.brs}`,border:"none",borderRightWidth:1,borderRightStyle:"solid",borderRightColor:c.brs,textAlign:"left",width:"100%"},children:m.label+" ▾"}),
       ...columns.map(col=>t("div",{key:col.id,style:{padding:"4px 5px",display:"flex",alignItems:"center",justifyContent:"flex-end"},children:numCell(m.key,col)})),
     ]})),
     o("div",{style:{display:"grid",gridTemplateColumns:gridMR,borderTop:`2px solid ${c.brs}`,background:c.sf2},children:[t("div",{style:{...sticky,background:c.sf2,fontFamily:F.mo,fontSize:9.5,color:c.tm,letterSpacing:.5,padding:"9px 8px",display:"flex",alignItems:"center"},children:"TOTAL"}),...columns.map(col=>t("div",{key:col.id,children:totCell(col)}))]}),
@@ -8407,7 +8418,7 @@ function SalaryTracker({data,persist,basis,ps,pe,pKey,label,subLabel,cur}){
         t("button",{onClick:()=>sManage(v=>!v),className:"act95 tr",style:{padding:"6px 10px",background:manage?c.ac:c.sf2,border:`1px solid ${manage?c.ac:c.brs}`,borderRadius:9,fontSize:10.5,fontFamily:F.mo,color:manage?"#0a0a0a":c.td,fontWeight:600},children:manage?"Done":"Columns"}),
       ]}),
     ]}),
-    t("div",{style:{fontSize:11.5,color:c.tm,lineHeight:1.5,marginBottom:10},children:"Track each salary component month by month. Mark a component as a deduction and it is stored negative and subtracted; Net Pay is worked out for you. Use ⇄ to flip months between columns and rows."}),
+    t("div",{style:{fontSize:11.5,color:c.tm,lineHeight:1.5,marginBottom:10},children:"Track each salary component month by month. Pay repeats, so fill one month then tap its ▾ to copy it across the rest of the year. Mark a component as a deduction and it is stored negative and subtracted; Net Pay is worked out for you. Use ⇄ to flip months between columns and rows."}),
     o("div",{className:"f ia",style:{gap:10,flexWrap:"wrap",marginBottom:12,fontFamily:F.mo,fontSize:9.5,color:c.tm,letterSpacing:.3},children:[
       t("span",{children:"＋ EARNING"}),t("span",{style:{color:c.co},children:"− DEDUCTION"}),t("span",{style:{color:c.ac},children:"= NET · AUTO"}),
       t("span",{children:filledCount+" / "+allMonths.length+" MONTHS FILLED"}),
@@ -8451,6 +8462,26 @@ function SalaryTracker({data,persist,basis,ps,pe,pKey,label,subLabel,cur}){
       ]}))}),
     ]}),
     delCol&&t(CSht,{title:"Remove “"+delCol.label+"”?",subtitle:"This deletes the component and its values across every month. This can't be undone.",confirmLabel:"Remove",danger:true,onConfirm:()=>removeCol(delCol.id),onClose:()=>sDelCol(null)}),
+    mSht!=null&&(()=>{
+      const idx=mSht,m=allMonths[idx];if(!m)return null;
+      const prev=idx>0?allMonths[idx-1]:null;const last=allMonths[allMonths.length-1];
+      const{empty,filled}=laterCounts(idx);const filledHere=hasData(m.key);const net=netOf(m.key);
+      const close=()=>sMSht(null);const run=(fn)=>{fn();close()};
+      const act=(icon,title,sub,onClick,danger)=>t("button",{onClick:onClick||null,disabled:!onClick,className:"w100 f ia act98 tr",style:{gap:12,textAlign:"left",padding:"13px 14px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,color:"inherit",opacity:onClick?1:.4,marginBottom:8},children:[
+        t("span",{style:{fontFamily:F.mo,fontSize:15,color:danger?c.co:c.ac,flexShrink:0,width:18,textAlign:"center"},children:icon}),
+        o("div",{className:"f1 minw0",children:[t("div",{style:{fontSize:13.5,color:danger?c.co:c.tx,fontWeight:500},children:title}),sub&&t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,marginTop:2},children:sub})]}),
+      ]});
+      return t(Sht,{onClose:close,children:o(Fragment,{children:[
+        t("div",{style:{fontFamily:c.hf,fontSize:22,color:c.tx},children:m.label}),
+        t("div",{style:{fontFamily:F.mo,fontSize:10.5,color:c.tm,marginTop:4,marginBottom:18,letterSpacing:.3},children:filledHere?("NET "+fmS(net)):"NO ENTRIES YET"}),
+        act("⇧","Copy from "+(prev?prev.label:"previous month"),prev&&hasData(prev.key)?"Pulls every component from "+prev.label:"Nothing to copy",prev&&hasData(prev.key)?()=>run(()=>copyPrev(idx)):null),
+        act("⇩","Fill forward through "+last.label,!filledHere?"Enter values here first":empty+filled===0?"This is the last month":empty===0?("All "+filled+" later month"+(filled===1?"":"s")+" already have values"):filled>0?("Fills "+empty+" empty · skips "+filled+" already filled"):("Fills "+empty+" month"+(empty===1?"":"s")),filledHere&&empty>0?()=>run(()=>fillFwd(idx,false)):null),
+        filled>0&&filledHere&&act("⇩","Fill forward & overwrite",("Replaces all "+filled+" filled month"+(filled===1?"":"s")+" after "+m.label),()=>{close();sCfm({title:"Overwrite "+filled+" month"+(filled===1?"":"s")+"?",subtitle:m.label+" will replace every month after it through "+last.label+", including the "+filled+" that already have values. This can't be undone.",confirmLabel:"Overwrite",onConfirm:()=>{fillFwd(idx,true);sCfm(null)}})},true),
+        act("✕","Clear "+m.label,filledHere?"Removes every value in this month":"Already empty",filledHere?()=>{close();sCfm({title:"Clear "+m.label+"?",subtitle:"This removes every component value for this month. This can't be undone.",confirmLabel:"Clear",onConfirm:()=>{clearMonth(m.key);sCfm(null)}})}:null,true),
+        t("button",{onClick:close,className:"w100 act98 tr",style:{padding:"13px 0",marginTop:4,background:"transparent",border:`1px solid ${c.brs}`,borderRadius:12,color:c.td,fontSize:13},children:"Cancel"}),
+      ]})});
+    })(),
+    cfm&&t(CSht,{title:cfm.title,subtitle:cfm.subtitle,confirmLabel:cfm.confirmLabel,danger:true,onConfirm:cfm.onConfirm,onClose:()=>sCfm(null)}),
   ]});
 }
 
