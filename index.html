@@ -2904,7 +2904,8 @@ function StmtImports({data,onClose,onTx}){
       o("div",{className:"f1 tl minw0",children:[
         t("div",{className:"tru",style:{fontSize:15,fontWeight:500},children:e.merchant||e.note||cat.label}),
         t("div",{className:"tru",style:{color:c.tm,fontSize:12,marginTop:2},children:exactDate+(sub?" · "+sub:"")+(e.subcategory?" · "+e.subcategory:"")}),
-        t("div",{style:{fontFamily:F.mo,fontSize:9.5,color:loggedAt?c.td:c.tm,marginTop:3,fontStyle:loggedAt?"normal":"italic"},children:loggedAt?"Imported "+loggedAt:"Import time not recorded"})
+        t("div",{style:{fontFamily:F.mo,fontSize:9.5,color:loggedAt?c.td:c.tm,marginTop:3,fontStyle:loggedAt?"normal":"italic"},children:loggedAt?"Imported "+loggedAt:"Import time not recorded"}),
+        e.stmtVerified&&t("div",{style:{fontFamily:F.mo,fontSize:9.5,color:c.mt,marginTop:2,letterSpacing:.3},children:"✓ Checked against the statement photo"})
       ]}),
       t("div",{style:{fontFamily:F.mo,fontSize:15,fontWeight:500,color:c.tx,flexShrink:0},children:"−"+fm(e.amount,e.currency||currency)})
     ]})
@@ -2975,6 +2976,7 @@ function StmtImports({data,onClose,onTx}){
 function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
   const{expenses,currency,accounts}=data;
   const cards=data.cards||[];
+  const rupeeMode=currency==="₹";
   const mm=useMemo(()=>buildMerchantMemory(expenses,data.merchantRules),[expenses,data.merchantRules]);
   const guessCat=(merchant)=>{const g=mm(merchant);return(g&&g.category)?g.category:"other"};
   const[cmpCardId,sCmpCardId]=useState(null);
@@ -3001,6 +3003,25 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
   const[photoPrompt,sPhotoPrompt]=useState("");
   const[note,sNote]=useState(null);
   const fileRef=useRef(null);const photoRef=useRef(null);
+  // --- Photo verification -------------------------------------------------
+  // OCR and vision models both misread rupee amounts (see stmtFindAmountToken): the ₹ can be read
+  // as a stray leading "3", or dropped along with the amount's own first digit. Neither is
+  // detectable from the text alone, so every parsed transaction remembers which uploaded photo it
+  // came from and the user can open that photo side-by-side with the row to confirm or correct it.
+  const[srcPhotos,sSrcPhotos]=useState([]);        // [{id,preview,label}] — source images for `parsed`
+  const[verify,sVerify]=useState(null);            // {tx, match, draft:{merchant,amount,date}}
+  const csvSrcRef=useRef({});                      // srcKey -> {photoId,alt,amtFix,rawLine} for the OCR→CSV path
+  const srcKey=(ts,amount)=>new Date(ts).toLocaleDateString("en-CA")+"|"+Number(amount).toFixed(2);
+  const photoFor=(tx)=>{
+    if(!tx||!srcPhotos.length)return null;
+    const byId=tx.photoId&&srcPhotos.find(p=>p.id===tx.photoId);
+    if(byId)return byId;
+    // A row can lose its photoId if its line was edited in the CSV box. With a single-photo
+    // scan there's only one thing it could have come from — but only if this parse really did
+    // come off that photo, not from a CSV pasted in afterwards.
+    const fromPhotos=(parsed||[]).some(x=>x.photoId);
+    return(srcPhotos.length===1&&fromPhotos)?srcPhotos[0]:null;
+  };
   const rowsToTxns=(rows)=>{
     if(!rows||rows.length<2)return{err:"No data found."};
     const headers=rows[0].map(h=>String(h||"").toLowerCase().trim());
@@ -3018,13 +3039,16 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
       if(rawDate){const pd=new Date(rawDate);if(!isNaN(pd.getTime()))ts=pd.getTime()}
       if(!ts)continue;
       const merchant=mI>=0?String(row[mI]||"").trim().slice(0,60):"";
-      txns.push({date:ts,amount:amt,merchant:merchant||"Unknown",category:guessCat(merchant||"Unknown")});
+      // Rows that came from the photo→OCR→CSV path carry their photo + ambiguity flags across,
+      // matched on date+amount (the description is editable in the CSV box, the numbers aren't).
+      const src=csvSrcRef.current[srcKey(ts,amt)]||null;
+      txns.push({date:ts,amount:amt,merchant:merchant||"Unknown",category:guessCat(merchant||"Unknown"),...(src?{photoId:src.photoId,alt:src.alt,amtFix:src.amtFix,rawLine:src.rawLine}:{})});
     }
     if(!txns.length)return{err:"No valid transactions found. Check that Date and Amount columns have data."};
     txns.sort((a,b)=>b.date-a.date);return{txns};
   };
   const parseFile=async(f)=>{
-    sErr(null);sResult(null);
+    sErr(null);sResult(null);sSrcPhotos([]);csvSrcRef.current={};
     try{
       const buf=await f.arrayBuffer();const X=window.XLSX||XLSX;const wb=X.read(buf);const ws=wb.Sheets[wb.SheetNames[0]];
       const rows=X.utils.sheet_to_json(ws,{header:1,raw:false,defval:""});
@@ -3054,17 +3078,30 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
       const ph=photos[i];
       try{
         const b64=ph.preview||await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(ph.file)});
-        const u=[{type:"image",source:{type:"base64",media_type:ph.file.type,data:b64.split(",")[1]}},{type:"text",text:(photoPrompt.trim()?photoPrompt.trim()+"\n\n":"")+'Extract ALL spending transactions visible. Return JSON only: {"transactions":[{"date":"YYYY-MM-DD","amount":N,"merchant":"name"}]}. Amounts as positive numbers.'}];
+        const u=[{type:"image",source:{type:"base64",media_type:ph.file.type,data:b64.split(",")[1]}},{type:"text",text:(photoPrompt.trim()?photoPrompt.trim()+"\n\n":"")+'Extract ALL spending transactions visible. Return JSON only: {"transactions":[{"date":"YYYY-MM-DD","amount":N,"merchant":"name","amountText":"exact characters printed for the amount, including any currency symbol"}]}.\nAmount rules — read these carefully, they are the most common source of error:\n• Never let a currency symbol become a digit. A ₹ sitting flush against the number is NOT a 3.\n• Never drop the amount\'s own leading digit. ₹350.00 is 350.00, not 50.00.\n• Copy every digit exactly as printed; do not round, reformat or infer.\n• amount must be a positive plain number with no symbol, commas or spaces.'}];
         const r=await cAPI({max_tokens:3000,system:sys,messages:[{role:"user",content:u}]});
         const txt=r.content?.map(x=>x.text||"").join("")||"";
         const m=txt.match(/\{[\s\S]*\}/);if(!m)throw new Error("Could not read transactions");
         const arr=(JSON.parse(m[0]).transactions)||[];
-        for(const it of arr){const amt=parseFloat(String(it.amount).replace(/[^0-9.]/g,""));if(!amt||isNaN(amt)||amt<=0)continue;const pd=parseAIDate(it.date);const ts=isNaN(pd.getTime())?Date.now():pd.getTime();all.push({date:ts,amount:amt,merchant:String(it.merchant||"Unknown").slice(0,60)})}
+        for(const it of arr){
+          const amt=parseFloat(String(it.amount).replace(/[^0-9.]/g,""));if(!amt||isNaN(amt)||amt<=0)continue;
+          const pd=parseAIDate(it.date);const ts=isNaN(pd.getTime())?Date.now():pd.getTime();
+          // Same ₹-as-3 ambiguity as the OCR path: if the printed text carried no currency symbol
+          // and the amount starts with 3, keep the alternate reading so the row can be checked.
+          const raw=String(it.amountText||"");
+          let alt=null,amtFix=null;
+          if(rupeeMode&&!/[₹$€£]|rs\.?|inr/i.test(raw)&&/^-?3\d/.test(String(amt))){
+            const stripped=parseFloat(String(amt).replace(/^3/,""));
+            if(!isNaN(stripped)&&stripped>0){alt=stripped;amtFix="maybe3"}
+          }
+          all.push({date:ts,amount:amt,merchant:String(it.merchant||"Unknown").slice(0,60),photoId:ph.id,rawLine:raw||null,alt,amtFix});
+        }
       }catch(e2){if(!firstErr)firstErr=`Photo ${i+1}: ${e2.message}`}
       sPhotoProgress(photos.length>1?{done:i+1,total:photos.length}:null);
     }
     if(!all.length){sErr(firstErr||"No transactions found in the photo(s).");sAnalyzing(false);sPhotoProgress(null);return}
     all.sort((a,b)=>b.date-a.date);sParsed(all);sFile({name:`${photos.length} photo${photos.length===1?"":"s"} · ${all.length} txns`});
+    sSrcPhotos(photos.map((p,pi)=>({id:p.id,preview:p.preview,label:`Photo #${pi+1}`})));csvSrcRef.current={};
     if(firstErr)sErr(firstErr+" — other photos were still processed.");
     sAnalyzing(false);sPhotoProgress(null);
   };
@@ -3103,7 +3140,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
           const month=Math.min(Math.max(it.month||1,1),12);
           const year=it.year||fallbackYear;
           const pd=new Date(year,month-1,day);const ts=isNaN(pd.getTime())?Date.now():pd.getTime();
-          all.push({date:ts,amount:it.amount,merchant:String(it.name||"Unknown").slice(0,60)||"Unknown"});
+          all.push({date:ts,amount:it.amount,merchant:String(it.name||"Unknown").slice(0,60)||"Unknown",photoId:ph.id,alt:it.alt!=null?it.alt:null,amtFix:it.amtFix||null,rawLine:it.rawLine||null});
         }
       }catch(e2){console.error(`Photo ${i+1} OCR failed:`,e2);if(!firstErr)firstErr=`Photo ${i+1}: ${describeErr(e2)}`}
       sCsvPhotoProgress({done:i+1,total:csvPhotos.length,pct:100,stage:"reading"});
@@ -3115,7 +3152,14 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
     marked.sort((a,b)=>a.date-b.date);
     const csvLines=["Date,Description,Amount",...marked.map(tx=>{const desc=String(tx.merchant||"Unknown")+(tx.dup?" [POSSIBLE DUPLICATE]":"");return `${new Date(tx.date).toLocaleDateString("en-CA")},${desc.replace(/,/g,";")},${tx.amount.toFixed(2)}`})];
     sCsvText(csvLines.join("\n"));
+    // Remember which photo each row was read off, plus the alternate ₹-misread amount, so the
+    // rows survive the round-trip through the editable CSV box and stay verifiable against the photo.
+    const srcMap={};for(const tx of marked)srcMap[srcKey(tx.date,tx.amount)]={photoId:tx.photoId,alt:tx.alt,amtFix:tx.amtFix,rawLine:tx.rawLine};
+    csvSrcRef.current=srcMap;
+    sSrcPhotos(csvPhotos.map((p,pi)=>({id:p.id,preview:p.preview,label:`Photo #${pi+1}`})));
+    const flagged=marked.filter(tx=>tx.amtFix).length;
     const notes=[];if(dupCount>0)notes.push(`Flagged ${dupCount} likely-duplicate row${dupCount===1?"":"s"} (same date, amount & merchant appeared on more than one photo) — look for "[POSSIBLE DUPLICATE]" below and delete any rows you don't want before tapping Parse CSV text.`);
+    if(flagged>0)notes.push(`${flagged} amount${flagged===1?"":"s"} could be misread — the ₹ symbol and a leading "3" look identical to OCR. After parsing, tap "Photo" on any flagged row to check it against the original.`);
     if(firstErr)notes.push(firstErr+" — other photos were still processed.");
     sNote(notes.length?notes.join(" "):`Read ${marked.length} transaction${marked.length===1?"":"s"} from ${csvPhotos.length} photo${csvPhotos.length===1?"":"s"}. Review below, then tap Parse CSV text.`);
     sCsvPhotoBusy(false);sCsvPhotoProgress(null);
@@ -3146,8 +3190,26 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
   },[parsed,expenses,win,cmpCardId]);
   const logged=recon.filter(r=>r.match);
   const unlogged=recon.filter(r=>!r.match);
-  const mkExp=(tx)=>({type:"expense",amount:tx.amount,currency,accountId:(accounts&&accounts[0]&&accounts[0].id)||null,cardId:cmpCardId||null,category:tx.category||guessCat(tx.merchant),merchant:tx.merchant||null,note:"From statement",date:tx.date,source:"statement"});
+  const mkExp=(tx)=>({type:"expense",amount:tx.amount,currency,accountId:(accounts&&accounts[0]&&accounts[0].id)||null,cardId:cmpCardId||null,category:tx.category||guessCat(tx.merchant),merchant:tx.merchant||null,note:"From statement",date:tx.date,source:"statement",...(tx.verified?{stmtVerified:true}:{})});
   const logOne=(tx)=>onAddExpenses&&onAddExpenses([mkExp(tx)]);
+  // Replace one row in the parsed list in place — recon recomputes off `parsed`, so a corrected
+  // amount immediately re-runs the logged/not-logged match.
+  const patchTx=(orig,patch)=>{const next={...orig,...patch};sParsed(prev=>(prev||[]).map(x=>x===orig?next:x));return next};
+  const flagged=useMemo(()=>(parsed||[]).filter(tx=>tx.amtFix&&!tx.verified),[parsed]);
+  // Swap every unverified flagged row to its alternate reading in one go — for when the photo shows
+  // the parser guessed the wrong way on all of them (a whole statement's ₹ read as 3, or vice versa).
+  const swapAllFlagged=()=>sParsed(prev=>(prev||[]).map(tx=>(tx.amtFix&&!tx.verified&&tx.alt!=null)?{...tx,amount:tx.alt,alt:tx.amount}:tx));
+  const openVerify=(r)=>sVerify({tx:r.tx,match:r.match||null,merchant:r.tx.merchant||"",amount:String(r.tx.amount),date:tsToYMD(r.tx.date),zoom:1});
+  // Write the checked values back onto the parsed row and mark it confirmed, so the warning badge
+  // clears and "Use the other reading for all" stops touching it.
+  const saveVerify=(alsoLog)=>{
+    if(!verify)return;
+    const amt=parseFloat(verify.amount);if(!amt||amt<=0)return;
+    const d=verify.date?parseAIDate(verify.date):null;
+    const next=patchTx(verify.tx,{amount:amt,merchant:(verify.merchant||"").trim()||"Unknown",date:(d&&!isNaN(d.getTime()))?d.getTime():verify.tx.date,verified:true,amtFix:null});
+    sVerify(null);
+    if(alsoLog)logOne(next);
+  };
   const openManual=(tx)=>sMan({merchant:tx.merchant||"",amount:String(tx.amount),date:tsToYMD(tx.date),category:tx.category||guessCat(tx.merchant),via:cmpCardId?"card":"account",accountId:(accounts&&accounts[0]&&accounts[0].id)||null,cardId:cmpCardId||(cards[0]&&cards[0].id)||null,note:"From statement"});
   const saveManual=()=>{const amt=parseFloat(man.amount);if(!amt||amt<=0)return;const viaCard=man.via==="card";onAddExpenses&&onAddExpenses([{type:"expense",amount:amt,currency,accountId:viaCard?null:(man.accountId||null),cardId:viaCard?(man.cardId||null):null,category:man.category||"other",merchant:(man.merchant||"").trim()||null,note:(man.note||"").trim()||null,date:man.date?parseAIDate(man.date).getTime():Date.now(),source:"statement"}]);sMan(null)};
   const logAll=()=>{if(unlogged.length&&onAddExpenses)onAddExpenses(unlogged.map(r=>mkExp(r.tx)))};
@@ -3174,7 +3236,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
   const removeParsedTx=(tx)=>sParsed(prev=>(prev||[]).filter(x=>x!==tx));
   return o("div",{style:{padding:"8px 24px 40px"},className:"st",children:[
     t(SH,{title:t("em",{children:"Statement Analyzer"}),onBack:onClose,right:t("button",{onClick:onViewImports,className:"act95 trt",style:{padding:"8px 12px",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:10,fontSize:11,fontWeight:600,fontFamily:F.mo},children:"IMPORTS"})}),
-    t("div",{style:{fontSize:13,color:c.td,marginBottom:16,lineHeight:1.5},children:"Bring in your bank or credit card statement — upload a CSV/Excel file, paste CSV text, or snap one or more photos. Each transaction is matched against your logged expenses; log any that are missing, then ask the AI follow-up questions."}),
+    t("div",{style:{fontSize:13,color:c.td,marginBottom:16,lineHeight:1.5},children:"Bring in your bank or credit card statement — upload a CSV/Excel file, paste CSV text, or snap one or more photos. Each transaction is matched against your logged expenses; log any that are missing, then ask the AI follow-up questions. Rows read from a photo keep that photo attached, so you can tap 🔍 Photo on any of them — logged or not — to check the amount against the original."}),
     o("div",{className:"f ia",style:{gap:6,marginBottom:14},children:[{id:"file",l:"📄 File"},{id:"paste",l:"📋 Paste CSV"},{id:"photo",l:"📷 Photo"}].map(mm=>t("button",{key:mm.id,onClick:()=>{sMode(mm.id);sErr(null)},className:"act95 tr",style:{flex:1,padding:"9px 0",background:mode===mm.id?c.ac:c.sf2,color:mode===mm.id?"#0a0a0a":c.td,border:`1px solid ${mode===mm.id?c.ac:c.brs}`,borderRadius:10,fontSize:12,fontFamily:F.mo},children:mm.l}))}),
     mode==="file"&&o("div",{style:{background:c.sfg,borderRadius:16,border:`2px dashed ${file?c.mt:c.brs}`,padding:20,textAlign:"center",marginBottom:16,cursor:"pointer"},onClick:()=>fileRef.current?.click(),children:[
       t("div",{style:{fontSize:28,marginBottom:8},children:file?"✅":"📄"}),
@@ -3274,12 +3336,20 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
         o("div",{className:"f ia",style:{gap:6},children:[{id:"unlogged",l:"Not logged"},{id:"logged",l:"Logged"},{id:"all",l:"All"}].map(f=>t("button",{key:f.id,onClick:()=>sFilter(f.id),className:"act95 tr",style:{padding:"6px 13px",background:filter===f.id?c.ac:c.sf2,color:filter===f.id?"#0a0a0a":c.td,border:`1px solid ${filter===f.id?c.ac:c.brs}`,borderRadius:999,fontSize:11.5,fontFamily:F.mo},children:f.l+(f.id==="unlogged"?` (${unlogged.length})`:f.id==="logged"?` (${logged.length})`:` (${recon.length})`)}))}),
         t("button",{onClick:()=>sSortDir(d=>d==="desc"?"asc":"desc"),className:"act95 tr f ia jc",style:{gap:4,padding:"6px 11px",flexShrink:0,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:999,fontSize:11,fontFamily:F.mo,color:c.td},children:[sortDir==="desc"?"↓":"↑",sortDir==="desc"?"Newest":"Oldest"]})
       ]}),
-      t("div",{style:{display:"flex",flexDirection:"column",gap:8,marginBottom:18},children:shownSorted.length===0?[t("div",{key:"e",style:{fontSize:12,color:c.tm,textAlign:"center",padding:"16px 0"},children:"Nothing here."})]:shownSorted.map((r,i)=>o("div",{key:i,style:{background:c.sfg,borderRadius:12,border:`1px solid ${r.match?c.brs:c.co+"40"}`,padding:"12px 14px"},children:[
+      srcPhotos.length>0&&flagged.length>0&&o("div",{style:{background:c.co+"14",border:`1px solid ${c.co}40`,borderRadius:12,padding:"11px 14px",marginBottom:12},children:[
+        t("div",{style:{fontSize:12.5,color:c.tx,lineHeight:1.5},children:`${flagged.length} amount${flagged.length===1?"":"s"} could be misread — a ₹ pressed against the digits looks exactly like a leading "3". Tap Photo on a flagged row to compare it with the original.`}),
+        t("button",{onClick:swapAllFlagged,className:"act95 tr",style:{marginTop:9,padding:"7px 13px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:999,fontSize:11.5,color:c.td,fontFamily:F.mo},children:"Use the other reading for all "+flagged.length})
+      ]}),
+      t("div",{style:{display:"flex",flexDirection:"column",gap:8,marginBottom:18},children:shownSorted.length===0?[t("div",{key:"e",style:{fontSize:12,color:c.tm,textAlign:"center",padding:"16px 0"},children:"Nothing here."})]:shownSorted.map((r,i)=>{
+        const ph=photoFor(r.tx);const susp=!!r.tx.amtFix&&!r.tx.verified;
+        return o("div",{key:i,style:{background:c.sfg,borderRadius:12,border:`1px solid ${susp?c.gd||c.co:r.match?c.brs:c.co+"40"}`,padding:"12px 14px"},children:[
         o("div",{className:"f ia jb",style:{gap:8},children:[
           o("div",{className:"f1 minw0",children:[
             t("div",{className:"tru",style:{fontSize:14,color:c.tx,fontWeight:500},children:r.tx.merchant||"Unknown"}),
             t("div",{style:{fontSize:11,color:c.tm,marginTop:3},children:new Date(r.tx.date).toLocaleDateString("en-US",{day:"numeric",month:"short",year:"numeric"})}),
-            !r.match&&t("div",{style:{fontSize:10.5,color:c.td,marginTop:3,fontFamily:F.mo},children:co(r.tx.category||guessCat(r.tx.merchant)).emoji+" "+co(r.tx.category||guessCat(r.tx.merchant)).label})
+            !r.match&&t("div",{style:{fontSize:10.5,color:c.td,marginTop:3,fontFamily:F.mo},children:co(r.tx.category||guessCat(r.tx.merchant)).emoji+" "+co(r.tx.category||guessCat(r.tx.merchant)).label}),
+            susp&&t("div",{style:{fontSize:10,color:c.gd||c.co,marginTop:4,fontFamily:F.mo,letterSpacing:.3},children:r.tx.amtFix==="stripped3"?"⚠ ₹ REMOVED FROM AMOUNT — CHECK PHOTO":"⚠ AMOUNT MAY START WITH A MISREAD ₹"}),
+            r.tx.verified&&t("div",{style:{fontSize:10,color:c.mt,marginTop:4,fontFamily:F.mo,letterSpacing:.3},children:"✓ CHECKED AGAINST PHOTO"})
           ]}),
           o("div",{style:{textAlign:"right",flexShrink:0},children:[
             t("div",{style:{fontFamily:F.mo,fontSize:14,color:r.match?c.tx:c.co},children:"−"+fm(r.tx.amount,currency)}),
@@ -3287,10 +3357,11 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
               t("button",{onClick:()=>sQuick({...r.tx,category:r.tx.category||guessCat(r.tx.merchant)}),className:"act95 tr",style:{padding:"5px 11px",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:999,fontSize:11,fontWeight:600},children:"+ Quick"}),
               t("button",{onClick:()=>openManual(r.tx),className:"act95 tr",style:{padding:"5px 11px",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:999,fontSize:11,fontWeight:600},children:"Edit"})
             ]}),
+            ph&&t("button",{onClick:()=>openVerify(r),className:"act95 tr",style:{marginTop:6,marginLeft:"auto",padding:"5px 11px",background:susp?(c.gd||c.ac):c.sf2,color:susp?"#0a0a0a":c.td,border:`1px solid ${susp?(c.gd||c.ac):c.brs}`,borderRadius:999,fontSize:11,fontWeight:600,display:"block"},children:"🔍 Photo"}),
             t("button",{onClick:()=>removeParsedTx(r.tx),"aria-label":"Remove this parsed row",title:"Remove this row from the parsed list (e.g. duplicate or misread)",className:"act95 tr",style:{marginTop:6,padding:"4px 8px",background:"transparent",border:"none",color:c.co,display:"flex",alignItems:"center",gap:4,fontSize:10,fontFamily:F.mo,marginLeft:"auto"},children:[t(Trash2,{size:11,color:c.co}),"Remove"]})
           ]})
         ]})
-      ]}))}),
+      ]})})}),
       !result&&t("button",{disabled:analyzing||!gAK(),onClick:analyze,className:"w100 act98 tr",style:{padding:"13px 0",background:analyzing||!gAK()?c.sf2:c.sf3,color:analyzing||!gAK()?c.tm:c.tx,borderRadius:12,fontWeight:600,fontSize:14,border:`1px solid ${c.brs}`,marginBottom:18},children:analyzing?"Analyzing…":!gAK()?"Add API key in Settings for AI analysis":"✨ Analyze with AI"}),
       result&&o(Fragment,{children:[
         result.summary&&o("div",{style:{background:`linear-gradient(135deg,${c.ac}15 0%,${c.sfg} 70%)`,borderRadius:16,border:`1px solid ${c.brs}`,padding:16,marginBottom:14},children:[
@@ -3302,7 +3373,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
           t("div",{style:{display:"flex",flexDirection:"column",gap:8},children:(result.observations||[]).map((obs,i)=>o("div",{key:i,style:{background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,padding:"12px 14px",fontSize:13,color:c.tx,lineHeight:1.5},children:[t("span",{style:{color:c.ac,marginRight:8},children:"→"}),obs]}))})
         ]})
       ]}),
-      t("button",{onClick:()=>{sResult(null);sParsed(null);sFile(null);sPhotos([]);sPhotoProgress(null)},className:"w100 act98 tr",style:{padding:"12px 0",background:c.sf2,color:c.td,borderRadius:12,border:`1px solid ${c.brs}`,fontSize:13,marginTop:10},children:"Upload another statement"})
+      t("button",{onClick:()=>{sResult(null);sParsed(null);sFile(null);sPhotos([]);sPhotoProgress(null);sSrcPhotos([]);sVerify(null);sCsvPhotos([]);csvSrcRef.current={}},className:"w100 act98 tr",style:{padding:"12px 0",background:c.sf2,color:c.td,borderRadius:12,border:`1px solid ${c.brs}`,fontSize:13,marginTop:10},children:"Upload another statement"})
     ]}),
     quick&&t(Sht,{onClose:()=>sQuick(null),children:o(Fragment,{children:[
       t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:6},children:"Log this transaction?"}),
@@ -3338,7 +3409,61 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
       ]}),
       o("div",{style:{marginBottom:18},children:t(FI,{label:"Note (optional)",value:man.note,onChange:v=>sMan({...man,note:v}),placeholder:"e.g., from statement"})}),
       t("button",{disabled:!parseFloat(man.amount)||parseFloat(man.amount)<=0,onClick:saveManual,className:"w100 act98 tr",style:{padding:"14px 0",background:parseFloat(man.amount)?c.ac:c.sf2,color:parseFloat(man.amount)?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:parseFloat(man.amount)?`Log ${fm(parseFloat(man.amount),currency)}`:"Enter an amount"})
-    ]})})
+    ]})}),
+    verify&&(()=>{
+      const ph=photoFor(verify.tx);
+      const amt=parseFloat(verify.amount);
+      const alt=verify.tx.alt;
+      const zoom=verify.zoom||1;
+      const setZoom=z=>sVerify(v=>({...v,zoom:Math.min(4,Math.max(1,+z.toFixed(2)))}));
+      return t(Sht,{onClose:()=>sVerify(null),children:o(Fragment,{children:[
+        o("div",{className:"f ia jb",style:{marginBottom:6},children:[
+          t("div",{style:{fontFamily:c.hf,fontSize:22},children:"Check against the photo"}),
+          t("button",{onClick:()=>sVerify(null),style:{background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:999,width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",color:c.td},children:t(X,{size:16})})
+        ]}),
+        t("div",{style:{fontSize:12.5,color:c.td,marginBottom:14,lineHeight:1.5},children:verify.match?"This row already matches a logged expense. Compare it with the original to be sure the statement was read correctly.":"Zoom into the amount on the original and correct anything the reader got wrong before logging it."}),
+        ph?o("div",{style:{marginBottom:14},children:[
+          o("div",{className:"f ia jb",style:{marginBottom:6},children:[
+            t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1},children:(ph.label||"SOURCE PHOTO").toUpperCase()}),
+            o("div",{className:"f ia",style:{gap:6},children:[
+              t("button",{onClick:()=>setZoom(zoom-0.5),disabled:zoom<=1,className:"act90 trt",style:{width:28,height:28,borderRadius:999,background:c.sf2,border:`1px solid ${c.brs}`,color:zoom<=1?c.tm:c.tx,fontSize:15,lineHeight:1,padding:0},children:"−"}),
+              t("div",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,minWidth:34,textAlign:"center"},children:Math.round(zoom*100)+"%"}),
+              t("button",{onClick:()=>setZoom(zoom+0.5),disabled:zoom>=4,className:"act90 trt",style:{width:28,height:28,borderRadius:999,background:c.sf2,border:`1px solid ${c.brs}`,color:zoom>=4?c.tm:c.tx,fontSize:15,lineHeight:1,padding:0},children:"+"})
+            ]})
+          ]}),
+          t("div",{style:{maxHeight:"42vh",overflow:"auto",borderRadius:12,border:`1px solid ${c.brs}`,background:"#000",WebkitOverflowScrolling:"touch"},children:t("img",{src:ph.preview,alt:"Statement photo",style:{width:100*zoom+"%",minWidth:"100%",display:"block"}})}),
+          zoom===1&&t("div",{style:{fontSize:10.5,color:c.tm,marginTop:5},children:"Tap + to magnify, then scroll the image to find this row."})
+        ]}):t("div",{style:{fontSize:12,color:c.tm,marginBottom:14},children:"No source photo is attached to this row."}),
+        verify.tx.rawLine&&o("div",{style:{background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"9px 11px",marginBottom:14},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:4},children:"READ AS"}),
+          t("div",{style:{fontFamily:F.mo,fontSize:12,color:c.td,wordBreak:"break-word"},children:verify.tx.rawLine})
+        ]}),
+        alt!=null&&o("div",{style:{marginBottom:14},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:"WHICH AMOUNT IS ON THE PHOTO?"}),
+          o("div",{className:"g g2",style:{gap:8},children:[
+            t("button",{onClick:()=>sVerify(v=>({...v,amount:String(verify.tx.amount)})),className:"act95 tr",style:{padding:"11px 6px",background:amt===verify.tx.amount?c.ac:c.sf2,color:amt===verify.tx.amount?"#0a0a0a":c.td,border:`1px solid ${amt===verify.tx.amount?c.ac:c.brs}`,borderRadius:11,fontSize:13.5,fontFamily:F.mo,fontWeight:600},children:fm(verify.tx.amount,currency)}),
+            t("button",{onClick:()=>sVerify(v=>({...v,amount:String(alt)})),className:"act95 tr",style:{padding:"11px 6px",background:amt===alt?c.ac:c.sf2,color:amt===alt?"#0a0a0a":c.td,border:`1px solid ${amt===alt?c.ac:c.brs}`,borderRadius:11,fontSize:13.5,fontFamily:F.mo,fontWeight:600},children:fm(alt,currency)})
+          ]}),
+          t("div",{style:{fontSize:10.5,color:c.tm,marginTop:6,lineHeight:1.45},children:verify.tx.amtFix==="stripped3"?"A leading \"3\" was treated as the ₹ symbol and dropped. Pick the right-hand figure if that 3 is really part of the amount.":"The amount starts with a 3, which may actually be the ₹ symbol misread. Pick the right-hand figure if the 3 isn't part of the amount."})
+        ]}),
+        o("div",{style:{marginBottom:12},children:t(FI,{label:"Merchant / description",value:verify.merchant,onChange:v=>sVerify(x=>({...x,merchant:v})),placeholder:"e.g., Amazon"})}),
+        o("div",{className:"g g2",style:{gap:10,marginBottom:14},children:[
+          o("div",{children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"AMOUNT"}),o("div",{className:"f ia",style:{gap:6,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 12px"},children:[t("span",{style:{color:c.td,fontFamily:F.mo,fontSize:15},children:currency}),t("input",{type:"text",inputMode:"decimal",value:verify.amount,onChange:e=>sVerify(x=>({...x,amount:e.target.value.replace(/[^\d.]/g,"")})),style:{flex:1,minWidth:0,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:15,fontFamily:F.mo}})]})]}),
+          o("div",{children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"DATE"}),t("input",{type:"date",value:verify.date,onChange:e=>sVerify(x=>({...x,date:e.target.value})),style:{width:"100%",boxSizing:"border-box",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 12px",color:c.tx,fontSize:13,outline:"none",fontFamily:'var(--tf)',colorScheme:c.dk?"dark":"light"}})]})
+        ]}),
+        verify.match&&o("div",{style:{background:c.mt+"14",border:`1px solid ${c.mt}40`,borderRadius:12,padding:"10px 13px",marginBottom:14},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.mt,letterSpacing:1,marginBottom:4},children:"MATCHED LOGGED EXPENSE"}),
+          t("div",{style:{fontSize:12.5,color:c.tx},children:(verify.match.merchant||verify.match.note||co(verify.match.category).label)+" · "+fm(verify.match.amount,verify.match.currency||currency)}),
+          t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:new Date(verify.match.date).toLocaleDateString("en-US",{day:"numeric",month:"short",year:"numeric"})}),
+          amt>0&&Math.abs(amt-verify.match.amount)>0.01&&t("div",{style:{fontSize:11,color:c.co,marginTop:6,lineHeight:1.45},children:"Saving this amount will no longer match that expense — it will move back to Not logged so you can fix whichever one is wrong."})
+        ]}),
+        o("div",{className:"f",style:{gap:10},children:[
+          t("button",{onClick:()=>sVerify(null),className:"f1 act98 tr",style:{padding:"13px 0",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:12,fontSize:14,fontWeight:500},children:"Cancel"}),
+          t("button",{disabled:!(amt>0),onClick:()=>saveVerify(false),className:"f1 act98 tr",style:{padding:"13px 0",background:amt>0?c.ac:c.sf2,color:amt>0?"#0a0a0a":c.tm,border:"none",borderRadius:12,fontSize:14,fontWeight:600},children:"Mark checked"})
+        ]}),
+        !verify.match&&t("button",{disabled:!(amt>0),onClick:()=>saveVerify(true),className:"w100 act98 tr",style:{marginTop:10,padding:"13px 0",background:"transparent",color:amt>0?c.mt:c.tm,border:`1px solid ${amt>0?c.mt:c.brs}`,borderRadius:12,fontSize:14,fontWeight:600},children:amt>0?`Mark checked & log ${fm(amt,currency)}`:"Enter an amount"})
+      ]})});
+    })()
   ]})
 }
 
@@ -4302,17 +4427,38 @@ function stmtFindDateToken(line){
 // Tesseract's base "eng" model has no ₹ glyph in its trained character set at all (it's simply
 // never seen it), so on ₹-labelled photos it maps the symbol to whatever character looks closest —
 // commonly a stray "3" glued directly onto the real number with no space ("₹303.32" -> "3303.32"),
-// silently inflating the amount. When rupeeMode is on, a leading "3" immediately touching the digits
-// is treated as that misread symbol and captured separately so it never reaches the parsed number —
-// a real amount's digits always live in their own capture group, so a genuine "3" that's actually the
-// amount's own leading digit (e.g. a correctly-read ₹303.32, or a bare 350.00) is never touched.
+// silently inflating the amount. But the mirror image is just as common: the ₹ is dropped entirely
+// and the amount's OWN leading digit happens to be a 3 ("₹350.00" -> "350.00"). Those two cases are
+// character-for-character identical, so no regex can tell them apart on a single line. Instead of
+// guessing per-line (which silently ate the first digit of every genuine ₹3xx/₹3,xxx amount), both
+// readings are returned here — `amount` as printed and `alt` with the leading 3 removed — and the
+// choice is made document-wide in stmtResolveRupee3, with the row flagged for photo verification.
 function stmtFindAmountToken(line,rupeeMode){
-  const re=rupeeMode?/(?:₹|rs\.?|inr\.?|\$|€|£|3(?=\d))?\s?(-?\d[\d,]*\.\d{2})\b/i:/(?:₹|rs\.?|inr\.?|\$|€|£)?\s?(-?\d[\d,]*\.\d{2})\b/i;
-  const m=line.match(re);
+  const m=line.match(/(₹|rs\.?|inr\.?|\$|€|£)?\s?(-?\d[\d,]*\.\d{2})\b/i);
   if(!m)return null;
-  const num=parseFloat(m[1].replace(/,/g,""));
+  const num=parseFloat(m[2].replace(/,/g,""));
   if(isNaN(num))return null;
-  return{amount:Math.abs(num),match:m[0]};
+  const sym=!!m[1];
+  let alt=null;
+  // Only ambiguous when the currency symbol itself never made it into the text.
+  if(rupeeMode&&!sym&&/^-?3\d/.test(m[2])){
+    const stripped=parseFloat(m[2].replace(/,/g,"").replace(/^(-?)3/,"$1"));
+    if(!isNaN(stripped)&&Math.abs(stripped)>0)alt=Math.abs(stripped);
+  }
+  return{amount:Math.abs(num),alt,sym,match:m[0]};
+}
+// Decide, across the whole statement, whether a leading "3" on symbol-less amounts is a misread ₹.
+// One row starting with 3 proves nothing; most of them starting with 3 is the signature of a symbol
+// the OCR mapped to "3" on every single line. Whichever way it goes, ambiguous rows keep both
+// readings (`amount` + `alt`) and carry an amtFix tag so the UI can ask the user to check the photo.
+function stmtResolveRupee3(rows){
+  const cands=rows.filter(r=>r.alt!=null);
+  if(!cands.length)return rows;
+  const noSym=rows.filter(r=>!r.sym);
+  const systematic=cands.length>=2&&noSym.length>0&&cands.length/noSym.length>=0.6;
+  return rows.map(r=>r.alt==null?r:(systematic
+    ?{...r,amount:r.alt,alt:r.amount,amtFix:"stripped3"}
+    :{...r,amtFix:"maybe3"}));
 }
 const STMT_SKIP_RE=/^(statement|summary|total|sub\s*total|balance|available|credit limit|minimum (amount )?due|due date|payment due|page\s*\d|opening balance|closing balance|transaction (history|details)|date\s+description\s+amount)\b/i;
 const STMT_CATWORDS=new Set(["grocery","groceries","shopping","food and drinks","food & drinks","medical","others","other","transport","bills","entertainment","subscriptions","subscription","health","travel","fuel","rent","emi","recharge","utilities","utility","insurance","salary","income","transfer","atm","cash withdrawal","refund","reversal"]);
@@ -4329,23 +4475,23 @@ function stmtStripTokens(line,dt,am){
 function stmtParseOCRText(text,fallbackYear,currency){
   const rupeeMode=currency==="₹";
   const lines=String(text||"").split(/\r?\n/).map(l=>l.trim()).filter(Boolean).filter(l=>!STMT_SKIP_RE.test(l));
-  const out=[];let nameBuf=[],amt=null;
+  const out=[];let nameBuf=[],am2=null,amLine=null;
   const allDates=[],allAmounts=[],allNames=[];
   lines.forEach((line,idx)=>{
     const dt=stmtFindDateToken(line);const am=stmtFindAmountToken(line,rupeeMode);
     const rest=stmtStripTokens(line,dt,am);
     if(dt)allDates.push({idx,dt});
-    if(am)allAmounts.push({idx,a:am.amount});
+    if(am)allAmounts.push({idx,am,line});
     if(rest&&!STMT_CATWORDS.has(rest.toLowerCase()))allNames.push({idx,line:rest});
   });
   for(const line of lines){
     const dt=stmtFindDateToken(line);const am=stmtFindAmountToken(line,rupeeMode);
     const rest=stmtStripTokens(line,dt,am);
-    if(am)amt=am.amount;
+    if(am){am2=am;amLine=line}
     if(rest&&!STMT_CATWORDS.has(rest.toLowerCase()))nameBuf.push(rest);
     if(dt){
-      if(amt!=null&&nameBuf.length)out.push({name:nameBuf.join(" ").trim(),amount:amt,day:dt.day,month:dt.month,year:dt.year!=null?dt.year:fallbackYear});
-      nameBuf=[];amt=null;
+      if(am2!=null&&nameBuf.length)out.push({name:nameBuf.join(" ").trim(),amount:am2.amount,alt:am2.alt,sym:am2.sym,rawLine:amLine,day:dt.day,month:dt.month,year:dt.year!=null?dt.year:fallbackYear});
+      nameBuf=[];am2=null;amLine=null;
     }
   }
   // Fallback for OCR that reads column-by-column instead of row-by-row: if the sequential
@@ -4353,15 +4499,15 @@ function stmtParseOCRText(text,fallbackYear,currency){
   if(out.length<allDates.length&&allAmounts.length===allDates.length&&allDates.length>0){
     const fb=[];const namesLineUp=allNames.length===allDates.length;
     for(let i=0;i<allDates.length;i++){
-      const{idx:dIdx,dt}=allDates[i];const{a}=allAmounts[i];
+      const{idx:dIdx,dt}=allDates[i];const{am,line:aLine}=allAmounts[i];
       let name;
       if(namesLineUp)name=allNames[i].line;
       else{let nearest=null,bestDist=Infinity;for(const n of allNames){const dist=Math.abs(n.idx-dIdx);if(dist<bestDist){bestDist=dist;nearest=n}}name=(nearest&&nearest.line)||"Unknown"}
-      fb.push({name,amount:a,day:dt.day,month:dt.month,year:dt.year!=null?dt.year:fallbackYear});
+      fb.push({name,amount:am.amount,alt:am.alt,sym:am.sym,rawLine:aLine,day:dt.day,month:dt.month,year:dt.year!=null?dt.year:fallbackYear});
     }
-    if(fb.length>out.length)return fb;
+    if(fb.length>out.length)return stmtResolveRupee3(fb);
   }
-  return out;
+  return stmtResolveRupee3(out);
 }
 // Local text-list parser: handles "Milk 64", "2 Milk 128", "Rice 5kg 250", "Maggi MRP 70 disc 6 64", bare names.
 function grocParseText(text){
@@ -5092,7 +5238,7 @@ function Calend({data,onTx,onFlt,presetAdd}){const{expenses,currency}=data;const
   useEffect(()=>{_calState={yr,mo,sel,cf,cSub}},[yr,mo,sel,cf,cSub]);
   const days=useMemo(()=>{const fd=new Date(yr,mo,1).getDay(),la=new Date(yr,mo+1,0).getDate(),x=[];for(let i=fd-1;i>=0;i--)x.push({date:new Date(yr,mo,-i),other:true});for(let d=1;d<=la;d++)x.push({date:new Date(yr,mo,d),other:false});while(x.length<42){const l=x[x.length-1].date,n=new Date(l);n.setDate(l.getDate()+1);x.push({date:n,other:true})}return x},[yr,mo]);
   const byD=useMemo(()=>{const pairs=txPairs(expenses);const m={};for(const e of expenses){if(e.type==="transfer-in")continue;const k=new Date(e.date).toDateString();if(!m[k])m[k]={total:0,income:0,items:[]};if(e.type==="expense"||e.type==="card-payment")m[k].total+=netAmt(e);else if(e.type==="income")m[k].income+=e.amount;m[k].items.push(enrichTx(e,pairs))}return m},[expenses]);
-  const fByD=useMemo(()=>{if(cf==="all")return byD;const fn=cf==="income"?e=>e.type==="income":cf==="expense"?e=>e.type==="expense":cf==="cards"?(cSub?e=>e.cardId===cSub&&e.type!=="card-payment":e=>!!e.cardId&&e.type!=="card-payment"):cf==="reimbursable"?(cSub==="pending"?e=>!!(e.reimbursable)&&!e.reimbursedBy&&e.type==="expense":cSub==="done"?e=>!!(e.reimbursable)&&!!e.reimbursedBy&&e.type==="expense":e=>!!(e.reimbursable)&&e.type==="expense"):cf==="cardpay"?e=>e.type==="card-payment":(cSub?e=>e.accountId===cSub&&e.type==="expense"&&!e.cardId:e=>e.type==="expense"&&!e.cardId);const m={};for(const[k,v]of Object.entries(byD)){const fi=v.items.filter(fn);if(fi.length>0){const ft=fi.filter(e=>e.type==="expense"||e.type==="card-payment").reduce((s,e)=>s+netAmt(e),0),fin=fi.filter(e=>e.type==="income").reduce((s,e)=>s+e.amount,0);m[k]={total:ft,income:fin,items:fi}}}return m},[byD,cf,cSub]);
+  const fByD=useMemo(()=>{if(cf==="all")return byD;const fn=cf==="income"?e=>e.type==="income":cf==="expense"?e=>e.type==="expense":cf==="cards"?(cSub?e=>e.cardId===cSub&&e.type!=="card-payment":e=>!!e.cardId&&e.type!=="card-payment"):cf==="reimbursable"?(cSub==="pending"?e=>!!(e.reimbursable)&&!e.reimbursedBy&&e.type==="expense":cSub==="done"?e=>!!(e.reimbursable)&&!!e.reimbursedBy&&e.type==="expense":e=>!!(e.reimbursable)&&e.type==="expense"):cf==="cardpay"?e=>e.type==="card-payment":cf==="stmt"?e=>e.source==="statement":(cSub?e=>e.accountId===cSub&&e.type==="expense"&&!e.cardId:e=>e.type==="expense"&&!e.cardId);const m={};for(const[k,v]of Object.entries(byD)){const fi=v.items.filter(fn);if(fi.length>0){const ft=fi.filter(e=>e.type==="expense"||e.type==="card-payment").reduce((s,e)=>s+netAmt(e),0),fin=fi.filter(e=>e.type==="income").reduce((s,e)=>s+e.amount,0);m[k]={total:ft,income:fin,items:fi}}}return m},[byD,cf,cSub]);
   const mst=useMemo(()=>{let to=0,ic=0,co2=0,mx=0;for(const cl of days){if(cl.other)continue;const x=fByD[cl.date.toDateString()];if(x){to+=x.total;ic+=x.income;co2+=x.items.length;if(x.total>mx)mx=x.total}}return{total:to,income:ic,max:mx,count:co2}},[days,fByD]);
   // Gross vs Net expense for the visible month (shown only on the "All" filter).
   // Gross = every outflow, INCLUDING credit-card bill payments. Net strips two
@@ -5102,7 +5248,7 @@ function Calend({data,onTx,onFlt,presetAdd}){const{expenses,currency}=data;const
   //   • Reimbursed: the reimbursed portion of any remaining expense.
   const gn=useMemo(()=>{let gross=0,ccbill=0,reimb=0,pend=0;for(const e of expenses){const dt=new Date(e.date);if(dt.getFullYear()!==yr||dt.getMonth()!==mo)continue;if(e.type==="card-payment"){gross+=e.amount;ccbill+=e.amount;continue;}if(e.type!=="expense")continue;gross+=e.amount;if(isCcBill(e)){ccbill+=e.amount;continue;}reimb+=rbAmt(e);if(e.reimbursable&&!e.reimbursedBy)pend+=e.amount;}return{gross,ccbill,reimb,pend,net:Math.max(0,gross-ccbill-reimb)};},[expenses,yr,mo]);
   const tod=new Date().toDateString(),cl=fByD[sel],its=cl?.items||[],sp=cl?.total||0,inc=cl?.income||0,mn=new Date(yr,mo).toLocaleDateString("en-US",{month:"long",year:"numeric"}),selTs=useMemo(()=>{const d=new Date(sel);d.setHours(12,0,0,0);return d.getTime()},[sel]);
-  const filterLabel=cf==="all"?"All":cf==="income"?"Income":cf==="expense"?"Expense":cf==="cards"?(cSub?(((data.cards||[]).find(x=>x.id===cSub)||{}).name||"Card"):"All cards"):cf==="accounts"?(cSub?(((data.accounts||[]).find(x=>x.id===cSub)||{}).name||"Account"):"All accounts"):cf==="reimbursable"?(cSub==="pending"?"To be reimbursed":cSub==="done"?"Reimbursed":"Reimbursable"):cf==="cardpay"?"Card Payments":"All";
+  const filterLabel=cf==="all"?"All":cf==="income"?"Income":cf==="expense"?"Expense":cf==="cards"?(cSub?(((data.cards||[]).find(x=>x.id===cSub)||{}).name||"Card"):"All cards"):cf==="accounts"?(cSub?(((data.accounts||[]).find(x=>x.id===cSub)||{}).name||"Account"):"All accounts"):cf==="reimbursable"?(cSub==="pending"?"To be reimbursed":cSub==="done"?"Reimbursed":"Reimbursable"):cf==="cardpay"?"Card Payments":cf==="stmt"?"Statement imports":"All";
 return o("div",{style:{padding:"8px 24px 48px"},className:"st",children:[
   o("div",{style:{marginTop:12},children:[t("div",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1.5,color:c.tm},children:"CALENDAR"}),o("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:38,lineHeight:1.1,marginTop:2},children:["day-by-",t("span",{style:{color:c.mt},children:"day"})]})]}),
   o("div",{style:{marginTop:14,background:`linear-gradient(135deg,${c.ac}12 0%,${c.sfg} 70%)`,border:`1px solid ${c.brs}`,borderRadius:14,padding:"12px 14px"},children:o("div",{className:"f ia jb",style:{gap:10},children:[
@@ -5135,10 +5281,11 @@ return o("div",{style:{padding:"8px 24px 48px"},className:"st",children:[
     o("div",{className:"tc",children:[t("div",{style:{fontFamily:c.hf,fontSize:24,lineHeight:1},children:mn}),o("div",{className:"f jc ia",style:{fontFamily:F.mo,fontSize:10,color:c.td,marginTop:4,gap:10,letterSpacing:.5},children:[o("span",{style:{color:c.co},children:["−",fs(mst.total,currency)]}),mst.income>0&&o("span",{style:{color:c.mt},children:["+",fs(mst.income,currency)]}),o("span",{style:{color:c.tm},children:[mst.count," TXN"]})]})]}),
     t(IB,{onClick:()=>{if(mo===11){sMo(0);sYr(yr+1)}else sMo(mo+1)},children:t(CR,{size:18,color:c.tx})}),
   ]}),
-  o("div",{className:"f",style:{gap:6,marginTop:16,flexWrap:"wrap"},children:[{id:"all",l:"All"},{id:"income",l:"💚 Income"},{id:"expense",l:"🔴 Expense"},{id:"cards",l:"💳 Cards"},{id:"accounts",l:"🏦 Accounts"},{id:"reimbursable",l:"↩️ Reimb."},{id:"cardpay",l:"🪙 Card Pay"}].map(f=>t("button",{key:f.id,onClick:()=>{sCf(f.id);sCSub(null)},className:"act95 tr",style:{padding:"6px 14px",background:cf===f.id?c.ac:c.sf,border:"none",borderRadius:999,fontSize:12,fontWeight:cf===f.id?600:400,color:cf===f.id?"#0a0a0a":c.td,whiteSpace:"nowrap"},children:f.l}))}),
+  o("div",{className:"f",style:{gap:6,marginTop:16,flexWrap:"wrap"},children:[{id:"all",l:"All"},{id:"income",l:"💚 Income"},{id:"expense",l:"🔴 Expense"},{id:"cards",l:"💳 Cards"},{id:"accounts",l:"🏦 Accounts"},{id:"reimbursable",l:"↩️ Reimb."},{id:"cardpay",l:"🪙 Card Pay"},{id:"stmt",l:"📥 Stmt Import"}].map(f=>t("button",{key:f.id,onClick:()=>{sCf(f.id);sCSub(null)},className:"act95 tr",style:{padding:"6px 14px",background:cf===f.id?c.ac:c.sf,border:"none",borderRadius:999,fontSize:12,fontWeight:cf===f.id?600:400,color:cf===f.id?"#0a0a0a":c.td,whiteSpace:"nowrap"},children:f.l}))}),
   cf==="cards"&&(data.cards||[]).length>0&&o("div",{className:"f",style:{gap:6,marginTop:8,flexWrap:"wrap"},children:[(data.cards||[]).map(cd=>t("button",{key:cd.id,onClick:()=>sCSub(cSub===cd.id?null:cd.id),className:"act95 tr",style:{padding:"5px 12px",background:cSub===cd.id?c.gd+"30":c.sf2,border:`1px solid ${cSub===cd.id?c.gd:c.brs}`,borderRadius:999,fontSize:11,color:cSub===cd.id?c.gd:c.td,whiteSpace:"nowrap"},children:cd.name+(cd.last4?" ····"+cd.last4:"")}))]})  ,
   cf==="accounts"&&data.accounts.length>0&&o("div",{className:"f",style:{gap:6,marginTop:8,flexWrap:"wrap"},children:[data.accounts.map(ac=>t("button",{key:ac.id,onClick:()=>sCSub(cSub===ac.id?null:ac.id),className:"act95 tr",style:{padding:"5px 12px",background:cSub===ac.id?c.ac+"25":c.sf2,border:`1px solid ${cSub===ac.id?c.ac:c.brs}`,borderRadius:999,fontSize:11,color:cSub===ac.id?c.ac:c.td,whiteSpace:"nowrap"},children:ac.emoji+" "+ac.name}))]})  ,
   cf==="reimbursable"&&o("div",{className:"f",style:{gap:6,marginTop:8,flexWrap:"wrap"},children:[{id:"pending",l:"⏳ To be reimbursed"},{id:"done",l:"✓ Reimbursed"}].map(sf=>t("button",{key:sf.id,onClick:()=>sCSub(cSub===sf.id?null:sf.id),className:"act95 tr",style:{padding:"5px 12px",background:cSub===sf.id?c.co+"25":c.sf2,border:`1px solid ${cSub===sf.id?c.co:c.brs}`,borderRadius:999,fontSize:11,color:cSub===sf.id?c.co:c.td,whiteSpace:"nowrap"},children:sf.l}))})  ,
+  cf==="stmt"&&t("div",{style:{marginTop:8,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"9px 12px",fontSize:11.5,color:c.tm,lineHeight:1.45},children:mst.count>0?`Showing only the ${mst.count} transaction${mst.count===1?"":"s"} in ${mn} that were logged from a bank or card statement.`:`Nothing in ${mn} was logged from a statement — imports show up here as soon as you log them from the Statement Analyzer.`})  ,
   t("div",{className:"g g7",style:{gap:6,marginTop:12},children:["S","M","T","W","T","F","S"].map((d,i)=>t("div",{key:i,className:"tc",style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,paddingBottom:6},children:d}))}),
   t("div",{className:"g g7",style:{gap:6},children:days.map((d,i)=>{const k=d.date.toDateString(),x=fByD[k],iT=k===tod,iS=k===sel,inten=x&&mst.max>0?Math.min(1,x.total/mst.max):0,hI=x&&x.income>0;let bg="transparent";if(iS)bg=c.ac;else if(x&&!d.other&&x.total>0)bg=`rgba(219,255,77,${.05+inten*.18})`;else if(x&&!d.other&&hI)bg="rgba(168,230,207,0.08)";return o("button",{key:i,onClick:()=>sSel(k),className:"act90 tr",style:{aspectRatio:"1",background:bg,border:iT&&!iS?`1px solid ${c.ac}`:`1px solid ${iS?c.ac:"transparent"}`,borderRadius:10,opacity:d.other?.45:1,color:iS?"#0a0a0a":c.tx,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:1,padding:2,position:"relative"},children:[t("span",{style:{fontSize:13,fontWeight:iT||iS?600:400},children:d.date.getDate()}),x&&!d.other&&t("span",{style:{fontFamily:F.mo,fontSize:9,fontWeight:500,color:iS?"#0a0a0a":c.td},children:x.total>0?fs(x.total,currency):hI?"+"+fs(x.income,currency):""}),hI&&!d.other&&x.total>0&&t("span",{style:{position:"absolute",top:3,right:3,width:5,height:5,borderRadius:"50%",background:iS?"#0a0a0a":c.mt}})]})})}),
   o("div",{style:{marginTop:28},children:[
