@@ -1701,7 +1701,6 @@ return o("div",{className:"st",children:[
         o("div",{children:[t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:13.5,color:c.tx},children:"multi-scan"}),t("div",{style:{fontSize:10,color:c.tm,marginTop:2,lineHeight:1.3},children:"many photos · by date"})]}),
       ]}),
     ]}),
-    t(NetWorthHomeCard,{data,onView}),
     data.accounts.length===0&&data.expenses.length===0&&!localStorage.getItem("welcomeDismissed")&&t(WelcomeCard,{onView,onTour:onTour||function(){},onDismiss:()=>{localStorage.setItem("welcomeDismissed","1");onView("home")}}),
     t(AlertsSection,{data}),
     t("div",{style:{marginTop:20},children:t(BudgetBlock,{data})}),
@@ -5530,7 +5529,7 @@ const[reimbTab,sReimbTab]=useState("pending");
 const[editReimbE,sEditReimbE]=useState(null);
 const saveReimbDate=(exp,newTs)=>{persist({expenses:data.expenses.map(x=>{if(x.id===exp.id)return{...x,reimbursedAt:newTs};if(x.id===exp.reimbursedBy)return{...x,date:newTs};return x;})});sEditReimbE(null);};
 const acctSpend2=data.accounts.map(a=>monExp.filter(e=>e.accountId===a.id).reduce((s,e)=>s+netAmt(e),0)).filter(v=>v>0);
-const SEC_CAT=[["stsec-reimb","Reimbursement Expenses",pendReimb.length>0||doneReimb.length>0],["stsec-insights","Insights & Forecast",true],["stsec-catbudg","Category Budgets",Object.keys(categoryBudgets||{}).some(k=>categoryBudgets[k]&&categoryBudgets[k].limit>0)],["stsec-top10","Top 10 Expenses",true],["stsec-overview","Spending Overview",true],["stsec-byacct","By Account",byCat.length>0&&acctSpend2.length>1],["stsec-bycat","By Category",byCat.length>0],["stsec-needswants","Needs vs Wants",byNWS.length>0],["stsec-income","Income by Category",byInc.length>0],["stsec-restrict","Spending Restrictions",!!spendR]];
+const SEC_CAT=[["stsec-reimb","Reimbursement Expenses",pendReimb.length>0||doneReimb.length>0],["stsec-insights","Insights & Forecast",true],["stsec-networth","Quarterly Net Worth",true],["stsec-catbudg","Category Budgets",Object.keys(categoryBudgets||{}).some(k=>categoryBudgets[k]&&categoryBudgets[k].limit>0)],["stsec-top10","Top 10 Expenses",true],["stsec-overview","Spending Overview",true],["stsec-byacct","By Account",byCat.length>0&&acctSpend2.length>1],["stsec-bycat","By Category",byCat.length>0],["stsec-needswants","Needs vs Wants",byNWS.length>0],["stsec-income","Income by Category",byInc.length>0],["stsec-restrict","Spending Restrictions",!!spendR]];
 const q2=secQ.trim().toLowerCase();
 const secMatches=q2?SEC_CAT.filter(([id,name,show])=>show&&name.toLowerCase().includes(q2)):[];
 const goSec=(id)=>{const el=document.getElementById(id);if(!el){sSecQ("");return}el.scrollIntoView({behavior:"smooth",block:"start"});el.style.transition="box-shadow .3s";el.style.boxShadow=`0 0 0 2px ${c.ac}`;setTimeout(()=>{el.style.boxShadow="none"},1400);sSecQ("")};
@@ -5572,6 +5571,7 @@ return o("div",{style:{padding:"8px 24px 0"},className:"st",children:[
     ]}),
     Object.keys(categoryBudgets).filter(k=>categoryBudgets[k].limit>0).length===0&&t("button",{onClick:()=>onView("categoryBudgets"),className:"w100 act98 trt",style:{marginTop:16,padding:"10px 0",background:"transparent",border:`1px dashed ${c.brs}`,borderRadius:10,color:c.td,fontSize:11,fontFamily:F.mo,letterSpacing:.5},children:"+ SET CATEGORY BUDGETS"}),
   ]}),
+  onView&&t(NetWorthStatsCard,{data,onView}),
   o("div",{id:"stsec-top10",style:{marginTop:20,background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18},children:[
     o("div",{className:"f ib jb",style:{marginBottom:8},children:[t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1.5},children:"TOP 10 EXPENSES"}),tot>0&&t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.td},children:`${((top10.reduce((s,x)=>s+x.amount,0)/tot)*100).toFixed(0)}% OF TOTAL`})]}),
     t("div",{className:"f",style:{gap:4,marginBottom:12,flexWrap:"wrap"},children:[["amtD","amtA","dateD","catA"].map((k,ki)=>{const lbl=["High→Low","Low→High","Newest","Category"][ki];const on=t10Sort===k;return t("button",{key:k,onClick:()=>sT10Sort(k),className:"act95 tr",style:{padding:"4px 10px",background:on?c.sf3:c.sf,border:`1px solid ${on?c.ac:c.brs}`,borderRadius:999,fontSize:9,fontFamily:F.mo,color:on?c.tx:c.td,letterSpacing:.3},children:lbl})})]}),
@@ -7106,36 +7106,62 @@ function NetWorth({data,persist,onClose}){
     delId&&t(CSht,{onClose:()=>sDelId(null),title:"Delete snapshot?",subtitle:"This quarter is removed from your net worth history. Other quarters are untouched.",onConfirm:()=>doDelete(delId),confirmLabel:"Delete"}),
   ]});
 }
-// Compact Home card: current net worth, quarter-on-quarter move, and a nudge when a quarter is unlogged.
-function NetWorthHomeCard({data,onView}){
+// Stats section: current net worth, quarter-on-quarter move, the assets/liabilities split, and a
+// nudge when the quarter hasn't been logged. Tapping through opens the full history screen.
+function NetWorthStatsCard({data,onView}){
   const snaps=nwSorted(data.netWorthSnapshots||[]);
   const cur=data.currency||"₹";
   const curQ=nwCurQKey();
   const latest=snaps[0]||null,prev=snaps[1]||null;
+  const yearAgo=latest?snaps.find(s=>s.qKey===nwQStep(latest.qKey,-4)):null;
   const due=!snaps.some(s=>s.qKey===curQ);
-  if(!latest)return o("button",{onClick:()=>onView("netWorth"),className:"w100 act98 trt",style:{display:"block",textAlign:"left",marginTop:12,background:c.sfg,border:`1px solid ${c.brs}`,borderLeft:`3px solid ${c.gd}`,borderRadius:18,padding:"13px 16px"},children:o("div",{className:"f ia",style:{gap:12},children:[
-    t("span",{style:{fontSize:22,flexShrink:0},children:"📈"}),
-    o("div",{className:"f1 minw0",children:[
-      t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.gd,letterSpacing:1.2,marginBottom:3},children:"QUARTERLY NET WORTH"}),
-      t("div",{style:{fontFamily:c.hf,fontWeight:600,fontSize:14,color:c.tx,lineHeight:1.25},children:"Track it every quarter"}),
-      t("div",{style:{fontSize:11.5,color:c.tm,marginTop:2,lineHeight:1.35},children:"Assets minus liabilities. The trend line matters more than any single number."}),
+  const lbl={fontFamily:F.mo,fontSize:10,letterSpacing:1.5,color:c.tm};
+  const box={marginTop:20,background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18};
+  if(!latest)return o("div",{id:"stsec-networth",style:box,children:[
+    o("div",{className:"f ib jb",style:{marginBottom:10},children:[
+      t("span",{style:lbl,children:"QUARTERLY NET WORTH"}),
+      t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.gd},children:"NOT LOGGED"}),
     ]}),
-    t(CR,{size:16,color:c.tm}),
-  ]})});
+    t("div",{style:{fontSize:12.5,color:c.tm,lineHeight:1.5,marginBottom:12},children:"Assets minus liabilities, recorded once every three months. The trend line matters more than any single number."}),
+    o("button",{onClick:()=>onView("netWorth"),className:"w100 act95 trt f ia jc",style:{gap:7,padding:"11px 0",background:c.gd+"18",border:`1px solid ${c.gd}45`,borderRadius:12,color:c.gd,fontSize:13,fontWeight:600},children:[
+      t("span",{style:{fontSize:14},children:"📈"}),
+      t("span",{children:`Log ${nwQLabel(curQ)}`}),
+    ]}),
+  ]});
   const tot=nwTotal(latest);
-  return o("button",{onClick:()=>onView("netWorth"),className:"w100 act98 trt",style:{display:"block",textAlign:"left",marginTop:12,background:c.sfg,border:`1px solid ${due?c.gd+"45":c.brs}`,borderRadius:18,padding:"14px 16px"},children:o(Fragment,{children:[
-    o("div",{className:"f ia jb",style:{gap:10},children:[
-      o("div",{className:"minw0",children:[
-        t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1.2},children:`NET WORTH · ${nwQLabel(latest.qKey).toUpperCase()}`}),
-        t("div",{style:{fontFamily:"var(--nf)",fontSize:26,fontWeight:300,letterSpacing:-1,color:tot<0?c.co:c.gd,marginTop:4,lineHeight:1.1},children:fm(tot,cur)}),
+  const assetsT=nwSum(latest.assets),liabT=nwSum(latest.liabilities),base=assetsT+liabT;
+  return o("div",{id:"stsec-networth",style:box,children:[
+    o("div",{className:"f ib jb",style:{marginBottom:10},children:[
+      t("span",{style:lbl,children:"QUARTERLY NET WORTH"}),
+      t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.tm},children:nwQLabel(latest.qKey).toUpperCase()}),
+    ]}),
+    o("div",{className:"f ib",style:{gap:6},children:[
+      t("span",{style:{fontFamily:F.mo,fontSize:15,color:c.td},children:cur}),
+      t("span",{style:{fontFamily:"var(--nf)",fontSize:34,fontWeight:300,letterSpacing:-1.2,color:tot<0?c.co:c.gd,lineHeight:1},children:fs(Math.abs(tot),"").replace(cur,"")}),
+    ]}),
+    o("div",{className:"f ia",style:{gap:10,marginTop:9,flexWrap:"wrap"},children:[
+      prev?t(NWDelta,{from:nwTotal(prev),to:tot,currency:cur,suffix:"QoQ"}):t("span",{style:{fontFamily:F.mo,fontSize:11,color:c.tm},children:"FIRST SNAPSHOT"}),
+      yearAgo&&t("span",{style:{color:c.tm},children:"·"}),
+      yearAgo&&t(NWDelta,{from:nwTotal(yearAgo),to:tot,currency:cur,suffix:"YoY"}),
+    ]}),
+    base>0&&o("div",{style:{marginTop:14},children:[
+      o("div",{className:"f",style:{height:8,borderRadius:999,overflow:"hidden",background:c.sf2},children:[
+        t("div",{style:{width:(assetsT/base)*100+"%",background:c.mt}}),
+        t("div",{style:{width:(liabT/base)*100+"%",background:c.co}}),
       ]}),
-      t("span",{style:{fontSize:22,flexShrink:0},children:"📈"}),
+      o("div",{className:"f ia jb",style:{marginTop:7,fontFamily:F.mo,fontSize:10.5},children:[
+        t("span",{style:{color:c.mt},children:"💰 "+fs(assetsT,cur)}),
+        t("span",{style:{color:c.co},children:fs(liabT,cur)+" 🧾"}),
+      ]}),
     ]}),
-    o("div",{className:"f ia jb",style:{marginTop:8,gap:10},children:[
-      prev?t(NWDelta,{from:nwTotal(prev),to:tot,currency:cur,suffix:"QoQ"}):t("span",{style:{fontFamily:F.mo,fontSize:10.5,color:c.tm},children:"FIRST SNAPSHOT LOGGED"}),
-      due&&t("span",{style:{fontFamily:F.mo,fontSize:9.5,color:c.gd,background:c.gd+"18",border:`1px solid ${c.gd}40`,borderRadius:999,padding:"3px 9px",flexShrink:0},children:`LOG ${nwQLabel(curQ).toUpperCase()} →`}),
+    o("div",{className:"f ia",style:{gap:8,marginTop:14},children:[
+      due&&o("button",{onClick:()=>onView("netWorth"),className:"f1 act95 trt f ia jc",style:{gap:6,padding:"10px 0",background:c.gd+"18",border:`1px solid ${c.gd}45`,borderRadius:11,color:c.gd,fontSize:12.5,fontWeight:600},children:[t("span",{children:`Log ${nwQLabel(curQ)}`})]}),
+      o("button",{onClick:()=>onView("netWorth"),className:"f1 act95 trt f ia jc",style:{gap:6,padding:"10px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:11,color:c.td,fontSize:12.5},children:[
+        t("span",{children:snaps.length>1?`History · ${snaps.length} quarters`:"Open net worth"}),
+        t(CR,{size:12,color:c.tm}),
+      ]}),
     ]}),
-  ]})});
+  ]});
 }
 
 function Wealth({data,onClose}){const{accounts,expenses,currency,investments=[]}=data;const series=useMemo(()=>nws(accounts,expenses,12,investments),[accounts,expenses,investments]);const series24=useMemo(()=>nws(accounts,expenses,24,investments),[accounts,expenses,investments]);const assetClasses=useMemo(()=>{const m={};for(const iv of investments){const k=iv.type||"other";m[k]=(m[k]||0)+invCurrent(iv)}return INV_TYPES.filter(tp=>m[tp.id]>0).map(tp=>({id:tp.id,label:tp.label,emoji:tp.emoji,color:tp.color,value:Math.round(m[tp.id])})).sort((a,b)=>b.value-a.value)},[investments]);const invTotal=assetClasses.reduce((s2,x)=>s2+x.value,0);const[range,sRange]=useState("12");const s=range==="24"?series24:series;const cur=s[s.length-1]?.value||0,prev=s[s.length-2]?.value||0;const delta=cur-prev,dPct=prev!==0?(delta/Math.abs(prev))*100:0;const yearAgo=s[0]?.value||0,yearDelta=cur-yearAgo,yPct=yearAgo!==0?(yearDelta/Math.abs(yearAgo))*100:0;
