@@ -67,7 +67,9 @@ input:focus,textarea:focus,select:focus{outline:none}
 @keyframes mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 .mqt{display:flex;gap:36px;animation:mq 38s linear infinite;white-space:nowrap}
 @keyframes su{from{transform:translateY(100%)}to{transform:translateY(0)}}
-.shn{animation:su 300ms cubic-bezier(.2,.9,.2,1)}
+.shn{animation:su 440ms var(--sp-s)}
+@keyframes scrimin{from{opacity:0}to{opacity:1}}
+.scrimin{animation:scrimin 300ms var(--ez) both}
 @keyframes vpulse{0%{box-shadow:0 0 0 0 rgba(255,77,99,.45)}70%{box-shadow:0 0 0 26px rgba(255,77,99,0)}100%{box-shadow:0 0 0 0 rgba(255,77,99,0)}}
 .vpulse{animation:vpulse 1.5s ease-out infinite}
 @keyframes slin{from{transform:translateX(-100%)}to{transform:translateX(0)}}
@@ -108,20 +110,131 @@ body{background:#fff!important;color:#000!important}
   justify-content:center;
   padding-bottom:0;
 }
-.nav-inner{
-  width:100%;
-  max-width:440px;
-  padding:0 12px;
-}
 body.sheet-open .nav-bar{display:none!important}
+/* === Motion system ===
+   One set of easings for the whole app so nothing feels hand-rolled.
+   --sp overshoots (things that should feel physical: taps, pops, indicators)
+   --sp-s settles without overshoot (things that carry content: sheets, screens) */
+:root{
+  --sp:cubic-bezier(.34,1.56,.64,1);
+  --sp-s:cubic-bezier(.22,1,.36,1);
+  --ez:cubic-bezier(.4,0,.2,1);
+  /* Neumorphic shadow tints. Overridden per theme below — these used to be
+     hardcoded dark values, which is why light mode looked like grime. */
+  --neu-d:rgba(0,0,0,.6);    --neu-l:rgba(255,255,255,.07);
+  --neu-dc:rgba(0,0,0,.65);  --neu-lc:rgba(255,255,255,.08);
+  --neu-pd:rgba(0,0,0,.65);  --neu-pl:rgba(255,255,255,.06);
+  --neu-ad:rgba(0,0,0,.6);   --neu-al:rgba(255,255,255,.04);
+}
+body[data-theme="light"]{
+  --neu-d:rgba(92,80,58,.13);  --neu-l:rgba(255,255,255,.95);
+  --neu-dc:rgba(92,80,58,.16); --neu-lc:rgba(255,255,255,1);
+  --neu-pd:rgba(92,80,58,.17); --neu-pl:rgba(255,255,255,.92);
+  --neu-ad:rgba(92,80,58,.15); --neu-al:rgba(255,255,255,.88);
+}
 /* === Synth-style neumorphic utilities === */
-.neu{box-shadow:6px 6px 14px rgba(0,0,0,.6),-5px -5px 12px rgba(255,255,255,.07)}
-.neu-circ{box-shadow:6px 6px 14px rgba(0,0,0,.65),-5px -5px 12px rgba(255,255,255,.08)}
-.neu-pit{box-shadow:inset 4px 4px 9px rgba(0,0,0,.65),inset -3px -3px 8px rgba(255,255,255,.06)}
+.neu{box-shadow:6px 6px 14px var(--neu-d),-5px -5px 12px var(--neu-l)}
+.neu-circ{box-shadow:6px 6px 14px var(--neu-dc),-5px -5px 12px var(--neu-lc)}
+.neu-pit{box-shadow:inset 4px 4px 9px var(--neu-pd),inset -3px -3px 8px var(--neu-pl)}
 .neu-press{transition:box-shadow 140ms ease,transform 140ms ease}
-.neu-press:active{box-shadow:inset 4px 4px 9px rgba(0,0,0,.6),inset -3px -3px 8px rgba(255,255,255,.04);transform:translateY(1px)}
+.neu-press:active{box-shadow:inset 4px 4px 9px var(--neu-ad),inset -3px -3px 8px var(--neu-al);transform:translateY(1px)}
 .neu-flat{box-shadow:0 6px 16px rgba(48,98,224,.42),inset 0 1px 0 rgba(255,255,255,.18)}
 .neu-flat.neu-press:active{box-shadow:inset 0 3px 8px rgba(0,0,0,.35);transform:translateY(1px)}
+
+/* === BOTTOM NAV ===
+   Full-width flat bar. Colours come from --nb-* vars, which applyTheme()
+   rewrites on every theme change, so the bar tracks the theme. */
+.nb{
+  position:relative;width:100%;
+  display:flex;justify-content:center;
+  background:var(--nb-bg);
+  border-top:1px solid var(--nb-br);
+  padding-bottom:env(safe-area-inset-bottom);
+  transition:background 280ms var(--ez),border-color 280ms var(--ez);
+}
+.nb-row{width:100%;max-width:440px;display:grid;grid-template-columns:repeat(5,1fr);height:56px}
+.nb-tab{
+  position:relative;background:transparent;border:none;padding:0;height:100%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;overflow:hidden;
+  color:var(--nb-off);
+  transition:color 240ms var(--ez);
+}
+.nb-tab[data-on="1"]{color:var(--nb-ac)}
+/* the short bar that sits above the active icon */
+.nb-ind{
+  position:absolute;top:0;left:50%;width:28px;height:3px;border-radius:0 0 3px 3px;
+  background:var(--nb-ac);opacity:0;
+  transform:translateX(-50%) scaleX(.3);
+  transition:transform 380ms var(--sp),opacity 220ms var(--ez);
+}
+.nb-tab[data-on="1"] .nb-ind{opacity:1;transform:translateX(-50%) scaleX(1)}
+.nb-ico{display:flex;transition:transform 200ms var(--ez)}
+.nb-tab:active .nb-ico{transform:scale(.84)}
+.nb-tab[data-on="1"] .nb-ico{animation:nbpop 480ms var(--sp)}
+@keyframes nbpop{0%{transform:scale(1) translateY(0)}36%{transform:scale(1.2) translateY(-3px)}100%{transform:scale(1) translateY(0)}}
+.nb-lb{font-size:10px;letter-spacing:.2px;transition:opacity 240ms var(--ez)}
+.nb-tab[data-on="0"] .nb-lb{opacity:.72}
+/* tap ripple */
+.nb-rip{
+  position:absolute;border-radius:999px;background:var(--nb-ac);
+  opacity:.20;pointer-events:none;transform:scale(0);
+  animation:nbrip 560ms var(--sp-s) forwards;
+}
+@keyframes nbrip{to{transform:scale(1);opacity:0}}
+/* centre FAB — the ring is a box-shadow in the bar colour, so it reads as a
+   notch cut out of the bar without needing an actual mask */
+.nb-fab{
+  position:absolute;left:50%;top:-23px;width:58px;height:58px;border-radius:999px;
+  display:flex;align-items:center;justify-content:center;
+  border:none;cursor:pointer;-webkit-tap-highlight-color:transparent;
+  background:var(--nb-ac);color:var(--nb-fabfg);
+  box-shadow:0 0 0 6px var(--nb-bg),0 8px 20px var(--nb-glow),0 2px 6px rgba(0,0,0,.16);
+  transform:translateX(-50%);
+  /* above the popover scrim (49) so it stays crisp and tappable as the close button */
+  z-index:51;
+  transition:transform 460ms var(--sp),background 280ms var(--ez),box-shadow 280ms var(--ez);
+}
+.nb-fab:active{transform:translateX(-50%) scale(.88)}
+.nb-fab[data-open="1"]{transform:translateX(-50%) rotate(135deg)}
+.nb-fab[data-open="1"]:active{transform:translateX(-50%) rotate(135deg) scale(.88)}
+/* FAB popover */
+@keyframes nbpin{from{opacity:0;transform:translateY(16px) scale(.84)}to{opacity:1;transform:translateY(0) scale(1)}}
+.nb-pop{animation:nbpin 460ms var(--sp) both}
+.nb-pop:nth-child(1){animation-delay:0ms}
+.nb-pop:nth-child(2){animation-delay:60ms}
+@keyframes nbscrim{from{opacity:0}to{opacity:1}}
+.nb-scrim{animation:nbscrim 260ms var(--ez) both;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);background:var(--nb-scrim)}
+
+/* === SCREEN TRANSITIONS — direction follows tab order === */
+@keyframes vwr{from{opacity:0;transform:translate3d(20px,0,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+@keyframes vwl{from{opacity:0;transform:translate3d(-20px,0,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+.vw-r{animation:vwr 360ms var(--sp-s) both}
+.vw-l{animation:vwl 360ms var(--sp-s) both}
+
+/* === LISTS === deeper stagger than the original 8-child cap */
+.st>*:nth-child(9){animation-delay:400ms}
+.st>*:nth-child(10){animation-delay:450ms}
+.st>*:nth-child(11){animation-delay:500ms}
+.st>*:nth-child(12){animation-delay:550ms}
+.stg>*{animation:fu 400ms var(--sp-s) both}
+.stg>*:nth-child(1){animation-delay:0ms}
+.stg>*:nth-child(2){animation-delay:30ms}
+.stg>*:nth-child(3){animation-delay:60ms}
+.stg>*:nth-child(4){animation-delay:90ms}
+.stg>*:nth-child(5){animation-delay:120ms}
+.stg>*:nth-child(6){animation-delay:150ms}
+.stg>*:nth-child(7){animation-delay:180ms}
+.stg>*:nth-child(8){animation-delay:210ms}
+.stg>*:nth-child(n+9){animation-delay:240ms}
+
+/* === REDUCED MOTION === honour the OS setting rather than ignoring it */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:1ms!important;animation-iteration-count:1!important;
+    transition-duration:1ms!important;scroll-behavior:auto!important;
+  }
+}
 </style>
 </head>
 <body>
@@ -279,6 +392,25 @@ const darkC={bg:"#1B1B1D",bgg:"#1B1B1D",sf:"#242427",sfg:"#242427",sf2:"#2C2C30"
 const lightC={bg:"#F5F3EE",bgg:"#F5F3EE",sf:"#ECEAE3",sfg:"#ECEAE3",sf2:"#E2DFD7",sf3:"#D6D2C8",br:"#C0BDB3",brs:"#CCCAC0",tx:"#1A1814",td:"#4A4640",tm:"#7A7670",ac:"#1A7A2E",gd:"#8B6A14",cr:"#7A4020",co:"#CC4400",ro:"#CC2020",mt:"#156830",sk:"#0E5FA0",lv:"#5E2EA0",cu:"#8A5A2E",hf:"'Instrument Serif','Times New Roman',serif"};
 const navyC={bg:"#0F1117",bgg:"#0F1117",sf:"#1A1E2E",sfg:"#1A1E2E",sf2:"#232840",sf3:"#2D3354",br:"#2E3555",brs:"#262B45",tx:"#F1F5F9",td:"#94A3B8",tm:"#64748B",ac:"#6366F1",gd:"#F59E0B",cr:"#FB7185",co:"#F97316",ro:"#EF4444",mt:"#10B981",sk:"#38BDF8",lv:"#A78BFA",cu:"#D8956A",hf:"'Instrument Serif','Times New Roman',serif"};
 let c={...darkC};c.dk=true;
+
+// Pick black or white text for whatever sits on top of `hex`, by WCAG relative
+// luminance. The nav accent (c.cu) is a mid-tone copper that differs per theme,
+// so the FAB glyph colour has to be derived, not hardcoded.
+const _lum=(hex)=>{const h=String(hex||"").replace("#","");if(h.length!==6)return 0;const ch=[0,2,4].map(i=>{const v=parseInt(h.substr(i,2),16)/255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4)});return 0.2126*ch[0]+0.7152*ch[1]+0.0722*ch[2]};
+const fgOn=(hex)=>{const L=_lum(hex);return (L+0.05)/0.05 > 1.05/(L+0.05) ? "#14110E" : "#FFFFFF"};
+
+// Push the bottom-nav palette into CSS custom properties. The nav's :active,
+// ripple and FAB-ring styles live in CSS, so they can't read the JS `c` object
+// directly — these vars are the bridge that keeps the bar theme-reactive.
+const paintNavVars=(nc,name)=>{const r=document.documentElement.style;
+  r.setProperty("--nb-bg",nc.sfg);
+  r.setProperty("--nb-br",nc.brs);
+  r.setProperty("--nb-ac",nc.cu);
+  r.setProperty("--nb-off",nc.td);
+  r.setProperty("--nb-fabfg",fgOn(nc.cu));
+  r.setProperty("--nb-glow",nc.cu+(name==="light"?"4D":"66"));
+  r.setProperty("--nb-scrim",name==="light"?"rgba(26,24,20,.28)":"rgba(0,0,0,.45)");
+};
 const F={se:"'Instrument Serif','Times New Roman',serif",dp:"'Fraunces','Instrument Serif',serif",sa:"'Geist',-apple-system,system-ui,sans-serif",mo:"'JetBrains Mono','SF Mono',ui-monospace,monospace"};
 const FONT_OPT=[
   {id:'system',l:'SF Pro',f:"-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display',system-ui,sans-serif"},
@@ -868,6 +1000,26 @@ const Gr=()=>t("div",{className:"grain"});
 const Hr=({mt:m="0",mb:mb2="0"})=>t("div",{style:{height:1,background:c.brs,marginTop:m,marginBottom:mb2}});
 const Pl=({children,col=c.ac})=>t("span",{style:{display:"inline-flex",alignItems:"center",gap:4,padding:"3px 8px",borderRadius:999,fontFamily:F.mo,fontSize:9.5,letterSpacing:.5,textTransform:"uppercase",background:col+"18",color:col,border:`1px solid ${col}30`},children});
 const Mast=({date=new Date()})=>o("div",{className:"f ia",style:{gap:12,color:c.tm,fontFamily:F.mo,fontSize:10,letterSpacing:1.3},children:[t("div",{style:{flex:1,height:1,background:c.br}}),t("span",{children:date.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"}).toUpperCase()}),t("div",{style:{flex:1,height:1,background:c.br}})]});
+// Eases a number toward its new value instead of snapping. Cubic ease-out over
+// ~0.5s; re-targets mid-flight from wherever it currently is, so rapid changes
+// chain smoothly rather than jumping back to the old start value.
+function CountUp({v,fmt,style,className}){
+  const[n,sN]=useState(v);const cur=useRef(v),raf=useRef(0);
+  useEffect(()=>{
+    const a=cur.current,b=v;
+    if(a===b||typeof b!=="number"||!isFinite(b)){cur.current=b;sN(b);return}
+    if(window.matchMedia&&window.matchMedia("(prefers-reduced-motion:reduce)").matches){cur.current=b;sN(b);return}
+    const t0=performance.now(),D=560;
+    const step=(now)=>{
+      const q=Math.min(1,(now-t0)/D),e=1-Math.pow(1-q,3),val=a+(b-a)*e;
+      cur.current=val;sN(val);
+      if(q<1)raf.current=requestAnimationFrame(step);else{cur.current=b;sN(b)}
+    };
+    raf.current=requestAnimationFrame(step);
+    return()=>cancelAnimationFrame(raf.current);
+  },[v]);
+  return t("span",{className,style,children:fmt?fmt(n):n});
+}
 const IB=({onClick,children,size=36})=>t("button",{onClick,className:"act90 trt neu neu-press",style:{width:size,height:size,borderRadius:12,background:c.sfg,border:`1px solid ${c.brs}`,display:"flex",alignItems:"center",justifyContent:"center"},children});
 const BB=({onClick})=>c.dk?t("button",{onClick,"aria-label":"back",className:"neu-circ neu-press act95 f ia jc",style:{width:38,height:38,borderRadius:999,background:c.sfg,border:`1px solid ${c.brs}`},children:t(CL,{size:18,color:c.cu})}):t(IB,{onClick,size:38,children:t(CL,{size:20,color:c.tx})});
 const SH=({title,onBack,right})=>o("div",{className:"f ia jb",style:{padding:"0 24px",marginBottom:20},children:[onBack?t(BB,{onClick:onBack}):t("div",{style:{width:38}}),t("div",{style:{fontFamily:c.hf,fontSize:24},children:title}),right||t("div",{style:{width:38}})]});
@@ -878,7 +1030,44 @@ const NeuImg=({icon,onClick,size=44,col,style={}})=>t("button",{onClick,"aria-la
 // NeuBtn: pill button. flat=blue Synth CTA, else soft neumorphic platform. icon renders in a neumorphic "pit".
 const NeuBtn=({label,icon,onClick,flat=false,full=false,disabled=false,style={}})=>{const bg=flat?`linear-gradient(180deg,${c.sk} 0%,${c.sk}D9 100%)`:c.sfg;const fg=flat?"#fff":c.tx;return o("button",{onClick:disabled?null:onClick,disabled,className:`act98 f ia ${c.dk?("neu-press "+(flat?"neu-flat":"neu")):""}`,style:{gap:icon?12:0,justifyContent:icon?"flex-start":"center",width:full?"100%":"auto",padding:icon?"7px 20px 7px 7px":"13px 24px",borderRadius:999,background:bg,border:flat?"none":`1px solid ${c.brs}`,color:fg,fontFamily:c.hf,fontSize:15,fontWeight:600,opacity:disabled?0.5:1,...style},children:[icon&&t("span",{className:(c.dk?"neu-pit ":"")+"f ia jc",style:{width:38,height:38,borderRadius:999,background:flat?"rgba(0,0,0,0.18)":c.sf2,color:flat?"#fff":(c.dk?c.cu:c.ac),flexShrink:0},children:icon}),t("span",{children:label})]})};
 let _shtOpen=0;
-const Sht=({children,onClose})=>{useEffect(()=>{_shtOpen++;document.body.classList.add("sheet-open");return()=>{_shtOpen=Math.max(0,_shtOpen-1);if(_shtOpen===0)document.body.classList.remove("sheet-open")}},[]);return t("div",{className:"fx f iend",style:{inset:0,background:"rgba(0,0,0,.6)",zIndex:50},onClick:onClose,children:t("div",{className:"w100 shn",onClick:e=>e.stopPropagation(),style:{maxWidth:440,margin:"0 auto",maxHeight:"85vh",overflowY:"auto",background:c.sfg,borderTopLeftRadius:24,borderTopRightRadius:24,padding:"20px 24px 32px",borderTop:`1px solid ${c.br}`},children:o(Fragment,{children:[t("div",{style:{width:40,height:4,margin:"0 auto 16px",borderRadius:999,background:c.br}}),children]})})});}
+const Sht=({children,onClose})=>{
+  useEffect(()=>{_shtOpen++;document.body.classList.add("sheet-open");return()=>{_shtOpen=Math.max(0,_shtOpen-1);if(_shtOpen===0)document.body.classList.remove("sheet-open")}},[]);
+  const pnl=useRef(null),scrim=useRef(null),dr=useRef(null);
+  // Drag-to-dismiss. Driven straight through the DOM rather than React state so
+  // the panel tracks the finger at frame rate. Only engages when the panel is
+  // scrolled to the top, otherwise it would fight the inner scroll.
+  const H=()=>pnl.current?pnl.current.offsetHeight:1;
+  const down=e=>{const el=pnl.current;if(!el||el.scrollTop>0)return;
+    dr.current={y:e.clientY,t:performance.now(),ly:e.clientY,v:0,on:false};
+    try{el.setPointerCapture(e.pointerId)}catch{}};
+  const move=e=>{const d=dr.current,el=pnl.current;if(!d||!el)return;
+    const dy=e.clientY-d.y;
+    if(!d.on){if(dy<6)return;d.on=true;el.style.transition="none";el.style.animation="none"}
+    const now=performance.now(),dt=now-d.t;
+    if(dt>0){d.v=(e.clientY-d.ly)/dt;d.t=now;d.ly=e.clientY}
+    const y=Math.max(0,dy);
+    el.style.transform="translate3d(0,"+y+"px,0)";
+    if(scrim.current)scrim.current.style.opacity=String(Math.max(0,1-y/(H()*0.9)));};
+  const up=()=>{const d=dr.current,el=pnl.current;dr.current=null;
+    if(!d||!d.on||!el)return;
+    const y=parseFloat((el.style.transform.match(/,\s*(-?[\d.]+)px/)||[0,0])[1])||0;
+    // Either dragged far enough, or flicked hard enough to mean it.
+    if(y>H()*0.32||d.v>0.55){onClose&&onClose();return}
+    el.style.transition="transform 420ms var(--sp-s)";
+    el.style.transform="translate3d(0,0,0)";
+    if(scrim.current){scrim.current.style.transition="opacity 300ms var(--ez)";scrim.current.style.opacity="1"}};
+
+  return t("div",{className:"fx f iend",style:{inset:0,zIndex:50},onClick:onClose,children:o(Fragment,{children:[
+    t("div",{ref:scrim,className:"fx scrimin",style:{inset:0,background:c.dk?"rgba(0,0,0,.6)":"rgba(26,24,20,.34)",backdropFilter:"blur(5px)",WebkitBackdropFilter:"blur(5px)"}}),
+    t("div",{ref:pnl,className:"w100 shn r",onClick:e=>e.stopPropagation(),
+      onPointerDown:down,onPointerMove:move,onPointerUp:up,onPointerCancel:up,
+      style:{maxWidth:440,margin:"0 auto",maxHeight:"85vh",overflowY:"auto",background:c.sfg,borderTopLeftRadius:24,borderTopRightRadius:24,padding:"20px 24px 32px",borderTop:`1px solid ${c.br}`,touchAction:"pan-y",boxShadow:c.dk?"0 -12px 40px rgba(0,0,0,.5)":"0 -12px 40px rgba(92,80,58,.20)"},
+      children:o(Fragment,{children:[
+        t("div",{style:{width:40,height:4,margin:"0 auto 16px",borderRadius:999,background:c.br}}),
+        children
+      ]})})
+  ]})});
+}
 const CSht=({title,subtitle,onClose,onConfirm,confirmLabel="Confirm",danger=true})=>t(Sht,{onClose,children:o(Fragment,{children:[t("div",{style:{fontFamily:c.hf,fontSize:22},children:title}),subtitle&&t("div",{style:{fontSize:13,color:c.td,marginTop:8},children:subtitle}),o("div",{className:"g g2",style:{gap:8,marginTop:20},children:[t("button",{onClick:onClose,className:"act95 trt",style:{padding:"14px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,color:c.tx,fontWeight:500,fontSize:14},children:"Cancel"}),t("button",{onClick:onConfirm,className:"act95 trt",style:{padding:"14px 0",background:danger?c.ro:c.ac,color:danger?"#fff":"#0a0a0a",borderRadius:12,fontWeight:600,fontSize:14,border:"none"},children:confirmLabel})]})]})});
 
 function FI({label,value,onChange,placeholder,type="text",readOnly,small,mono,icon}){return o("div",{children:[t("label",{style:{fontFamily:F.mo,fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:label.toUpperCase()}),o("div",{className:"f ia",style:{background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,padding:small?"10px 12px":"12px 14px",gap:8},children:[icon&&t("span",{style:{color:c.tm,display:"flex"},children:icon}),t("input",{type,value:value||"",onChange:e=>onChange&&onChange(e.target.value),placeholder,readOnly,style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:14,fontFamily:mono?F.mo:F.sa}})]})]})}
@@ -1301,11 +1490,23 @@ function App(){
   const[users,setUsers]=useState([]);
   const[activeUser,setActiveUser]=useState(null);
   const themeC=theme==="navy"?navyC:theme==="light"?lightC:darkC;
-  Object.assign(c,themeC);c.dk=true;
+  Object.assign(c,themeC);c.dk=(theme!=="light");
   const THEME_CYCLE={dark:"navy",navy:"light",light:"dark"};
   const THEME_BG={dark:"#1B1B1D",navy:"#0F1117",light:"#F5F3EE"};
-  const applyTheme=(next)=>{setTheme(next);const nc=next==="navy"?navyC:next==="light"?lightC:darkC;Object.assign(c,nc);c.dk=true;localStorage.setItem("etp-theme",next);document.body.style.background=THEME_BG[next];document.querySelector('meta[name="theme-color"]')?.setAttribute("content",THEME_BG[next])};
+  const applyTheme=(next)=>{setTheme(next);const nc=next==="navy"?navyC:next==="light"?lightC:darkC;Object.assign(c,nc);c.dk=(next!=="light");localStorage.setItem("etp-theme",next);document.body.style.background=THEME_BG[next];document.body.dataset.theme=next;paintNavVars(nc,next);document.querySelector('meta[name="theme-color"]')?.setAttribute("content",THEME_BG[next])};
   const toggleTheme=()=>applyTheme(THEME_CYCLE[theme]);
+  // Covers first paint and any theme change (including restore from storage),
+  // so the nav vars are never left describing the previous theme.
+  useEffect(()=>{document.body.dataset.theme=theme;paintNavVars(themeC,theme)},[theme]);
+
+  // Screen-transition direction. Moving right along the tab order slides the
+  // incoming screen in from the right; anything that isn't a tab-to-tab move
+  // (drill-downs, editors) just fades up instead of implying a sideways step.
+  const vwPrev=useRef(v);
+  let vwCls="fi";
+  {const a=NAV_ORDER.indexOf(vwPrev.current),b=NAV_ORDER.indexOf(v);
+   if(a>=0&&b>=0&&a!==b)vwCls=b>a?"vw-r":"vw-l";}
+  useEffect(()=>{vwPrev.current=v},[v]);
 
   useEffect(()=>{(async()=>{
   let usrs=[];
@@ -1473,7 +1674,7 @@ function App(){
     notice&&o("div",{onClick:()=>{if(notice.title.includes("Log"))sV("add");sNotice(null)},style:{margin:"10px 16px 0",padding:"13px 14px",background:`linear-gradient(135deg,${c.ac}1f 0%,${c.sfg} 60%)`,border:`1px solid ${c.ac}40`,borderRadius:14,display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer",width:"calc(100% - 32px)",maxWidth:408,boxSizing:"border-box"},children:[o("div",{className:"f1 minw0",children:[t("div",{style:{fontSize:13,fontWeight:600,color:c.tx,marginBottom:2},children:notice.title}),t("div",{style:{fontSize:12,color:c.td,lineHeight:1.45},children:notice.body})]}),t("button",{onClick:e=>{e.stopPropagation();sNotice(null)},style:{background:"transparent",border:"none",color:c.tm,flexShrink:0,padding:2,display:"flex"},children:t(X,{size:15})})]}),
     t(IOSTip,{}),
     o("div",{className:"r w100",style:{maxWidth:440,flex:1,minHeight:0,background:c.bg,borderLeft:`1px solid ${c.brs}`,borderRight:`1px solid ${c.brs}`,overflow:"hidden",display:"flex",flexDirection:"column"},children:[
-      o("div",{ref:scrollRef,style:{paddingBottom:"calc(34px + env(safe-area-inset-bottom))",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
+      o("div",{key:"vw-"+v,ref:scrollRef,className:vwCls,style:{paddingBottom:"calc(34px + env(safe-area-inset-bottom))",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
         v==="home"&&t(Home,{data:dv,persist:pst,onTx:sAtx,onView:sV,onSetBudget:b=>pst({budget:b}),onFlt:sFlt,onUseProfile:p=>sProfToUse(p),onTour:()=>sShowTour(true),onAddExpenses:aEMany}),
         v==="calendar"&&t(Calend,{data:dv,onTx:sAtx,onFlt:sFlt,presetAdd:(ts,k)=>{window.__pd=ts;window.__pt=k||"expense";sV("add")}}),
         v==="stats"&&t(Stats,{data:dv,onTx:sAtx,onView:(id)=>{navFromRef.current="stats";sV(id)},onFlt:sFlt,persist:pst,onReimburse:(e)=>sReimbT(e),onUnreimburse:unReimburse}),
@@ -1563,22 +1764,80 @@ function App(){
 }
 
 // === BOTTOM NAV ===
-function Nav({view,setView,onQuickPick,onVoice}){const[open,sOpen]=useState(false);const tabs=[{id:"home",icon:Hm,label:"home"},{id:"calendar",icon:Cal,label:"calendar"},{id:"add",icon:Plus,label:"add",main:true},{id:"stats",icon:BarChart3,label:"stats"},{id:"calculators",icon:Calc,label:"calc"}];const go=(id)=>{sOpen(false);setView(id)};return t("div",{className:"nav-bar noprint",style:{background:c.bg},children:o("div",{className:"nav-inner",style:{position:"relative"},children:[
-  open&&t("div",{onClick:()=>sOpen(false),style:{position:"fixed",inset:0,zIndex:49}}),
-  open&&o("div",{style:{position:"absolute",bottom:72,left:"50%",transform:"translateX(-50%)",display:"flex",gap:10,zIndex:50,padding:4},children:[
-    o("button",{onClick:()=>{sOpen(false);onQuickPick&&onQuickPick()},className:"act95 trt",style:{display:"flex",flexDirection:"row",alignItems:"center",gap:10,padding:"12px 12px",background:c.sfg,border:`1px solid ${c.cu}44`,borderRadius:18,minWidth:100,textAlign:"left",boxShadow:"0 8px 24px rgba(0,0,0,.55)"},children:[
-      t("div",{style:{width:36,height:36,borderRadius:12,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",color:c.cu,flexShrink:0},children:t(Zap,{size:18})}),
-      o("div",{children:[t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:13,color:c.tx},children:"quick"}),t("div",{style:{fontSize:10,color:c.tm,marginTop:2},children:"profiles"})]})
+// Flat, full-width bar. Every colour is a CSS var written by paintNavVars(), so
+// the bar follows the theme instead of carrying baked-in dark shadows.
+const NAV_TABS=[
+  {id:"home",icon:Hm,label:"home"},
+  {id:"calendar",icon:Cal,label:"calendar"},
+  {id:"add",icon:Plus,label:"add",main:true},
+  {id:"stats",icon:BarChart3,label:"stats"},
+  {id:"calculators",icon:Calc,label:"calc"},
+];
+// Tab order drives which way a screen slides in — see navDir() below.
+const NAV_ORDER=NAV_TABS.filter(x=>!x.main).map(x=>x.id);
+
+function Nav({view,setView,onQuickPick,onVoice}){
+  const[open,sOpen]=useState(false);
+  const[rip,sRip]=useState(null);
+
+  // Ripple is keyed by timestamp so tapping the same tab twice remounts the
+  // node and restarts the animation instead of leaving it finished.
+  useEffect(()=>{if(!rip)return;const h=setTimeout(()=>sRip(null),620);return()=>clearTimeout(h)},[rip]);
+
+  const buzz=()=>{try{navigator.vibrate&&navigator.vibrate(8)}catch{}};
+  const go=(id)=>{sOpen(false);setView(id)};
+
+  const tap=(e,id)=>{
+    const el=e.currentTarget,r=el.getBoundingClientRect();
+    const d=Math.max(r.width,r.height)*1.7;
+    const cx=e.clientX||r.width/2+r.left, cy=e.clientY||r.height/2+r.top;
+    sRip({k:Date.now(),id,x:cx-r.left-d/2,y:cy-r.top-d/2,d});
+    buzz(); go(id);
+  };
+
+  const pop=(icon,title,sub,tint,onPick)=>o("button",{
+    onClick:onPick,className:"nb-pop act95 trt",
+    style:{display:"flex",alignItems:"center",gap:10,padding:12,background:c.sfg,
+      border:`1px solid ${tint}44`,borderRadius:18,minWidth:104,textAlign:"left",
+      boxShadow:c.dk?"0 10px 28px rgba(0,0,0,.5)":"0 10px 28px rgba(92,80,58,.22)"},
+    children:[
+      t("div",{style:{width:36,height:36,borderRadius:12,background:c.sf2,display:"flex",
+        alignItems:"center",justifyContent:"center",color:tint,flexShrink:0},children:t(icon,{size:18})}),
+      o("div",{children:[
+        t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:13,color:c.tx},children:title}),
+        t("div",{style:{fontSize:10,color:c.tm,marginTop:2},children:sub}),
+      ]}),
+    ]});
+
+  return t("div",{className:"nav-bar noprint",children:o("div",{className:"nb",children:[
+
+    open&&t("div",{onClick:()=>sOpen(false),className:"nb-scrim",
+      style:{position:"fixed",inset:0,zIndex:49}}),
+
+    open&&o("div",{style:{position:"absolute",bottom:70,left:"50%",transform:"translateX(-50%)",
+      display:"flex",gap:10,zIndex:50,padding:4},children:[
+      pop(Zap,"quick","profiles",c.cu,()=>{sOpen(false);onQuickPick&&onQuickPick()}),
+      pop(Pencil,"add","manual",c.ac,()=>go("add")),
     ]}),
-    o("button",{onClick:()=>go("add"),className:"act95 trt",style:{display:"flex",flexDirection:"row",alignItems:"center",gap:10,padding:"12px 12px",background:c.sfg,border:`1px solid ${c.ac}44`,borderRadius:18,minWidth:100,textAlign:"left",boxShadow:"0 8px 24px rgba(0,0,0,.55)"},children:[
-      t("div",{style:{width:36,height:36,borderRadius:12,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",color:c.ac,flexShrink:0},children:t(Pencil,{size:18})}),
-      o("div",{children:[t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:13,color:c.tx},children:"add"}),t("div",{style:{fontSize:10,color:c.tm,marginTop:2},children:"manual"})]})
-    ]})
-  ]}),
-  o("div",{className:"f ia jb",style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:24,padding:"7px 14px",boxShadow:"6px 6px 16px rgba(0,0,0,.6),-5px -5px 13px rgba(255,255,255,.06)"},children:tabs.map(tb=>{if(tb.main)return t("div",{key:"sp",style:{width:60,flexShrink:0}});const a=view===tb.id,I=tb.icon;return o("button",{key:tb.id,onClick:()=>go(tb.id),className:"act90 trt f fc ia",style:{background:"transparent",border:"none",gap:3,color:a?c.cu:c.cu+"73",flexShrink:0,padding:"2px 4px"},children:[t(I,{size:20,strokeWidth:a?2.4:1.7}),t("span",{style:{fontSize:10,fontFamily:F.mo,letterSpacing:.2,fontWeight:a?700:400},children:tb.label}),t("div",{style:{width:4,height:4,borderRadius:999,marginTop:2,background:a?c.cu:"transparent",transition:"background 180ms"}})]})})}),
-  t("div",{style:{position:"absolute",top:-12,left:"50%",transform:"translateX(-50%)",width:74,height:74,borderRadius:999,background:c.bg,pointerEvents:"none"}}),
-  t("button",{onClick:()=>sOpen(x=>!x),"aria-label":"add",className:"neu-circ neu-press act90 f ia jc",style:{position:"absolute",top:-16,left:"50%",transform:"translateX(-50%)",width:58,height:58,borderRadius:999,background:open?`radial-gradient(circle at 36% 28%,${c.ac}33 0%,${c.sfg} 70%)`:`radial-gradient(circle at 36% 28%,${c.sf3} 0%,${c.sfg} 70%)`,border:`1px solid ${open?c.ac:c.cu}66`,color:open?c.ac:c.cu,transition:"border-color 150ms,color 150ms"},children:open?t(X,{size:22,strokeWidth:2.2}):t(Plus,{size:26,strokeWidth:2.3})})
-]})})}
+
+    o("div",{className:"nb-row",children:NAV_TABS.map(tb=>{
+      if(tb.main)return t("div",{key:"sp"});
+      const a=view===tb.id,I=tb.icon;
+      return o("button",{key:tb.id,onClick:e=>tap(e,tb.id),"data-on":a?"1":"0",
+        "aria-label":tb.label,"aria-current":a?"page":undefined,className:"nb-tab",children:[
+          t("div",{className:"nb-ind"}),
+          rip&&rip.id===tb.id&&t("span",{key:rip.k,className:"nb-rip",
+            style:{left:rip.x,top:rip.y,width:rip.d,height:rip.d}}),
+          t("div",{className:"nb-ico",children:t(I,{size:21,strokeWidth:a?2.4:1.8})}),
+          t("span",{className:"nb-lb",style:{fontFamily:F.mo,fontWeight:a?700:500},children:tb.label}),
+        ]});
+    })}),
+
+    t("button",{onClick:()=>{buzz();sOpen(x=>!x)},"aria-label":open?"close add menu":"add",
+      "aria-expanded":open?"true":"false","data-open":open?"1":"0",className:"nb-fab",
+      children:t(Plus,{size:26,strokeWidth:2.4})}),
+  ]})});
+}
 
 
 // === HOME ===
@@ -2622,19 +2881,19 @@ return o("div",{style:{background:c.sfg,borderRadius:16,border:`1px solid ${ov?c
   budOpen&&o("div",{className:"g g3",style:{gap:0},children:[
     o("button",{className:"act95 trt",style:{padding:"14px 12px",borderRight:`1px solid ${c.brs}`,textAlign:"left"},children:[
       t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.co,letterSpacing:1,marginBottom:6},children:"SPENT"}),
-      t("div",{style:{fontFamily:'var(--nf)',fontSize:'var(--ns)',fontWeight:500,color:c.co,letterSpacing:-0.5},children:fm(sp,currency)}),
+      t("div",{style:{fontFamily:'var(--nf)',fontSize:'var(--ns)',fontWeight:500,color:c.co,letterSpacing:-0.5},children:t(CountUp,{v:sp,fmt:x=>fm(x,currency)})}),
     ]}),
     o("button",{className:"act95 trt",style:{padding:"14px 12px",borderRight:`1px solid ${c.brs}`,textAlign:"left"},children:[
       t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:"LIMIT"}),
-      t("div",{style:{fontFamily:'var(--nf)',fontSize:'var(--ns)',fontWeight:500,color:budget==null?c.td:c.tx,letterSpacing:-0.5},children:budget!=null?fm(budget,currency):"—"}),
+      t("div",{style:{fontFamily:'var(--nf)',fontSize:'var(--ns)',fontWeight:500,color:budget==null?c.td:c.tx,letterSpacing:-0.5},children:budget!=null?t(CountUp,{v:budget,fmt:x=>fm(x,currency)}):"—"}),
     ]}),
     o("button",{className:"act95 trt",style:{padding:"14px 12px",textAlign:"left"},children:[
       t("div",{style:{fontFamily:F.mo,fontSize:9,color:ov?c.co:c.mt,letterSpacing:1,marginBottom:6},children:ov?"OVER":"FRUGAL"}),
-      t("div",{style:{fontFamily:'var(--nf)',fontSize:'var(--ns)',fontWeight:500,color:ov?c.co:budget==null?c.td:c.mt,letterSpacing:-0.5},children:budget!=null?((re??0)<0?"−":"")+fm(Math.abs(re??0),currency):"—"}),
+      t("div",{style:{fontFamily:'var(--nf)',fontSize:'var(--ns)',fontWeight:500,color:ov?c.co:budget==null?c.td:c.mt,letterSpacing:-0.5},children:budget!=null?t(CountUp,{v:Math.abs(re??0),fmt:x=>((re??0)<0?"−":"")+fm(x,currency)}):"—"}),
     ]}),
   ]}),
   budOpen&&budget!=null&&t("div",{style:{padding:"0 16px 14px"},children:t("div",{style:{height:6,background:c.sf2,borderRadius:999,overflow:"hidden"},children:t("div",{style:{width:barPct+"%",height:"100%",background:ov?`linear-gradient(90deg,${c.co},#FF3300)`:c.ac,transition:"width 600ms cubic-bezier(0.2,0.9,0.2,1)",boxShadow:ov?`0 0 10px ${c.co}60`:`0 0 6px ${c.ac}40`}})})}),
-  budOpen&&weekRows&&weekRows.length>0&&o("div",{style:{padding:"2px 16px 14px",borderTop:`1px solid ${c.brs}`},children:[
+  budOpen&&weekRows&&weekRows.length>0&&o("div",{className:"stg",style:{padding:"2px 16px 14px",borderTop:`1px solid ${c.brs}`},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,margin:"10px 0 6px"},children:"THIS MONTH · BY WEEK"}),
     ...weekRows.map((w,i)=>{const stateLbl=w.state==="past"?"spent":w.state==="current"?"spent so far":"left to spend";const isFut=w.state==="future";const val=isFut?(w.left!=null?fm(w.left,currency):"—"):fm(w.spent,currency);const valCol=isFut?c.mt:w.state==="current"?c.tx:c.td;return o("div",{key:i,className:"f ia jb",style:{padding:"7px 0",borderTop:i?`1px solid ${c.brs}`:"none"},children:[
       o("div",{className:"f ia",style:{gap:8,minWidth:0},children:[t("span",{style:{fontFamily:F.mo,fontSize:11,color:w.state==="current"?dot:c.td,fontWeight:w.state==="current"?700:500,flexShrink:0},children:"W"+w.wk}),t("span",{className:"tru",style:{fontSize:11,color:c.tm},children:w.range}),w.state==="current"&&t("span",{style:{fontFamily:F.mo,fontSize:7.5,letterSpacing:.5,textTransform:"uppercase",padding:"1px 5px",borderRadius:999,color:dot,background:dot+"1a",flexShrink:0},children:"now"})]}),
