@@ -1485,11 +1485,19 @@ function App(){
   // viewport, so it can't undershoot the way dvh sometimes does.
   const[vpH,setVpH]=useState(()=>typeof window!=="undefined"?window.innerHeight:800);
   useEffect(()=>{
-    const upd=()=>setVpH(window.visualViewport?window.visualViewport.height:window.innerHeight);
+    // Take the largest of three independent measurements rather than trusting
+    // any single one -- on some mobile browsers innerHeight/visualViewport can
+    // under-report right after load, before the chrome (toolbar, home
+    // indicator) has finished settling. Re-measure a few times after mount to
+    // catch that late settling, since a single resize listener can miss it.
+    const measure=()=>Math.max(window.innerHeight||0,window.visualViewport?.height||0,document.documentElement.clientHeight||0);
+    const upd=()=>setVpH(measure());
     upd();
+    const timers=[120,500,1200].map(ms=>setTimeout(upd,ms));
     window.addEventListener("resize",upd);
+    window.addEventListener("orientationchange",upd);
     window.visualViewport?.addEventListener("resize",upd);
-    return()=>{window.removeEventListener("resize",upd);window.visualViewport?.removeEventListener("resize",upd)};
+    return()=>{timers.forEach(clearTimeout);window.removeEventListener("resize",upd);window.removeEventListener("orientationchange",upd);window.visualViewport?.removeEventListener("resize",upd)};
   },[]);
   const[v,sV]=useState("home");
   const navFromRef=useRef("home");
