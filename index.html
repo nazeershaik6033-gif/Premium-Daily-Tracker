@@ -42,7 +42,7 @@ if(typeof Recharts === 'undefined') {
 <style>
 :root{--nf:'SF Mono',ui-monospace,monospace;--tf:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display',system-ui,sans-serif;--ns:14px}
 *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
-html{height:-webkit-fill-available;height:100dvh}body{min-height:-webkit-fill-available;min-height:100dvh;margin:0;padding:0;background:#1B1B1D;overflow:hidden}#root{height:100dvh;margin:0;padding:0;overflow:hidden}
+html{height:-webkit-fill-available;height:100dvh;background:#1B1B1D}body{min-height:-webkit-fill-available;min-height:100dvh;margin:0;padding:0;background:#1B1B1D;overflow:hidden}#root{height:100dvh;margin:0;padding:0;overflow:hidden;background:#1B1B1D}
 body{overscroll-behavior-y:none;-webkit-font-smoothing:antialiased;-webkit-touch-callout:none}
 div,span,button,h1,h2,h3,h4,h5,h6,p,label,a{-webkit-user-select:none;user-select:none}
 button{border:none;background:none;padding:0;color:inherit;font:inherit;cursor:pointer}
@@ -1506,11 +1506,11 @@ function App(){
   Object.assign(c,themeC);c.dk=(theme!=="light");
   const THEME_CYCLE={dark:"navy",navy:"light",light:"dark"};
   const THEME_BG={dark:"#1B1B1D",navy:"#0F1117",light:"#EDEAE2"};
-  const applyTheme=(next)=>{setTheme(next);const nc=next==="navy"?navyC:next==="light"?lightC:darkC;Object.assign(c,nc);c.dk=(next!=="light");localStorage.setItem("etp-theme",next);document.body.style.background=THEME_BG[next];document.body.dataset.theme=next;paintNavVars(nc,next);document.querySelector('meta[name="theme-color"]')?.setAttribute("content",THEME_BG[next])};
+  const applyTheme=(next)=>{setTheme(next);const nc=next==="navy"?navyC:next==="light"?lightC:darkC;Object.assign(c,nc);c.dk=(next!=="light");localStorage.setItem("etp-theme",next);document.documentElement.style.background=THEME_BG[next];document.body.style.background=THEME_BG[next];document.body.dataset.theme=next;paintNavVars(nc,next);document.querySelector('meta[name="theme-color"]')?.setAttribute("content",THEME_BG[next])};
   const toggleTheme=()=>applyTheme(THEME_CYCLE[theme]);
   // Covers first paint and any theme change (including restore from storage),
   // so the nav vars are never left describing the previous theme.
-  useEffect(()=>{document.body.dataset.theme=theme;document.body.style.background=THEME_BG[theme];paintNavVars(themeC,theme)},[theme]);
+  useEffect(()=>{document.body.dataset.theme=theme;document.documentElement.style.background=THEME_BG[theme];document.body.style.background=THEME_BG[theme];paintNavVars(themeC,theme)},[theme]);
 
   // Screen-transition direction. Moving right along the tab order slides the
   // incoming screen in from the right; anything that isn't a tab-to-tab move
