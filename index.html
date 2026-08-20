@@ -2111,6 +2111,28 @@ return o("div",{children:[
     recurring.length>0&&o("button",{onClick:()=>onView("recurring"),className:"act99 trt",style:{display:"block",width:"100%",marginTop:12,padding:"16px 18px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:18},children:o("div",{className:"f ia jb",children:[o("div",{className:"f ia",style:{gap:10},children:[t("div",{style:{width:36,height:36,borderRadius:11,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",color:c.ac},children:t(Rpt,{size:16})}),o("div",{className:"tl",children:[t("div",{style:{fontFamily:c.hf,fontWeight:600,fontSize:14,color:c.tx},children:"recurring"}),o("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:[recurring.length," active · ",fm(totRec,data.currency),"/mo est."]})]})]}),t(CR,{size:16,color:c.tm})]})}),
     o("div",{className:"f ia jb",style:{marginTop:28,marginBottom:12},children:[o("div",{className:"f ia",style:{gap:8},children:[t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:20,color:c.tx},children:"recent"}),streakVal>=2&&o("span",{className:"f ia",style:{gap:3,padding:"2px 8px",borderRadius:999,background:c.ac+"18",border:`1px solid ${c.ac}40`},children:[t("span",{style:{fontSize:11},children:"🔥"}),t("span",{style:{fontFamily:F.mo,fontSize:10,color:c.ac,fontWeight:600},children:streakVal+"d"})]})]}),o("span",{style:{fontSize:10,color:c.tm,letterSpacing:1,fontFamily:F.mo},children:[recent.length," ENTRIES"]})]}),
     recent.length===0?t(ES,{title:t("em",{children:"nothing tracked yet"}),subtitle:"Tap the + below to start"}):t("div",{style:{background:c.sfg,borderRadius:R,boxShadow:cardSh()},children:recent.map((e,i)=>t(TX,{key:e.id,expense:e,accounts:data.accounts,cards:data.cards||[],isLast:i===recent.length-1,onClick:()=>onTx(e)}))}),
+
+    o("div",{style:{marginTop:28},children:[
+      o("div",{className:"f ia jb",style:{marginBottom:12},children:[
+        t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:20,color:c.tx},children:"your accounts"}),
+        o("button",{onClick:()=>onView("accounts"),className:"act95",style:{background:"transparent",border:"none",padding:0,fontSize:10,color:c.ac,fontFamily:F.mo,letterSpacing:1},children:"VIEW ALL"}),
+      ]}),
+      o("div",{className:"ox",style:{display:"flex",gap:10,paddingBottom:2,marginLeft:-2,paddingLeft:2},children:nwData.map(({acc,bal})=>
+        o("button",{key:acc.id,onClick:()=>onView("accounts"),className:"act95 trt",style:{flexShrink:0,minWidth:108,background:c.sfg,borderRadius:R,boxShadow:cardSh(),padding:14,textAlign:"left",border:"none"},children:[
+          t("div",{style:{width:34,height:34,borderRadius:999,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,marginBottom:10},children:acc.emoji||"💰"}),
+          t("div",{className:"tru",style:{fontSize:11,color:c.tm,marginBottom:3,maxWidth:96},children:acc.name}),
+          t("div",{className:"tru",style:{fontFamily:F.mo,fontSize:13,fontWeight:600,color:bal<0?c.co:c.tx,maxWidth:96},children:fm(bal,acc.currency||data.currency)}),
+        ]}))
+      }),
+    ]}),
+
+    o("button",{onClick:()=>onView("aiInsights"),className:"w100 act98 trt",style:{marginTop:20,textAlign:"left",border:"none",cursor:"pointer",background:`linear-gradient(135deg,${c.ac}17 0%,${c.sfg} 100%)`,borderRadius:R,boxShadow:cardSh(),padding:18,display:"flex",alignItems:"center",gap:14},children:[
+      o("div",{className:"f1 minw0",children:[
+        t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:15,color:c.tx,marginBottom:4},children:"Your AI Insights are ready"}),
+        t("div",{style:{fontSize:12,color:c.tm,lineHeight:1.4},children:"Spending patterns & suggestions, built from what you've logged"}),
+      ]}),
+      t("div",{style:{width:44,height:44,borderRadius:14,background:c.ac,display:"flex",alignItems:"center",justifyContent:"center",color:fgOn(c.ac),flexShrink:0},children:t(Sparkles,{size:20})}),
+    ]}),
   ]}),
   snapOpen&&t(Sht,{onClose:()=>{setSnapOpen(false);setSnapItems(null);setSnapErr(null);setSnapBusy(false);setSnapEdit(null);setSnapMonthOk(false);setSnapProgress(null);setSnapBulkPay("");setSnapMulti(false)},children:o(Fragment,{children:[
     t("div",{style:{fontFamily:c.hf,fontSize:20,marginBottom:4},children:snapMulti?"Multi-Photo Scan":"Scan Receipt"}),
