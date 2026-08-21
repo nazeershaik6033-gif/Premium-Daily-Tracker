@@ -105,10 +105,11 @@ body{background:#fff!important;color:#000!important}
 }
 
 .nav-bar{
-  flex-shrink:0;
+  position:fixed;
+  left:0;right:0;bottom:0;
+  z-index:30;
   display:flex;
   justify-content:center;
-  padding-bottom:0;
 }
 body.sheet-open .nav-bar{display:none!important}
 /* === Motion system ===
@@ -1476,54 +1477,14 @@ return o("div",{style:{padding:`8px ${GUT}px 32px`},className:"st",children:[
 ]});
 }
 function ReimbLinkSht({prompt,expenses,currency,onLink,onClose}){const[sel,setSel]=useState(new Set());return t(Sht,{onClose,children:o(Fragment,{children:[o("div",{className:"f ia",style:{gap:12,marginBottom:20},children:[t("div",{style:{width:48,height:48,borderRadius:14,background:c.ac+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0},children:"↩️"}),o("div",{children:[t("div",{style:{fontSize:17,fontWeight:700,color:c.tx},children:"Reimbursement received?"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:"This income matches a pending reimbursable expense"})]})]})  ,o("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,overflow:"hidden",marginBottom:20},children:prompt.candidates.map((e,i)=>{const cat=co(e.category),isOn=sel.has(e.id);return o("button",{key:e.id,onClick:()=>setSel(s=>{const ns=new Set(s);ns.has(e.id)?ns.delete(e.id):ns.add(e.id);return ns}),className:"w100 f ia act99 trt",style:{padding:"12px 14px",borderBottom:i===prompt.candidates.length-1?"none":`1px solid ${c.brs}`,background:"transparent",border:"none",color:"inherit",gap:12,textAlign:"left"},children:[t("div",{style:{width:22,height:22,borderRadius:999,border:`2px solid ${isOn?c.ac:c.brs}`,background:isOn?c.ac:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 150ms"},children:isOn?t(Check,{size:12,color:"#0a0a0a",strokeWidth:3}):null}),t("span",{style:{fontSize:18,flexShrink:0},children:cat.emoji}),o("div",{className:"f1 minw0",children:[t("div",{className:"tru",style:{fontSize:13,fontWeight:500,color:c.tx},children:e.merchant||e.payee||cat.label}),t("div",{style:{fontFamily:F.mo,fontSize:11,color:c.tm},children:new Date(e.date).toLocaleDateString("en-US",{month:"short",day:"numeric"})})]}),t("div",{style:{fontFamily:F.mo,fontSize:14,fontWeight:600,flexShrink:0},children:fm(e.amount,currency)})]})})}),o("div",{style:{display:"flex",flexDirection:"column",gap:8},children:[sel.size>0&&t("button",{onClick:()=>{[...sel].forEach(expId=>onLink(expId,prompt.incomeId));onClose()},className:"w100 act98 tr",style:{padding:"14px 0",background:c.ac,color:"#0a0a0a",borderRadius:12,fontWeight:600,fontSize:14,border:"none"},children:`Link ${sel.size} expense${sel.size>1?"s":""} as reimbursed`}),t("button",{onClick:onClose,className:"w100 act98 tr",style:{padding:"12px 0",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:12,color:c.td,fontSize:13},children:"Skip for now"})]})]})})}
-// Temporary, opt-in diagnostic for the app-shell/nav bottom-gap issue.
-// Enabled via a one-time visit to ?vpdebug=1 (persisted in localStorage so it
-// also applies to an installed home-screen icon); ?vpdebug=0 turns it off.
-// Not linked from any UI -- safe to leave in, invisible unless the flag is set.
-function VpDebugOverlay({info,fontSize}){
-  const[open,sOpen]=useState(false);
-  const bad=info&&Math.abs(info.gap)>1;
-  const label=!info?"measuring…":bad?`gap ${info.gap>0?"+":""}${info.gap}px`:"flush ✓";
-  const copy=()=>{
-    if(!info)return;
-    const report=[
-      "Viewport diagnostic report (live app)",
-      "—",
-      "innerHeight: "+info.inner+"px",
-      "visualViewport.height: "+info.vv+"px",
-      "documentElement.clientHeight: "+info.ch+"px",
-      "used (max): "+info.used+"px",
-      "zoom: "+info.zoom,
-      "app-shell height: "+info.shellH+"px",
-      "app-shell bottom: "+info.shellBottom+"px",
-      "gap to true edge: "+info.gap+"px",
-      "devicePixelRatio: "+(window.devicePixelRatio||1),
-      "standalone: "+((window.navigator.standalone===true)||(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)),
-      "fontSize setting: "+fontSize,
-      "screen: "+screen.width+"x"+screen.height,
-      "userAgent: "+navigator.userAgent,
-    ].join("\n");
-    navigator.clipboard?.writeText(report);
-  };
-  return t("div",{onClick:()=>sOpen(x=>!x),style:{position:"fixed",top:"calc(env(safe-area-inset-top,0px) + 6px)",left:"50%",transform:"translateX(-50%)",zIndex:9999,fontFamily:"'JetBrains Mono',monospace",fontSize:11,cursor:"pointer",userSelect:"none"},children:
-    o("div",{style:{background:"#0b0d10",color:bad?"#ff5c6c":"#35d48c",border:`1px solid ${bad?"#ff5c6c":"#35d48c"}55`,borderRadius:999,padding:"5px 12px",fontWeight:700,letterSpacing:.3,boxShadow:"0 4px 14px rgba(0,0,0,.4)"},children:[
-      "▣ "+label,
-      open&&info&&o("div",{onClick:e=>e.stopPropagation(),style:{marginTop:8,background:"#14171c",border:"1px solid #262b33",borderRadius:10,padding:10,textAlign:"left",fontWeight:500,color:"#e8ecef",minWidth:220,cursor:"default"},children:[
-        ["inner",info.inner],["visualViewport",info.vv],["clientHeight",info.ch],["used",info.used],["zoom",info.zoom],["shell H",info.shellH],["shell bottom",info.shellBottom],["gap",info.gap],
-      ].map(([k,v])=>o("div",{key:k,style:{display:"flex",justifyContent:"space-between",gap:12,padding:"2px 0"},children:[t("span",{style:{color:"#7c8592"},children:k}),t("span",{children:String(v)})]})).concat([
-        t("button",{key:"copy",onClick:copy,style:{marginTop:8,width:"100%",background:"#35d48c",color:"#0b0d10",border:"none",borderRadius:6,padding:"7px 0",fontFamily:"inherit",fontWeight:700,fontSize:11,cursor:"pointer"},children:"copy report"})
-      ])})
-    ]})
-  });
-}
-
 function App(){
   // Real, live viewport height in px, not a CSS dvh string. dvh support and
   // its recalc timing vary enough across mobile browsers/WebViews that the
-  // root container could come up short of the true viewport, leaving a gap
-  // of raw page background below the nav instead of the nav sitting flush
-  // at the bottom. window.innerHeight always reflects the actual rendered
-  // viewport, so it can't undershoot the way dvh sometimes does.
+  // root container could come up short of the true viewport. window.innerHeight
+  // always reflects the actual rendered viewport, so it can't undershoot the
+  // way dvh sometimes does. The bottom nav is pinned with position:fixed
+  // (see .nav-bar), so it always sits flush at the true viewport edge
+  // regardless of any residual imprecision here.
   const[vpH,setVpH]=useState(()=>typeof window!=="undefined"?window.innerHeight:800);
   useEffect(()=>{
     // Take the largest of three independent measurements rather than trusting
@@ -1540,44 +1501,6 @@ function App(){
     window.visualViewport?.addEventListener("resize",upd);
     return()=>{timers.forEach(clearTimeout);window.removeEventListener("resize",upd);window.removeEventListener("orientationchange",upd);window.visualViewport?.removeEventListener("resize",upd)};
   },[]);
-  // Debug-only live readout of the same measurement, run against the real
-  // #app-shell element instead of a reproduction. Off by default; a visit
-  // with ?vpdebug=1 flips a localStorage flag so it also applies to an
-  // installed home-screen icon (which shares localStorage with the origin
-  // but won't carry a query string added after the icon was created).
-  const[vpDebug,setVpDebug]=useState(()=>{try{return localStorage.getItem("etp-vpdebug")==="1"}catch{return false}});
-  useEffect(()=>{try{
-    const q=new URLSearchParams(location.search).get("vpdebug");
-    if(q==="1"){localStorage.setItem("etp-vpdebug","1");setVpDebug(true)}
-    else if(q==="0"){localStorage.removeItem("etp-vpdebug");setVpDebug(false)}
-  }catch{}},[]);
-  const[dbgInfo,setDbgInfo]=useState(null);
-  useEffect(()=>{
-    if(!vpDebug)return;
-    const read=()=>{
-      const el=document.getElementById("app-shell");
-      if(!el)return;
-      requestAnimationFrame(()=>{
-        const r=el.getBoundingClientRect();
-        const cs=getComputedStyle(el);
-        setDbgInfo({
-          inner:window.innerHeight||0,
-          vv:window.visualViewport?.height||0,
-          ch:document.documentElement.clientHeight||0,
-          used:vpH,
-          zoom:cs.zoom||"1",
-          shellH:Math.round(r.height*100)/100,
-          shellBottom:Math.round(r.bottom*100)/100,
-          gap:Math.round((window.innerHeight-r.bottom)*100)/100,
-        });
-      });
-    };
-    read();
-    const timers=[150,600,1400].map(ms=>setTimeout(read,ms));
-    window.addEventListener("resize",read);
-    window.visualViewport?.addEventListener("resize",read);
-    return()=>{timers.forEach(clearTimeout);window.removeEventListener("resize",read);window.visualViewport?.removeEventListener("resize",read)};
-  },[vpDebug,vpH]);
   const[v,sV]=useState("home");
   const navFromRef=useRef("home");
   const scrollRef=useRef(null);
@@ -1782,14 +1705,13 @@ function App(){
   const fzH=`${(vpH/fzScale).toFixed(2)}px`;
   const dv={...d,expenses:(d.expenses||[]).filter(e=>!e.archived),openingBalances:d.openingBalances||[]};
   return o("div",{id:"app-shell",style:{background:c.bgg,color:c.tx,fontFamily:'var(--tf)',height:fzH,maxHeight:fzH,width:"100%",overflow:"hidden",display:"flex",flexDirection:"column",alignItems:"center",zoom:fzScale,transformOrigin:"top left",boxSizing:"border-box",paddingTop:"calc(52px + env(safe-area-inset-top))"},className:"",children:[
-    vpDebug&&t(VpDebugOverlay,{info:dbgInfo,fontSize:d.fontSize}),
     t(Gr,{}),
     t(AppHeader,{onMenu:()=>{sSbFocus(null);sSbar(true)},onSearch:()=>sV("search"),onToggleTheme:toggleTheme,isDark,theme,onHome:()=>{sFlt(null);sAtx(null);if(scrollRef.current)scrollRef.current.scrollTop=0;sV("home")},onAI:()=>{sSbFocus("AI");sSbar(true)},onDiary:()=>{navFromRef.current=v;sV("diary")}}),
     d.expenses.some(e=>e.archived)&&(d.openingBalances||[]).length>0&&o("div",{style:{margin:"10px 16px 0",padding:"14px 16px",background:"#7f1d1d",border:"1px solid #ef4444",borderRadius:14,display:"flex",alignItems:"flex-start",gap:12,width:"calc(100% - 32px)",maxWidth:408,boxSizing:"border-box"},children:[t("span",{style:{fontSize:22,flexShrink:0},children:"⚠️"}),o("div",{className:"f1",children:[t("div",{style:{fontSize:14,fontWeight:700,color:"#fef2f2",marginBottom:4},children:"Reconcile archived your transactions"}),t("div",{style:{fontSize:12,color:"#fca5a5",lineHeight:1.5,marginBottom:10},children:d.expenses.filter(e=>e.archived).length+" transactions were archived. Tap below to restore all of them immediately."}),t("button",{onClick:doRevertAllReconcile,className:"act98 tr",style:{padding:"10px 20px",background:"#ef4444",border:"none",borderRadius:10,color:"#fff",fontWeight:700,fontSize:14},children:"Restore all transactions now"})]})]})  ,
     notice&&o("div",{onClick:()=>{if(notice.title.includes("Log"))sV("add");sNotice(null)},style:{margin:"10px 16px 0",padding:"13px 14px",background:`linear-gradient(135deg,${c.ac}1f 0%,${c.sfg} 60%)`,border:`1px solid ${c.ac}40`,borderRadius:14,display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer",width:"calc(100% - 32px)",maxWidth:408,boxSizing:"border-box"},children:[o("div",{className:"f1 minw0",children:[t("div",{style:{fontSize:13,fontWeight:600,color:c.tx,marginBottom:2},children:notice.title}),t("div",{style:{fontSize:12,color:c.td,lineHeight:1.45},children:notice.body})]}),t("button",{onClick:e=>{e.stopPropagation();sNotice(null)},style:{background:"transparent",border:"none",color:c.tm,flexShrink:0,padding:2,display:"flex"},children:t(X,{size:15})})]}),
     t(IOSTip,{}),
     o("div",{className:"r w100",style:{maxWidth:AW,flex:1,minHeight:0,background:c.bg,overflow:"hidden",display:"flex",flexDirection:"column"},children:[
-      o("div",{key:"vw-"+v,ref:scrollRef,className:vwCls,style:{paddingBottom:"calc(34px + env(safe-area-inset-bottom))",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
+      o("div",{key:"vw-"+v,ref:scrollRef,className:vwCls,style:{paddingBottom:"calc(70px + env(safe-area-inset-bottom))",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
         v==="home"&&t(Home,{data:dv,persist:pst,onTx:sAtx,onView:sV,onSetBudget:b=>pst({budget:b}),onFlt:sFlt,onUseProfile:p=>sProfToUse(p),onTour:()=>sShowTour(true),onAddExpenses:aEMany}),
         v==="calendar"&&t(Calend,{data:dv,onTx:sAtx,onFlt:sFlt,presetAdd:(ts,k)=>{window.__pd=ts;window.__pt=k||"expense";sV("add")}}),
         v==="stats"&&t(Stats,{data:dv,onTx:sAtx,onView:(id)=>{navFromRef.current="stats";sV(id)},onFlt:sFlt,persist:pst,onReimburse:(e)=>sReimbT(e),onUnreimburse:unReimburse}),
