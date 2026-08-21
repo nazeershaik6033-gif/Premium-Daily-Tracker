@@ -768,7 +768,12 @@ async function idbOpenFile(k){try{const b=await idbGetFile(k);if(!b)return false
 function _blobToDataUrl(b){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(b)})}
 function _dataUrlToBlob(u){const i=u.indexOf(",");const head=u.slice(0,i),b64=u.slice(i+1);const mime=(head.match(/:(.*?);/)||[])[1]||"application/pdf";const bin=atob(b64),arr=new Uint8Array(bin.length);for(let j=0;j<bin.length;j++)arr[j]=bin.charCodeAt(j);return new Blob([arr],{type:mime})}
 async function collectStmtFiles(stmts){const out={};for(const s of (stmts||[])){if(s&&s.fileId&&!out[s.fileId]){try{const b=await idbGetFile(s.fileId);if(b)out[s.fileId]={name:s.fileName||"statement.pdf",type:b.type||"application/pdf",dataUrl:await _blobToDataUrl(b)}}catch(e){}}}return out}
-async function restoreStmtFiles(map){if(!map)return;for(const k of Object.keys(map)){try{const f=map[k];if(f&&f.dataUrl)await idbPutFile(k,_dataUrlToBlob(f.dataUrl))}catch(e){}}}
+// Runs `fn` over `items` with at most `limit` in flight at once. A large
+// backup can carry hundreds of embedded files; writing them to IndexedDB one
+// at a time made restore slow. Unbounded Promise.all instead would open
+// hundreds of IndexedDB connections at once, so cap it.
+async function _pAll(items,limit,fn){let i=0;const workers=Array.from({length:Math.min(limit,items.length)},async()=>{while(i<items.length){const idx=i++;await fn(items[idx],idx)}});await Promise.all(workers)}
+async function restoreStmtFiles(map){if(!map)return;const keys=Object.keys(map);await _pAll(keys,8,async k=>{try{const f=map[k];if(f&&f.dataUrl)await idbPutFile(k,_dataUrlToBlob(f.dataUrl))}catch(e){}})}
 // === EXPENSE PHOTO STORAGE (IndexedDB — keeps receipt images out of the localStorage quota) ===
 async function collectPhotoFiles(expenses){const out={};for(const e of (expenses||[])){for(const p of ((e&&e.photos)||[])){if(p&&p.id&&!p.data&&!out[p.id]){try{const b=await idbGetFile(String(p.id));if(b)out[p.id]={name:p.name||"photo.jpg",type:b.type||"image/jpeg",dataUrl:await _blobToDataUrl(b)}}catch(err){}}}}return out}
 async function collectLedgerPhotoFiles(ledger){const out={};for(const p2 of (ledger||[])){const refs=[...(p2.photo?[p2.photo]:[]),...((p2.entries||[]).flatMap(en=>en.photos||[]))];for(const p of refs){if(p&&p.id&&!p.data&&!out[p.id]){try{const b=await idbGetFile(String(p.id));if(b)out[p.id]={name:p.name||"photo.jpg",type:b.type||"image/jpeg",dataUrl:await _blobToDataUrl(b)}}catch(err){}}}}return out}
@@ -8535,9 +8540,30 @@ function Backup({data,persist,onClose}){const[txt,sTxt]=useState("");const[msg,s
 const exp=async()=>buildBackupJSON(data,true);
 const dl=async()=>{sMsg("Preparing backup (embedding statement PDFs)…");try{const blob=new Blob([await exp()],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`expense-tracker-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url);sMsg("Downloaded backup file (incl. statement PDFs)")}catch(err){sMsg("Error: "+(err&&err.message||err))}};
 const cp=async()=>{try{await navigator.clipboard.writeText(await exp());sMsg("Copied to clipboard (incl. statement PDFs)")}catch{alert("Clipboard blocked")}};
-const onFile=async e=>{const f=e.target.files?.[0];if(!f)return;const text=await f.text();sTxt(text)};
+// A big backup (embedded photos/statement PDFs) can be tens of MB. Routing
+// that through sTxt()+the review textarea forced the browser to render and
+// measure a multi-megabyte text control, which is what was crashing the PWA
+// -- so file-picked backups skip the textarea entirely and go straight to
+// the confirm sheet. The textarea remains for small hand-pasted JSON only.
+const onFile=async e=>{
+  const f=e.target.files?.[0];
+  if(!f)return;
+  sMsg("Reading backup file…");
+  try{
+    const text=await f.text();
+    await new Promise(r=>setTimeout(r,0)); // let "Reading…" paint before the synchronous parse below
+    const o2=JSON.parse(text);
+    if(!o2.expenses||!Array.isArray(o2.expenses))throw new Error("Invalid format — missing expenses array");
+    sMsg(null);
+    sConf(o2);
+  }catch(err){
+    sMsg("Error: "+(err&&err.message||err));
+  }finally{
+    e.target.value="";
+  }
+};
 const tryRestore=()=>{try{const o2=JSON.parse(txt);if(!o2.expenses||!Array.isArray(o2.expenses))throw new Error("Invalid format — missing expenses array");sConf(o2)}catch(err){sMsg("Error: "+err.message)}};
-const doRestore=async()=>{const o2=conf;try{await restoreStmtFiles(o2.statementFiles)}catch(e){}try{await restoreStmtFiles(o2.expensePhotos)}catch(e){}try{await restoreStmtFiles(o2.ledgerPhotos)}catch(e){}try{await restoreStmtFiles(o2.lasPhotos)}catch(e){}if(Array.isArray(o2.sidebarOrder)){try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2.sidebarOrder))}catch(e){}}persist({expenses:o2.expenses||[],recurring:o2.recurring||[],accounts:o2.accounts&&o2.accounts.length?o2.accounts:[DA],profiles:o2.profiles||[],cards:o2.cards||[],cardStatements:o2.cardStatements||[],bills:o2.bills||[],goals:o2.goals||[],budgetLoans:o2.budgetLoans||[],ledger:o2.ledger||[],categoryBudgets:o2.categoryBudgets||{},monthlyRestrictionLogs:o2.monthlyRestrictionLogs||[],investments:o2.investments||[],planThreshold:o2.planThreshold??null,customExpenseCategories:o2.customExpenseCategories||[],customIncomeCategories:o2.customIncomeCategories||[],categoryOverrides:o2.categoryOverrides||{},categoryOrder:o2.categoryOrder||{expense:[],income:[]},budget:o2.budget??null,budgetPeriod:o2.budgetPeriod||"monthly",...(o2.morningEnabled!=null?{morningEnabled:o2.morningEnabled,morningTime:o2.morningTime||"08:00",eveningEnabled:o2.eveningEnabled||false,eveningTime:o2.eveningTime||"21:00"}:{}),currency:o2.currency||"$",monthStartDay:o2.monthStartDay||1,merchantRules:o2.merchantRules||{},debtPlan:o2.debtPlan||null,las:o2.las||null,varExpensePlans:o2.varExpensePlans||{},varIncomePlans:o2.varIncomePlans||{},varSavingsPlans:o2.varSavingsPlans||{},advStats:o2.advStats||{},calculators:o2.calculators||{},groceryCategories:o2.groceryCategories||GROC_CATS_DEFAULT,priceWatch:o2.priceWatch||PW_DEFAULT,threads:o2.threads||[],thresholdRules:o2.thresholdRules||[],netWorthSnapshots:o2.netWorthSnapshots||[]});try{if(o2.aiProvider)sProv(o2.aiProvider);if("aiModel" in o2)sMdl(o2.aiModel||null);sAK(null)}catch(e){}sConf(null);sMsg("✓ Restored. Re-enter your AI API key in Settings (keys are never stored in backups)"+(o2.statementFiles?" (statement PDFs included)":""));sTxt("")};
+const doRestore=async()=>{const o2=conf;sMsg("Restoring…");await Promise.all([restoreStmtFiles(o2.statementFiles),restoreStmtFiles(o2.expensePhotos),restoreStmtFiles(o2.ledgerPhotos),restoreStmtFiles(o2.lasPhotos)].map(p=>p.catch(()=>{})));if(Array.isArray(o2.sidebarOrder)){try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2.sidebarOrder))}catch(e){}}persist({expenses:o2.expenses||[],recurring:o2.recurring||[],accounts:o2.accounts&&o2.accounts.length?o2.accounts:[DA],profiles:o2.profiles||[],cards:o2.cards||[],cardStatements:o2.cardStatements||[],bills:o2.bills||[],goals:o2.goals||[],budgetLoans:o2.budgetLoans||[],ledger:o2.ledger||[],categoryBudgets:o2.categoryBudgets||{},monthlyRestrictionLogs:o2.monthlyRestrictionLogs||[],investments:o2.investments||[],planThreshold:o2.planThreshold??null,customExpenseCategories:o2.customExpenseCategories||[],customIncomeCategories:o2.customIncomeCategories||[],categoryOverrides:o2.categoryOverrides||{},categoryOrder:o2.categoryOrder||{expense:[],income:[]},budget:o2.budget??null,budgetPeriod:o2.budgetPeriod||"monthly",...(o2.morningEnabled!=null?{morningEnabled:o2.morningEnabled,morningTime:o2.morningTime||"08:00",eveningEnabled:o2.eveningEnabled||false,eveningTime:o2.eveningTime||"21:00"}:{}),currency:o2.currency||"$",monthStartDay:o2.monthStartDay||1,merchantRules:o2.merchantRules||{},debtPlan:o2.debtPlan||null,las:o2.las||null,varExpensePlans:o2.varExpensePlans||{},varIncomePlans:o2.varIncomePlans||{},varSavingsPlans:o2.varSavingsPlans||{},advStats:o2.advStats||{},calculators:o2.calculators||{},groceryCategories:o2.groceryCategories||GROC_CATS_DEFAULT,priceWatch:o2.priceWatch||PW_DEFAULT,threads:o2.threads||[],thresholdRules:o2.thresholdRules||[],netWorthSnapshots:o2.netWorthSnapshots||[]});try{if(o2.aiProvider)sProv(o2.aiProvider);if("aiModel" in o2)sMdl(o2.aiModel||null);sAK(null)}catch(e){}sConf(null);sMsg("✓ Restored. Re-enter your AI API key in Settings (keys are never stored in backups)"+(o2.statementFiles?" (statement PDFs included)":""));sTxt("")};
 const prebuild=async()=>{try{const s=await window.storage.get(KB);if(!s){alert("No prebuild snapshot found");return}sTxt(s.value);sMsg("Loaded prebuild backup — review then tap Restore")}catch{alert("Error loading snapshot")}};
 return o("div",{style:{padding:`8px ${GUT}px 32px`},className:"st",children:[
   t(SH,{title:t("em",{children:"Backup & Restore"}),onBack:onClose}),
