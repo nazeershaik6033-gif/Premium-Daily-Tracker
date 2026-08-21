@@ -1820,10 +1820,35 @@ const NAV_ORDER=NAV_TABS.filter(x=>!x.main).map(x=>x.id);
 function Nav({view,setView,onQuickPick,onVoice}){
   const[open,sOpen]=useState(false);
   const[rip,sRip]=useState(null);
+  const navRef=useRef(null);
 
   // Ripple is keyed by timestamp so tapping the same tab twice remounts the
   // node and restarts the animation instead of leaving it finished.
   useEffect(()=>{if(!rip)return;const h=setTimeout(()=>sRip(null),620);return()=>clearTimeout(h)},[rip]);
+
+  // Mobile Safari can leave position:fixed;bottom:0 sitting above the true
+  // visible edge while its toolbar shows/hides, since a fixed element doesn't
+  // reliably track the *visual* viewport there -- exposing a strip of page
+  // background below the bar. Rather than trust the CSS anchor, measure the
+  // actual residual gap against visualViewport and nudge the bar down to
+  // close it; a no-op (empty transform) wherever the CSS anchor is already correct.
+  useEffect(()=>{
+    const el=navRef.current;
+    if(!el||!window.visualViewport)return;
+    const vv=window.visualViewport;
+    const sync=()=>{
+      const rect=el.getBoundingClientRect();
+      const visualBottom=vv.height+vv.offsetTop;
+      const shift=Math.max(0,visualBottom-rect.bottom);
+      el.style.transform=shift>0.5?`translateY(${shift.toFixed(2)}px)`:"";
+    };
+    sync();
+    const timers=[120,500,1200].map(ms=>setTimeout(sync,ms));
+    vv.addEventListener("resize",sync);
+    vv.addEventListener("scroll",sync);
+    window.addEventListener("orientationchange",sync);
+    return()=>{timers.forEach(clearTimeout);vv.removeEventListener("resize",sync);vv.removeEventListener("scroll",sync);window.removeEventListener("orientationchange",sync)};
+  },[]);
 
   const buzz=()=>{try{navigator.vibrate&&navigator.vibrate(8)}catch{}};
   const go=(id)=>{sOpen(false);setView(id)};
@@ -1850,7 +1875,7 @@ function Nav({view,setView,onQuickPick,onVoice}){
       ]}),
     ]});
 
-  return t("div",{className:"nav-bar noprint",children:o("div",{className:"nb",children:[
+  return t("div",{className:"nav-bar noprint",ref:navRef,children:o("div",{className:"nb",children:[
 
     open&&t("div",{onClick:()=>sOpen(false),className:"nb-scrim",
       style:{position:"fixed",inset:0,zIndex:49}}),
