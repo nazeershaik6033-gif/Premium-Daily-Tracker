@@ -952,6 +952,24 @@ function friendlyAPIError(e,providerName){
 function sanitizeForPrompt(v){if(v==null)return"";const s=String(v).slice(0,500);return s.replace(/[\x00-\x1F\x7F]/g," ").replace(/[<>]/g," ");}
 function sanitizeObj(obj){if(!obj||typeof obj!=="object")return obj;if(Array.isArray(obj))return obj.map(sanitizeObj);const r={};for(const k of Object.keys(obj))r[k]=typeof obj[k]==="string"?sanitizeForPrompt(obj[k]):sanitizeObj(obj[k]);return r;}
 function extractJSON(txt){let s=txt.replace(/<think>[\s\S]*?<\/think>/gi,"").replace(/<thinking>[\s\S]*?<\/thinking>/gi,"");const f=s.match(/```(?:json)?\s*([\s\S]*?)```/i);if(f)s=f[1];const m=s.match(/\{[\s\S]*\}/);if(m){try{return JSON.parse(m[0])}catch{}}const all=(txt.match(/\{[\s\S]*?\}/g)||[]);for(const c2 of all){try{return JSON.parse(c2)}catch{}}return null}
+// A vision model's response can get cut off mid-array when a page has more line
+// items than fit in the token budget (a busy diary page for multi-scan, easily
+// 30+ lines). extractJSON then fails outright on the truncated JSON. Recover
+// whatever complete "items" objects came through before the cutoff instead of
+// throwing the whole scan away.
+function salvageJSONItems(txt){
+  const s=txt.replace(/<think>[\s\S]*?<\/think>/gi,"").replace(/<thinking>[\s\S]*?<\/thinking>/gi,"");
+  const ai=s.indexOf('"items"');if(ai===-1)return null;
+  const ab=s.indexOf("[",ai);if(ab===-1)return null;
+  const items=[];let depth=0,objStart=-1;
+  for(let i=ab+1;i<s.length;i++){
+    const ch=s[i];
+    if(ch==="{"){if(depth===0)objStart=i;depth++}
+    else if(ch==="}"){depth--;if(depth===0&&objStart!==-1){try{items.push(JSON.parse(s.slice(objStart,i+1)))}catch{}objStart=-1}}
+    else if(ch==="]"&&depth===0)break;
+  }
+  return items.length?{items}:null;
+}
 const AI_PROVIDERS={
   anthropic:{name:"Anthropic",ph:"sk-ant-…",url:"https://api.anthropic.com/v1/messages",def:"claude-haiku-4-5-20251001",fmt:"anthropic",vision:true,visionModel:"claude-haiku-4-5-20251001"},
   deepseek:{name:"DeepSeek",ph:"sk-…",url:"https://api.deepseek.com/v1/chat/completions",def:"deepseek-chat",fmt:"openai",vision:true,visionModel:"deepseek-chat"},
@@ -1051,7 +1069,23 @@ const NeuBtn=({label,icon,onClick,flat=false,full=false,disabled=false,style={}}
 let _shtOpen=0;
 const Sht=({children,onClose})=>{
   useEffect(()=>{_shtOpen++;document.body.classList.add("sheet-open");return()=>{_shtOpen=Math.max(0,_shtOpen-1);if(_shtOpen===0)document.body.classList.remove("sheet-open")}},[]);
-  const pnl=useRef(null),scrim=useRef(null),dr=useRef(null);
+  const pnl=useRef(null),scrim=useRef(null),dr=useRef(null),ov=useRef(null);
+  // Same mobile-Safari fixed-position gap as the nav bar (see Nav below): inset:0
+  // can leave the overlay short of the true visible viewport while the browser
+  // chrome/keyboard is animating, exposing page content below the scrim. Pin the
+  // overlay to the measured visual viewport instead of trusting the CSS anchor.
+  useEffect(()=>{
+    const el=ov.current;
+    if(!el||!window.visualViewport)return;
+    const vv=window.visualViewport;
+    const sync=()=>{el.style.top=vv.offsetTop+"px";el.style.height=vv.height+"px"};
+    sync();
+    const timers=[120,500,1200].map(ms=>setTimeout(sync,ms));
+    vv.addEventListener("resize",sync);
+    vv.addEventListener("scroll",sync);
+    window.addEventListener("orientationchange",sync);
+    return()=>{timers.forEach(clearTimeout);vv.removeEventListener("resize",sync);vv.removeEventListener("scroll",sync);window.removeEventListener("orientationchange",sync)};
+  },[]);
   // Drag-to-dismiss. Driven straight through the DOM rather than React state so
   // the panel tracks the finger at frame rate. Only engages when the panel is
   // scrolled to the top, otherwise it would fight the inner scroll.
@@ -1076,7 +1110,7 @@ const Sht=({children,onClose})=>{
     el.style.transform="translate3d(0,0,0)";
     if(scrim.current){scrim.current.style.transition="opacity 300ms var(--ez)";scrim.current.style.opacity="1"}};
 
-  return t("div",{className:"fx f iend",style:{inset:0,zIndex:50},onClick:onClose,children:o(Fragment,{children:[
+  return t("div",{ref:ov,className:"fx f iend",style:{inset:0,zIndex:50},onClick:onClose,children:o(Fragment,{children:[
     t("div",{ref:scrim,className:"fx scrimin",style:{inset:0,background:c.dk?"rgba(0,0,0,.6)":"rgba(26,24,20,.34)",backdropFilter:"blur(5px)",WebkitBackdropFilter:"blur(5px)"}}),
     t("div",{ref:pnl,className:"w100 shn r",onClick:e=>e.stopPropagation(),
       onPointerDown:down,onPointerMove:move,onPointerUp:up,onPointerCancel:up,
@@ -1843,6 +1877,11 @@ function Nav({view,setView,onQuickPick,onVoice}){
     const vv=window.visualViewport;
     const sync=()=>{
       const rect=el.getBoundingClientRect();
+      // A sheet over the app hides the nav bar via `body.sheet-open .nav-bar{display:none}`,
+      // which makes getBoundingClientRect() report an empty rect. Measuring against
+      // that would compute a bogus large shift and translate the bar off-screen, so it
+      // stays hidden even after the sheet closes and the bar is display:flex again.
+      if(rect.width===0&&rect.height===0)return;
       const visualBottom=vv.height+vv.offsetTop;
       const shift=Math.max(0,visualBottom-rect.bottom);
       el.style.transform=shift>0.5?`translateY(${shift.toFixed(2)}px)`:"";
@@ -1852,7 +1891,11 @@ function Nav({view,setView,onQuickPick,onVoice}){
     vv.addEventListener("resize",sync);
     vv.addEventListener("scroll",sync);
     window.addEventListener("orientationchange",sync);
-    return()=>{timers.forEach(clearTimeout);vv.removeEventListener("resize",sync);vv.removeEventListener("scroll",sync);window.removeEventListener("orientationchange",sync)};
+    // Re-measure once a sheet closes and the bar becomes visible again, in case the
+    // real viewport changed while it was hidden (e.g. keyboard/orientation during the scan flow).
+    const mo=new MutationObserver(sync);
+    mo.observe(document.body,{attributes:true,attributeFilter:["class"]});
+    return()=>{timers.forEach(clearTimeout);vv.removeEventListener("resize",sync);vv.removeEventListener("scroll",sync);window.removeEventListener("orientationchange",sync);mo.disconnect()};
   },[]);
 
   const buzz=()=>{try{navigator.vibrate&&navigator.vibrate(8)}catch{}};
@@ -2007,7 +2050,7 @@ useEffect(()=>{if(spendFlt.from||spendFlt.to){try{localStorage.setItem("etp-spen
 useEffect(()=>{return;const k="etp-nudge-"+new Date().toISOString().slice(0,10);if(nudge||nudgeLoading)return;const eList=expenses.filter(x=>x.type==="expense"&&x.date>=periodStart);const tot=eList.reduce((s,e)=>s+e.amount,0);const byCat={};for(const e of eList){const lbl=co(e.category)?.label||e.category;byCat[lbl]=(byCat[lbl]||0)+e.amount}const ranked=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);const top=ranked.slice(0,5).map(([l,v])=>`${l}: ${v.toFixed(0)}`).join(", ");const cur=data.currency;const fb=()=>{if(!ranked.length)return`No spending logged this ${periodLabel} yet — a clean slate. Keep logging as you go to stay on track.`;const[tl,tv]=ranked[0];const pct=tot>0?Math.round((tv/tot)*100):0;const vs=[`${tl} is your biggest ${periodLabel} spend so far — ${fs(tv,cur)} (${pct}% of ${fs(tot,cur)}).`,`You've spent ${fs(tot,cur)} this ${periodLabel}; ${tl} leads at ${fs(tv,cur)}. Worth a second look.`,`Top category this ${periodLabel}: ${tl} at ${pct}% of total. Small trims here add up fast.`];return vs[new Date().getDate()%vs.length]};const fbText=fb();const cache=(txt)=>{try{localStorage.setItem(k,JSON.stringify(txt))}catch{}};if(!gAK()){setNudge(fbText);cache(fbText);return}
 // Show the local insight instantly, then silently upgrade with the AI one if/when it arrives.
 setNudge(fbText);const timeout=new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),8000));Promise.race([cAPI({max_tokens:80,system:"Reply with ONE short spending insight or encouragement (under 20 words). Be specific, friendly, no emoji.",messages:[{role:"user",content:`Currency: ${cur}. Total spent: ${tot.toFixed(0)}. Top categories: ${top||"none"}. Period: ${periodLabel}.`}]}),timeout]).then(r=>{const txt=(r.content?.map(x=>x.text||"").join("")||"").trim();if(txt){setNudge(txt);cache(txt)}else cache(fbText)}).catch(()=>cache(fbText))},[]);
-const snapPhotos=async(files,prompt)=>{const arr=Array.from(files||[]).filter(Boolean);if(!arr.length)return;if(!gAK()){setSnapErr("Add an AI API key in Settings first.");return}const pv=AI_PROVIDERS[gProv()]||AI_PROVIDERS.anthropic;if(!pv.vision){setSnapErr(`${pv.name} doesn't support photo scanning — switch to Anthropic, DeepSeek, OpenAI, or Gemini in Settings.`);return}setSnapBusy(true);setSnapErr(null);setSnapItems(null);setSnapMonthOk(false);setSnapBulkPay("");setSnapProgress(arr.length>1?{done:0,total:arr.length}:null);const multi=snapMulti;const thisYear=new Date().getFullYear();const sys=multi?`You are a multi-date expense extractor. The image may be a handwritten diary page, a note, a ledger, a spreadsheet screenshot, or a receipt, and it MAY contain expenses belonging to SEVERAL DIFFERENT DATES.\nRules:\n1. Read every date written on the page — headings, column values, row prefixes, receipt timestamps.\n2. Attach each expense line to the date it sits under or beside. Do NOT merge everything onto one date.\n3. Emit one item per expense line. Never sum lines together and never invent lines.\n4. Normalise dates to YYYY-MM-DD. Day-first formats (12/03, 12-03-2026) are day/month. If the year is missing assume ${thisYear}.\n5. If a line genuinely has no date anywhere above or beside it, set "date":null. Never guess a date and never fall back to today.\nReturn JSON only:\n{"items":[{"merchant":"store or payee","amount":0.00,"date":"YYYY-MM-DD","category":"food|shopping|transport|utilities|health|entertainment|other","note":"item or empty"}]}\nIf nothing is readable: {"items":[],"error":"reason"}.`:`You are a receipt scanner. Extract ALL expense line items. Return JSON only:\n{"items":[{"merchant":"store name","amount":0.00,"date":"YYYY-MM-DD","category":"food|shopping|transport|utilities|health|entertainment|other","note":"item or empty"}]}\nFor grocery/restaurant, one entry per distinct item, all sharing the merchant. If unreadable: {"items":[],"error":"reason"}.`;const userText=prompt||(multi?"Extract every expense from this image and keep each one on the date written next to it.":"Extract all expense items from this receipt.");let allItems=[];let globalErr=null;for(let pi=0;pi<arr.length;pi++){const f=arr[pi];try{const b64=await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(f)});const mt=f.type||"image/jpeg";const r=await cAPI({max_tokens:multi?4000:1500,system:sys,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:mt,data:b64.split(",")[1]}},{type:"text",text:userText}]}]});const txt=r.content?.map(x=>x.text||"").join("")||"";const parsed=extractJSON(txt);if(parsed&&Array.isArray(parsed.items)){allItems=[...allItems,...parsed.items.map(it=>({...it,_photoIdx:arr.length>1?pi+1:null,_photoTotal:arr.length}))]}else if(parsed?.error&&!allItems.length){globalErr=parsed.error}}catch(e){if(!allItems.length)globalErr=friendlyAPIError(e)}if(arr.length>1)setSnapProgress({done:pi+1,total:arr.length})}if(!allItems.length){setSnapErr(globalErr||"No items found — try clearer photos.");setSnapBusy(false);return}const merchMem=buildMerchantMemory(data.expenses,data.merchantRules);const items=allItems.map((it,i)=>{const guess=it.merchant?merchMem(it.merchant):null;const cat=(guess?.category||(it.category!=null?String(it.category):"other")).toLowerCase();const grp=(CE_GROUPS.slice(1).find(g=>g.ids?.includes(cat))||{}).id||"all";const mop=guess?.cardId?"card":"account";const dt=SNAP_ISO(it.date);return{...it,date:dt,amount:parseFloat(it.amount)||0,category:cat,mop,accountId:guess?.cardId?null:(guess?.accountId||null),cardId:guess?.cardId||null,needWant:guess?.needWant||catNW(cat),_catGrp:grp,_catQ:"",_id:i}});setSnapItems(items);setSnapEdit(null);const s2={};items.forEach((_,i)=>{s2[i]=true});setSnapSel(s2);setSnapBusy(false);setSnapProgress(null)};
+const snapPhotos=async(files,prompt)=>{const arr=Array.from(files||[]).filter(Boolean);if(!arr.length)return;if(!gAK()){setSnapErr("Add an AI API key in Settings first.");return}const pv=AI_PROVIDERS[gProv()]||AI_PROVIDERS.anthropic;if(!pv.vision){setSnapErr(`${pv.name} doesn't support photo scanning — switch to Anthropic, DeepSeek, OpenAI, or Gemini in Settings.`);return}setSnapBusy(true);setSnapErr(null);setSnapItems(null);setSnapMonthOk(false);setSnapBulkPay("");setSnapProgress(arr.length>1?{done:0,total:arr.length}:null);const multi=snapMulti;const thisYear=new Date().getFullYear();const sys=multi?`You are a multi-date expense extractor. The image may be a handwritten diary page, a note, a ledger, a spreadsheet screenshot, or a receipt, and it MAY contain expenses belonging to SEVERAL DIFFERENT DATES.\nRules:\n1. Read every date written on the page — headings, column values, row prefixes, receipt timestamps.\n2. Attach each expense line to the date it sits under or beside. Do NOT merge everything onto one date.\n3. Emit one item per expense line. Never sum lines together and never invent lines.\n4. Normalise dates to YYYY-MM-DD. Day-first formats (12/03, 12-03-2026) are day/month. If the year is missing assume ${thisYear}.\n5. If a line genuinely has no date anywhere above or beside it, set "date":null. Never guess a date and never fall back to today.\nReturn JSON only:\n{"items":[{"merchant":"store or payee","amount":0.00,"date":"YYYY-MM-DD","category":"food|shopping|transport|utilities|health|entertainment|other","note":"item or empty"}]}\nIf nothing is readable: {"items":[],"error":"reason"}.`:`You are a receipt scanner. Extract ALL expense line items. Return JSON only:\n{"items":[{"merchant":"store name","amount":0.00,"date":"YYYY-MM-DD","category":"food|shopping|transport|utilities|health|entertainment|other","note":"item or empty"}]}\nFor grocery/restaurant, one entry per distinct item, all sharing the merchant. If unreadable: {"items":[],"error":"reason"}.`;const userText=prompt||(multi?"Extract every expense from this image and keep each one on the date written next to it.":"Extract all expense items from this receipt.");let allItems=[];let globalErr=null;for(let pi=0;pi<arr.length;pi++){const f=arr[pi];try{const b64=await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(f)});const mt=f.type||"image/jpeg";const r=await cAPI({max_tokens:multi?8000:1500,system:sys,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:mt,data:b64.split(",")[1]}},{type:"text",text:userText}]}]});const txt=r.content?.map(x=>x.text||"").join("")||"";let parsed=extractJSON(txt);if(!parsed||!Array.isArray(parsed.items))parsed=salvageJSONItems(txt);if(parsed&&Array.isArray(parsed.items)&&parsed.items.length){allItems=[...allItems,...parsed.items.map(it=>({...it,_photoIdx:arr.length>1?pi+1:null,_photoTotal:arr.length}))]}else if(parsed?.error&&!allItems.length){globalErr=parsed.error}}catch(e){if(!allItems.length)globalErr=friendlyAPIError(e)}if(arr.length>1)setSnapProgress({done:pi+1,total:arr.length})}if(!allItems.length){setSnapErr(globalErr||"No items found — try clearer photos.");setSnapBusy(false);return}const merchMem=buildMerchantMemory(data.expenses,data.merchantRules);const items=allItems.map((it,i)=>{const guess=it.merchant?merchMem(it.merchant):null;const cat=(guess?.category||(it.category!=null?String(it.category):"other")).toLowerCase();const grp=(CE_GROUPS.slice(1).find(g=>g.ids?.includes(cat))||{}).id||"all";const mop=guess?.cardId?"card":"account";const dt=SNAP_ISO(it.date);return{...it,date:dt,amount:parseFloat(it.amount)||0,category:cat,mop,accountId:guess?.cardId?null:(guess?.accountId||null),cardId:guess?.cardId||null,needWant:guess?.needWant||catNW(cat),_catGrp:grp,_catQ:"",_id:i}});setSnapItems(items);setSnapEdit(null);const s2={};items.forEach((_,i)=>{s2[i]=true});setSnapSel(s2);setSnapBusy(false);setSnapProgress(null)};
 const snapUpd=(i,patch)=>setSnapItems(items=>items?items.map((it,j)=>j===i?{...it,...patch}:it):items);
 const streakVal=useMemo(()=>calcStreaks(expenses).current,[expenses]);
 return o("div",{children:[
