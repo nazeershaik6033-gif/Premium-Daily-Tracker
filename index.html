@@ -1072,13 +1072,21 @@ const Sht=({children,onClose})=>{
   const pnl=useRef(null),scrim=useRef(null),dr=useRef(null),ov=useRef(null);
   // Same mobile-Safari fixed-position gap as the nav bar (see Nav below): inset:0
   // can leave the overlay short of the true visible viewport while the browser
-  // chrome/keyboard is animating, exposing page content below the scrim. Pin the
-  // overlay to the measured visual viewport instead of trusting the CSS anchor.
+  // chrome/keyboard is animating, exposing page content below the scrim. Only
+  // ever GROW the overlay to close a gap, never shrink it: visualViewport.height
+  // reliably under-reports for the first second or so after a sheet opens on iOS,
+  // and trusting that raw value here previously shrank the overlay on every
+  // settle-timer tick, eating into coverage CSS's inset:0 already had right.
   useEffect(()=>{
     const el=ov.current;
     if(!el||!window.visualViewport)return;
     const vv=window.visualViewport;
-    const sync=()=>{el.style.top=vv.offsetTop+"px";el.style.height=vv.height+"px"};
+    const sync=()=>{
+      const rect=el.getBoundingClientRect();
+      const visualBottom=vv.height+vv.offsetTop;
+      const gap=visualBottom-rect.bottom;
+      if(gap>0.5)el.style.height=(el.offsetHeight+gap)+"px";
+    };
     sync();
     const timers=[120,500,1200].map(ms=>setTimeout(sync,ms));
     vv.addEventListener("resize",sync);
