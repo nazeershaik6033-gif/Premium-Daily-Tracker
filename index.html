@@ -1647,6 +1647,29 @@ function App(){
   const strip=x=>({expenses:x.expenses,recurring:x.recurring,accounts:x.accounts,profiles:x.profiles,cards:x.cards||[],cardStatements:x.cardStatements||[],bills:x.bills||[],goals:x.goals||[],budgetLoans:x.budgetLoans||[],ledger:x.ledger||[],categoryBudgets:x.categoryBudgets||{},monthlyRestrictionLogs:x.monthlyRestrictionLogs||[],openingBalances:x.openingBalances||[],customExpenseCategories:x.customExpenseCategories||[],customIncomeCategories:x.customIncomeCategories||[],categoryOverrides:x.categoryOverrides||{},categoryOrder:x.categoryOrder||{expense:[],income:[]},financeProfile:x.financeProfile||null,budget:x.budget,budgetPeriod:x.budgetPeriod,currency:x.currency,monthStartDay:x.monthStartDay,fontSize:x.fontSize||"medium",upcomingExpenses:x.upcomingExpenses||[],alertThreshold:x.alertThreshold??null,thresholdRules:x.thresholdRules||[],expensePlans:x.expensePlans||[],investmentPlans:x.investmentPlans||[],investments:x.investments||[],planThreshold:x.planThreshold??null,reminderEnabled:x.reminderEnabled||false,reminderTime:x.reminderTime||"21:00",morningEnabled:x.morningEnabled||false,morningTime:x.morningTime||"08:00",eveningEnabled:x.eveningEnabled||false,eveningTime:x.eveningTime||"21:00",backupFreq:x.backupFreq||"off",backupGDrive:x.backupGDrive||false,lastBackupAt:x.lastBackupAt||0,merchantRules:x.merchantRules||{},debtPlan:x.debtPlan||null,las:x.las||null,threads:x.threads||[],varExpensePlans:x.varExpensePlans||{},varIncomePlans:x.varIncomePlans||{},varSavingsPlans:x.varSavingsPlans||{},advStats:x.advStats||{},calculators:x.calculators||{},incomeTracker:x.incomeTracker||{},groceryCategories:x.groceryCategories||GROC_CATS_DEFAULT,priceWatch:x.priceWatch||PW_DEFAULT,netWorthSnapshots:x.netWorthSnapshots||[]});
 
   const pst=async(p)=>{const n={...d,...p};_custCE=n.customExpenseCategories||[];_custCI=n.customIncomeCategories||[];_catOv=n.categoryOverrides||{};_catOrder=n.categoryOrder||{expense:[],income:[]};_grocCats=n.groceryCategories||GROC_CATS_DEFAULT;sD(n);const dk=activeUser?"etp-data-"+activeUser.id:KS;try{await window.storage.set(dk,JSON.stringify(strip(n)))}catch(e){console.error(e);try{if(!window.__pstErrWarned){window.__pstErrWarned=true;alert("⚠ Could not save your data — device storage looks full. Recent changes may disappear when the app closes. Free up space, then make any small edit to retry saving.")}}catch(e2){}}};
+  const pstRef=useRef(null);pstRef.current=pst;
+  // Recurring rules are only caught up once, in the initial load effect above,
+  // which runs on a full page load. A PWA that's merely resumed from the
+  // background/app-switcher (no full reload -- common on iOS, which keeps a
+  // standalone PWA alive across app-switches far more often than it evicts it)
+  // never re-runs that catch-up, so a recurring expense whose date passed while
+  // the app sat backgrounded never posts against its account until the user
+  // happens to force-quit and relaunch. Re-run the same catch-up whenever the
+  // app becomes visible again; pr() is idempotent (keyed by rec_<id>_<date>) so
+  // calling it repeatedly is harmless when nothing new is actually due.
+  useEffect(()=>{
+    const onVis=()=>{
+      if(document.visibilityState&&document.visibilityState!=="visible")return;
+      const cur=dRef.current;
+      if(!cur||cur.loading||!cur.recurring||!cur.recurring.length)return;
+      const{newExpenses,updatedRecurring}=pr(cur.recurring,cur.expenses);
+      if(newExpenses.length)pstRef.current({expenses:[...newExpenses,...cur.expenses].sort((a,b)=>b.date-a.date),recurring:updatedRecurring});
+    };
+    document.addEventListener("visibilitychange",onVis);
+    window.addEventListener("focus",onVis);
+    window.addEventListener("pageshow",onVis);
+    return()=>{document.removeEventListener("visibilitychange",onVis);window.removeEventListener("focus",onVis);window.removeEventListener("pageshow",onVis)};
+  },[]);
 
   const aE=(e)=>{const id=uid(),L=[{...e,id,type:e.type||"expense"},...d.expenses].sort((a,b)=>b.date-a.date);pst({expenses:L})};
   const aEMany=(arr)=>{if(!arr||!arr.length)return;const add=arr.map(e=>({...e,id:uid(),type:e.type||"expense",createdAt:e.createdAt||Date.now()}));const L=[...add,...d.expenses].sort((a,b)=>b.date-a.date);pst({expenses:L})};
