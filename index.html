@@ -128,7 +128,7 @@ body.sheet-open .nav-bar{display:none!important}
   --neu-pd:rgba(0,0,0,.65);  --neu-pl:rgba(255,255,255,.06);
   --neu-ad:rgba(0,0,0,.6);   --neu-al:rgba(255,255,255,.04);
 }
-body[data-theme="light"]{
+body[data-theme="light"],body[data-theme="snow"],body[data-theme="parchment"]{
   --neu-d:rgba(92,80,58,.13);  --neu-l:rgba(255,255,255,.95);
   --neu-dc:rgba(92,80,58,.16); --neu-lc:rgba(255,255,255,1);
   --neu-pd:rgba(92,80,58,.17); --neu-pl:rgba(255,255,255,.92);
@@ -390,10 +390,17 @@ const KU="etp-users",KAU="etp-active-user";
 
 // === THEME ===
 // CRED-2020 (Fabrik) — luxury dark, gradient depth, champagne gold + jewel tones, Cirka-style serif
-const darkC={bg:"#1B1B1D",bgg:"#1B1B1D",sf:"#242427",sfg:"#242427",sf2:"#2C2C30",sf3:"#34343A",br:"#3A3A40",brs:"#303036",tx:"#F4F4F6",td:"#9B9BA2",tm:"#6C6C74",ac:"#FFFFFF",gd:"#FFD66B",cr:"#FF9E7A",co:"#FF5A6E",ro:"#FF4D63",mt:"#2FC59B",sk:"#4D7BF0",lv:"#9B8CFF",cu:"#C99064",hf:"'Space Grotesk','Geist',-apple-system,system-ui,sans-serif"};
-const lightC={bg:"#EDEAE2",bgg:"#EDEAE2",sf:"#FDFCFA",sfg:"#FDFCFA",sf2:"#F4F1EB",sf3:"#E9E5DC",br:"#DCD7CB",brs:"#E7E3D9",tx:"#1A1814",td:"#4A4640",tm:"#7A7670",ac:"#1A7A2E",gd:"#8B6A14",cr:"#7A4020",co:"#CC4400",ro:"#CC2020",mt:"#156830",sk:"#0E5FA0",lv:"#5E2EA0",cu:"#8A5A2E",hf:"'Instrument Serif','Times New Roman',serif"};
-const navyC={bg:"#0F1117",bgg:"#0F1117",sf:"#1A1E2E",sfg:"#1A1E2E",sf2:"#232840",sf3:"#2D3354",br:"#2E3555",brs:"#262B45",tx:"#F1F5F9",td:"#94A3B8",tm:"#64748B",ac:"#6366F1",gd:"#F59E0B",cr:"#FB7185",co:"#F97316",ro:"#EF4444",mt:"#10B981",sk:"#38BDF8",lv:"#A78BFA",cu:"#D8956A",hf:"'Instrument Serif','Times New Roman',serif"};
-let c={...darkC};c.dk=true;
+const darkC={bg:"#1B1B1D",bgg:"#1B1B1D",sf:"#242427",sfg:"#242427",sf2:"#2C2C30",sf3:"#34343A",br:"#3A3A40",brs:"#303036",tx:"#F4F4F6",td:"#9B9BA2",tm:"#6C6C74",ac:"#FFFFFF",gd:"#FFD66B",cr:"#FF9E7A",co:"#FF5A6E",ro:"#FF4D63",mt:"#2FC59B",sk:"#4D7BF0",lv:"#9B8CFF",cu:"#C99064",hf:"'Space Grotesk','Geist',-apple-system,system-ui,sans-serif",dk:true};
+const lightC={bg:"#EDEAE2",bgg:"#EDEAE2",sf:"#FDFCFA",sfg:"#FDFCFA",sf2:"#F4F1EB",sf3:"#E9E5DC",br:"#DCD7CB",brs:"#E7E3D9",tx:"#1A1814",td:"#4A4640",tm:"#7A7670",ac:"#1A7A2E",gd:"#8B6A14",cr:"#7A4020",co:"#CC4400",ro:"#CC2020",mt:"#156830",sk:"#0E5FA0",lv:"#5E2EA0",cu:"#8A5A2E",hf:"'Instrument Serif','Times New Roman',serif",dk:false};
+const navyC={bg:"#0F1117",bgg:"#0F1117",sf:"#1A1E2E",sfg:"#1A1E2E",sf2:"#232840",sf3:"#2D3354",br:"#2E3555",brs:"#262B45",tx:"#F1F5F9",td:"#94A3B8",tm:"#64748B",ac:"#6366F1",gd:"#F59E0B",cr:"#FB7185",co:"#F97316",ro:"#EF4444",mt:"#10B981",sk:"#38BDF8",lv:"#A78BFA",cu:"#D8956A",hf:"'Instrument Serif','Times New Roman',serif",dk:true};
+// Cool neutral white/grey -- distinct from the warm-cream "light" theme.
+const snowC={bg:"#F5F6F8",bgg:"#F5F6F8",sf:"#FFFFFF",sfg:"#FFFFFF",sf2:"#F0F1F4",sf3:"#E6E8EC",br:"#D7DAE0",brs:"#E1E3E8",tx:"#14161A",td:"#4B4F58",tm:"#868C96",ac:"#2563EB",gd:"#B58900",cr:"#C2410C",co:"#DC2626",ro:"#B91C1C",mt:"#059669",sk:"#0284C7",lv:"#7C3AED",cu:"#A16207",hf:"'Inter','SF Pro Display',-apple-system,system-ui,sans-serif",dk:false};
+// Deeper, warmer paper tone than "light", with a classic ledger serif and a brass accent.
+const parchmentC={bg:"#E8DFC8",bgg:"#E8DFC8",sf:"#F7F1E1",sfg:"#F7F1E1",sf2:"#EFE6D0",sf3:"#E4D8BC",br:"#C9B98F",brs:"#DCCEA9",tx:"#2B2113",td:"#5C4E33",tm:"#8A7A57",ac:"#8B5E1F",gd:"#A47C1B",cr:"#7A4A20",co:"#A83A1C",ro:"#8F2A1A",mt:"#3F6B3A",sk:"#3E6E8E",lv:"#6B4E8E",cu:"#8A5A2E",hf:"'Georgia','Times New Roman',serif",dk:false};
+// Cool charcoal-grey dark theme -- distinct from "dark" (near-black) and "navy" (blue-black).
+const slateC={bg:"#1E2328",bgg:"#1E2328",sf:"#262C33",sfg:"#262C33",sf2:"#2E353D",sf3:"#383F48",br:"#454D57",brs:"#3A414A",tx:"#F2F4F6",td:"#A7AFB8",tm:"#737C86",ac:"#38BDF8",gd:"#F0B429",cr:"#FB923C",co:"#F87171",ro:"#EF4444",mt:"#34D399",sk:"#38BDF8",lv:"#A78BFA",cu:"#94A3B8",hf:"'Space Grotesk','Geist',-apple-system,system-ui,sans-serif",dk:true};
+const THEMES={dark:darkC,navy:navyC,slate:slateC,light:lightC,snow:snowC,parchment:parchmentC};
+let c={...darkC};
 
 // Pick black or white text for whatever sits on top of `hex`, by WCAG relative
 // luminance. The nav accent (c.cu) is a mid-tone copper that differs per theme,
@@ -410,8 +417,8 @@ const paintNavVars=(nc,name)=>{const r=document.documentElement.style;
   r.setProperty("--nb-ac",nc.cu);
   r.setProperty("--nb-off",nc.td);
   r.setProperty("--nb-fabfg",fgOn(nc.cu));
-  r.setProperty("--nb-glow",nc.cu+(name==="light"?"4D":"66"));
-  r.setProperty("--nb-scrim",name==="light"?"rgba(26,24,20,.28)":"rgba(0,0,0,.45)");
+  r.setProperty("--nb-glow",nc.cu+(nc.dk?"66":"4D"));
+  r.setProperty("--nb-scrim",nc.dk?"rgba(0,0,0,.45)":"rgba(26,24,20,.28)");
 };
 // === LAYOUT TOKENS ===
 // One content width and one card radius for the whole app. The app previously
@@ -1601,15 +1608,15 @@ function App(){
   const[showTour,sShowTour]=useState(false);
   const[sbar,sSbar]=useState(false);const[sbFocus,sSbFocus]=useState(null);
   const[flt,sFlt]=useState(null);
-  const[theme,setTheme]=useState(()=>{const t2=localStorage.getItem("etp-theme");return t2==="navy"?"navy":t2==="light"?"light":"dark"});
-  const isDark=theme!=="light";
+  const[theme,setTheme]=useState(()=>{const t2=localStorage.getItem("etp-theme");return THEMES[t2]?t2:"dark"});
+  const themeC=THEMES[theme]||darkC;
+  const isDark=themeC.dk;
   const[users,setUsers]=useState([]);
   const[activeUser,setActiveUser]=useState(null);
-  const themeC=theme==="navy"?navyC:theme==="light"?lightC:darkC;
-  Object.assign(c,themeC);c.dk=(theme!=="light");
-  const THEME_CYCLE={dark:"navy",navy:"light",light:"dark"};
-  const THEME_BG={dark:"#1B1B1D",navy:"#0F1117",light:"#EDEAE2"};
-  const applyTheme=(next)=>{setTheme(next);const nc=next==="navy"?navyC:next==="light"?lightC:darkC;Object.assign(c,nc);c.dk=(next!=="light");localStorage.setItem("etp-theme",next);document.documentElement.style.background=THEME_BG[next];document.body.style.background=THEME_BG[next];document.body.dataset.theme=next;paintNavVars(nc,next);document.querySelector('meta[name="theme-color"]')?.setAttribute("content",THEME_BG[next])};
+  Object.assign(c,themeC);
+  const THEME_CYCLE={dark:"navy",navy:"slate",slate:"light",light:"snow",snow:"parchment",parchment:"dark"};
+  const THEME_BG={dark:"#1B1B1D",navy:"#0F1117",slate:"#1E2328",light:"#EDEAE2",snow:"#F5F6F8",parchment:"#E8DFC8"};
+  const applyTheme=(next)=>{setTheme(next);const nc=THEMES[next]||darkC;Object.assign(c,nc);localStorage.setItem("etp-theme",next);document.documentElement.style.background=THEME_BG[next];document.body.style.background=THEME_BG[next];document.body.dataset.theme=next;paintNavVars(nc,next);document.querySelector('meta[name="theme-color"]')?.setAttribute("content",THEME_BG[next])};
   const toggleTheme=()=>applyTheme(THEME_CYCLE[theme]);
   // Covers first paint and any theme change (including restore from storage),
   // so the nav vars are never left describing the previous theme.
@@ -8564,7 +8571,7 @@ const showAlert=stgHit("big expense alert","threshold","upcoming expense");
 const showThresholdRules=stgHit("threshold rules","spending alert","card alert","account alert","category alert","spending limit rule","alert rule");
 const showTextSize=stgHit("text size","small","medium","large","font size");
 const showSections=stgHit("sections","minimise","maximise","minimize","maximize","collapse","expand","home","stats","lending diary","las tracker","reimbursement");
-const showTheme=stgHit("theme","luxe","navy","light","dark","mode","color","colour");
+const showTheme=stgHit("theme","luxe","navy","light","dark","mode","color","colour","slate","snow","parchment");
 const showFonts=stgHit("number font","number size","text font","amounts","labels","sf mono");
 const showMonthStart=stgHit("month starts on day","pay cycle","calendar month");
 const showNotif=stgHit("notifications","reminder","morning quote","evening log","push","alerts");
@@ -8628,7 +8635,10 @@ return o("div",{style:{padding:`8px ${GUT}px 104px`},className:"st",children:[
     t("div",{className:"g g3",style:{gap:8},children:[
       {id:"dark",label:"Luxe",emoji:"👑",desc:"Gold & jewel"},
       {id:"navy",label:"Navy",emoji:"🌊",desc:"Indigo blue"},
+      {id:"slate",label:"Slate",emoji:"🪨",desc:"Cool charcoal"},
       {id:"light",label:"Light",emoji:"☀️",desc:"Clean white"},
+      {id:"snow",label:"Snow",emoji:"❄️",desc:"Neutral grey"},
+      {id:"parchment",label:"Parchment",emoji:"📜",desc:"Warm paper"},
     ].map(th=>o("button",{key:th.id,onClick:()=>theme!==th.id&&onSetTheme&&onSetTheme(th.id),style:{padding:"12px 8px",background:theme===th.id?c.sf3:c.sf2,border:`1px solid ${theme===th.id?c.ac:c.brs}`,borderRadius:11,display:"flex",flexDirection:"column",alignItems:"center",gap:4},children:[
       t("span",{style:{fontSize:20},children:th.emoji}),
       t("div",{style:{fontFamily:'var(--nf)',fontSize:11,fontWeight:600,color:theme===th.id?c.ac:c.tx,letterSpacing:.3},children:th.label}),
