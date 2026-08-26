@@ -3056,7 +3056,11 @@ const weekRows=useMemo(()=>{if(!isMonthly)return null;const wks=monthWeeks(st,en
   // past/current week be flagged as having overspent on its own, independent of how
   // the other weeks landed (that's what the overall budget bar already shows).
   const totalDays=Math.max(1,Math.round((en-st)/864e5));const perDayBudget=budget!=null?budget/totalDays:null;
-  return wks.map(w=>{const spent=expenses.filter(e=>e.type==="expense"&&e.date>=w.s&&e.date<w.e).reduce((s,e)=>s+netAmt(e),0);const days=Math.round((w.e-w.s)/864e5);const state=w.e<=nowTs?"past":(w.s<=nowTs&&nowTs<w.e?"current":"future");const left=perDay!=null?perDay*days:null;const fairShare=perDayBudget!=null?perDayBudget*days:null;const over=state!=="future"&&fairShare!=null&&spent>fairShare;const sd=new Date(w.s),ed=new Date(w.e-864e5);const range=sd.toLocaleDateString("en-US",{month:"short",day:"numeric"})+(days>1?"–"+ed.toLocaleDateString("en-US",{day:"numeric"}):"");return{wk:w.wk,range,spent,left,state,over,overBy:over?spent-fairShare:0}})},[expenses,st,en,isMonthly,budget,netSp]);
+  return wks.map(w=>{const spent=expenses.filter(e=>e.type==="expense"&&e.date>=w.s&&e.date<w.e).reduce((s,e)=>s+netAmt(e),0);const days=Math.round((w.e-w.s)/864e5);const state=w.e<=nowTs?"past":(w.s<=nowTs&&nowTs<w.e?"current":"future");const left=perDay!=null?perDay*days:null;const fairShare=perDayBudget!=null?perDayBudget*days:null;// Only flag full 7-day weeks. The month's first/last week is often a short partial
+// stub (e.g. 2 days), so its pro-rated share is tiny and any normal lump-sum expense
+// (rent on the 1st, etc.) trivially blows past it -- a huge, meaningless "over" figure
+// rather than a real overspending signal.
+const over=state!=="future"&&days>=7&&fairShare!=null&&spent>fairShare;const sd=new Date(w.s),ed=new Date(w.e-864e5);const range=sd.toLocaleDateString("en-US",{month:"short",day:"numeric"})+(days>1?"–"+ed.toLocaleDateString("en-US",{day:"numeric"}):"");return{wk:w.wk,range,spent,left,state,over,overBy:over?spent-fairShare:0}})},[expenses,st,en,isMonthly,budget,netSp]);
 const[budOpen,sBudOpen]=useState(()=>gSec("budget",false));const toggleBud=()=>{sBudOpen(v=>{const nv=!v;sSec("budget",nv);return nv})};
 return o("div",{style:{background:c.sfg,borderRadius:16,border:`1px solid ${ov?c.co+"50":c.brs}`,overflow:"hidden",marginBottom:10},children:[
   o("div",{style:{padding:"12px 16px 10px",borderBottom:budOpen?`1px solid ${c.brs}`:"none",background:`linear-gradient(135deg,${dot}12 0%,transparent 60%)`},children:[
