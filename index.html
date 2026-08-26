@@ -4452,6 +4452,7 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
   const[entryFor,sEntryFor]=useState(null);const[editEntryId,sEditEntryId]=useState(null);const[eKind,sEKind]=useState("gave");const[eAmt,sEAmt]=useState("");const[eNote,sENote]=useState("");const[eDate,sEDate]=useState("");const[ePhotos,sEPhotos]=useState([]);const[gallery,sGallery]=useState(null);const photoRef=useRef(null);
   const[editP,sEditP]=useState(null);const[edName,sEdName]=useState("");const[edNote,sEdNote]=useState("");const[edDue,sEdDue]=useState("");const[edPhoto,sEdPhoto]=useState(null);const edPhotoRef=useRef(null);
   const[delP,sDelP]=useState(null);
+  const[delEntry,sDelEntry]=useState(null);
   const[settledCollapsed,sSettledCollapsed]=useState(()=>!gSec("ldSettled",false));
   useEffect(()=>{sSec("ldSettled",!settledCollapsed)},[settledCollapsed]);
   const entryPhotoSrc=usePhotoSrc(ePhotos);
@@ -4524,16 +4525,26 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
             t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:new Date(en.date).toLocaleDateString("en-US",{day:"numeric",month:"short",year:"numeric"})+(en.note?" · "+en.note:"")})
           ]})
         ]}),
-        o("div",{className:"f ia",style:{gap:4,flexShrink:0},children:[
-          t("div",{style:{fontFamily:F.mo,fontSize:14,color:cashOut(en.kind)?c.co:c.mt,marginRight:2},children:(cashOut(en.kind)?"−":"+")+fm(en.amount,currency)}),
-          t("button",{"aria-label":"Edit entry",onClick:()=>openEditEntry(selP.id,en),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(Pencil,{size:13})}),
-          t("button",{"aria-label":"Delete entry",onClick:()=>onDeleteEntry(selP.id,en.id),style:{background:"transparent",border:"none",color:c.tm,display:"flex",padding:4},children:t(X,{size:13})})
+        o("div",{className:"f ia",style:{gap:2,flexShrink:0},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:14,color:cashOut(en.kind)?c.co:c.mt,marginRight:6},children:(cashOut(en.kind)?"−":"+")+fm(en.amount,currency)}),
+          // Edit/delete are separate 36px targets with their own hit area, not bare 13px
+          // icons a few px apart -- those were easy to mis-tap, hitting delete (with no
+          // confirmation, until the sheet below) when reaching for edit.
+          t("button",{"aria-label":"Edit entry",onClick:()=>openEditEntry(selP.id,en),className:"act90 trt",style:{width:36,height:36,borderRadius:10,background:c.sf2,border:`1px solid ${c.brs}`,color:c.td,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(Pencil,{size:14})}),
+          t("button",{"aria-label":"Delete entry",onClick:()=>sDelEntry({pid:selP.id,en}),className:"act90 trt",style:{width:36,height:36,borderRadius:10,background:c.sf2,border:`1px solid ${c.brs}`,color:c.co,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(X,{size:14})})
         ]})
       ]}))}),
       entryFor&&t(Sht,{onClose:()=>{sEntryFor(null);sEditEntryId(null)},children:o(Fragment,{children:[
         t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:14},children:editEntryId?"Edit entry":"Add entry"}),
-        o("div",{className:"g g2",style:{gap:8,marginBottom:12},children:[
-          [["gave","Lent (−)",c.co],["got","Received (+)",c.mt],["borrow","Borrowed (+)",c.mt],["repaid","Repaid (−)",c.co]].map(([k,lbl,col])=>t("button",{key:k,onClick:()=>sEKind(k),className:"act95 tr",style:{padding:"11px 0",background:eKind===k?col+"22":c.sf2,color:eKind===k?col:c.td,border:`1px solid ${eKind===k?col:c.brs}`,borderRadius:10,fontSize:13,fontWeight:600},children:lbl}))
+        // Grouped under the same two headers the detail-view action buttons use, instead
+        // of a flat 4-up grid -- picking blind between "Lent"/"Received"/"Borrowed"/"Repaid"
+        // with no grouping is exactly the kind of thing that's easy to get wrong, especially
+        // when re-selecting a kind while editing an entry you didn't create moments ago.
+        o("div",{style:{marginBottom:12},children:[
+          t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1.2,marginBottom:6},children:"LENDING · THEY OWE YOU"}),
+          o("div",{className:"g g2",style:{gap:8,marginBottom:10},children:[["gave","Lent (−)",c.co],["got","Received (+)",c.mt]].map(([k,lbl,col])=>t("button",{key:k,onClick:()=>sEKind(k),className:"act95 tr",style:{padding:"11px 0",background:eKind===k?col+"22":c.sf2,color:eKind===k?col:c.td,border:`1px solid ${eKind===k?col:c.brs}`,borderRadius:10,fontSize:13,fontWeight:600},children:lbl}))}),
+          t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1.2,marginBottom:6},children:"BORROWING · YOU OWE THEM"}),
+          o("div",{className:"g g2",style:{gap:8},children:[["borrow","Borrowed (+)",c.mt],["repaid","Repaid (−)",c.co]].map(([k,lbl,col])=>t("button",{key:k,onClick:()=>sEKind(k),className:"act95 tr",style:{padding:"11px 0",background:eKind===k?col+"22":c.sf2,color:eKind===k?col:c.td,border:`1px solid ${eKind===k?col:c.brs}`,borderRadius:10,fontSize:13,fontWeight:600},children:lbl}))}),
         ]}),
         t("div",{style:{fontSize:11,color:c.tm,textAlign:"center",marginBottom:14,lineHeight:1.5},children:eKind==="gave"?"Money you lent / paid them → increases what they owe you":eKind==="got"?"Money they paid back → decreases what they owe you":eKind==="borrow"?"Money you borrowed from them → increases what you owe them":"Money you paid back to them → decreases what you owe them"}),
         o("div",{style:{marginBottom:14,textAlign:"center"},children:[
@@ -4572,6 +4583,14 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
         o("div",{className:"f",style:{gap:10},children:[
           t("button",{onClick:()=>sDelP(null),className:"f1 act98 tr",style:{padding:"13px 0",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:12,fontSize:14,fontWeight:500},children:"Cancel"}),
           t("button",{onClick:()=>{onDeletePerson(delP.id);sDelP(null);sSel(null)},className:"f1 act98 tr",style:{padding:"13px 0",background:c.co,color:"#0a0a0a",border:"none",borderRadius:12,fontSize:14,fontWeight:600},children:"Delete"})
+        ]})
+      ]})}),
+      delEntry&&t(Sht,{onClose:()=>sDelEntry(null),children:o(Fragment,{children:[
+        t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:8},children:"Delete this entry?"}),
+        t("div",{style:{fontSize:13,color:c.td,marginBottom:20,lineHeight:1.5},children:`${kindLabel(delEntry.en.kind)} ${fm(delEntry.en.amount,currency)} on ${new Date(delEntry.en.date).toLocaleDateString("en-US",{day:"numeric",month:"short",year:"numeric"})}. This can't be undone.`}),
+        o("div",{className:"f",style:{gap:10},children:[
+          t("button",{onClick:()=>sDelEntry(null),className:"f1 act98 tr",style:{padding:"13px 0",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:12,fontSize:14,fontWeight:500},children:"Cancel"}),
+          t("button",{onClick:()=>{onDeleteEntry(delEntry.pid,delEntry.en.id);sDelEntry(null)},className:"f1 act98 tr",style:{padding:"13px 0",background:c.co,color:"#0a0a0a",border:"none",borderRadius:12,fontSize:14,fontWeight:600},children:"Delete"})
         ]})
       ]})}),
       gallery&&t(GalleryViewer,{photos:gallery.photos,idx:gallery.idx,onClose:()=>sGallery(null),onNav:i=>sGallery(g=>({...g,idx:i}))}),
