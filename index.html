@@ -947,6 +947,8 @@ function friendlyAPIError(e,providerName){
   if(e.status===429)return`Rate limit reached on ${p}. Free tier allows ~15 requests/min — wait 30 seconds and try again.`;
   if(e.status===503||e.status===502||e.status===504)return`${p} is temporarily unavailable — try again in a moment.`;
   if(e.status===400)return`Bad request to ${p}: ${e.message}`;
+  if(e.code==="TIMEOUT")return`${p} took too long to respond (45s) and the request was cancelled — try again, or use fewer/smaller photos.`;
+  if(e.code==="NETWORK")return`Couldn't reach ${p} — check your internet connection and try again.`;
   return e.message||`Unexpected error from ${p}`;
 }
 function sanitizeForPrompt(v){if(v==null)return"";const s=String(v).slice(0,500);return s.replace(/[\x00-\x1F\x7F]/g," ").replace(/[<>]/g," ");}
@@ -974,7 +976,7 @@ const AI_PROVIDERS={
   anthropic:{name:"Anthropic",ph:"sk-ant-…",url:"https://api.anthropic.com/v1/messages",def:"claude-haiku-4-5-20251001",fmt:"anthropic",vision:true,visionModel:"claude-haiku-4-5-20251001"},
   deepseek:{name:"DeepSeek",ph:"sk-…",url:"https://api.deepseek.com/v1/chat/completions",def:"deepseek-chat",fmt:"openai",vision:true,visionModel:"deepseek-chat"},
   openai:{name:"OpenAI",ph:"sk-…",url:"https://api.openai.com/v1/chat/completions",def:"gpt-4o-mini",fmt:"openai",vision:true,visionModel:"gpt-4o-mini"},
-  openrouter:{name:"OpenRouter",ph:"sk-or-…",url:"https://openrouter.ai/api/v1/chat/completions",def:"deepseek/deepseek-chat:free",fmt:"openai",vision:false,visionModel:null},
+  openrouter:{name:"OpenRouter",ph:"sk-or-…",url:"https://openrouter.ai/api/v1/chat/completions",def:"stealth/ox-alpha",fmt:"openai",vision:false,visionModel:null},
   gemini:{name:"Gemini",ph:"AIza…",url:"https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",def:"gemini-2.0-flash",fmt:"openai",vision:true,visionModel:"gemini-2.0-flash"}
 };
 function gAK(){try{return localStorage.getItem("etp-ai-apikey")||localStorage.getItem(KK)||null}catch{return null}}
@@ -983,31 +985,53 @@ function gProv(){try{return localStorage.getItem(AI_PROV_K)||"anthropic"}catch{r
 function sProv(p){try{p?localStorage.setItem(AI_PROV_K,p):localStorage.removeItem(AI_PROV_K)}catch{}}
 function gMdl(){try{return localStorage.getItem(AI_MDL_K)||null}catch{return null}}
 function sMdl(m){try{m?localStorage.setItem(AI_MDL_K,m):localStorage.removeItem(AI_MDL_K)}catch{}}
+const AI_RETRY_STATUSES=new Set([429,500,502,503,504]);
 async function cAPI(p){
   const k=gAK();if(!k){const e=new Error("NO_API_KEY");e.code="NO_API_KEY";throw e}
   const prov=gProv(),pc=AI_PROVIDERS[prov]||AI_PROVIDERS.anthropic;
   const hasImage=(p.messages||[]).some(m=>Array.isArray(m.content)&&m.content.some(x=>x&&x.type==="image"));
   // Image requests need a vision-capable model; the configured text model (e.g. DeepSeek R1) may not support vision.
   const model=hasImage?(gMdl()||pc.visionModel||pc.def||p.model):(gMdl()||pc.def||p.model);
-  if(pc.fmt==="anthropic"){
-    const r=await fetch(pc.url,{method:"POST",headers:{"Content-Type":"application/json","x-api-key":k,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({...p,model})});
-    if(!r.ok){const tx=await r.text();let m=`API error ${r.status}`;try{const j=JSON.parse(tx);if(j?.error?.message)m=j.error.message}catch{m+=": "+tx.slice(0,200)}const e=new Error(m);e.status=r.status;if(r.status===401)e.code="INVALID_KEY";if(r.status===429)e.code="RATE_LIMITED";if(r.status===403)e.code="FORBIDDEN";throw e}
-    return r.json();
+  const attempt=async()=>{
+    const ac=new AbortController();
+    // Without a timeout, a stalled request (common on free/shared model tiers) just
+    // leaves the "scanning…"/"thinking…" UI spinning forever with no error to react to.
+    const to=setTimeout(()=>ac.abort(),45000);
+    try{
+      if(pc.fmt==="anthropic"){
+        const r=await fetch(pc.url,{method:"POST",headers:{"Content-Type":"application/json","x-api-key":k,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({...p,model}),signal:ac.signal});
+        if(!r.ok){const tx=await r.text();let m=`API error ${r.status}`;try{const j=JSON.parse(tx);if(j?.error?.message)m=j.error.message}catch{m+=": "+tx.slice(0,200)}const e=new Error(m);e.status=r.status;if(r.status===401)e.code="INVALID_KEY";if(r.status===429)e.code="RATE_LIMITED";if(r.status===403)e.code="FORBIDDEN";throw e}
+        return r.json();
+      }
+      const msgs=[];
+      if(p.system)msgs.push({role:"system",content:p.system});
+      for(const m2 of p.messages||[]){
+        if(Array.isArray(m2.content)){msgs.push({role:m2.role,content:m2.content.map(c=>c.type==="image"?{type:"image_url",image_url:{url:`data:${c.source.media_type};base64,${c.source.data}`}}:{type:"text",text:c.text||""})});}
+        else{msgs.push({role:m2.role,content:m2.content});}
+      }
+      const hdrs={"Content-Type":"application/json","Authorization":`Bearer ${k}`};
+      if(prov==="openrouter"){hdrs["HTTP-Referer"]=location.origin;hdrs["X-Title"]="Expense Tracker Pro";}
+      const isReasoner=/(^|\/)deepseek-r|r1|reason|o[134]-|qwq/i.test(model);
+      const maxTok=isReasoner?Math.max(p.max_tokens||1024,6000):p.max_tokens;
+      const r=await fetch(pc.url,{method:"POST",headers:hdrs,body:JSON.stringify({model,max_tokens:maxTok,messages:msgs}),signal:ac.signal});
+      if(!r.ok){const tx=await r.text();let m=`API error ${r.status}`;try{const j=JSON.parse(tx);if(j?.error?.message)m=j.error.message}catch{m+=": "+tx.slice(0,200)}if(/no endpoints|not a valid model|does not exist|model_not_found|no allowed providers/i.test(m))m+=` — set a different model for ${pc.name} in Settings → AI Assistant.`;const e=new Error(m);e.status=r.status;if(r.status===401)e.code="INVALID_KEY";if(r.status===429)e.code="RATE_LIMITED";if(r.status===403)e.code="FORBIDDEN";throw e}
+      const j=await r.json();
+      return{content:[{type:"text",text:j.choices?.[0]?.message?.content||""}]};
+    }catch(err){
+      if(err.name==="AbortError"){const e=new Error("Request timed out");e.code="TIMEOUT";throw e}
+      if(!err.status&&!err.code)err.code="NETWORK";
+      throw err;
+    }finally{clearTimeout(to)}
+  };
+  // Transient failures (a rate limit, a momentary 5xx, a dropped connection) are common
+  // on free/shared model tiers and account for a lot of the "sometimes it just fails"
+  // feel -- retry once with a short backoff before surfacing an error to the user.
+  try{return await attempt()}
+  catch(e){
+    if(!AI_RETRY_STATUSES.has(e.status)&&e.code!=="NETWORK")throw e;
+    await new Promise(res=>setTimeout(res,1500));
+    return await attempt();
   }
-  const msgs=[];
-  if(p.system)msgs.push({role:"system",content:p.system});
-  for(const m2 of p.messages||[]){
-    if(Array.isArray(m2.content)){msgs.push({role:m2.role,content:m2.content.map(c=>c.type==="image"?{type:"image_url",image_url:{url:`data:${c.source.media_type};base64,${c.source.data}`}}:{type:"text",text:c.text||""})});}
-    else{msgs.push({role:m2.role,content:m2.content});}
-  }
-  const hdrs={"Content-Type":"application/json","Authorization":`Bearer ${k}`};
-  if(prov==="openrouter"){hdrs["HTTP-Referer"]=location.origin;hdrs["X-Title"]="Expense Tracker Pro";}
-  const isReasoner=/(^|\/)deepseek-r|r1|reason|o[134]-|qwq/i.test(model);
-  const maxTok=isReasoner?Math.max(p.max_tokens||1024,6000):p.max_tokens;
-  const r=await fetch(pc.url,{method:"POST",headers:hdrs,body:JSON.stringify({model,max_tokens:maxTok,messages:msgs})});
-  if(!r.ok){const tx=await r.text();let m=`API error ${r.status}`;try{const j=JSON.parse(tx);if(j?.error?.message)m=j.error.message}catch{m+=": "+tx.slice(0,200)}if(/no endpoints|not a valid model|does not exist|model_not_found|no allowed providers/i.test(m))m+=` — set a different model for ${pc.name} in Settings → AI Assistant.`;const e=new Error(m);e.status=r.status;if(r.status===401)e.code="INVALID_KEY";if(r.status===429)e.code="RATE_LIMITED";if(r.status===403)e.code="FORBIDDEN";throw e}
-  const j=await r.json();
-  return{content:[{type:"text",text:j.choices?.[0]?.message?.content||""}]};
 }
 // AI-generate a world-class subcategory list for a category (reuses the provider-agnostic cAPI).
 async function aiSuggestSubs(label,existing){
@@ -2206,11 +2230,12 @@ return o("div",{children:[
       (cardSpend.length>0||((spendFlt.from||spendFlt.to)&&monExp.some(e=>!!e.cardId)))&&o("div",{style:{background:c.sfg,borderRadius:R,boxShadow:cardSh(),overflow:"hidden",marginBottom:10},children:[
         o("div",{style:{padding:"12px 16px 10px",borderBottom:`1px solid ${c.brs}`,background:`linear-gradient(135deg,${c.co}10 0%,transparent 60%)`},children:[
           o("div",{className:"f ia jb",children:[
-            o("div",{className:"f ia",style:{gap:6},children:[
-              t("div",{style:{width:6,height:6,borderRadius:"50%",background:c.co}}),
-              t("div",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1.5,color:c.co,fontWeight:600},children:"SPENDINGS BY CARD"}),
+            o("div",{className:"f ia",style:{gap:6,minWidth:0},children:[
+              t("div",{style:{width:6,height:6,borderRadius:"50%",background:c.co,flexShrink:0}}),
+              t("div",{style:{fontFamily:F.mo,fontSize:10,letterSpacing:1.5,color:c.co,fontWeight:600,flexShrink:0},children:"SPENDINGS BY CARD"}),
+              cardSpend.length>0&&t("div",{className:"tru",style:{fontFamily:F.mo,fontSize:10.5,fontWeight:600,color:c.tx},children:fm(cardSpend.reduce((s,x)=>s+x.amt,0),data.currency)}),
             ]}),
-            cardSpend.length>0&&t("button",{onClick:()=>onFlt({title:"Card Spending",items:spendExp.filter(e=>!!e.cardId)}),style:{fontFamily:F.mo,fontSize:10,color:c.ac,background:"transparent",border:"none",letterSpacing:.5},children:"VIEW ALL"}),
+            cardSpend.length>0&&t("button",{onClick:()=>onFlt({title:"Card Spending",items:spendExp.filter(e=>!!e.cardId)}),style:{fontFamily:F.mo,fontSize:10,color:c.ac,background:"transparent",border:"none",letterSpacing:.5,flexShrink:0},children:"VIEW ALL"}),
           ]}),
         ]}),
         cardSpend.length===0
@@ -3025,7 +3050,12 @@ function DebtPlan({data,persist,onClose}){
 
 function BudgetBlock({data}){const{expenses,budget,budgetPeriod,currency,monthStartDay=1}=data;const now=new Date();const st=budgetPeriod==="weekly"?ws():budgetPeriod==="yearly"?ys():ps(now,monthStartDay);const en=budgetPeriod==="weekly"?st+7*864e5:budgetPeriod==="yearly"?new Date(now.getFullYear()+1,0,1).getTime():mse(now.getFullYear(),now.getMonth(),monthStartDay);const sp=useMemo(()=>expenses.filter(e=>e.type==="expense"&&e.date>=st&&e.date<en).reduce((s,e)=>s+e.amount,0),[expenses,st,en]);const reimb=useMemo(()=>expenses.filter(e=>e.type==="expense"&&e.date>=st&&e.date<en&&e.reimbursedBy).reduce((s,e)=>s+(e.reimbursedAmount??e.amount),0),[expenses,st,en]);const netSp=Math.max(0,sp-reimb);const re=budget?budget-netSp:null,barPct=budget?Math.min(100,(netSp/budget)*100):0,realPct=budget?Math.round((netSp/budget)*100):0,ov=budget&&netSp>budget;const dot=ov?c.co:c.ac;
 const isMonthly=budgetPeriod!=="weekly"&&budgetPeriod!=="yearly";
-const weekRows=useMemo(()=>{if(!isMonthly)return null;const wks=monthWeeks(st,en);const nowTs=Date.now();const todayS=ds(new Date());const remDays=Math.max(1,Math.round((en-todayS)/864e5));const remBudget=budget!=null?budget-netSp:null;const perDay=remBudget!=null?Math.max(0,remBudget)/remDays:null;return wks.map(w=>{const spent=expenses.filter(e=>e.type==="expense"&&e.date>=w.s&&e.date<w.e).reduce((s,e)=>s+netAmt(e),0);const days=Math.round((w.e-w.s)/864e5);const state=w.e<=nowTs?"past":(w.s<=nowTs&&nowTs<w.e?"current":"future");const left=perDay!=null?perDay*days:null;const sd=new Date(w.s),ed=new Date(w.e-864e5);const range=sd.toLocaleDateString("en-US",{month:"short",day:"numeric"})+(days>1?"–"+ed.toLocaleDateString("en-US",{day:"numeric"}):"");return{wk:w.wk,range,spent,left,state}})},[expenses,st,en,isMonthly,budget,netSp]);
+const weekRows=useMemo(()=>{if(!isMonthly)return null;const wks=monthWeeks(st,en);const nowTs=Date.now();const todayS=ds(new Date());const remDays=Math.max(1,Math.round((en-todayS)/864e5));const remBudget=budget!=null?budget-netSp:null;const perDay=remBudget!=null?Math.max(0,remBudget)/remDays:null;
+  // Each week's fair share of the monthly limit, pro-rated by its day count — lets a
+  // past/current week be flagged as having overspent on its own, independent of how
+  // the other weeks landed (that's what the overall budget bar already shows).
+  const totalDays=Math.max(1,Math.round((en-st)/864e5));const perDayBudget=budget!=null?budget/totalDays:null;
+  return wks.map(w=>{const spent=expenses.filter(e=>e.type==="expense"&&e.date>=w.s&&e.date<w.e).reduce((s,e)=>s+netAmt(e),0);const days=Math.round((w.e-w.s)/864e5);const state=w.e<=nowTs?"past":(w.s<=nowTs&&nowTs<w.e?"current":"future");const left=perDay!=null?perDay*days:null;const fairShare=perDayBudget!=null?perDayBudget*days:null;const over=state!=="future"&&fairShare!=null&&spent>fairShare;const sd=new Date(w.s),ed=new Date(w.e-864e5);const range=sd.toLocaleDateString("en-US",{month:"short",day:"numeric"})+(days>1?"–"+ed.toLocaleDateString("en-US",{day:"numeric"}):"");return{wk:w.wk,range,spent,left,state,over,overBy:over?spent-fairShare:0}})},[expenses,st,en,isMonthly,budget,netSp]);
 const[budOpen,sBudOpen]=useState(()=>gSec("budget",false));const toggleBud=()=>{sBudOpen(v=>{const nv=!v;sSec("budget",nv);return nv})};
 return o("div",{style:{background:c.sfg,borderRadius:16,border:`1px solid ${ov?c.co+"50":c.brs}`,overflow:"hidden",marginBottom:10},children:[
   o("div",{style:{padding:"12px 16px 10px",borderBottom:budOpen?`1px solid ${c.brs}`:"none",background:`linear-gradient(135deg,${dot}12 0%,transparent 60%)`},children:[
@@ -3062,9 +3092,9 @@ return o("div",{style:{background:c.sfg,borderRadius:16,border:`1px solid ${ov?c
   budOpen&&budget!=null&&t("div",{style:{padding:"0 16px 14px"},children:t("div",{style:{height:6,background:c.sf2,borderRadius:999,overflow:"hidden"},children:t("div",{style:{width:barPct+"%",height:"100%",background:ov?`linear-gradient(90deg,${c.co},#FF3300)`:c.ac,transition:"width 600ms cubic-bezier(0.2,0.9,0.2,1)",boxShadow:ov?`0 0 10px ${c.co}60`:`0 0 6px ${c.ac}40`}})})}),
   budOpen&&weekRows&&weekRows.length>0&&o("div",{className:"stg",style:{padding:"2px 16px 14px",borderTop:`1px solid ${c.brs}`},children:[
     t("div",{style:{fontFamily:F.mo,fontSize:9,color:c.tm,letterSpacing:1,margin:"10px 0 6px"},children:"THIS MONTH · BY WEEK"}),
-    ...weekRows.map((w,i)=>{const stateLbl=w.state==="past"?"spent":w.state==="current"?"spent so far":"left to spend";const isFut=w.state==="future";const val=isFut?(w.left!=null?fm(w.left,currency):"—"):fm(w.spent,currency);const valCol=isFut?c.mt:w.state==="current"?c.tx:c.td;return o("div",{key:i,className:"f ia jb",style:{padding:"7px 0",borderTop:i?`1px solid ${c.brs}`:"none"},children:[
-      o("div",{className:"f ia",style:{gap:8,minWidth:0},children:[t("span",{style:{fontFamily:F.mo,fontSize:11,color:w.state==="current"?dot:c.td,fontWeight:w.state==="current"?700:500,flexShrink:0},children:"W"+w.wk}),t("span",{className:"tru",style:{fontSize:11,color:c.tm},children:w.range}),w.state==="current"&&t("span",{style:{fontFamily:F.mo,fontSize:7.5,letterSpacing:.5,textTransform:"uppercase",padding:"1px 5px",borderRadius:999,color:dot,background:dot+"1a",flexShrink:0},children:"now"})]}),
-      o("div",{style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:F.mo,fontSize:12,fontWeight:600,color:valCol},children:val}),t("div",{style:{fontFamily:F.mo,fontSize:8,color:c.tm,letterSpacing:.3,marginTop:1},children:stateLbl})]}),
+    ...weekRows.map((w,i)=>{const stateLbl=w.state==="past"?"spent":w.state==="current"?"spent so far":"left to spend";const isFut=w.state==="future";const val=isFut?(w.left!=null?fm(w.left,currency):"—"):fm(w.spent,currency);const valCol=w.over?c.co:isFut?c.mt:w.state==="current"?c.tx:c.td;return o("div",{key:i,className:"f ia jb",style:{padding:"7px 0",borderTop:i?`1px solid ${c.brs}`:"none"},children:[
+      o("div",{className:"f ia",style:{gap:8,minWidth:0},children:[t("span",{style:{fontFamily:F.mo,fontSize:11,color:w.state==="current"?dot:c.td,fontWeight:w.state==="current"?700:500,flexShrink:0},children:"W"+w.wk}),t("span",{className:"tru",style:{fontSize:11,color:c.tm},children:w.range}),w.state==="current"&&t("span",{style:{fontFamily:F.mo,fontSize:7.5,letterSpacing:.5,textTransform:"uppercase",padding:"1px 5px",borderRadius:999,color:dot,background:dot+"1a",flexShrink:0},children:"now"}),w.over&&t("span",{title:`${fm(w.overBy,currency)} over this week's fair share`,style:{fontFamily:F.mo,fontSize:7.5,letterSpacing:.5,textTransform:"uppercase",padding:"1px 5px",borderRadius:999,color:c.co,background:c.co+"1a",flexShrink:0},children:"⚠ over"})]}),
+      o("div",{style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:F.mo,fontSize:12,fontWeight:600,color:valCol},children:val}),t("div",{style:{fontFamily:F.mo,fontSize:8,color:w.over?c.co:c.tm,letterSpacing:.3,marginTop:1},children:w.over?`+${fm(w.overBy,currency)} over share`:stateLbl})]}),
     ]})}),
   ]}),
 ]})}
@@ -4068,9 +4098,12 @@ function AiInsights({data,onClose}){
     if(!gAK())return;
     sCoachLoading(true);sCoachErr(null);
     try{
-      const sys='You are a personal finance coach. Reply JSON only: {"grade":"A|B|C|D|F","headline":"one sentence","wins":["..."],"leaks":["specific, with numbers"],"actions":["3 concrete actions"]}';
+      const sys='You are a personal finance coach. Reply JSON only: {"grade":"A|B|C|D|F","headline":"one sentence","wins":["..." (max 3)],"leaks":["specific, with numbers" (max 3)],"actions":["3 concrete actions"]}. Keep every string short — this must fit in one compact response.';
       const u=`Here is my month's finance snapshot as JSON: ${JSON.stringify(sanitizeObj(stats))}. Grade my month and give wins, leaks (specific numbers), and 3 concrete actions.`;
-      const r=await cAPI({max_tokens:900,system:sys,messages:[{role:"user",content:u}]});
+      // Unbounded "wins"/"leaks" arrays could run past the old 900-token cap and get cut
+      // off mid-JSON, which extractJSON can't parse at all -- the report would then just
+      // fail with an opaque "Could not parse coach response" every time it happened.
+      const r=await cAPI({max_tokens:1400,system:sys,messages:[{role:"user",content:u}]});
       const txt=r.content?.map(x=>x.text||"").join("")||"";
       const parsed=extractJSON(txt);if(!parsed)throw new Error("Could not parse coach response — try again");
       sCoach(parsed);try{localStorage.setItem(coachKey,JSON.stringify(parsed))}catch{}
@@ -4902,10 +4935,15 @@ async function grocDownscale(file,maxDim=1600,quality=0.82){try{const url=URL.cr
 async function grocScanBill(file){
   const {dataUrl,media}=await grocDownscale(file);
   const sys=`You parse grocery/supermarket receipts. Extract ONLY purchased product line items. IGNORE HSN/SAC codes, tax rows (CGST/SGST/IGST/GST/VAT), subtotals, grand totals, round-off, total-savings summary lines, store address, GSTIN, phone, invoice/bill numbers, cashier and loyalty text. For EACH product return: name (clean product name, no codes), qty (number, default 1), unit (one of ${GROC_UNITS.join(",")}; infer from name/weight; default pc), mrp (printed MRP per unit for that line if shown, else null), final (net amount actually paid for that line after discount), discount (line discount amount if shown, else null). Also extract store (store/merchant name) and date (YYYY-MM-DD) if visible. Return JSON ONLY: {"store":"","date":"","items":[{"name":"","qty":0,"unit":"pc","mrp":null,"final":0,"discount":null}]}. All numbers plain — no currency symbols, no commas. If nothing readable: {"items":[],"error":"reason"}.`;
-  const call=cAPI({max_tokens:2200,system:sys,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:media,data:dataUrl.split(",")[1]}},{type:"text",text:"Extract the grocery line items from this bill."}]}]});
+  const call=cAPI({max_tokens:4000,system:sys,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:media,data:dataUrl.split(",")[1]}},{type:"text",text:"Extract the grocery line items from this bill."}]}]});
   const r=await Promise.race([call,new Promise((_,rej)=>setTimeout(()=>rej(new Error("The scan is taking too long — check your connection and try again.")),75000))]);
   const txt=r.content?.map(x=>x.text||"").join("")||"";
-  const parsed=extractJSON(txt);
+  // A long grocery receipt (30+ items) can push the response past the token budget and
+  // get cut off mid-array; extractJSON then fails outright, so fall back to salvaging
+  // whatever complete items came through before the truncation instead of losing the
+  // whole scan (same fix as multi-photo Scan Receipt).
+  let parsed=extractJSON(txt);
+  if(!parsed||!Array.isArray(parsed.items)||parsed.items.length===0)parsed=salvageJSONItems(txt);
   if(!parsed||!Array.isArray(parsed.items)||parsed.items.length===0)throw new Error(parsed&&parsed.error?parsed.error:"Couldn't read any items from this bill — try a clearer photo.");
   return parsed;
 }
