@@ -4398,11 +4398,40 @@ function PhotoThumb({photos,size=38,onClick}){
 function GalleryViewer({photos,idx,onClose,onNav}){
   const getSrc=usePhotoSrc(photos||[]);
   const cur=(photos||[])[idx];
+  // Pinch/double-tap/drag zoom, ported from the transaction-detail photo viewer (TxSht)
+  // below -- this viewer previously had no zoom at all, so a photo attached before
+  // saving (lending-diary proof photos) couldn't be zoomed in to check details, unlike
+  // an already-saved expense's photos.
+  const[zoom,sZoom]=useState(1);
+  const pvRef=useRef(null),pvPend=useRef(null),pinchRef=useRef(null),tapRef=useRef(0),tapStartRef=useRef(null),dragRef=useRef(null);
+  useEffect(()=>{sZoom(1)},[idx]);
+  useEffect(()=>{const el=pvRef.current;if(el&&pvPend.current){el.scrollLeft=pvPend.current.l;el.scrollTop=pvPend.current.t;pvPend.current=null}},[zoom]);
   if(!cur)return null;
   const src=getSrc(cur);
-  return o("div",{onClick:onClose,className:"fx f fc ia jc",style:{inset:0,background:"rgba(0,0,0,.92)",zIndex:60,padding:20,gap:14},children:[
-    src?t("img",{src,alt:"",onClick:e=>e.stopPropagation(),style:{maxWidth:"100%",maxHeight:"78vh",borderRadius:12,objectFit:"contain"}}):t("div",{style:{color:"#fff",fontSize:13},children:"Loading…"}),
-    photos.length>1&&o("div",{onClick:e=>e.stopPropagation(),className:"f ia jc",style:{gap:16},children:[
+  const clampZ=z=>Math.max(1,Math.min(5,z));
+  const applyZoom=(nz,ax,ay)=>{nz=clampZ(+(+nz).toFixed(3));if(nz===zoom)return;const el=pvRef.current;if(el){const r=el.getBoundingClientRect();const cx=ax!=null?ax-r.left:r.width/2,cy=ay!=null?ay-r.top:r.height/2;const k=nz/zoom;pvPend.current={l:(el.scrollLeft+cx)*k-cx,t:(el.scrollTop+cy)*k-cy}}sZoom(nz)};
+  const dblTap=(x,y)=>applyZoom(zoom>1.05?1:2.5,x,y);
+  return o("div",{onClick:onClose,className:"fx f fc",style:{inset:0,background:"rgba(0,0,0,.92)",zIndex:60},children:[
+    o("div",{onClick:e=>e.stopPropagation(),className:"f ia jb",style:{width:"100%",padding:"14px 14px 10px",flexShrink:0},children:[
+      t("button",{onClick:onClose,style:{background:"rgba(255,255,255,.15)",border:"none",borderRadius:999,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",cursor:"pointer"},children:t(X,{size:20})}),
+      o("div",{className:"f ia",style:{gap:8},children:[
+        t("button",{onClick:()=>applyZoom(zoom-0.25),style:{background:"rgba(255,255,255,.15)",border:"none",borderRadius:999,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:22,lineHeight:1,cursor:"pointer"},children:t("span",{style:{marginTop:-2},children:"−"})}),
+        t("span",{style:{color:"rgba(255,255,255,.85)",fontFamily:F.mo,fontSize:12,minWidth:40,textAlign:"center"},children:Math.round(zoom*100)+"%"}),
+        t("button",{onClick:()=>applyZoom(zoom+0.25),style:{background:"rgba(255,255,255,.15)",border:"none",borderRadius:999,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:22,lineHeight:1,cursor:"pointer"},children:t("span",{style:{marginTop:-2},children:"+"})}),
+      ]}),
+      t("div",{style:{width:36}}),
+    ]}),
+    t("div",{ref:pvRef,onClick:e=>e.stopPropagation(),
+      onTouchStart:ev=>{if(ev.touches.length===2){const a=ev.touches[0],b=ev.touches[1];pinchRef.current={d:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY),z:zoom,moved:false}}else if(ev.touches.length===1){tapStartRef.current={x:ev.touches[0].clientX,y:ev.touches[0].clientY}}},
+      onTouchMove:ev=>{const pc=pinchRef.current;if(pc&&ev.touches.length===2){const a=ev.touches[0],b=ev.touches[1];const dd=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);if(Math.abs(dd-pc.d)>4)pc.moved=true;if(pc.moved)applyZoom(pc.z*dd/pc.d,(a.clientX+b.clientX)/2,(a.clientY+b.clientY)/2)}},
+      onTouchEnd:ev=>{if(ev.touches.length>0)return;const wasPinch=pinchRef.current&&pinchRef.current.moved;pinchRef.current=null;if(wasPinch){tapRef.current=0;return}const t0=ev.changedTouches[0],st=tapStartRef.current;if(!t0||!st||Math.hypot(t0.clientX-st.x,t0.clientY-st.y)>12){tapRef.current=0;return}const now=Date.now();if(now-tapRef.current<320){tapRef.current=0;dblTap(t0.clientX,t0.clientY)}else tapRef.current=now},
+      onMouseDown:ev=>{const el=pvRef.current;if(el&&zoom>1){dragRef.current={x:ev.clientX,y:ev.clientY,l:el.scrollLeft,t:el.scrollTop};ev.preventDefault()}},
+      onMouseMove:ev=>{const dr=dragRef.current,el=pvRef.current;if(dr&&el){el.scrollLeft=dr.l-(ev.clientX-dr.x);el.scrollTop=dr.t-(ev.clientY-dr.y)}},
+      onMouseUp:()=>{dragRef.current=null},onMouseLeave:()=>{dragRef.current=null},
+      onDoubleClick:ev=>dblTap(ev.clientX,ev.clientY),
+      style:{flex:1,minHeight:0,overflow:"auto",width:"100%",WebkitOverflowScrolling:"touch",touchAction:zoom>1?"pan-x pan-y":"none",overscrollBehavior:"contain",cursor:zoom>1?"grab":"zoom-in"},
+      children:src?t("div",{style:{width:"max-content",minWidth:"100%",minHeight:"100%",display:"flex",alignItems:"center",justifyContent:"center"},children:t("img",{src,alt:"",draggable:false,style:zoom===1?{display:"block",maxWidth:"100vw",maxHeight:"calc(100dvh - 140px)",objectFit:"contain",pointerEvents:"none",userSelect:"none"}:{display:"block",width:Math.round(zoom*100)+"vw",height:"auto",pointerEvents:"none",userSelect:"none"}})}):t("div",{style:{color:"#fff",fontSize:13,height:"100%",display:"flex",alignItems:"center",justifyContent:"center"},children:"Loading…"})}),
+    photos.length>1&&o("div",{onClick:e=>e.stopPropagation(),className:"f ia jc",style:{gap:16,padding:"10px 0 calc(env(safe-area-inset-bottom, 0px) + 12px)",flexShrink:0},children:[
       t("button",{onClick:()=>onNav((idx-1+photos.length)%photos.length),style:{background:"rgba(255,255,255,.12)",border:"none",color:"#fff",width:40,height:40,borderRadius:999,display:"flex",alignItems:"center",justifyContent:"center"},children:t(CL,{size:18,color:"#fff"})}),
       t("div",{style:{color:"#fff",fontFamily:F.mo,fontSize:12,alignSelf:"center"},children:(idx+1)+" / "+photos.length}),
       t("button",{onClick:()=>onNav((idx+1)%photos.length),style:{background:"rgba(255,255,255,.12)",border:"none",color:"#fff",width:40,height:40,borderRadius:999,display:"flex",alignItems:"center",justifyContent:"center"},children:t(CR,{size:18,color:"#fff"})}),
