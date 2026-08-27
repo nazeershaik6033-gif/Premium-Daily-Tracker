@@ -790,7 +790,7 @@ async function collectPhotoFiles(expenses){const out={};for(const e of (expenses
 async function collectLedgerPhotoFiles(ledger){const out={};for(const p2 of (ledger||[])){const refs=[...(p2.photo?[p2.photo]:[]),...((p2.entries||[]).flatMap(en=>en.photos||[]))];for(const p of refs){if(p&&p.id&&!p.data&&!out[p.id]){try{const b=await idbGetFile(String(p.id));if(b)out[p.id]={name:p.name||"photo.jpg",type:b.type||"image/jpeg",dataUrl:await _blobToDataUrl(b)}}catch(err){}}}}return out}
 async function collectLasPhotoFiles(las){const out={};for(const p of ((las&&las.docs)||[])){if(p&&p.id&&!p.data&&!out[p.id]){try{const b=await idbGetFile(String(p.id));if(b)out[p.id]={name:p.name||"doc.jpg",type:b.type||"image/jpeg",dataUrl:await _blobToDataUrl(b)}}catch(err){}}}return out}
 function usePhotoSrc(photos){const[map,sMap]=useState({});useEffect(()=>{let live=true;(async()=>{const need=(photos||[]).filter(p=>p&&p.id&&!p.data&&!map[p.id]);if(!need.length)return;const m={};for(const p of need){try{const b=await idbGetFile(String(p.id));if(b)m[p.id]=await _blobToDataUrl(b)}catch(e){}}if(live&&Object.keys(m).length)sMap(mm=>({...mm,...m}))})();return()=>{live=false}},[photos]);return p=>(p&&p.data)||map[p&&p.id]||null}
-function buildBackupObj(dd){let sidebarOrder=null;try{const s=localStorage.getItem(SB_ORDER_KEY);if(s)sidebarOrder=JSON.parse(s)}catch(e){}return{version:"v3.2",exportedAt:new Date().toISOString(),expenses:dd.expenses,recurring:dd.recurring,accounts:dd.accounts,profiles:dd.profiles,cards:dd.cards||[],cardStatements:dd.cardStatements||[],bills:dd.bills||[],goals:dd.goals||[],budgetLoans:dd.budgetLoans||[],ledger:dd.ledger||[],categoryBudgets:dd.categoryBudgets||{},monthlyRestrictionLogs:dd.monthlyRestrictionLogs||[],investments:dd.investments||[],planThreshold:dd.planThreshold??null,customExpenseCategories:dd.customExpenseCategories||[],customIncomeCategories:dd.customIncomeCategories||[],categoryOverrides:dd.categoryOverrides||{},categoryOrder:dd.categoryOrder||{expense:[],income:[]},sidebarOrder,budget:dd.budget,budgetPeriod:dd.budgetPeriod,morningEnabled:dd.morningEnabled||false,morningTime:dd.morningTime||"08:00",eveningEnabled:dd.eveningEnabled||false,eveningTime:dd.eveningTime||"21:00",currency:dd.currency,monthStartDay:dd.monthStartDay,aiProvider:gProv(),aiModel:gMdl()||null,merchantRules:dd.merchantRules||{},debtPlan:dd.debtPlan||null,las:dd.las||null,varExpensePlans:dd.varExpensePlans||{},varIncomePlans:dd.varIncomePlans||{},varSavingsPlans:dd.varSavingsPlans||{},advStats:dd.advStats||{},calculators:dd.calculators||{},groceryCategories:dd.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:dd.grocerySubDefaults||{},priceWatch:dd.priceWatch||PW_DEFAULT,threads:dd.threads||[],thresholdRules:dd.thresholdRules||[],netWorthSnapshots:dd.netWorthSnapshots||[]}}
+function buildBackupObj(dd){let sidebarOrder=null;try{const s=localStorage.getItem(SB_ORDER_KEY);if(s)sidebarOrder=JSON.parse(s)}catch(e){}return{version:"v3.2",exportedAt:new Date().toISOString(),expenses:dd.expenses,recurring:dd.recurring,accounts:dd.accounts,profiles:dd.profiles,cards:dd.cards||[],cardStatements:dd.cardStatements||[],bills:dd.bills||[],goals:dd.goals||[],budgetLoans:dd.budgetLoans||[],ledger:dd.ledger||[],categoryBudgets:dd.categoryBudgets||{},monthlyRestrictionLogs:dd.monthlyRestrictionLogs||[],investments:dd.investments||[],planThreshold:dd.planThreshold??null,customExpenseCategories:dd.customExpenseCategories||[],customIncomeCategories:dd.customIncomeCategories||[],categoryOverrides:dd.categoryOverrides||{},categoryOrder:dd.categoryOrder||{expense:[],income:[]},sidebarOrder,budget:dd.budget,budgetPeriod:dd.budgetPeriod,morningEnabled:dd.morningEnabled||false,morningTime:dd.morningTime||"08:00",eveningEnabled:dd.eveningEnabled||false,eveningTime:dd.eveningTime||"21:00",currency:dd.currency,monthStartDay:dd.monthStartDay,aiProvider:gProv(),aiModel:gMdl()||null,merchantRules:dd.merchantRules||{},debtPlan:dd.debtPlan||null,las:dd.las||null,varExpensePlans:dd.varExpensePlans||{},varIncomePlans:dd.varIncomePlans||{},varSavingsPlans:dd.varSavingsPlans||{},advStats:dd.advStats||{},calculators:dd.calculators||{},groceryCategories:dd.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:dd.grocerySubDefaults||{},groceryStores:dd.groceryStores||[],groceryDefaultStore:dd.groceryDefaultStore||"",priceWatch:dd.priceWatch||PW_DEFAULT,threads:dd.threads||[],thresholdRules:dd.thresholdRules||[],netWorthSnapshots:dd.netWorthSnapshots||[]}}
 async function buildBackupJSON(dd,withFiles=true){const j=buildBackupObj(dd);if(withFiles){try{j.statementFiles=await collectStmtFiles(j.cardStatements)}catch(e){j.statementFiles={}}try{j.expensePhotos=await collectPhotoFiles(j.expenses)}catch(e){j.expensePhotos={}}try{j.ledgerPhotos=await collectLedgerPhotoFiles(j.ledger)}catch(e){j.ledgerPhotos={}}try{j.lasPhotos=await collectLasPhotoFiles(j.las)}catch(e){j.lasPhotos={}}}return JSON.stringify(j,null,2)}
 async function gdUpload(json){const token=localStorage.getItem("gd_token");if(!token)throw new Error("Not connected to Google Drive");const fname=`expense-backup-${new Date().toISOString().slice(0,10)}.json`;const meta=JSON.stringify({name:fname,mimeType:"application/json"});const form=new FormData();form.append("metadata",new Blob([meta],{type:"application/json"}));form.append("file",new Blob([json],{type:"application/json"}));const res=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{method:"POST",headers:{Authorization:"Bearer "+token},body:form});if(!res.ok){const txt=await res.text().catch(()=>res.status);throw new Error("Upload failed ("+res.status+"): "+txt)}}
 
@@ -1644,8 +1644,8 @@ function App(){
   const cu=usrs.find(u=>u.id===auid)||usrs[0];
   setUsers(usrs);setActiveUser(cu);
   const dk="etp-data-"+cu.id;
-  let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],cardStatements:[],bills:[],goals:[],budgetLoans:[],ledger:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},categoryOrder:{expense:[],income:[]},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,thresholdRules:[],expensePlans:[],investmentPlans:[],investments:[],planThreshold:null,monthlyRestrictionLogs:[],openingBalances:[],reminderEnabled:false,reminderTime:"21:00",rules:[],backupFreq:"off",backupGDrive:false,lastBackupAt:0,merchantRules:{},debtPlan:null,las:null,varExpensePlans:{},varIncomePlans:{},varSavingsPlans:{},advStats:{},calculators:{},groceryCategories:GROC_CATS_DEFAULT,grocerySubDefaults:{},priceWatch:PW_DEFAULT,threads:[],netWorthSnapshots:[]};
-  try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,expenses:p.expenses||[],recurring:p.recurring||[],accounts:p.accounts&&p.accounts.length?p.accounts:[DA],profiles:p.profiles||[],cards:p.cards||[],cardStatements:p.cardStatements||[],bills:p.bills||[],goals:p.goals||[],budgetLoans:p.budgetLoans||[],ledger:p.ledger||[],categoryBudgets:p.categoryBudgets||{},customExpenseCategories:p.customExpenseCategories||[],customIncomeCategories:p.customIncomeCategories||[],categoryOverrides:p.categoryOverrides||{},categoryOrder:p.categoryOrder||{expense:[],income:[]},financeProfile:p.financeProfile||null,budget:p.budget??null,budgetPeriod:p.budgetPeriod||"monthly",currency:p.currency||"₹",monthStartDay:p.monthStartDay||1,fontSize:p.fontSize||"medium",upcomingExpenses:p.upcomingExpenses||[],alertThreshold:p.alertThreshold??null,thresholdRules:p.thresholdRules||[],expensePlans:p.expensePlans||[],investmentPlans:p.investmentPlans||[],investments:p.investments||[],planThreshold:p.planThreshold??null,monthlyRestrictionLogs:p.monthlyRestrictionLogs||[],openingBalances:p.openingBalances||[],reminderEnabled:p.reminderEnabled||false,reminderTime:p.reminderTime||"21:00",morningEnabled:p.morningEnabled||false,morningTime:p.morningTime||"08:00",eveningEnabled:p.eveningEnabled??(p.reminderEnabled||false),eveningTime:p.eveningTime||p.reminderTime||"21:00",rules:p.rules||[],backupFreq:p.backupFreq||"off",backupGDrive:p.backupGDrive||false,lastBackupAt:p.lastBackupAt||0,merchantRules:p.merchantRules||{},debtPlan:p.debtPlan||null,las:p.las||null,varExpensePlans:p.varExpensePlans||{},varIncomePlans:p.varIncomePlans||{},varSavingsPlans:p.varSavingsPlans||{},advStats:p.advStats||{},calculators:p.calculators||{},incomeTracker:p.incomeTracker||{},groceryCategories:p.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:p.grocerySubDefaults||{},priceWatch:p.priceWatch||PW_DEFAULT,threads:p.threads||[],netWorthSnapshots:p.netWorthSnapshots||[]};_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[];_catOv=i.categoryOverrides||{};_catOrder=i.categoryOrder||{expense:[],income:[]};_grocCats=i.groceryCategories||GROC_CATS_DEFAULT;
+  let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],cardStatements:[],bills:[],goals:[],budgetLoans:[],ledger:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},categoryOrder:{expense:[],income:[]},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,thresholdRules:[],expensePlans:[],investmentPlans:[],investments:[],planThreshold:null,monthlyRestrictionLogs:[],openingBalances:[],reminderEnabled:false,reminderTime:"21:00",rules:[],backupFreq:"off",backupGDrive:false,lastBackupAt:0,merchantRules:{},debtPlan:null,las:null,varExpensePlans:{},varIncomePlans:{},varSavingsPlans:{},advStats:{},calculators:{},groceryCategories:GROC_CATS_DEFAULT,grocerySubDefaults:{},groceryStores:[],groceryDefaultStore:"",priceWatch:PW_DEFAULT,threads:[],netWorthSnapshots:[]};
+  try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,expenses:p.expenses||[],recurring:p.recurring||[],accounts:p.accounts&&p.accounts.length?p.accounts:[DA],profiles:p.profiles||[],cards:p.cards||[],cardStatements:p.cardStatements||[],bills:p.bills||[],goals:p.goals||[],budgetLoans:p.budgetLoans||[],ledger:p.ledger||[],categoryBudgets:p.categoryBudgets||{},customExpenseCategories:p.customExpenseCategories||[],customIncomeCategories:p.customIncomeCategories||[],categoryOverrides:p.categoryOverrides||{},categoryOrder:p.categoryOrder||{expense:[],income:[]},financeProfile:p.financeProfile||null,budget:p.budget??null,budgetPeriod:p.budgetPeriod||"monthly",currency:p.currency||"₹",monthStartDay:p.monthStartDay||1,fontSize:p.fontSize||"medium",upcomingExpenses:p.upcomingExpenses||[],alertThreshold:p.alertThreshold??null,thresholdRules:p.thresholdRules||[],expensePlans:p.expensePlans||[],investmentPlans:p.investmentPlans||[],investments:p.investments||[],planThreshold:p.planThreshold??null,monthlyRestrictionLogs:p.monthlyRestrictionLogs||[],openingBalances:p.openingBalances||[],reminderEnabled:p.reminderEnabled||false,reminderTime:p.reminderTime||"21:00",morningEnabled:p.morningEnabled||false,morningTime:p.morningTime||"08:00",eveningEnabled:p.eveningEnabled??(p.reminderEnabled||false),eveningTime:p.eveningTime||p.reminderTime||"21:00",rules:p.rules||[],backupFreq:p.backupFreq||"off",backupGDrive:p.backupGDrive||false,lastBackupAt:p.lastBackupAt||0,merchantRules:p.merchantRules||{},debtPlan:p.debtPlan||null,las:p.las||null,varExpensePlans:p.varExpensePlans||{},varIncomePlans:p.varIncomePlans||{},varSavingsPlans:p.varSavingsPlans||{},advStats:p.advStats||{},calculators:p.calculators||{},incomeTracker:p.incomeTracker||{},groceryCategories:p.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:p.grocerySubDefaults||{},groceryStores:p.groceryStores||[],groceryDefaultStore:p.groceryDefaultStore||"",priceWatch:p.priceWatch||PW_DEFAULT,threads:p.threads||[],netWorthSnapshots:p.netWorthSnapshots||[]};_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[];_catOv=i.categoryOverrides||{};_catOrder=i.categoryOrder||{expense:[],income:[]};_grocCats=i.groceryCategories||GROC_CATS_DEFAULT;
   if(i.currency==="₹"){i.accounts=i.accounts.map(a=>a.currency==="$"?{...a,currency:"₹"}:a);const accMap=Object.fromEntries(i.accounts.map(a=>[a.id,a]));i.expenses=i.expenses.map(e=>e.currency==="$"?{...e,currency:accMap[e.accountId]?.currency||i.currency}:e)}
   if(!localStorage.getItem("etp-cash-unlinked")){const cashIds=new Set(i.accounts.filter(a=>a.id==="acc_default"||a.name==="Cash").map(a=>a.id));i.expenses=i.expenses.map(e=>cashIds.has(e.accountId)?{...e,accountId:null}:e);localStorage.setItem("etp-cash-unlinked","1")}}}catch(e){console.error("load",e)}
   if(i.recurring.length>0){const{newExpenses,updatedRecurring}=pr(i.recurring,i.expenses);if(newExpenses.length>0){i.expenses=[...newExpenses,...i.expenses].sort((a,b)=>b.date-a.date);i.recurring=updatedRecurring}}
@@ -1679,7 +1679,7 @@ function App(){
   try{await window.storage.set(dk,JSON.stringify(strip(i)))}catch{}
 })()},[]);
 
-  const strip=x=>({expenses:x.expenses,recurring:x.recurring,accounts:x.accounts,profiles:x.profiles,cards:x.cards||[],cardStatements:x.cardStatements||[],bills:x.bills||[],goals:x.goals||[],budgetLoans:x.budgetLoans||[],ledger:x.ledger||[],categoryBudgets:x.categoryBudgets||{},monthlyRestrictionLogs:x.monthlyRestrictionLogs||[],openingBalances:x.openingBalances||[],customExpenseCategories:x.customExpenseCategories||[],customIncomeCategories:x.customIncomeCategories||[],categoryOverrides:x.categoryOverrides||{},categoryOrder:x.categoryOrder||{expense:[],income:[]},financeProfile:x.financeProfile||null,budget:x.budget,budgetPeriod:x.budgetPeriod,currency:x.currency,monthStartDay:x.monthStartDay,fontSize:x.fontSize||"medium",upcomingExpenses:x.upcomingExpenses||[],alertThreshold:x.alertThreshold??null,thresholdRules:x.thresholdRules||[],expensePlans:x.expensePlans||[],investmentPlans:x.investmentPlans||[],investments:x.investments||[],planThreshold:x.planThreshold??null,reminderEnabled:x.reminderEnabled||false,reminderTime:x.reminderTime||"21:00",morningEnabled:x.morningEnabled||false,morningTime:x.morningTime||"08:00",eveningEnabled:x.eveningEnabled||false,eveningTime:x.eveningTime||"21:00",backupFreq:x.backupFreq||"off",backupGDrive:x.backupGDrive||false,lastBackupAt:x.lastBackupAt||0,merchantRules:x.merchantRules||{},debtPlan:x.debtPlan||null,las:x.las||null,threads:x.threads||[],varExpensePlans:x.varExpensePlans||{},varIncomePlans:x.varIncomePlans||{},varSavingsPlans:x.varSavingsPlans||{},advStats:x.advStats||{},calculators:x.calculators||{},incomeTracker:x.incomeTracker||{},groceryCategories:x.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:x.grocerySubDefaults||{},priceWatch:x.priceWatch||PW_DEFAULT,netWorthSnapshots:x.netWorthSnapshots||[]});
+  const strip=x=>({expenses:x.expenses,recurring:x.recurring,accounts:x.accounts,profiles:x.profiles,cards:x.cards||[],cardStatements:x.cardStatements||[],bills:x.bills||[],goals:x.goals||[],budgetLoans:x.budgetLoans||[],ledger:x.ledger||[],categoryBudgets:x.categoryBudgets||{},monthlyRestrictionLogs:x.monthlyRestrictionLogs||[],openingBalances:x.openingBalances||[],customExpenseCategories:x.customExpenseCategories||[],customIncomeCategories:x.customIncomeCategories||[],categoryOverrides:x.categoryOverrides||{},categoryOrder:x.categoryOrder||{expense:[],income:[]},financeProfile:x.financeProfile||null,budget:x.budget,budgetPeriod:x.budgetPeriod,currency:x.currency,monthStartDay:x.monthStartDay,fontSize:x.fontSize||"medium",upcomingExpenses:x.upcomingExpenses||[],alertThreshold:x.alertThreshold??null,thresholdRules:x.thresholdRules||[],expensePlans:x.expensePlans||[],investmentPlans:x.investmentPlans||[],investments:x.investments||[],planThreshold:x.planThreshold??null,reminderEnabled:x.reminderEnabled||false,reminderTime:x.reminderTime||"21:00",morningEnabled:x.morningEnabled||false,morningTime:x.morningTime||"08:00",eveningEnabled:x.eveningEnabled||false,eveningTime:x.eveningTime||"21:00",backupFreq:x.backupFreq||"off",backupGDrive:x.backupGDrive||false,lastBackupAt:x.lastBackupAt||0,merchantRules:x.merchantRules||{},debtPlan:x.debtPlan||null,las:x.las||null,threads:x.threads||[],varExpensePlans:x.varExpensePlans||{},varIncomePlans:x.varIncomePlans||{},varSavingsPlans:x.varSavingsPlans||{},advStats:x.advStats||{},calculators:x.calculators||{},incomeTracker:x.incomeTracker||{},groceryCategories:x.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:x.grocerySubDefaults||{},groceryStores:x.groceryStores||[],groceryDefaultStore:x.groceryDefaultStore||"",priceWatch:x.priceWatch||PW_DEFAULT,netWorthSnapshots:x.netWorthSnapshots||[]});
 
   const pst=async(p)=>{const n={...d,...p};_custCE=n.customExpenseCategories||[];_custCI=n.customIncomeCategories||[];_catOv=n.categoryOverrides||{};_catOrder=n.categoryOrder||{expense:[],income:[]};_grocCats=n.groceryCategories||GROC_CATS_DEFAULT;sD(n);const dk=activeUser?"etp-data-"+activeUser.id:KS;try{await window.storage.set(dk,JSON.stringify(strip(n)))}catch(e){console.error(e);try{if(!window.__pstErrWarned){window.__pstErrWarned=true;alert("⚠ Could not save your data — device storage looks full. Recent changes may disappear when the app closes. Free up space, then make any small edit to retry saving.")}}catch(e2){}}};
   const pstRef=useRef(null);pstRef.current=pst;
@@ -5218,6 +5218,38 @@ function grocRows(entries,currency){const rows=[["Date","Store","Item","Subcateg
 function exportGrocXlsx(title,entries,currency){const X=window.XLSX;if(!X){alert("Excel library isn't loaded — check your connection and reload.");return}const ws=X.utils.aoa_to_sheet(grocRows(entries,currency));const wb=X.utils.book_new();X.utils.book_append_sheet(wb,ws,"Groceries");X.writeFile(wb,_safeName(title)+".xlsx")}
 function exportGrocPdf(title,entries,currency){const fmtN=n=>(currency||"")+Number(n||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});const now=new Date().toLocaleString("en-US");let grand=0,grandSaved=0;const blocks=entries.map(e=>{const items=grocItemsOf(e);const tot=items.length?grocSum(items):Number(e.amount||0);const saved=grocSumSaved(items);grand+=tot;grandSaved+=saved;const d=new Date(e.date).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});const body=items.length?items.map(it=>`<tr><td>${_htmlEsc(it.n||"")}</td><td style="color:#666">${_htmlEsc(grocItemSub(it,e))}</td><td class="r">${_htmlEsc(String(grocQty(it)||""))} ${_htmlEsc(grocUnit(it))}</td><td class="r">${it.mrp!=null&&it.mrp!==""?fmtN(it.mrp):"—"}</td><td class="r">${fmtN(grocUnitPrice(it))}</td><td class="r">${grocLineSaved(it)?fmtN(grocLineSaved(it)):"—"}</td><td class="r">${fmtN(grocLine(it))}</td></tr>`).join(""):`<tr><td colspan="7" style="color:#888">No itemised breakdown</td></tr>`;return `<div class="trip"><div class="th"><span>${_htmlEsc(e.merchant||"—")}</span><span>${_htmlEsc(d)} · ${fmtN(tot)}${saved>0?" · saved "+fmtN(saved):""}</span></div><table><thead><tr><th>Item</th><th>Subcategory</th><th class="r">Qty</th><th class="r">MRP/u</th><th class="r">Price/u</th><th class="r">Saved</th><th class="r">Total</th></tr></thead><tbody>${body}</tbody></table>${e.note?`<div class="note">${_htmlEsc(e.note)}</div>`:""}</div>`}).join("");const html=`<!doctype html><html><head><meta charset="utf-8"><title>${_htmlEsc(title||"Groceries")}</title><style>*{box-sizing:border-box}body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111;margin:24px;font-size:12px}h1{font-size:18px;margin:0 0 2px}.sub{color:#666;font-size:11px;margin-bottom:14px}.summary{display:flex;gap:26px;margin-bottom:16px}.summary b{font-size:14px}.trip{margin-bottom:16px;break-inside:avoid}.th{display:flex;justify-content:space-between;font-weight:700;font-size:13px;padding:6px 8px;background:#f4f4f4;border-radius:6px}table{width:100%;border-collapse:collapse;margin-top:4px}th,td{text-align:left;padding:5px 8px;border-bottom:1px solid #ececec}th{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#666}td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}.note{font-size:11px;color:#666;margin-top:4px;padding:0 8px}@media print{body{margin:12mm}}</style></head><body><h1>${_htmlEsc(title||"Groceries")}</h1><div class="sub">Exported ${_htmlEsc(now)} · Expense Tracker Pro</div><div class="summary"><div>Trips <b>${entries.length}</b></div><div>Total <b>${fmtN(grand)}</b></div>${grandSaved>0?`<div>Saved <b>${fmtN(grandSaved)}</b></div>`:""}</div>${blocks||'<div style="color:#888">No grocery trips.</div>'}</body></html>`;_printHTML(html)}
 function GrocBillThumb({photos}){const src=usePhotoSrc(photos);const[open,sOpen]=useState(false);const url=(photos||[]).map(p=>src(p)).find(Boolean);if(!url)return null;return o("div",{style:{marginTop:12},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:"ATTACHED BILL"}),t("button",{onClick:()=>sOpen(true),className:"act95",style:{padding:0,background:"none",border:"none",display:"block"},children:t("img",{src:url,alt:"bill",style:{maxWidth:120,maxHeight:150,borderRadius:10,border:`1px solid ${c.brs}`,objectFit:"cover",display:"block"}})}),open&&t("div",{className:"fx f ia jc",style:{inset:0,background:"rgba(0,0,0,.88)",zIndex:60,padding:16},onClick:()=>sOpen(false),children:t("img",{src:url,alt:"bill",style:{maxWidth:"92vw",maxHeight:"88vh",borderRadius:8,objectFit:"contain"}})})]})}
+// --- Store registry -----------------------------------------------------------
+// Stores used to exist only as merchant strings on past trips, so a supermarket
+// couldn't be set up before its first trip and carried no type or icon.
+// `groceryStores` is the editable registry; a merchant seen on a trip but never
+// registered still lists (as unregistered) so nothing silently disappears.
+const GROC_STORE_TYPES=[
+  {id:"supermarket",label:"Supermarket",emoji:"🏬"},
+  {id:"kirana",label:"Kirana / Local",emoji:"🏪"},
+  {id:"quick",label:"Quick commerce",emoji:"🛵"},
+  {id:"online",label:"Online",emoji:"📦"},
+  {id:"wholesale",label:"Wholesale",emoji:"🏭"}
+];
+const GROC_STORE_EMOJIS=["🏬","🏪","🛒","🛵","📦","🏭","🥬","🍎","🥩","🐟","🍞","🥛","🧴","🧺","🛍️","🌾","🏙️","🚚"];
+const grocTypeMeta=id=>GROC_STORE_TYPES.find(x=>x.id===id)||GROC_STORE_TYPES[0];
+const grocSKey=s=>String(s||"").trim().toLowerCase();
+function grocStoreReg(data){return Array.isArray(data&&data.groceryStores)?data.groceryStores:[]}
+function grocStoreOf(data,name){const k=grocSKey(name);if(!k)return null;return grocStoreReg(data).find(s=>grocSKey(s.name)===k)||null}
+function grocStoreEmoji(data,name){const s=grocStoreOf(data,name);return (s&&s.emoji)||"🛒"}
+function grocStoreTypeOf(data,name){const s=grocStoreOf(data,name);return s?(s.type||"supermarket"):"unregistered"}
+// Registry first, in the order the user arranged it, then merchants that only
+// exist on trips — every row annotated with its trip count and spend.
+function grocStoreRows(data,allGroc){
+  const use=new Map();
+  for(const e of (allGroc||[])){const k=grocSKey(e.merchant);if(!k)continue;const cx=use.get(k)||{name:String(e.merchant).trim(),trips:0,total:0};cx.trips+=1;cx.total+=(e.amount||0);use.set(k,cx)}
+  const out=[],seen=new Set();
+  for(const s of grocStoreReg(data)){const k=grocSKey(s.name);if(!k||seen.has(k))continue;seen.add(k);const u=use.get(k);out.push({...s,trips:u?u.trips:0,total:u?u.total:0,registered:true})}
+  for(const[k,u]of use){if(seen.has(k))continue;out.push({id:null,name:u.name,emoji:"🛒",type:null,trips:u.trips,total:u.total,registered:false})}
+  return out;
+}
+function grocStoreNames(data,allGroc){return grocStoreRows(data,allGroc).map(s=>s.name)}
+// The store new trips open on — cleared automatically once it stops existing.
+function grocDefStore(data){const w=String((data&&data.groceryDefaultStore)||"").trim();if(!w)return"";if(grocStoreOf(data,w))return w;return ((data&&data.expenses)||[]).some(e=>grocIsExp(e)&&grocSKey(e.merchant)===grocSKey(w))?w:""}
 function GroceryEditor({data,editing,stores,itemNames,onSave,onDelete,onClose}){
   const ucr=(data.cards||[]).filter(c2=>!c2.isExternal);
   const dStr=ts=>{const d=new Date(ts);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
@@ -5228,7 +5260,7 @@ function GroceryEditor({data,editing,stores,itemNames,onSave,onDelete,onClose}){
   // A fresh row starts on the category default rather than blank, so an item never
   // silently lands in "Uncategorised" just because the user tabbed past the picker.
   const blank=(s0)=>({n:"",q:"1",u:"pc",mrp:"",p:"",disc:"",s:s0!==undefined?s0:grocDefSub(data,initCat)});
-  const[store,sStore]=useState(iE?(editing.merchant||""):"");
+  const[store,sStore]=useState(iE?(editing.merchant||""):grocDefStore(data));
   const[dt,sDt]=useState(iE?editing.date:Date.now());
   const[mop,sMop]=useState(iE?(editing.cardId?"card":"account"):"account");
   const[aId,sAId]=useState(iE?(editing.accountId||(data.accounts[0]&&data.accounts[0].id)):(data.accounts[0]&&data.accounts[0].id));
@@ -5277,9 +5309,9 @@ function GroceryEditor({data,editing,stores,itemNames,onSave,onDelete,onClose}){
     t("input",{ref:fileRef,type:"file",accept:"image/*",style:{display:"none"},onChange:e=>{const f=e.target.files&&e.target.files[0];e.target.value="";if(f)runScan(f)}}),
     o("div",{className:"f ia jb",style:{gap:12,marginBottom:16},children:[o("div",{className:"f ia minw0",style:{gap:12,flex:1},children:[t("div",{style:{width:46,height:46,borderRadius:13,background:c.mt+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:23,flexShrink:0},children:"🛒"}),o("div",{className:"minw0",children:[t("div",{style:{fontSize:17,fontWeight:700,color:c.tx},children:iE?"Edit trip":"New grocery trip"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:"Store, items, quantities & prices"})]})]}),t("button",{onClick:onClose,"aria-label":"Close",className:"act95 tr",style:{background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:999,width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",color:c.td,flexShrink:0},children:t(X,{size:16})})]}),
     o("div",{style:{marginBottom:14},children:[o("div",{className:"f ia",style:{gap:8},children:[t("button",{onClick:()=>fileRef.current&&fileRef.current.click(),disabled:scanBusy,className:"f1 act95 tr f ia jc",style:{gap:6,padding:"12px 8px",background:scanBusy?c.sf2:`linear-gradient(135deg,${c.ac}22,${c.sfg})`,border:`1px solid ${c.ac}55`,borderRadius:12,color:scanBusy?c.tm:c.tx,fontSize:13,fontWeight:600,minWidth:0},children:scanBusy?"Reading bill…":[t("span",{style:{fontSize:15},children:"📸"}),"Scan bill"]}),t("button",{onClick:()=>{sPasteOpen(v=>!v);sScanErr(null)},className:"f1 act95 tr f ia jc",style:{gap:6,padding:"12px 8px",background:pasteOpen?c.sf3:`linear-gradient(135deg,${c.lv}22,${c.sfg})`,border:`1px solid ${c.lv}55`,borderRadius:12,color:c.tx,fontSize:13,fontWeight:600,minWidth:0},children:[t("span",{style:{fontSize:15},children:"📝"}),"Paste list"]})]}),iE&&(editing.photos||[]).length>0&&t("button",{onClick:scanAttached,disabled:scanBusy,className:"w100 act95 tr",style:{marginTop:8,padding:"9px 0",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:10,color:c.td,fontSize:12,fontWeight:500},children:"📎 Scan the attached bill"}),pasteOpen&&o("div",{style:{marginTop:10,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px"},children:[t("textarea",{value:pasteText,onChange:e=>sPasteText(e.target.value),placeholder:"Paste your list, one item per line:\nMilk 64\nRice 5kg 250\nTomato 500g @40\nMaggi MRP 70 disc 6 64\nBread x2",rows:5,style:{width:"100%",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px",color:c.tx,fontSize:13,fontFamily:'var(--nf)',outline:"none",boxSizing:"border-box",resize:"vertical",lineHeight:1.5}}),o("div",{className:"f ia",style:{gap:8,marginTop:8},children:[t("button",{onClick:()=>doParse(false),disabled:!pasteText.trim()||pasteBusy,className:"f1 act95 tr",style:{padding:"11px 0",background:pasteText.trim()?c.ac:c.sf2,color:pasteText.trim()?"#0a0a0a":c.tm,borderRadius:10,fontSize:13,fontWeight:600,border:"none"},children:"Parse"}),t("button",{onClick:()=>doParse(true),disabled:!pasteText.trim()||pasteBusy,className:"f1 act95 tr f ia jc",style:{gap:6,padding:"11px 0",background:c.sf3,border:`1px solid ${c.brs}`,borderRadius:10,fontSize:12.5,color:c.tx,fontWeight:600},children:pasteBusy?"Parsing…":[t("span",{style:{fontSize:13},children:"✨"}),"Parse with AI"]})]})]}),scanErr&&t("div",{style:{marginTop:8,fontSize:12,color:c.co,lineHeight:1.4},children:scanErr})]}),
-    o("div",{style:{marginBottom:14},children:[LB("STORE / SUPERMARKET"),o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${!st?c.ac+"66":c.brs}`,borderRadius:12,padding:"12px 14px"},children:[t("span",{style:{fontSize:16},children:"🏬"}),t("input",{value:store,onChange:e=>sStore(e.target.value),placeholder:"e.g., DMart, Reliance Fresh",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:15,fontFamily:'var(--tf)',minWidth:0}}),store&&t("button",{onClick:()=>sStore(""),style:{background:"transparent",border:"none",color:c.tm,display:"flex"},children:t(X,{size:14})})]}),sug.length>0&&t("div",{className:"f sx",style:{gap:6,marginTop:8,overflowX:"auto"},children:sug.map((s,i)=>t("button",{key:i,onClick:()=>sStore(s),className:"act95 tr",style:{flexShrink:0,padding:"6px 11px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:999,fontSize:12,color:c.td,whiteSpace:"nowrap"},children:s}))})]}),
+    o("div",{style:{marginBottom:14},children:[LB("STORE / SUPERMARKET"),o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${!st?c.ac+"66":c.brs}`,borderRadius:12,padding:"12px 14px"},children:[t("span",{style:{fontSize:16},children:"🏬"}),t("input",{value:store,onChange:e=>sStore(e.target.value),placeholder:"e.g., DMart, Reliance Fresh",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:15,fontFamily:'var(--tf)',minWidth:0}}),store&&t("button",{onClick:()=>sStore(""),style:{background:"transparent",border:"none",color:c.tm,display:"flex"},children:t(X,{size:14})})]}),sug.length>0&&t("div",{className:"f sx",style:{gap:6,marginTop:8,overflowX:"auto"},children:sug.map((s,i)=>t("button",{key:i,onClick:()=>sStore(s),className:"act95 tr",style:{flexShrink:0,padding:"6px 11px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:999,fontSize:12,color:c.td,whiteSpace:"nowrap"},children:grocStoreEmoji(data,s)+" "+s}))})]}),
     o("div",{style:{marginBottom:14},children:[LB("DATE"),t("input",{type:"date",value:dStr(dt),onChange:e=>{const[y,m,d]=e.target.value.split("-").map(Number);const x=new Date(dt);x.setFullYear(y,m-1,d);sDt(x.getTime())},style:{display:"block",width:"100%",height:46,lineHeight:"46px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"0 14px",color:c.tx,fontSize:14,outline:"none",fontFamily:'var(--tf)',colorScheme:"dark",boxSizing:"border-box",WebkitAppearance:"none",appearance:"none"}})]}),
-    o("div",{style:{marginBottom:14},children:[LB("CATEGORY"),t("select",{value:cat,onChange:e=>{const v=e.target.value;sCat(v);const subs=grocSubsFor(v);sSub(subs[0]||"");/* remap every item onto the new category's list — a stale sub would vanish from the picker */sItems(a=>a.map(it=>({...it,s:grocSnapSub(it.s,v,data)})))},style:{width:"100%",boxSizing:"border-box",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px",color:c.tx,fontSize:14,outline:"none",fontFamily:'var(--tf)'},children:CE.map(ct2=>t("option",{key:ct2.id,value:ct2.id,children:(ct2.emoji||"")+" "+ct2.label}))}),(()=>{const subs=(CE.find(x2=>x2.id===cat)||{}).subs||[];return subs.length>0&&t("div",{className:"f fw",style:{gap:6,marginTop:8},children:subs.map(s2=>{const on=sub===s2;return t("button",{key:s2,onClick:()=>sSub(on?"":s2),className:"act95 tr",style:{padding:"6px 12px",background:on?c.sf3:c.sf2,border:`1px solid ${on?c.ac:c.brs}`,borderRadius:999,fontSize:11.5,color:on?c.tx:c.td},children:s2})})})})()]}),
+    o("div",{style:{marginBottom:14},children:[LB("CATEGORY"),t("select",{value:cat,onChange:e=>{const v=e.target.value;sCat(v);const subs=grocSubsFor(v);sSub(subs[0]||"");/* remap every item onto the new category's list — a stale sub would vanish from the picker */sItems(a=>a.map(it=>({...it,s:grocSnapSub(it.s,v,data)})))},style:{width:"100%",boxSizing:"border-box",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px",color:c.tx,fontSize:14,outline:"none",fontFamily:'var(--tf)'},children:ceAll().map(ct2=>t("option",{key:ct2.id,value:ct2.id,children:(ct2.emoji||"")+" "+ct2.label}))}),(()=>{const subs=grocSubsFor(cat);return subs.length>0&&t("div",{className:"f fw",style:{gap:6,marginTop:8},children:subs.map(s2=>{const on=sub===s2;return t("button",{key:s2,onClick:()=>sSub(on?"":s2),className:"act95 tr",style:{padding:"6px 12px",background:on?c.sf3:c.sf2,border:`1px solid ${on?c.ac:c.brs}`,borderRadius:999,fontSize:11.5,color:on?c.tx:c.td},children:s2})})})})()]}),
     o("div",{style:{marginBottom:6},children:[o("div",{className:"f ia jb",style:{marginBottom:8},children:[LB("ITEMS"),t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm},children:clean.length+" item"+(clean.length===1?"":"s")})]}),o("div",{className:"f fc",style:{gap:8},children:items.map((it,i)=>o("div",{key:i,style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"10px 11px"},children:[o("div",{className:"f ia",style:{gap:8},children:[t("input",{value:it.n,list:"grocItemList",onChange:e=>setIt(i,"n",e.target.value),placeholder:"Item name",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:14,fontFamily:'var(--tf)',minWidth:0}}),t("button",{onClick:()=>rmRow(i),style:{background:"transparent",border:"none",color:c.tm,display:"flex",flexShrink:0,padding:2},children:t(Trash2,{size:15,color:c.tm})})]}),o("div",{className:"f ia",style:{gap:6,marginTop:8},children:[miniBox("QTY",it.q,v=>setIt(i,"q",v),"1",1),t("select",{value:it.u||"pc",onChange:e=>setIt(i,"u",e.target.value),style:{flex:1,background:c.sf2,border:"none",borderRadius:9,padding:"8px 8px",color:c.td,fontSize:12.5,fontFamily:'var(--nf)',outline:"none",colorScheme:"dark",minWidth:0},children:GROC_UNITS.map(u=>t("option",{key:u,value:u,children:u}))})]}),o("div",{className:"f ia",style:{gap:6,marginTop:6},children:[miniBox("MRP",it.mrp,v=>setIt(i,"mrp",v),"—",1),miniBox("PAID",it.p,v=>setIt(i,"p",v),"0",1)]}),subSel(it.s,v=>setIt(i,"s",v)),o("div",{className:"f ia jb",style:{marginTop:7},children:[grocLineSaved({q:Number(it.q)||0,mrp:Number(it.mrp)||0,p:Number(it.p)||0,disc:it.disc!==""&&it.disc!=null?Number(it.disc):null})>0?t("span",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.mt},children:"saved "+fm(grocLineSaved({q:Number(it.q)||0,mrp:Number(it.mrp)||0,p:Number(it.p)||0,disc:it.disc!==""&&it.disc!=null?Number(it.disc):null}),data.currency)}):t("span",{}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13,fontWeight:600,color:(Number(it.q)*Number(it.p))>0?c.tx:c.tm},children:fm((Number(it.q)||0)*(Number(it.p)||0),data.currency)})]})]}))}),t("button",{onClick:addRow,className:"w100 act95 tr f ia jc",style:{marginTop:8,gap:6,padding:"11px 0",background:"transparent",border:`1px dashed ${c.brs}`,borderRadius:12,color:c.td,fontSize:13,fontFamily:'var(--nf)',letterSpacing:.3},children:[t(Plus,{size:14,color:c.td}),"Add item"]})]}),
     o("div",{style:{margin:"14px 0",padding:"12px 14px",background:`linear-gradient(135deg,${c.mt}14,${c.sfg})`,border:`1px solid ${c.mt}44`,borderRadius:12},children:[o("div",{className:"f ia jb",children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1},children:"TRIP TOTAL"}),totOvOn?o("div",{className:"f ia",style:{gap:4},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:15,color:c.mt},children:data.currency}),t("input",{value:totOvVal,inputMode:"decimal",onChange:e=>sTotOvVal(e.target.value.replace(/[^\d.]/g,"")),style:{width:100,textAlign:"right",background:"transparent",border:"none",outline:"none",color:c.mt,fontSize:20,fontWeight:700,fontFamily:'var(--nf)'}})]}):t("div",{style:{fontFamily:'var(--nf)',fontSize:20,fontWeight:700,color:c.mt},children:fm(grand,data.currency)})]}),savedTot>0&&!totOvOn&&t("div",{style:{fontFamily:'var(--nf)',fontSize:10.5,color:c.mt,marginTop:4,textAlign:"right"},children:"you saved "+fm(savedTot,data.currency)+" vs MRP"}),o("div",{className:"f ia jb",style:{marginTop:8},children:[t("span",{style:{fontSize:10,color:c.tm},children:totOvOn?"Manual total — overrides the sum of items above":"Auto-calculated from items"}),t("button",{onClick:()=>{if(totOvOn){sTotOvOn(false)}else{sTotOvVal(grand?String(grand):"");sTotOvOn(true)}},style:{background:"transparent",border:"none",color:c.ac,fontSize:11,fontFamily:'var(--nf)',fontWeight:600},children:totOvOn?"Use auto total":"✏️ Override total"})]})]}),
     o("div",{style:{marginBottom:14},children:[LB("NEED OR WANT"),o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`},children:["need","want"].map(k=>{const on=nw===k,col=NW_META[k].color;return t("button",{key:k,onClick:()=>sNw(k),className:"act95 tr f ia jc",style:{flex:1,padding:"10px 0",gap:6,background:on?col+"26":"transparent",color:on?c.tx:c.td,border:on?`1px solid ${col}`:"1px solid transparent",borderRadius:9,fontSize:13,fontWeight:on?600:400},children:(k==="need"?"🧷 ":"✨ ")+NW_META[k].label})})})]}),
@@ -5330,35 +5362,201 @@ function GroceryCalendarView({data,persist,onClose}){
     delId&&t(CSht,{title:"Delete this trip?",subtitle:"This also removes it from your Expense Tracker — this can't be undone.",onClose:()=>sDelId(null),onConfirm:doDeleteEntry,confirmLabel:"Delete",danger:true})
   ]});
 }
-function StoreManagerSht({allGroc,expenses,persist,cur,onClose}){
-  const[renaming,sRenaming]=useState(null);
-  const[val,sVal]=useState("");
-  const[delStore,sDelStore]=useState(null);
-  const stats=useMemo(()=>{const m=new Map();for(const e of allGroc){const s=(e.merchant||"").trim();if(!s)continue;const k=s.toLowerCase();const cx=m.get(k)||{name:s,trips:0,total:0};cx.trips+=1;cx.total+=(e.amount||0);m.set(k,cx)}return[...m.values()].sort((a,b)=>b.trips-a.trips)},[allGroc]);
-  const applyRename=()=>{const newName=val.trim();if(!newName||!renaming)return;const oldKey=renaming.toLowerCase();persist({expenses:(expenses||[]).map(x=>grocIsExp(x)&&(x.merchant||"").trim().toLowerCase()===oldKey?{...x,merchant:newName}:x)});sRenaming(null);sVal("")};
-  const delInfo=delStore?stats.find(s=>s.name.toLowerCase()===delStore.toLowerCase()):null;
-  const applyDeleteAll=()=>{if(!delStore)return;const key=delStore.toLowerCase();persist({expenses:(expenses||[]).filter(x=>!(grocIsExp(x)&&(x.merchant||"").trim().toLowerCase()===key))});sDelStore(null)};
-  return t(Sht,{onClose,children:o(Fragment,{children:[
-    o("div",{className:"f ia jb",style:{gap:12,marginBottom:16},children:[o("div",{className:"minw0",children:[t("div",{style:{fontSize:17,fontWeight:700,color:c.tx},children:"Manage stores"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:"Rename a store to fix it across every past trip"})]}),t("button",{onClick:onClose,"aria-label":"Close",style:{background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:999,width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",color:c.td,flexShrink:0},children:t(X,{size:16})})]}),
-    stats.length===0?t("div",{style:{padding:"24px 0",textAlign:"center",color:c.tm,fontSize:12.5},children:"No stores yet."}):o("div",{className:"f fc",style:{gap:8},children:stats.map((s,i)=>o("div",{key:i,style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"10px 12px"},children:[
-      renaming&&renaming.toLowerCase()===s.name.toLowerCase()
-        ?o("div",{children:[t("input",{value:val,onChange:e=>sVal(e.target.value),autoFocus:true,placeholder:s.name,style:{width:"100%",boxSizing:"border-box",background:c.sf2,border:`1px solid ${c.ac}`,borderRadius:9,padding:"9px 11px",color:c.tx,fontSize:13.5,fontFamily:'var(--tf)',outline:"none"}}),o("div",{className:"f ia",style:{gap:8,marginTop:8},children:[t("button",{onClick:()=>{sRenaming(null);sVal("")},className:"act95 tr",style:{flex:1,padding:"8px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:9,color:c.td,fontSize:12},children:"Cancel"}),t("button",{onClick:applyRename,disabled:!val.trim(),className:"act95 tr",style:{flex:1,padding:"8px 0",background:val.trim()?c.ac:c.sf2,color:val.trim()?"#0a0a0a":c.tm,border:"none",borderRadius:9,fontSize:12,fontWeight:600},children:"Save"})]})]})
-        :o("div",{className:"f ia jb",children:[o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:13.5,fontWeight:500,color:c.tx},children:s.name}),t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,marginTop:2},children:s.trips+" trip"+(s.trips===1?"":"s")+" · "+fm(s.total,cur)})]}),o("div",{className:"f ia",style:{gap:6,flexShrink:0},children:[t("button",{onClick:()=>{sRenaming(s.name);sVal(s.name)},"aria-label":"Rename",style:{background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:8,width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",color:c.td},children:t(Pencil,{size:13,color:c.td})}),t("button",{onClick:()=>sDelStore(s.name),"aria-label":"Delete all trips at this store",style:{background:"transparent",border:`1px solid ${c.co}40`,borderRadius:8,width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",color:c.co},children:t(Trash2,{size:13,color:c.co})})]})]})
-    ]}))}),
-    delStore&&t(CSht,{title:`Delete all trips at "${delStore}"?`,subtitle:`This removes ${delInfo?delInfo.trips:0} trip(s) totaling ${fm(delInfo?delInfo.total:0,cur)} — including from your Expense Tracker. This can't be undone.`,onClose:()=>sDelStore(null),onConfirm:applyDeleteAll,confirmLabel:"Delete all",danger:true})
-  ]})});
+// Full-screen store manager. Stores are editable in their own right now — added
+// before their first trip, given a type and icon, starred as the default for new
+// trips, and merged when the same shop was typed three different ways.
+function GrocStoreMgr({data,persist,allGroc,cur,onClose}){
+  const rows=useMemo(()=>grocStoreRows(data,allGroc),[data,allGroc]);
+  const def=grocDefStore(data);
+  const[adding,sAdding]=useState(false);
+  const[editKey,sEditKey]=useState(null);
+  const[form,sForm]=useState({name:"",emoji:"🏬",type:"supermarket"});
+  const[rmS,sRmS]=useState(null);
+  const[delS,sDelS]=useState(null);
+  const[mergeOpen,sMergeOpen]=useState(false);
+  const[mSrc,sMSrc]=useState([]);
+  const[mTgt,sMTgt]=useState("");
+  const reg=grocStoreReg(data);
+  const LB=(txt)=>t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1,marginBottom:8},children:txt});
+  const nameTaken=(nm,exceptKey)=>{const k=grocSKey(nm);return !!k&&k!==exceptKey&&reg.some(s=>grocSKey(s.name)===k)};
+  const openAdd=()=>{sForm({name:"",emoji:"🏬",type:"supermarket"});sEditKey(null);sAdding(true)};
+  const openEdit=(r)=>{sForm({name:r.name,emoji:r.emoji||"🏬",type:r.type||"supermarket"});sAdding(false);sEditKey(grocSKey(r.name))};
+  const addStore=()=>{
+    const nm=form.name.trim();if(!nm||nameTaken(nm))return;
+    persist({groceryStores:[...reg,{id:"gs_"+uid(),name:nm,emoji:form.emoji||"🏬",type:form.type||"supermarket"}]});
+    sAdding(false);
+  };
+  // Renaming rewrites the merchant on every past trip, so a store fixed here is
+  // fixed everywhere. An unregistered merchant gets adopted into the registry.
+  const saveEdit=(orig)=>{
+    const nm=form.name.trim();const ok=grocSKey(orig.name),nk=grocSKey(nm);
+    if(!nm||nameTaken(nm,ok))return;
+    const next=orig.registered
+      ?reg.map(s=>grocSKey(s.name)===ok?{...s,name:nm,emoji:form.emoji||"🏬",type:form.type||"supermarket"}:s)
+      :[...reg,{id:"gs_"+uid(),name:nm,emoji:form.emoji||"🏬",type:form.type||"supermarket"}];
+    const patch={groceryStores:next};
+    if(nk!==ok){
+      patch.expenses=(data.expenses||[]).map(x=>grocIsExp(x)&&grocSKey(x.merchant)===ok?{...x,merchant:nm}:x);
+      if(grocSKey(data.groceryDefaultStore)===ok)patch.groceryDefaultStore=nm;
+    }
+    persist(patch);sEditKey(null);
+  };
+  const setDefault=(nm)=>persist({groceryDefaultStore:grocSKey(def)===grocSKey(nm)?"":nm});
+  const doRemove=()=>{const k=grocSKey(rmS.name);const patch={groceryStores:reg.filter(s=>grocSKey(s.name)!==k)};if(grocSKey(data.groceryDefaultStore)===k)patch.groceryDefaultStore="";persist(patch);sRmS(null);sEditKey(null)};
+  const doDeleteAll=()=>{const k=grocSKey(delS.name);const patch={expenses:(data.expenses||[]).filter(x=>!(grocIsExp(x)&&grocSKey(x.merchant)===k)),groceryStores:reg.filter(s=>grocSKey(s.name)!==k)};if(grocSKey(data.groceryDefaultStore)===k)patch.groceryDefaultStore="";persist(patch);sDelS(null);sEditKey(null)};
+  const mergeSrcRows=rows.filter(r=>mSrc.includes(grocSKey(r.name))&&grocSKey(r.name)!==grocSKey(mTgt));
+  const mergeTrips=mergeSrcRows.reduce((s,r)=>s+r.trips,0);
+  const doMerge=()=>{
+    const tk=grocSKey(mTgt);const srcKeys=mergeSrcRows.map(r=>grocSKey(r.name));
+    if(!tk||!srcKeys.length)return;
+    const tgtName=(rows.find(r=>grocSKey(r.name)===tk)||{name:mTgt}).name;
+    const patch={
+      expenses:(data.expenses||[]).map(x=>grocIsExp(x)&&srcKeys.includes(grocSKey(x.merchant))?{...x,merchant:tgtName}:x),
+      groceryStores:reg.filter(s=>!srcKeys.includes(grocSKey(s.name)))
+    };
+    if(srcKeys.includes(grocSKey(data.groceryDefaultStore)))patch.groceryDefaultStore=tgtName;
+    persist(patch);sMSrc([]);sMTgt("");sMergeOpen(false);
+  };
+  const emojiRow=o("div",{className:"f fw",style:{gap:6,marginTop:8},children:GROC_STORE_EMOJIS.map(em=>{const on=form.emoji===em;return t("button",{key:em,onClick:()=>sForm(f=>({...f,emoji:em})),className:"act95 tr",style:{width:34,height:34,borderRadius:9,fontSize:16,background:on?c.sf3:c.sf2,border:`1px solid ${on?c.ac:c.brs}`,display:"flex",alignItems:"center",justifyContent:"center",padding:0},children:em})})});
+  const typeRow=o("div",{className:"f fw",style:{gap:6,marginTop:8},children:GROC_STORE_TYPES.map(ty=>{const on=form.type===ty.id;return o("button",{key:ty.id,onClick:()=>sForm(f=>({...f,type:ty.id})),className:"act95 tr f ia",style:{gap:5,padding:"7px 11px",borderRadius:999,background:on?c.sf3:c.sf2,border:`1px solid ${on?c.ac:c.brs}`,fontSize:11.5,color:on?c.tx:c.td,fontWeight:on?600:400},children:[t("span",{children:ty.emoji}),t("span",{children:ty.label})]})})});
+  const formBody=(onSave,saveLabel,dupe)=>o("div",{style:{marginTop:10},children:[
+    t("input",{value:form.name,autoFocus:true,onChange:e=>sForm(f=>({...f,name:e.target.value})),onKeyDown:e=>{if(e.key==="Enter")onSave()},placeholder:"Store name, e.g. DMart Kompally",style:{width:"100%",boxSizing:"border-box",background:c.sf2,border:`1px solid ${dupe?c.co:c.brs}`,borderRadius:10,padding:"11px 13px",color:c.tx,fontSize:14,fontFamily:'var(--tf)',outline:"none"}}),
+    dupe&&t("div",{style:{fontSize:11,color:c.co,marginTop:6},children:"A store with that name already exists."}),
+    LB2("ICON"),emojiRow,LB2("TYPE"),typeRow,
+    o("div",{className:"f ia",style:{gap:8,marginTop:14},children:[
+      t("button",{onClick:()=>{sAdding(false);sEditKey(null)},className:"f1 act95 tr",style:{padding:"11px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,color:c.td,fontSize:12.5},children:"Cancel"}),
+      t("button",{onClick:onSave,disabled:!form.name.trim()||dupe,className:"f1 act95 tr",style:{padding:"11px 0",background:(form.name.trim()&&!dupe)?c.ac:c.sf2,color:(form.name.trim()&&!dupe)?"#0a0a0a":c.tm,border:"none",borderRadius:10,fontSize:12.5,fontWeight:600},children:saveLabel})
+    ]})
+  ]});
+  function LB2(txt){return t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1,marginTop:12},children:txt})}
+  return o("div",{style:{padding:"8px 0 40px"},children:[
+    t(SH,{title:t("em",{children:"Stores"}),onBack:onClose,right:t("button",{onClick:openAdd,"aria-label":"Add store",className:"act90 f ia jc",style:{width:38,height:38,borderRadius:999,background:c.mt,border:"none"},children:t(Plus,{size:19,color:"#0a0a0a"})})}),
+    o("div",{style:{padding:"0 24px"},children:[
+      t("div",{style:{fontSize:11.5,color:c.tm,marginBottom:14,lineHeight:1.5},children:"Add a supermarket before you ever shop there, tag what kind it is, and star one to prefill new trips. Renaming a store fixes it across every past trip."}),
+      adding&&o("div",{style:{background:c.sfg,border:`1px solid ${c.ac}55`,borderRadius:14,padding:"12px 14px",marginBottom:14},children:[
+        t("div",{style:{fontSize:13.5,fontWeight:600,color:c.tx},children:"New store"}),
+        formBody(addStore,"Add store",nameTaken(form.name))
+      ]}),
+      rows.length===0&&!adding&&o("div",{style:{textAlign:"center",padding:"36px 20px"},children:[
+        t("div",{style:{fontSize:36,marginBottom:10},children:"🏬"}),
+        t("div",{style:{fontSize:13.5,color:c.td,fontWeight:500,marginBottom:4},children:"No stores yet"}),
+        t("div",{style:{fontSize:12,color:c.tm,marginBottom:16,lineHeight:1.5},children:"Add the supermarkets you shop at, or log a trip and the store is picked up automatically."}),
+        t("button",{onClick:openAdd,className:"act95 tr",style:{padding:"11px 20px",background:c.mt,border:"none",borderRadius:12,color:"#0a0a0a",fontSize:13,fontWeight:600},children:"+ Add a store"})
+      ]}),
+      o("div",{className:"f fc",style:{gap:8},children:rows.map((r,i)=>{
+        const k=grocSKey(r.name);const isEd=editKey===k;const isDef=grocSKey(def)===k;const ty=r.registered?grocTypeMeta(r.type):null;
+        return o("div",{key:k||i,style:{background:c.sfg,border:`1px solid ${isEd?c.ac+"66":isDef?c.mt+"55":c.brs}`,borderRadius:14,padding:"11px 13px"},children:[
+          isEd?o(Fragment,{children:[
+            t("div",{style:{fontSize:13.5,fontWeight:600,color:c.tx},children:r.registered?"Edit store":"Add “"+r.name+"” to your list"}),
+            formBody(()=>saveEdit(r),r.registered?"Save":"Add to list",nameTaken(form.name,k)),
+            r.trips>0&&o("div",{className:"f ia",style:{gap:8,marginTop:10},children:[
+              t("button",{onClick:()=>sRmS(r),disabled:!r.registered,className:"f1 act95 tr",style:{padding:"10px 0",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:10,color:r.registered?c.td:c.tm,fontSize:12},children:"Remove from list"}),
+              t("button",{onClick:()=>sDelS(r),className:"f1 act95 tr",style:{padding:"10px 0",background:"transparent",border:`1px solid ${c.co}40`,borderRadius:10,color:c.co,fontSize:12},children:"Delete "+r.trips+" trip"+(r.trips===1?"":"s")})
+            ]})
+          ]}):o("div",{className:"f ia jb",style:{gap:8},children:[
+            o("div",{className:"f ia minw0",style:{gap:10},children:[
+              t("div",{style:{width:36,height:36,borderRadius:11,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0},children:r.emoji||"🛒"}),
+              o("div",{className:"minw0 tl",children:[
+                o("div",{className:"f ia",style:{gap:6,minWidth:0},children:[
+                  t("div",{className:"tru",style:{fontSize:13.5,fontWeight:600,color:c.tx,minWidth:0},children:r.name}),
+                  isDef&&t("span",{style:{fontFamily:'var(--nf)',fontSize:8,color:c.mt,background:c.mt+"22",borderRadius:5,padding:"2px 6px",letterSpacing:.5,flexShrink:0},children:"DEFAULT"})
+                ]}),
+                t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,marginTop:2},children:(ty?ty.label:"Not in your list")+" · "+(r.trips?r.trips+" trip"+(r.trips===1?"":"s")+" · "+fm(r.total,cur):"no trips yet")})
+              ]})
+            ]}),
+            o("div",{className:"f ia",style:{gap:4,flexShrink:0},children:[
+              t("button",{onClick:()=>setDefault(r.name),"aria-label":isDef?"Clear default store":"Make default store",title:isDef?"Default store":"Make default",className:"act95",style:{background:"transparent",border:"none",color:isDef?c.mt:c.tm,fontSize:15,padding:"0 3px"},children:isDef?"★":"☆"}),
+              t("button",{onClick:()=>openEdit(r),"aria-label":"Edit store",className:"act95",style:{background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:8,width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center"},children:t(Pencil,{size:13,color:c.td})}),
+              r.registered&&t("button",{onClick:()=>r.trips>0?sRmS(r):doRemoveNow(r),"aria-label":"Remove store",className:"act95",style:{background:"transparent",border:`1px solid ${c.brs}`,borderRadius:8,width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center"},children:t(Trash2,{size:13,color:c.tm})})
+            ]})
+          ]})
+        ]})
+      })}),
+      rows.length>1&&o("div",{style:{marginTop:16},children:[
+        t("button",{onClick:()=>sMergeOpen(v=>!v),className:"w100 act95 tr f ia jb",style:{background:c.sfg,border:`1px solid ${mergeOpen?c.ac+"55":c.brs}`,borderRadius:14,padding:"12px 14px",gap:10},children:[
+          o("div",{className:"f ia",style:{gap:10,minWidth:0},children:[t("span",{style:{fontSize:15},children:"🔀"}),o("div",{className:"tl minw0",children:[t("div",{style:{fontSize:13,fontWeight:600,color:c.tx},children:"Merge duplicates"}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:"Fold “Dmart”, “D-Mart” and “DMart” into one"})]})]}),
+          t("span",{style:{fontSize:14,color:c.tm,transform:mergeOpen?"rotate(90deg)":"none",transition:"transform .2s",display:"inline-block"},children:"›"})
+        ]}),
+        mergeOpen&&o("div",{style:{marginTop:8,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:"12px 14px"},children:[
+          LB("MERGE THESE"),
+          o("div",{className:"f fc",style:{gap:6},children:rows.map((r,i)=>{
+            const k=grocSKey(r.name);const on=mSrc.includes(k);const isTgt=grocSKey(mTgt)===k;
+            return o("button",{key:k||i,onClick:()=>sMSrc(a=>on?a.filter(x=>x!==k):[...a,k]),disabled:isTgt,className:"act95 tr f ia",style:{gap:9,padding:"8px 10px",background:on&&!isTgt?c.sf3:c.sf2,border:`1px solid ${on&&!isTgt?c.ac:c.brs}`,borderRadius:10,opacity:isTgt?.45:1,textAlign:"left"},children:[
+              t("span",{style:{width:18,height:18,borderRadius:5,flexShrink:0,border:`1.5px solid ${on&&!isTgt?c.ac:c.tm}`,background:on&&!isTgt?c.ac:"transparent",color:"#0a0a0a",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center"},children:on&&!isTgt?"✓":""}),
+              t("span",{style:{fontSize:15,flexShrink:0},children:r.emoji||"🛒"}),
+              t("div",{className:"tru f1 minw0",style:{fontSize:13,color:c.tx},children:r.name}),
+              t("span",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,flexShrink:0},children:isTgt?"TARGET":r.trips+" trip"+(r.trips===1?"":"s")})
+            ]})
+          })}),
+          LB2("INTO"),
+          t("select",{value:mTgt,onChange:e=>sMTgt(e.target.value),style:{width:"100%",boxSizing:"border-box",marginTop:8,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"11px 12px",color:mTgt?c.tx:c.tm,fontSize:13.5,fontFamily:'var(--tf)',outline:"none",colorScheme:"dark"},children:[t("option",{value:"",children:"— pick the store to keep —"}),...rows.map((r,i)=>t("option",{key:i,value:r.name,children:r.name}))]}),
+          t("button",{onClick:doMerge,disabled:!mTgt||mergeSrcRows.length===0,className:"w100 act95 tr",style:{marginTop:12,padding:"12px 0",background:(mTgt&&mergeSrcRows.length)?c.ac:c.sf2,color:(mTgt&&mergeSrcRows.length)?"#0a0a0a":c.tm,border:"none",borderRadius:11,fontSize:13,fontWeight:600},children:(mTgt&&mergeSrcRows.length)?"Merge "+mergeTrips+" trip"+(mergeTrips===1?"":"s")+" into "+mTgt:"Pick stores and a target"})
+        ]})
+      ]})
+    ]}),
+    rmS&&t(CSht,{title:`Remove “${rmS.name}” from your list?`,subtitle:`Its ${rmS.trips} trip${rmS.trips===1?"":"s"} stay exactly as they are — the store just loses its icon, type and star.`,onClose:()=>sRmS(null),onConfirm:doRemove,confirmLabel:"Remove",danger:false}),
+    delS&&t(CSht,{title:`Delete all trips at “${delS.name}”?`,subtitle:`This removes ${delS.trips} trip${delS.trips===1?"":"s"} totalling ${fm(delS.total,cur)} — including from your Expense Tracker. This can't be undone.`,onClose:()=>sDelS(null),onConfirm:doDeleteAll,confirmLabel:"Delete all",danger:true})
+  ]});
+  function doRemoveNow(r){const k=grocSKey(r.name);const patch={groceryStores:reg.filter(s=>grocSKey(s.name)!==k)};if(grocSKey(data.groceryDefaultStore)===k)patch.groceryDefaultStore="";persist(patch)}
 }
+// Which expense categories count as a grocery trip — plus a shortcut to invent a
+// new one without leaving Groceries. A category created here is a normal custom
+// expense category (it shows in Add Expense and Settings → Categories too), it
+// just arrives pre-ticked for Groceries.
+const GROC_CAT_EMOJIS=["🛒","🥬","🍎","🥩","🐟","🍞","🥛","🥚","🧀","🍚","🧂","🧴","🧻","🍫","🥤","🧊","🐕","👶"];
 function GroceryCatSht({data,persist,onClose}){
-  const cats=useMemo(()=>ceAll(),[]);
+  const cats=useMemo(()=>ceAll(),[data.customExpenseCategories,data.categoryOverrides,data.categoryOrder]);
   const sel=data.groceryCategories||GROC_CATS_DEFAULT;
-  const toggle=(id)=>{const on=sel.includes(id);const next=on?sel.filter(x=>x!==id):[...sel,id];persist({groceryCategories:next})};
+  const custom=data.customExpenseCategories||[];
+  const[showNew,sShowNew]=useState(false);
+  const[nl,sNl]=useState("");
+  const[ne,sNe]=useState("🛒");
+  const[delId,sDelId]=useState(null);
+  // Unticking the last category would leave Groceries with nothing to count, so
+  // the final one stays locked on.
+  const toggle=(id)=>{const on=sel.includes(id);if(on&&sel.length<=1)return;persist({groceryCategories:on?sel.filter(x=>x!==id):[...sel,id]})};
   const reset=()=>persist({groceryCategories:GROC_CATS_DEFAULT});
   const isDefault=sel.length===GROC_CATS_DEFAULT.length&&GROC_CATS_DEFAULT.every(id=>sel.includes(id));
+  const dupe=!!nl.trim()&&cats.some(x=>String(x.label).trim().toLowerCase()===nl.trim().toLowerCase());
+  const addCat=()=>{
+    const label=nl.trim();if(!label||dupe)return;
+    const nc={id:"custom_"+uid(),label,emoji:ne||"🛒",color:"#A39B8C",subs:["Other"]};
+    const ord=data.categoryOrder||{};
+    persist({customExpenseCategories:[...custom,nc],categoryOrder:{...ord,expense:[...(ord.expense||[]),nc.id]},groceryCategories:[...sel,nc.id]});
+    sNl("");sNe("🛒");sShowNew(false);
+  };
+  const delCustom=()=>{
+    const ord=data.categoryOrder||{};
+    persist({customExpenseCategories:custom.filter(x=>x.id!==delId),categoryOrder:{...ord,expense:(ord.expense||[]).filter(x=>x!==delId)},groceryCategories:sel.filter(x=>x!==delId)});
+    sDelId(null);
+  };
+  const delMeta=delId?(custom.find(x=>x.id===delId)||{}):null;
   return t(Sht,{onClose,children:o(Fragment,{children:[
-    o("div",{className:"f ia jb",style:{gap:12,marginBottom:6},children:[o("div",{className:"minw0",children:[t("div",{style:{fontSize:17,fontWeight:700,color:c.tx},children:"Categories in Groceries"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:"Pick which expense categories count as a grocery trip"})]}),t("button",{onClick:onClose,"aria-label":"Close",style:{background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:999,width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",color:c.td,flexShrink:0},children:t(X,{size:16})})]}),
+    o("div",{className:"f ia jb",style:{gap:12,marginBottom:6},children:[o("div",{className:"minw0",children:[t("div",{style:{fontSize:17,fontWeight:700,color:c.tx},children:"Categories in Groceries"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:"Pick which expense categories count as a grocery trip"})]}),t("button",{onClick:onClose,"aria-label":"Close",className:"act95 tr",style:{background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:999,width:30,height:30,display:"flex",alignItems:"center",justifyContent:"center",color:c.td,flexShrink:0},children:t(X,{size:16})})]}),
     t("div",{style:{fontSize:11.5,color:c.tm,marginBottom:14,lineHeight:1.5},children:"Selected categories show up in the Groceries screen, its totals, and the sidebar tile. Dining out (Food) is excluded by default so it doesn't inflate your grocery numbers — add it here if you'd rather track it together."}),
-    t("div",{className:"g g3",style:{gap:8,marginBottom:16},children:cats.map(cc2=>{const on=sel.includes(cc2.id);return o("button",{key:cc2.id,onClick:()=>toggle(cc2.id),className:"act95 tr f fc ia",style:{gap:4,padding:"12px 0",background:on?c.sf3:c.sf,border:`1px solid ${on?c.mt:c.brs}`,borderRadius:12,position:"relative"},children:[on&&t("span",{style:{position:"absolute",top:6,right:6,color:c.mt},children:t(Check,{size:12,color:c.mt})}),t("span",{style:{fontSize:20},children:cc2.emoji}),t("span",{style:{fontSize:10.5,color:on?c.tx:c.td,fontWeight:on?500:400,textAlign:"center",lineHeight:1.2},children:cc2.label})]})})}),
-    o("div",{className:"f ia",style:{gap:8},children:[t("button",{onClick:reset,disabled:isDefault,className:"f1 act95 tr",style:{padding:"12px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,color:isDefault?c.tm:c.td,fontSize:12.5,fontWeight:500},children:"Reset to default"}),t("button",{onClick:onClose,className:"f1 act95 tr",style:{padding:"12px 0",background:c.mt,border:"none",borderRadius:12,color:"#0a0a0a",fontSize:13,fontWeight:600},children:"Done"})]})
+    t("div",{className:"g g3",style:{gap:8,marginBottom:12},children:cats.map(cc2=>{
+      const on=sel.includes(cc2.id);const isCustom=custom.some(x=>x.id===cc2.id);
+      return o("button",{key:cc2.id,onClick:()=>toggle(cc2.id),className:"act95 tr f fc ia",style:{gap:4,padding:"12px 0",background:on?c.sf3:c.sf,border:`1px solid ${on?c.mt:c.brs}`,borderRadius:12,position:"relative"},children:[
+        on&&t("span",{style:{position:"absolute",top:6,right:6,color:c.mt},children:t(Check,{size:12,color:c.mt})}),
+        isCustom&&t("span",{onClick:e=>{e.stopPropagation();sDelId(cc2.id)},role:"button","aria-label":"Delete "+cc2.label,title:"Delete this custom category",style:{position:"absolute",top:4,left:5,color:c.tm,fontSize:12,lineHeight:1,padding:2},children:"×"}),
+        t("span",{style:{fontSize:20},children:cc2.emoji}),
+        t("span",{style:{fontSize:10.5,color:on?c.tx:c.td,fontWeight:on?500:400,textAlign:"center",lineHeight:1.2},children:cc2.label})
+      ]})
+    })}),
+    showNew?o("div",{style:{background:c.sfg,border:`1px solid ${c.ac}55`,borderRadius:14,padding:"12px 14px",marginBottom:14},children:[
+      t("div",{style:{fontSize:13.5,fontWeight:600,color:c.tx,marginBottom:10},children:"New grocery category"}),
+      t("input",{value:nl,autoFocus:true,onChange:e=>sNl(e.target.value),onKeyDown:e=>{if(e.key==="Enter")addCat()},placeholder:"e.g. Bakery run, Pet supplies",style:{width:"100%",boxSizing:"border-box",background:c.sf2,border:`1px solid ${dupe?c.co:c.brs}`,borderRadius:10,padding:"11px 13px",color:c.tx,fontSize:14,fontFamily:'var(--tf)',outline:"none"}}),
+      dupe&&t("div",{style:{fontSize:11,color:c.co,marginTop:6},children:"You already have a category with that name."}),
+      t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1,marginTop:12},children:"ICON"}),
+      o("div",{className:"f fw",style:{gap:6,marginTop:8},children:GROC_CAT_EMOJIS.map(em=>{const on=ne===em;return t("button",{key:em,onClick:()=>sNe(em),className:"act95 tr",style:{width:34,height:34,borderRadius:9,fontSize:16,background:on?c.sf3:c.sf2,border:`1px solid ${on?c.ac:c.brs}`,display:"flex",alignItems:"center",justifyContent:"center",padding:0},children:em})})}),
+      t("div",{style:{fontSize:10.5,color:c.tm,marginTop:10,lineHeight:1.5},children:"It starts with one subcategory (“Other”) — add your own in Grocery subcategories. It also appears in Add Expense and Settings → Categories."}),
+      o("div",{className:"f ia",style:{gap:8,marginTop:12},children:[
+        t("button",{onClick:()=>{sShowNew(false);sNl("")},className:"f1 act95 tr",style:{padding:"11px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,color:c.td,fontSize:12.5},children:"Cancel"}),
+        t("button",{onClick:addCat,disabled:!nl.trim()||dupe,className:"f1 act95 tr",style:{padding:"11px 0",background:(nl.trim()&&!dupe)?c.ac:c.sf2,color:(nl.trim()&&!dupe)?"#0a0a0a":c.tm,border:"none",borderRadius:10,fontSize:12.5,fontWeight:600},children:"Create"})
+      ]})
+    ]}):t("button",{onClick:()=>sShowNew(true),className:"w100 act95 tr f ia jc",style:{gap:6,marginBottom:14,padding:"11px 0",background:"transparent",border:`1px dashed ${c.brs}`,borderRadius:12,color:c.td,fontSize:12.5,fontWeight:500},children:[t(Plus,{size:14,color:c.td}),"New grocery category"]}),
+    o("div",{className:"f ia",style:{gap:8},children:[t("button",{onClick:reset,disabled:isDefault,className:"f1 act95 tr",style:{padding:"12px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,color:isDefault?c.tm:c.td,fontSize:12.5,fontWeight:500},children:"Reset to default"}),t("button",{onClick:onClose,className:"f1 act95 tr",style:{padding:"12px 0",background:c.mt,border:"none",borderRadius:12,color:"#0a0a0a",fontSize:13,fontWeight:600},children:"Done"})]}),
+    delId&&t(CSht,{title:`Delete “${delMeta&&delMeta.label}”?`,subtitle:"The category is removed everywhere, including Add Expense. Past expenses filed under it stay, but show as Other.",onClose:()=>sDelId(null),onConfirm:delCustom,confirmLabel:"Delete",danger:true})
   ]})});
 }
 // Manage the subcategory list that grocery ITEMS classify into, right where groceries
@@ -5446,47 +5644,66 @@ function GrocSubMgrSht({data,persist,onClose}){
     builtIn.length>0&&t("div",{style:{fontSize:10.5,color:c.tm,marginTop:10,lineHeight:1.5,textAlign:"center"},children:"Built-in list: "+builtIn.join(" · ")})
   ]})});
 }
+// Groceries is a hub, not one long scroll: the home screen carries the period
+// summary and the "where you spent" breakdown, and everything else — the trip
+// list, price watch, the item explorer, bill linking, settings — sits behind its
+// own link and gets a screen to itself.
 function GroceriesView({data,persist,onClose,onView}){
   const cur=data.currency;const msd=data.monthStartDay||1;
+  const[screen,sScreen]=useState("home");
   const[monOff,sMonOff]=useState(0);
   const[scope,sScope]=useState("month");
   const[q,sQ]=useState("");
   const[storeF,sStoreF]=useState(null);
+  const[catF,sCatF]=useState(null);
+  const[subF,sSubF]=useState(null);
+  const[typeF,sTypeF]=useState(null);
   const[expanded,sExpanded]=useState(null);
   const[editorOpen,sEditorOpen]=useState(false);
   const[editing,sEditing]=useState(null);
-  const[showInsight,sShowInsight]=useState(false);
   const[insightItem,sInsightItem]=useState("");
-  const[showLink,sShowLink]=useState(false);
   const[delId,sDelId]=useState(null);
-  const[showStoreMgr,sShowStoreMgr]=useState(false);
   const[showCatMgr,sShowCatMgr]=useState(false);
   const[showSubMgr,sShowSubMgr]=useState(false);
-  const[showFilters,sShowFilters]=useState(false);
   const[breakBy,sBreakBy]=useState("sub");
-  const[catF,sCatF]=useState(null);
-  const[subF,sSubF]=useState(null);
-  const[gtab,sGtab]=useState("trips");
+  const[subBreakQ,sSubBreakQ]=useState("");
   const allGroc=useMemo(()=>(data.expenses||[]).filter(e=>grocIsExp(e)).sort((a,b)=>b.date-a.date),[data.expenses]);
   const periodStart=useMemo(()=>{const b=new Date(ps(new Date(),msd));b.setMonth(b.getMonth()+monOff);return b.getTime()},[monOff,msd]);
   const periodEnd=useMemo(()=>{const b=new Date(periodStart);b.setMonth(b.getMonth()+1);return b.getTime()},[periodStart]);
   const monthLabel=new Date(periodStart).toLocaleDateString("en-US",{month:"long",year:"numeric"});
   const scoped=useMemo(()=>scope==="all"?allGroc:allGroc.filter(e=>e.date>=periodStart&&e.date<periodEnd),[allGroc,scope,periodStart,periodEnd]);
-  const stores=useMemo(()=>{const m=new Map();for(const e of allGroc){const s=(e.merchant||"").trim();if(!s)continue;const k=s.toLowerCase();if(!m.has(k))m.set(k,s)}return[...m.values()]},[allGroc]);
-  const itemNames=useMemo(()=>{const m=new Map();for(const e of allGroc)for(const it of grocItemsOf(e)){const n=(it.n||"").trim();if(!n)continue;const k=n.toLowerCase();if(!m.has(k))m.set(k,n)}return[...m.values()].sort((a,b)=>a.localeCompare(b))},[allGroc]);
+  // Picker/filter names come from the registry as well as past trips, so a store
+  // added but never shopped at is still selectable.
+  const stores=useMemo(()=>grocStoreNames(data,allGroc),[data.groceryStores,allGroc]);
   const scopedStores=useMemo(()=>{const m=new Map();for(const e of scoped){const s=(e.merchant||"").trim();if(!s)continue;const k=s.toLowerCase();if(!m.has(k))m.set(k,s)}return[...m.values()]},[scoped]);
-  const filtered=useMemo(()=>{const p=q.trim().toLowerCase();return scoped.filter(e=>{if(storeF&&(e.merchant||"").toLowerCase()!==storeF.toLowerCase())return false;if(catF&&e.category!==catF)return false;/* a trip matches a subcategory filter if any of its items sits in it */if(subF&&!grocSubSplit(e).some(x=>x.sub===subF))return false;if(!p)return true;if((e.merchant||"").toLowerCase().includes(p))return true;if((e.note||"").toLowerCase().includes(p))return true;if(new Date(e.date).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}).toLowerCase().includes(p))return true;return grocItemsOf(e).some(it=>(it.n||"").toLowerCase().includes(p))})},[scoped,q,storeF,catF,subF]);
+  const itemNames=useMemo(()=>{const m=new Map();for(const e of allGroc)for(const it of grocItemsOf(e)){const n=(it.n||"").trim();if(!n)continue;const k=n.toLowerCase();if(!m.has(k))m.set(k,n)}return[...m.values()].sort((a,b)=>a.localeCompare(b))},[allGroc]);
+  const filtered=useMemo(()=>{const p=q.trim().toLowerCase();return scoped.filter(e=>{
+    if(storeF&&grocSKey(e.merchant)!==grocSKey(storeF))return false;
+    if(catF&&e.category!==catF)return false;
+    if(typeF&&grocStoreTypeOf(data,e.merchant)!==typeF)return false;
+    /* a trip matches a subcategory filter if any of its items sits in it */
+    if(subF&&!grocSubSplit(e).some(x=>x.sub===subF))return false;
+    if(!p)return true;
+    if((e.merchant||"").toLowerCase().includes(p))return true;
+    if((e.note||"").toLowerCase().includes(p))return true;
+    if(new Date(e.date).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}).toLowerCase().includes(p))return true;
+    return grocItemsOf(e).some(it=>(it.n||"").toLowerCase().includes(p))})},[scoped,q,storeF,catF,subF,typeF,data.groceryStores]);
   const stat=useMemo(()=>{const total=scoped.reduce((s,e)=>s+(e.amount||0),0);const trips=scoped.length;const items=scoped.reduce((s,e)=>s+grocItemsOf(e).length,0);const saved=scoped.reduce((s,e)=>s+grocSumSaved(grocItemsOf(e)),0);const mrp=scoped.reduce((s,e)=>s+(grocItemsOf(e).length?grocSumMrp(grocItemsOf(e)):(e.amount||0)),0);return{total,trips,items,saved,mrp,avg:trips?total/trips:0,discPct:mrp>0?saved/mrp*100:0}},[scoped]);
   const candidates=useMemo(()=>{const storeSet=new Set(stores.map(s=>s.toLowerCase()));const catish=new Set(["groceries","food","milk_curd","eggs","shopping","household_sam"]);return (data.expenses||[]).filter(e=>{if(e.archived||e.type!=="expense")return false;if(grocIsExp(e)&&grocItemsOf(e).length>0)return false;const notItemised=grocIsExp(e);const hasPhoto=(e.photos||[]).length>0;const knownStore=e.merchant&&storeSet.has(String(e.merchant).toLowerCase());return notItemised||(hasPhoto&&catish.has(e.category))||knownStore}).sort((a,b)=>b.date-a.date).slice(0,40)},[data.expenses,stores]);
   const prev=useMemo(()=>{if(scope!=="month")return null;const s0=(()=>{const b=new Date(periodStart);b.setMonth(b.getMonth()-1);return b.getTime()})();const arr=allGroc.filter(e=>e.date>=s0&&e.date<periodStart);return{total:arr.reduce((s,e)=>s+(e.amount||0),0)}},[allGroc,scope,periodStart]);
   const storeBreak=useMemo(()=>{const m=new Map();for(const e of scoped){const s=e.merchant||"—";const k=s.toLowerCase();const cx=m.get(k)||{store:s,total:0,trips:0};cx.total+=(e.amount||0);cx.trips+=1;m.set(k,cx)}return[...m.values()].sort((a,b)=>b.total-a.total)},[scoped]);
   const catBreak=useMemo(()=>{const m=new Map();for(const e of scoped){const k=e.category||"other";const cx=m.get(k)||{id:k,total:0,trips:0};cx.total+=(e.amount||0);cx.trips+=1;m.set(k,cx)}return[...m.values()].sort((a,b)=>b.total-a.total)},[scoped]);
   const subBreak=useMemo(()=>{const m=new Map();for(const e of scoped){const seen=new Set();for(const part of grocSubSplit(e)){const k=part.sub;const cx=m.get(k)||{id:k,total:0,items:0,trips:0};cx.total+=part.amt;cx.items+=part.items;if(!seen.has(k)){cx.trips+=1;seen.add(k)}m.set(k,cx)}}return[...m.values()].sort((a,b)=>b.total-a.total)},[scoped]);
-  const[subBreakQ,sSubBreakQ]=useState("");
-  const weekGroups=useMemo(()=>{if(scope!=="month")return null;const buckets=monthWeeks(periodStart,periodEnd).map(w=>({wk:w.wk,s:w.s,e:w.e,items:[]}));for(const e of filtered){for(const b of buckets){if(e.date>=b.s&&e.date<b.e){b.items.push(e);break}}}const fmtD=d=>d.toLocaleDateString("en-US",{month:"short",day:"numeric"});return buckets.map(b=>{const wStart=new Date(b.s),wEnd=new Date(b.e-864e5);const sameMonth=wStart.getMonth()===wEnd.getMonth();const range=sameMonth?`${wStart.toLocaleDateString("en-US",{month:"short"})} ${wStart.getDate()}–${wEnd.getDate()}`:`${fmtD(wStart)} – ${fmtD(wEnd)}`;const total=b.items.reduce((s,x)=>s+(x.amount||0),0);return{wi:b.wk,label:"W"+b.wk,range,items:b.items,total}}).reverse()},[filtered,scope,periodStart,periodEnd]);
+  // Store types only earn a row once at least one store carries one.
+  const typeBreak=useMemo(()=>{const m=new Map();for(const e of scoped){const ty=grocStoreTypeOf(data,e.merchant);const cx=m.get(ty)||{id:ty,total:0,trips:0};cx.total+=(e.amount||0);cx.trips+=1;m.set(ty,cx)}return[...m.values()].sort((a,b)=>b.total-a.total)},[scoped,data.groceryStores]);
+  const hasTypes=useMemo(()=>grocStoreReg(data).length>0,[data.groceryStores]);
   const priceIndex=useMemo(()=>{const m=new Map();for(const e of allGroc)for(const it of grocItemsOf(e)){const n=(it.n||"").trim();if(!n||!(Number(it.p)>0))continue;const k=n.toLowerCase();const rec=m.get(k)||{name:n,recs:[]};rec.recs.push({store:e.merchant||"—",price:Number(it.p),date:e.date});m.set(k,rec)}return m},[allGroc]);
   const insightSug=useMemo(()=>{const p=insightItem.trim().toLowerCase();if(!p)return[];return itemNames.filter(n=>n.toLowerCase().includes(p)&&n.toLowerCase()!==p).slice(0,6)},[insightItem,itemNames]);
   const insight=useMemo(()=>{const p=insightItem.trim().toLowerCase();if(!p)return null;const rec=priceIndex.get(p);if(!rec)return null;const bs=new Map();for(const r of rec.recs){const k=r.store.toLowerCase();const cx=bs.get(k)||{store:r.store,latest:null,latestDate:-1,min:Infinity,max:0};if(r.date>=cx.latestDate){cx.latest=r.price;cx.latestDate=r.date}cx.min=Math.min(cx.min,r.price);cx.max=Math.max(cx.max,r.price);bs.set(k,cx)}const list=[...bs.values()].sort((a,b)=>(a.latest||a.min)-(b.latest||b.min));return{name:rec.name,list}},[insightItem,priceIndex]);
+  // Trips group under the store they were made at, biggest spender first.
+  const storeGroups=useMemo(()=>{const m=new Map();for(const e of filtered){const k=grocSKey(e.merchant)||"_none";const cx=m.get(k)||{key:k,name:(e.merchant||"").trim()||"—",items:[],total:0};cx.items.push(e);cx.total+=(e.amount||0);m.set(k,cx)}return[...m.values()].sort((a,b)=>b.total-a.total)},[filtered]);
+  const anyFilter=!!(q.trim()||storeF||catF||subF||typeF);
+  const clearFilters=()=>{sQ("");sStoreF(null);sCatF(null);sSubF(null);sTypeF(null)};
   const monShift=(d)=>{sScope("month");sMonOff(o2=>o2+d)};
   const openAdd=()=>{sEditing(null);sEditorOpen(true)};
   const openEdit=(e)=>{sEditing(e);sEditorOpen(true)};
@@ -5494,47 +5711,233 @@ function GroceriesView({data,persist,onClose,onView}){
   const delEntry=(id)=>sDelId(id);
   const doDeleteEntry=()=>{persist({expenses:(data.expenses||[]).filter(x=>x.id!==delId)});sDelId(null);sEditorOpen(false);sEditing(null);sExpanded(null)};
   const exportTitle=`Groceries ${scope==="all"?"All time":monthLabel}${storeF?" · "+storeF:""}`;
-  const tile=(label,val,col)=>o("div",{className:"f1",style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"10px 12px"},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:8.5,color:c.tm,letterSpacing:1},children:label}),t("div",{style:{fontFamily:'var(--nf)',fontSize:15,fontWeight:600,color:col||c.tx,marginTop:3},children:val})]});
-  const tripCard=(e)=>{const items=grocItemsOf(e);const isOpen=expanded===e.id;return o("div",{key:e.id,style:{background:c.sfg,border:`1px solid ${isOpen?c.mt+"55":c.brs}`,borderRadius:16,overflow:"hidden"},children:[o("button",{onClick:()=>sExpanded(isOpen?null:e.id),className:"w100 act98 trc f ia",style:{gap:12,padding:"13px 15px",background:"transparent",border:"none",textAlign:"left"},children:[t("div",{style:{width:40,height:40,borderRadius:12,background:c.mt+"1e",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0},children:"🛒"}),o("div",{className:"f1 minw0",children:[t("div",{className:"tru",style:{fontSize:14.5,fontWeight:600,color:c.tx},children:e.merchant||"—"}),o("div",{style:{fontSize:11.5,color:c.tm,marginTop:2},children:[rd(e.date),items.length?" · "+items.length+" item"+(items.length===1?"":"s"):""]})]}),o("div",{className:"trg",style:{flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:15,fontWeight:600,color:c.tx},children:fm(e.amount||0,cur)}),t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,marginTop:2},children:isOpen?"HIDE":"DETAILS"})]})]}),isOpen&&o("div",{style:{padding:"0 15px 14px",borderTop:`1px solid ${c.brs}`},children:[items.length>0?t("div",{style:{marginTop:10},children:items.map((it,i)=>o("div",{key:i,className:"f ia jb",style:{padding:"5px 0",gap:8},children:[o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:12.5,color:c.td},children:it.n||"—"}),t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,marginTop:1},children:[grocQty(it)+" "+grocUnit(it)+" × "+fm(grocUnitPrice(it),cur)+(it.mrp&&grocUnitMrp(it)>grocUnitPrice(it)?"  (MRP "+fm(grocUnitMrp(it),cur)+")":""),it.s&&t("span",{style:{display:"inline-block",marginLeft:6,padding:"1px 7px",background:c.mt+"1e",borderRadius:999,fontSize:9,color:c.mt,verticalAlign:"middle"},children:it.s})]})]}),o("div",{className:"trg",style:{flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:12.5,fontWeight:600,color:c.tx},children:fm(grocLine(it),cur)}),grocLineSaved(it)>0&&t("div",{style:{fontFamily:'var(--nf)',fontSize:8.5,color:c.mt,marginTop:1},children:"saved "+fm(grocLineSaved(it),cur)})]})]}))}):o("div",{style:{marginTop:10},children:[t("div",{style:{fontSize:12,color:c.tm,marginBottom:(e.photos||[]).length>0?8:0},children:"No itemised breakdown for this trip."}),(e.photos||[]).length>0&&t("button",{onClick:()=>openEdit(e),className:"act95 tr f ia jc",style:{gap:6,padding:"8px 14px",background:c.ac+"18",border:`1px solid ${c.ac}44`,borderRadius:10,fontSize:12,color:c.tx,fontWeight:500},children:[t("span",{style:{fontSize:13},children:"📸"}),"Scan attached bill to itemise"]})]}),(e.photos||[]).length>0&&t(GrocBillThumb,{photos:e.photos}),e.note&&t("div",{style:{marginTop:8,fontSize:12,color:c.td,lineHeight:1.5},children:"“"+e.note+"”"}),o("div",{className:"f ia",style:{gap:8,marginTop:12},children:[t("button",{onClick:()=>openEdit(e),className:"f1 act95 tr f ia jc",style:{gap:6,padding:"10px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,fontSize:12.5,color:c.td,fontWeight:500},children:[t(Pencil,{size:13,color:c.td}),"Edit"]}),t("button",{onClick:()=>delEntry(e.id),className:"act95 tr f ia jc",style:{gap:6,padding:"10px 16px",background:"transparent",border:`1px solid ${c.co}40`,borderRadius:10,fontSize:12.5,color:c.co,fontWeight:500},children:[t(Trash2,{size:13,color:c.co}),"Delete"]})]})]})]})};
+  const gotoTrips=()=>{sExpanded(null);sScreen("trips")};
   const addBtn=t("button",{onClick:openAdd,"aria-label":"Add grocery trip",className:"act90 f ia jc",style:{width:38,height:38,borderRadius:999,background:c.mt,border:"none"},children:t(Plus,{size:19,color:"#0a0a0a"})});
-  const iconBtn=(icon,label,onClick)=>t("button",{onClick,"aria-label":label,className:"act90 trt f ia jc",style:{width:34,height:34,borderRadius:10,background:c.sfg,border:`1px solid ${c.brs}`,color:c.td,flexShrink:0},children:icon});
-  const headerRight=o("div",{className:"f ia",style:{gap:8},children:[onView&&iconBtn(t(Cal,{size:16,color:c.td}),"Grocery calendar",()=>onView("groceryCalendar")),onView&&iconBtn(t(BarChart3,{size:16,color:c.td}),"Price analytics",()=>onView("groceryAnalytics")),addBtn]});
+  const tile=(label,val,col)=>o("div",{className:"f1",style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"10px 12px"},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:8.5,color:c.tm,letterSpacing:1},children:label}),t("div",{style:{fontFamily:'var(--nf)',fontSize:15,fontWeight:600,color:col||c.tx,marginTop:3},children:val})]});
+  const LBL=(txt)=>t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1,marginBottom:8},children:txt});
+  const tripCard=(e)=>{const items=grocItemsOf(e);const isOpen=expanded===e.id;return o("div",{key:e.id,style:{background:c.sfg,border:`1px solid ${isOpen?c.mt+"55":c.brs}`,borderRadius:16,overflow:"hidden"},children:[o("button",{onClick:()=>sExpanded(isOpen?null:e.id),className:"w100 act98 trc f ia",style:{gap:12,padding:"13px 15px",background:"transparent",border:"none",textAlign:"left"},children:[t("div",{style:{width:40,height:40,borderRadius:12,background:c.mt+"1e",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0},children:grocStoreEmoji(data,e.merchant)}),o("div",{className:"f1 minw0",children:[t("div",{className:"tru",style:{fontSize:14.5,fontWeight:600,color:c.tx},children:e.merchant||"—"}),o("div",{style:{fontSize:11.5,color:c.tm,marginTop:2},children:[rd(e.date),items.length?" · "+items.length+" item"+(items.length===1?"":"s"):""]})]}),o("div",{className:"trg",style:{flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:15,fontWeight:600,color:c.tx},children:fm(e.amount||0,cur)}),t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,marginTop:2},children:isOpen?"HIDE":"DETAILS"})]})]}),isOpen&&o("div",{style:{padding:"0 15px 14px",borderTop:`1px solid ${c.brs}`},children:[items.length>0?t("div",{style:{marginTop:10},children:items.map((it,i)=>o("div",{key:i,className:"f ia jb",style:{padding:"5px 0",gap:8},children:[o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:12.5,color:c.td},children:it.n||"—"}),o("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,marginTop:1},children:[grocQty(it)+" "+grocUnit(it)+" × "+fm(grocUnitPrice(it),cur)+(it.mrp&&grocUnitMrp(it)>grocUnitPrice(it)?"  (MRP "+fm(grocUnitMrp(it),cur)+")":""),it.s&&t("span",{style:{display:"inline-block",marginLeft:6,padding:"1px 7px",background:c.mt+"1e",borderRadius:999,fontSize:9,color:c.mt,verticalAlign:"middle"},children:it.s})]})]}),o("div",{className:"trg",style:{flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:12.5,fontWeight:600,color:c.tx},children:fm(grocLine(it),cur)}),grocLineSaved(it)>0&&t("div",{style:{fontFamily:'var(--nf)',fontSize:8.5,color:c.mt,marginTop:1},children:"saved "+fm(grocLineSaved(it),cur)})]})]}))}):o("div",{style:{marginTop:10},children:[t("div",{style:{fontSize:12,color:c.tm,marginBottom:(e.photos||[]).length>0?8:0},children:"No itemised breakdown for this trip."}),(e.photos||[]).length>0&&t("button",{onClick:()=>openEdit(e),className:"act95 tr f ia jc",style:{gap:6,padding:"8px 14px",background:c.ac+"18",border:`1px solid ${c.ac}44`,borderRadius:10,fontSize:12,color:c.tx,fontWeight:500},children:[t("span",{style:{fontSize:13},children:"📸"}),"Scan attached bill to itemise"]})]}),(e.photos||[]).length>0&&t(GrocBillThumb,{photos:e.photos}),e.note&&t("div",{style:{marginTop:8,fontSize:12,color:c.td,lineHeight:1.5},children:"“"+e.note+"”"}),o("div",{className:"f ia",style:{gap:8,marginTop:12},children:[t("button",{onClick:()=>openEdit(e),className:"f1 act95 tr f ia jc",style:{gap:6,padding:"10px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,fontSize:12.5,color:c.td,fontWeight:500},children:[t(Pencil,{size:13,color:c.td}),"Edit"]}),t("button",{onClick:()=>delEntry(e.id),className:"act95 tr f ia jc",style:{gap:6,padding:"10px 16px",background:"transparent",border:`1px solid ${c.co}40`,borderRadius:10,fontSize:12.5,color:c.co,fontWeight:500},children:[t(Trash2,{size:13,color:c.co}),"Delete"]})]})]})]})};
+  // One divided card of links — the whole point of the redesign.
+  const linkRow=(emoji,title,sub,onClick,last,badge)=>o("button",{key:title,onClick,className:"w100 act95 trc f ia jb",style:{gap:12,padding:"13px 14px",background:"transparent",border:"none",borderBottom:last?"none":`1px solid ${c.brs}`,textAlign:"left"},children:[
+    o("div",{className:"f ia minw0",style:{gap:11},children:[
+      t("span",{style:{fontSize:16,flexShrink:0},children:emoji}),
+      o("div",{className:"minw0",children:[
+        t("div",{style:{fontSize:13.5,fontWeight:600,color:c.tx},children:title}),
+        sub&&t("div",{style:{fontSize:10.5,color:c.tm,marginTop:2},children:sub})
+      ]})
+    ]}),
+    o("div",{className:"f ia",style:{gap:8,flexShrink:0},children:[
+      badge&&t("span",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.mt,background:c.mt+"22",borderRadius:6,padding:"2px 7px",letterSpacing:.4},children:badge}),
+      t(CR,{size:15,color:c.tm})
+    ]})
+  ]});
+  const linkCard=(rows)=>{const rs=rows.filter(Boolean);return t("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,overflow:"hidden"},children:rs})};
+  const subMgrCount=(()=>{const n=(data.groceryCategories||GROC_CATS_DEFAULT).reduce((a,id)=>a+grocSubsFor(id).length,0);return n})();
   const editorEl=editorOpen&&t(GroceryEditor,{data,editing,stores,itemNames,onSave:saveEntry,onDelete:delEntry,onClose:()=>{sEditorOpen(false);sEditing(null)}});
   const delConfirmEl=delId&&t(CSht,{title:"Delete this trip?",subtitle:"This also removes it from your Expense Tracker — this can't be undone.",onClose:()=>sDelId(null),onConfirm:doDeleteEntry,confirmLabel:"Delete",danger:true});
-  const storeMgrEl=showStoreMgr&&t(StoreManagerSht,{allGroc,expenses:data.expenses,persist,cur,onClose:()=>sShowStoreMgr(false)});
   const catMgrEl=showCatMgr&&t(GroceryCatSht,{data,persist,onClose:()=>sShowCatMgr(false)});
   const subMgrEl=showSubMgr&&t(GrocSubMgrSht,{data,persist,onClose:()=>sShowSubMgr(false)});
-  return o("div",{style:{padding:"8px 0 40px"},children:[
-    t(SH,{title:t("em",{children:"Groceries"}),onBack:onClose,right:gtab==="watch"?null:headerRight}),
+  const overlays=[editorEl,delConfirmEl,catMgrEl,subMgrEl];
+
+  // ---- Stores ---------------------------------------------------------------
+  if(screen==="stores")return o("div",{children:[t(GrocStoreMgr,{data,persist,allGroc,cur,onClose:()=>sScreen("settings")}),...overlays]});
+
+  // ---- Settings -------------------------------------------------------------
+  if(screen==="settings")return o("div",{style:{padding:"8px 0 40px"},children:[
+    t(SH,{title:t("em",{children:"Groceries settings"}),onBack:()=>sScreen("home")}),
     o("div",{style:{padding:"0 24px"},children:[
-      o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,marginBottom:12},children:[["trips","🧾 Trips"],["watch","🎯 Price watch"]].map(([k,lbl])=>{const on=gtab===k;return t("button",{key:k,onClick:()=>sGtab(k),className:"act95 tr",style:{flex:1,padding:"9px 0",background:on?c.mt:"transparent",color:on?"#0a0a0a":c.td,borderRadius:9,fontSize:12.5,fontWeight:on?700:400,border:"none"},children:lbl})})}),
-      gtab==="watch"?t(PriceWatchView,{data,persist,onView:onView||(()=>{})}):o(Fragment,{children:[
-      o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,marginBottom:12},children:["month","all"].map(s=>{const on=scope===s;return t("button",{key:s,onClick:()=>sScope(s),className:"act95 tr",style:{flex:1,padding:"9px 0",background:on?c.ac:"transparent",color:on?"#0a0a0a":c.td,borderRadius:9,fontSize:12.5,fontWeight:on?700:400,border:"none"},children:s==="month"?"By month":"All time"})})}),
-      scope==="month"&&o("div",{className:"f ia jb",style:{marginBottom:12},children:[t(IB,{onClick:()=>monShift(-1),children:t(CL,{size:18,color:c.tx})}),o("div",{className:"tc",children:[t("div",{style:{fontFamily:c.hf,fontSize:18,color:c.tx},children:monthLabel}),t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,marginTop:2},children:stat.trips+" trip"+(stat.trips===1?"":"s")})]}),t(IB,{onClick:()=>monShift(1),children:t(CR,{size:18,color:c.tx})})]}),
-      o("div",{className:"f",style:{gap:8,marginBottom:8},children:[tile("SPENT",fm(stat.total,cur),c.mt),tile("TRIPS",String(stat.trips)),tile("AVG / TRIP",fm(stat.avg,cur))]}),
-      o("div",{style:{marginBottom:12},children:[(prev&&prev.total>0)&&(()=>{const d=stat.total-prev.total;const up=d>0;return t("div",{style:{fontFamily:'var(--nf)',fontSize:10.5,color:up?c.co:c.mt,marginBottom:8,textAlign:"center"},children:(d===0?"—":(up?"▲ ":"▼ ")+fm(Math.abs(d),cur))+" vs last month"})})(),stat.saved>0&&o("div",{className:"f ia jb",style:{background:`linear-gradient(135deg,${c.mt}14,${c.sfg})`,border:`1px solid ${c.mt}44`,borderRadius:12,padding:"9px 12px"},children:[o("div",{className:"f ia",style:{gap:8},children:[t("span",{style:{fontSize:14},children:"🏷️"}),t("span",{style:{fontFamily:'var(--nf)',fontSize:10.5,color:c.tm,letterSpacing:.5},children:"SAVED VS MRP"})]}),o("div",{className:"f ia",style:{gap:8},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:13.5,fontWeight:700,color:c.mt},children:fm(stat.saved,cur)}),stat.discPct>=0.5&&t("span",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.mt,background:c.mt+"22",borderRadius:5,padding:"2px 6px"},children:stat.discPct.toFixed(0)+"% off"})]})]})]}),
-      o("button",{onClick:()=>sShowFilters(v=>!v),className:"w100 act95 tr f ia jb",style:{marginBottom:12,padding:"11px 13px",background:showFilters?c.ac+"14":c.sfg,border:`1px solid ${showFilters?c.ac+"55":c.brs}`,borderRadius:12,gap:10},children:[o("div",{className:"f ia",style:{gap:10,minWidth:0},children:[t(Srch,{size:15,color:showFilters?c.ac:c.tm}),o("div",{className:"tl minw0",children:[t("div",{style:{fontSize:13,fontWeight:600,color:c.tx},children:"Search & filters"}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:(q||storeF||catF)?"Filters active — tap to view":"Search, stores & price analytics"})]})]}),t("span",{style:{fontSize:14,color:c.tm,transform:showFilters?"rotate(90deg)":"none",transition:"transform .2s",display:"inline-block"},children:"›"})]}),
-      showFilters&&o(Fragment,{children:[
-      subF&&o("div",{className:"f ia jb",style:{gap:8,background:c.mt+"14",border:`1px solid ${c.mt}55`,borderRadius:12,padding:"9px 13px",marginBottom:10},children:[o("div",{className:"f ia minw0",style:{gap:7},children:[t("span",{style:{fontSize:13},children:"🧺"}),t("div",{className:"tru",style:{fontSize:12.5,color:c.tx},children:subF}),t("span",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,flexShrink:0},children:filtered.length+" trip"+(filtered.length===1?"":"s")})]}),t("button",{onClick:()=>sSubF(null),"aria-label":"Clear subcategory filter",className:"act95",style:{background:"transparent",border:"none",color:c.tm,display:"flex",flexShrink:0,padding:2},children:t(X,{size:14,color:c.tm})})]}),
-      o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${q?c.ac+"66":c.brs}`,borderRadius:12,padding:"11px 13px",marginBottom:10},children:[t(Srch,{size:15,color:q?c.ac:c.tm}),t("input",{value:q,onChange:e=>sQ(e.target.value),placeholder:"Search store, item, note, date…",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:14,fontFamily:'var(--tf)',minWidth:0}}),q&&t("button",{onClick:()=>sQ(""),style:{background:"transparent",border:"none",color:c.tm,display:"flex"},children:t(X,{size:14})})]}),
-      scopedStores.length>0&&o("div",{className:"f sx",style:{gap:6,marginBottom:14,overflowX:"auto"},children:[t("button",{onClick:()=>sStoreF(null),className:"act95 tr",style:{flexShrink:0,padding:"6px 12px",background:!storeF?c.ac:c.sf2,border:`1px solid ${!storeF?c.ac:c.brs}`,borderRadius:999,fontSize:11.5,color:!storeF?"#0a0a0a":c.td,fontWeight:!storeF?700:400,whiteSpace:"nowrap"},children:"All stores"}),...scopedStores.map((s,i)=>{const on=storeF&&storeF.toLowerCase()===s.toLowerCase();return t("button",{key:i,onClick:()=>sStoreF(on?null:s),className:"act95 tr",style:{flexShrink:0,padding:"6px 12px",background:on?c.mt+"26":c.sf2,border:`1px solid ${on?c.mt:c.brs}`,borderRadius:999,fontSize:11.5,color:on?c.mt:c.td,fontWeight:on?600:400,whiteSpace:"nowrap"},children:s})}),t("button",{onClick:()=>sShowStoreMgr(true),className:"act95 tr",style:{flexShrink:0,padding:"6px 12px",background:"transparent",border:`1px dashed ${c.brs}`,borderRadius:999,fontSize:11.5,color:c.tm,whiteSpace:"nowrap"},children:"✏️ Manage"})]}),
-      onView&&t("button",{onClick:()=>onView("groceryAnalytics"),className:"w100 act95 tr f ia jb",style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 13px",gap:10,marginBottom:10},children:[o("div",{className:"f ia",style:{gap:10},children:[t("span",{style:{fontSize:15},children:"📊"}),o("div",{className:"tl",children:[t("div",{style:{fontSize:13,fontWeight:600,color:c.tx},children:"Price analytics"}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:"Savings, trends, cheapest stores & ₹/unit"})]})]}),t(CR,{size:15,color:c.tm})]}),
-      t("button",{onClick:()=>sShowCatMgr(true),className:"w100 act95 tr f ia jb",style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 13px",gap:10,marginBottom:8},children:[o("div",{className:"f ia",style:{gap:10},children:[t("span",{style:{fontSize:15},children:"🏷️"}),o("div",{className:"tl",children:[t("div",{style:{fontSize:13,fontWeight:600,color:c.tx},children:"Categories in Groceries"}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:(data.groceryCategories||GROC_CATS_DEFAULT).length+" categor"+((data.groceryCategories||GROC_CATS_DEFAULT).length===1?"y":"ies")+" counted"})]})]}),t(CR,{size:15,color:c.tm})]}),
-      t("button",{onClick:()=>sShowSubMgr(true),className:"w100 act95 tr f ia jb",style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 13px",gap:10,marginBottom:14},children:[o("div",{className:"f ia",style:{gap:10},children:[t("span",{style:{fontSize:15},children:"🧺"}),o("div",{className:"tl",children:[t("div",{style:{fontSize:13,fontWeight:600,color:c.tx},children:"Grocery subcategories"}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:(()=>{const n=(data.groceryCategories||GROC_CATS_DEFAULT).reduce((a,id)=>a+grocSubsFor(id).length,0);return n+" bucket"+(n===1?"":"s")+" · default "+(grocDefSub(data,"groceries")||"none")})()})]})]}),t(CR,{size:15,color:c.tm})]})
-      ]}),
-      (scoped.length>0&&(storeBreak.length>1||catBreak.length>1||subBreak.length>1))&&(()=>{const isCat=breakBy==="cat";const isSub=breakBy==="sub";const baseRows=isCat?catBreak:isSub?subBreak:storeBreak;const rows=isSub&&subBreakQ.trim()?baseRows.filter(s=>String(s.id).toLowerCase().includes(subBreakQ.trim().toLowerCase())):baseRows;return o("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:"12px 14px",marginBottom:14},children:[o("div",{className:"f ia jb",style:{marginBottom:10,gap:8},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,letterSpacing:1.2},children:"WHERE YOU SPENT"}),o("div",{className:"f",style:{gap:2,padding:2,background:c.sf2,borderRadius:9,border:`1px solid ${c.brs}`},children:[["store","Stores"],["cat","Categories"],["sub","Subcategories"]].map(([k,lbl])=>{const on=breakBy===k;return t("button",{key:k,onClick:()=>{sBreakBy(k);if(k!=="sub")sSubBreakQ("")},className:"act95 tr",style:{padding:"4px 9px",background:on?c.ac:"transparent",color:on?"#0a0a0a":c.td,borderRadius:7,fontSize:10,fontWeight:on?700:500,border:"none",whiteSpace:"nowrap"},children:lbl})})})]}),isSub&&subBreak.length>6&&t("input",{value:subBreakQ,onChange:e=>sSubBreakQ(e.target.value),placeholder:"Search subcategory…",style:{width:"100%",boxSizing:"border-box",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:999,padding:"7px 12px",color:c.tx,fontSize:12,outline:"none",fontFamily:'var(--nf)',marginBottom:8}}),...rows.map((s,i)=>{const pct=stat.total>0?Math.round(s.total/stat.total*100):0;const ci=isCat?co(s.id):null;const label=isCat?(ci?ci.label:(s.id||"Other")):isSub?(s.id||"Uncategorised"):s.store;const on=isCat?(catF===s.id):isSub?(subF===s.id):(!!storeF&&storeF.toLowerCase()===s.store.toLowerCase());return o("button",{key:i,onClick:()=>{if(isCat)sCatF(on?null:s.id);else if(isSub)sSubF(on?null:s.id);else sStoreF(on?null:s.store)},className:"w100 act95 tr",style:{background:"transparent",border:"none",padding:"5px 0",marginTop:i?6:0,cursor:"pointer"},children:[o("div",{className:"f ia jb",style:{marginBottom:4},children:[o("div",{className:"f ia",style:{gap:6,minWidth:0},children:[isCat&&ci&&t("span",{style:{fontSize:12,flexShrink:0},children:ci.emoji}),t("div",{className:"tru",style:{fontSize:12.5,color:on?c.mt:c.td,minWidth:0},children:label}),isSub&&s.items>0&&t("span",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,flexShrink:0},children:s.items+"×"})]}),o("div",{className:"f ia",style:{gap:8,flexShrink:0},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm},children:pct+"%"}),t("span",{style:{fontFamily:'var(--nf)',fontSize:12.5,fontWeight:600,color:c.tx},children:fm(s.total,cur)})]})]}),t("div",{style:{height:5,borderRadius:999,background:c.sf2,overflow:"hidden"},children:t("div",{style:{height:"100%",width:pct+"%",background:c.mt,borderRadius:999}})})]})})]})})(),
-      itemNames.length>0&&o("div",{style:{marginBottom:14},children:[t("button",{onClick:()=>sShowInsight(v=>!v),className:"w100 act95 tr f ia jb",style:{background:c.sfg,border:`1px solid ${showInsight?c.ac+"55":c.brs}`,borderRadius:14,padding:"12px 14px",gap:10},children:[o("div",{className:"f ia",style:{gap:10,minWidth:0},children:[t("span",{style:{fontSize:16},children:"🔍"}),o("div",{className:"tl minw0",children:[t("div",{style:{fontSize:13.5,fontWeight:600,color:c.tx},children:"Item price explorer"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:"Compare an item's price across stores"})]})]}),t("span",{style:{fontSize:14,color:c.tm,transform:showInsight?"rotate(90deg)":"none",transition:"transform .2s",display:"inline-block"},children:"›"})]}),showInsight&&o("div",{style:{marginTop:8,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:"12px 14px"},children:[o("div",{className:"f ia",style:{gap:8,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"9px 12px"},children:[t(Srch,{size:14,color:c.tm}),t("input",{value:insightItem,list:"grocItemList",onChange:e=>sInsightItem(e.target.value),placeholder:"Type an item, e.g. Milk",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:13.5,fontFamily:'var(--tf)',minWidth:0}}),insightItem&&t("button",{onClick:()=>sInsightItem(""),style:{background:"transparent",border:"none",color:c.tm,display:"flex"},children:t(X,{size:13})})]}),insightSug.length>0&&o("div",{className:"f sx",style:{gap:6,marginTop:8,overflowX:"auto"},children:insightSug.map((n,i)=>t("button",{key:i,onClick:()=>sInsightItem(n),className:"act95 tr",style:{flexShrink:0,padding:"5px 10px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:999,fontSize:11.5,color:c.td,whiteSpace:"nowrap"},children:n}))}),insight&&insight.list.length>0&&o("div",{style:{marginTop:12},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1,marginBottom:8},children:insight.name.toUpperCase()+" · LATEST BY STORE"}),...insight.list.map((s,i)=>{const best=i===0;return o("div",{key:i,className:"f ia jb",style:{padding:"7px 0",borderTop:i?`1px solid ${c.brs}`:"none"},children:[o("div",{className:"f ia",style:{gap:8,minWidth:0},children:[best&&t("span",{style:{fontFamily:'var(--nf)',fontSize:8,color:c.mt,background:c.mt+"22",borderRadius:5,padding:"2px 6px",letterSpacing:.5,flexShrink:0},children:"CHEAPEST"}),t("div",{className:"tru",style:{fontSize:12.5,color:best?c.tx:c.td,fontWeight:best?600:400,minWidth:0},children:s.store})]}),o("div",{className:"trg",style:{flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:13,fontWeight:600,color:best?c.mt:c.tx},children:fm(s.latest,cur)}),(s.min<s.max)&&t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,marginTop:1},children:"range "+fm(s.min,cur)+"–"+fm(s.max,cur)})]})]})})]}),insightItem.trim()&&!insight&&t("div",{style:{marginTop:12,fontSize:12,color:c.tm,textAlign:"center",padding:"8px 0"},children:'No priced records for "'+insightItem.trim()+'" yet'})]})]}),
-      scoped.length>0&&o("div",{className:"f ia noprint",style:{gap:8,marginBottom:14},children:[t("button",{onClick:()=>exportGrocXlsx(exportTitle,filtered,cur),className:"act90 trt f ia jc f1",style:{gap:6,padding:"11px 0",background:c.ac,border:"none",borderRadius:12,fontSize:12,fontFamily:'var(--nf)',color:"#0a0a0a",fontWeight:600,letterSpacing:.5},children:[t(Dl,{size:13,color:"#0a0a0a"}),"EXCEL"]}),t("button",{onClick:()=>exportGrocPdf(exportTitle,filtered,cur),className:"act90 trt f ia jc f1",style:{gap:6,padding:"11px 0",background:c.sf3||c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,fontSize:12,fontFamily:'var(--nf)',color:c.tx,fontWeight:600,letterSpacing:.5},children:[t(Dl,{size:13,color:c.tx}),"PDF"]}),t("button",{onClick:()=>dlCSV(_safeName(exportTitle)+".csv",grocRows(filtered,cur)),className:"act90 trt f ia jc f1",style:{gap:6,padding:"11px 0",background:c.sf3||c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,fontSize:12,fontFamily:'var(--nf)',color:c.tx,fontWeight:600,letterSpacing:.5},children:[t(Dl,{size:13,color:c.tx}),"CSV"]})]}),
-      candidates.length>0&&o("div",{style:{marginBottom:14},children:[t("button",{onClick:()=>sShowLink(v=>!v),className:"w100 act95 tr f ia jb",style:{background:`linear-gradient(135deg,${c.sk}14,${c.sfg})`,border:`1px solid ${showLink?c.sk+"66":c.sk+"33"}`,borderRadius:14,padding:"12px 14px",gap:10},children:[o("div",{className:"f ia",style:{gap:10,minWidth:0},children:[t("span",{style:{fontSize:16},children:"🔗"}),o("div",{className:"tl minw0",children:[t("div",{style:{fontSize:13.5,fontWeight:600,color:c.tx},children:"Link supermarket bills"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:candidates.length+" expense"+(candidates.length===1?"":"s")+" to itemise"})]})]}),t("span",{style:{fontSize:14,color:c.tm,transform:showLink?"rotate(90deg)":"none",transition:"transform .2s",display:"inline-block"},children:"›"})]}),showLink&&o("div",{style:{marginTop:8,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,overflow:"hidden"},children:candidates.map((e,i)=>{const cat=co(e.category);const hasP=(e.photos||[]).length>0;return o("button",{key:e.id,onClick:()=>openEdit(e),className:"w100 act95 trc f ia",style:{gap:10,padding:"11px 13px",background:"transparent",border:"none",borderBottom:i===candidates.length-1?"none":`1px solid ${c.brs}`,textAlign:"left"},children:[t("div",{style:{width:34,height:34,borderRadius:10,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0},children:hasP?"🧾":cat.emoji}),o("div",{className:"f1 minw0",children:[t("div",{className:"tru",style:{fontSize:13,fontWeight:500,color:c.tx},children:e.merchant||e.note||cat.label}),o("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:[rd(e.date)," · ",cat.label,hasP?" · has bill":""]})]}),o("div",{className:"trg",style:{flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:13,fontWeight:600,color:c.tx},children:fm(e.amount||0,cur)}),t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.sk,marginTop:1},children:"ITEMISE →"})]})]})})})]}),
-      o("div",{className:"f ia jb",style:{marginBottom:10},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1},children:(storeF?storeF.toUpperCase()+" · ":catF?(((co(catF)&&co(catF).label)||catF).toUpperCase()+" · "):"")+filtered.length+" TRIP"+(filtered.length===1?"":"S")}),filtered.length>0&&t("div",{style:{fontFamily:'var(--nf)',fontSize:11,fontWeight:600,color:c.td},children:fm(filtered.reduce((s,e)=>s+(e.amount||0),0),cur)})]}),
-      filtered.length===0?o("div",{style:{textAlign:"center",padding:"44px 20px"},children:[t("div",{style:{fontSize:40,marginBottom:10},children:"🛒"}),t("div",{style:{fontSize:14,color:c.td,fontWeight:500,marginBottom:4},children:allGroc.length===0?"No grocery trips yet":((q||storeF||catF)?"No trips match":"Nothing this month")}),t("div",{style:{fontSize:12,color:c.tm,marginBottom:16,lineHeight:1.5},children:allGroc.length===0?"Log your first supermarket run — store, items, quantities and prices.":((q||storeF||catF)?"Try a different search or store.":"Tap + to log a trip, or switch to All time.")}),allGroc.length===0&&t("button",{onClick:openAdd,className:"act95 tr",style:{padding:"11px 20px",background:c.mt,border:"none",borderRadius:12,color:"#0a0a0a",fontSize:13,fontWeight:600},children:"+ Add first trip"})]}):(scope==="month"&&weekGroups)?t("div",{className:"f fc",style:{gap:18},children:weekGroups.map(g=>o("div",{key:g.wi,children:[
-        o("div",{className:"f ia jb",style:{marginBottom:8,padding:"0 2px"},children:[o("div",{className:"f ia",style:{gap:6},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:11,fontWeight:700,color:c.tx},children:g.label}),t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm},children:g.range}),t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm},children:"· "+g.items.length+" trip"+(g.items.length===1?"":"s")})]}),t("div",{style:{fontFamily:'var(--nf)',fontSize:11.5,fontWeight:600,color:c.td},children:fm(g.total,cur)})]}),
-        o("div",{className:"f fc",style:{gap:10},children:g.items.map(tripCard)})
-      ]}))}):t("div",{className:"f fc",style:{gap:10},children:filtered.map(tripCard)}),
-      ]}),
+      t("div",{style:{fontSize:11.5,color:c.tm,marginBottom:14,lineHeight:1.5},children:"Everything Groceries counts and classifies is yours to change — which categories are groceries, the buckets items sort into, and the stores you shop at."}),
+      linkCard([
+        linkRow("🏷️","Categories in Groceries",(data.groceryCategories||GROC_CATS_DEFAULT).length+" categor"+((data.groceryCategories||GROC_CATS_DEFAULT).length===1?"y":"ies")+" counted · add your own",()=>sShowCatMgr(true)),
+        linkRow("🧺","Grocery subcategories",subMgrCount+" bucket"+(subMgrCount===1?"":"s")+" · default "+(grocDefSub(data,"groceries")||"none"),()=>sShowSubMgr(true)),
+        linkRow("🏬","Stores & supermarkets",(()=>{const rs=grocStoreRows(data,allGroc);const d=grocDefStore(data);return rs.length+" store"+(rs.length===1?"":"s")+(d?" · default "+d:" · no default")})(),()=>sScreen("stores"),true)
+      ]),
+      t("div",{style:{fontSize:10.5,color:c.tm,marginTop:14,lineHeight:1.5,textAlign:"center"},children:"Subcategory lists are shared with Settings → Categories, so a list edited here is the list everywhere."})
     ]}),
-    editorOpen&&t(GroceryEditor,{data,editing,stores,itemNames,onSave:saveEntry,onDelete:delEntry,onClose:()=>{sEditorOpen(false);sEditing(null)}}),
-    delConfirmEl,storeMgrEl,catMgrEl,subMgrEl
+    ...overlays
+  ]});
+
+  // ---- Price watch ----------------------------------------------------------
+  if(screen==="watch")return o("div",{style:{padding:"8px 0 40px"},children:[
+    t(SH,{title:t("em",{children:"Price watch"}),onBack:()=>sScreen("home")}),
+    t("div",{style:{padding:"0 24px"},children:t(PriceWatchView,{data,persist,onView:onView||(()=>{})})}),
+    ...overlays
+  ]});
+
+  // ---- Item price explorer --------------------------------------------------
+  if(screen==="explorer")return o("div",{style:{padding:"8px 0 40px"},children:[
+    t(SH,{title:t("em",{children:"Item prices"}),onBack:()=>sScreen("home")}),
+    o("div",{style:{padding:"0 24px"},children:[
+      t("div",{style:{fontSize:11.5,color:c.tm,marginBottom:14,lineHeight:1.5},children:"Type an item you've bought before to see what each store last charged for it."}),
+      (itemNames&&itemNames.length>0)&&t("datalist",{id:"grocItemList",children:itemNames.slice(0,400).map((n,i)=>t("option",{key:i,value:n}))}),
+      o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${insightItem?c.ac+"66":c.brs}`,borderRadius:12,padding:"11px 13px"},children:[
+        t(Srch,{size:15,color:insightItem?c.ac:c.tm}),
+        t("input",{value:insightItem,list:"grocItemList",autoFocus:true,onChange:e=>sInsightItem(e.target.value),placeholder:"Type an item, e.g. Milk",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:14,fontFamily:'var(--tf)',minWidth:0}}),
+        insightItem&&t("button",{onClick:()=>sInsightItem(""),style:{background:"transparent",border:"none",color:c.tm,display:"flex"},children:t(X,{size:14})})
+      ]}),
+      insightSug.length>0&&t("div",{className:"f sx",style:{gap:6,marginTop:8,overflowX:"auto"},children:insightSug.map((n,i)=>t("button",{key:i,onClick:()=>sInsightItem(n),className:"act95 tr",style:{flexShrink:0,padding:"5px 10px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:999,fontSize:11.5,color:c.td,whiteSpace:"nowrap"},children:n}))}),
+      insight&&insight.list.length>0&&o("div",{style:{marginTop:14,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:"12px 14px"},children:[
+        t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1,marginBottom:8},children:insight.name.toUpperCase()+" · LATEST BY STORE"}),
+        ...insight.list.map((s,i)=>{const best=i===0;return o("div",{key:i,className:"f ia jb",style:{padding:"7px 0",borderTop:i?`1px solid ${c.brs}`:"none"},children:[
+          o("div",{className:"f ia",style:{gap:8,minWidth:0},children:[
+            best&&t("span",{style:{fontFamily:'var(--nf)',fontSize:8,color:c.mt,background:c.mt+"22",borderRadius:5,padding:"2px 6px",letterSpacing:.5,flexShrink:0},children:"CHEAPEST"}),
+            t("span",{style:{fontSize:13,flexShrink:0},children:grocStoreEmoji(data,s.store)}),
+            t("div",{className:"tru",style:{fontSize:12.5,color:best?c.tx:c.td,fontWeight:best?600:400,minWidth:0},children:s.store})
+          ]}),
+          o("div",{className:"trg",style:{flexShrink:0},children:[
+            t("div",{style:{fontFamily:'var(--nf)',fontSize:13,fontWeight:600,color:best?c.mt:c.tx},children:fm(s.latest,cur)}),
+            (s.min<s.max)&&t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,marginTop:1},children:"range "+fm(s.min,cur)+"–"+fm(s.max,cur)})
+          ]})
+        ]})})
+      ]}),
+      insightItem.trim()&&!insight&&t("div",{style:{marginTop:16,fontSize:12,color:c.tm,textAlign:"center",padding:"8px 0"},children:'No priced records for "'+insightItem.trim()+'" yet'})
+    ]}),
+    ...overlays
+  ]});
+
+  // ---- Link supermarket bills ----------------------------------------------
+  if(screen==="link")return o("div",{style:{padding:"8px 0 40px"},children:[
+    t(SH,{title:t("em",{children:"Link bills"}),onBack:()=>sScreen("home")}),
+    o("div",{style:{padding:"0 24px"},children:[
+      t("div",{style:{fontSize:11.5,color:c.tm,marginBottom:14,lineHeight:1.5},children:"Expenses that look like grocery runs but have no itemised breakdown yet. Tap one to itemise it — scan its bill, paste a list, or type the items."}),
+      candidates.length===0
+        ?t("div",{style:{textAlign:"center",padding:"40px 20px",fontSize:12.5,color:c.tm},children:"Nothing left to itemise."})
+        :t("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,overflow:"hidden"},children:candidates.map((e,i)=>{const cat=co(e.category);const hasP=(e.photos||[]).length>0;return o("button",{key:e.id,onClick:()=>openEdit(e),className:"w100 act95 trc f ia",style:{gap:10,padding:"11px 13px",background:"transparent",border:"none",borderBottom:i===candidates.length-1?"none":`1px solid ${c.brs}`,textAlign:"left"},children:[
+          t("div",{style:{width:34,height:34,borderRadius:10,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0},children:hasP?"🧾":cat.emoji}),
+          o("div",{className:"f1 minw0",children:[t("div",{className:"tru",style:{fontSize:13,fontWeight:500,color:c.tx},children:e.merchant||e.note||cat.label}),o("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:[rd(e.date)," · ",cat.label,hasP?" · has bill":""]})]}),
+          o("div",{className:"trg",style:{flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:13,fontWeight:600,color:c.tx},children:fm(e.amount||0,cur)}),t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.sk,marginTop:1},children:"ITEMISE →"})]})
+        ]})})})
+    ]}),
+    ...overlays
+  ]});
+
+  // ---- Trips ----------------------------------------------------------------
+  if(screen==="trips"){
+    const chip=(label,onClear)=>o("div",{key:label,className:"f ia",style:{gap:6,flexShrink:0,padding:"5px 10px",background:c.mt+"1e",border:`1px solid ${c.mt}55`,borderRadius:999},children:[
+      t("span",{className:"tru",style:{fontSize:11.5,color:c.mt,maxWidth:150},children:label}),
+      t("button",{onClick:onClear,"aria-label":"Clear "+label,className:"act95",style:{background:"transparent",border:"none",color:c.mt,display:"flex",padding:0},children:t(X,{size:12,color:c.mt})})
+    ]});
+    const activeChips=[
+      storeF&&chip(storeF,()=>sStoreF(null)),
+      typeF&&chip(typeF==="unregistered"?"Not in your list":grocTypeMeta(typeF).label,()=>sTypeF(null)),
+      catF&&chip((co(catF)&&co(catF).label)||catF,()=>sCatF(null)),
+      subF&&chip(subF,()=>sSubF(null))
+    ].filter(Boolean);
+    return o("div",{style:{padding:"8px 0 40px"},children:[
+      t(SH,{title:t("em",{children:"Trips"}),onBack:()=>sScreen("home"),right:addBtn}),
+      o("div",{style:{padding:"0 24px"},children:[
+        o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${q?c.ac+"66":c.brs}`,borderRadius:12,padding:"11px 13px",marginBottom:10},children:[
+          t(Srch,{size:15,color:q?c.ac:c.tm}),
+          t("input",{value:q,onChange:e=>sQ(e.target.value),placeholder:"Search store, item, note, date…",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:14,fontFamily:'var(--tf)',minWidth:0}}),
+          q&&t("button",{onClick:()=>sQ(""),style:{background:"transparent",border:"none",color:c.tm,display:"flex"},children:t(X,{size:14})})
+        ]}),
+        activeChips.length>0&&o("div",{className:"f sx ia",style:{gap:6,marginBottom:10,overflowX:"auto"},children:[...activeChips,t("button",{onClick:clearFilters,className:"act95 tr",style:{flexShrink:0,padding:"5px 11px",background:"transparent",border:`1px dashed ${c.brs}`,borderRadius:999,fontSize:11.5,color:c.tm,whiteSpace:"nowrap"},children:"Clear all"})]}),
+        scopedStores.length>0&&o("div",{className:"f sx",style:{gap:6,marginBottom:12,overflowX:"auto"},children:[
+          t("button",{onClick:()=>sStoreF(null),className:"act95 tr",style:{flexShrink:0,padding:"6px 12px",background:!storeF?c.ac:c.sf2,border:`1px solid ${!storeF?c.ac:c.brs}`,borderRadius:999,fontSize:11.5,color:!storeF?"#0a0a0a":c.td,fontWeight:!storeF?700:400,whiteSpace:"nowrap"},children:"All stores"}),
+          ...scopedStores.map((s,i)=>{const on=storeF&&grocSKey(storeF)===grocSKey(s);return t("button",{key:i,onClick:()=>sStoreF(on?null:s),className:"act95 tr",style:{flexShrink:0,padding:"6px 12px",background:on?c.mt+"26":c.sf2,border:`1px solid ${on?c.mt:c.brs}`,borderRadius:999,fontSize:11.5,color:on?c.mt:c.td,fontWeight:on?600:400,whiteSpace:"nowrap"},children:grocStoreEmoji(data,s)+" "+s})}),
+          t("button",{onClick:()=>sScreen("stores"),className:"act95 tr",style:{flexShrink:0,padding:"6px 12px",background:"transparent",border:`1px dashed ${c.brs}`,borderRadius:999,fontSize:11.5,color:c.tm,whiteSpace:"nowrap"},children:"✏️ Manage"})
+        ]}),
+        o("div",{className:"f ia jb",style:{marginBottom:10},children:[
+          t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1},children:(scope==="all"?"ALL TIME":monthLabel.toUpperCase())+" · "+filtered.length+" TRIP"+(filtered.length===1?"":"S")}),
+          filtered.length>0&&t("div",{style:{fontFamily:'var(--nf)',fontSize:11,fontWeight:600,color:c.td},children:fm(filtered.reduce((s,e)=>s+(e.amount||0),0),cur)})
+        ]}),
+        filtered.length===0
+          ?o("div",{style:{textAlign:"center",padding:"44px 20px"},children:[
+            t("div",{style:{fontSize:40,marginBottom:10},children:"🛒"}),
+            t("div",{style:{fontSize:14,color:c.td,fontWeight:500,marginBottom:4},children:allGroc.length===0?"No grocery trips yet":(anyFilter?"No trips match":"Nothing this month")}),
+            t("div",{style:{fontSize:12,color:c.tm,marginBottom:16,lineHeight:1.5},children:allGroc.length===0?"Log your first supermarket run — store, items, quantities and prices.":(anyFilter?"Try a different search or store.":"Tap + to log a trip, or switch to All time on the home screen.")}),
+            allGroc.length===0
+              ?t("button",{onClick:openAdd,className:"act95 tr",style:{padding:"11px 20px",background:c.mt,border:"none",borderRadius:12,color:"#0a0a0a",fontSize:13,fontWeight:600},children:"+ Add first trip"})
+              :anyFilter&&t("button",{onClick:clearFilters,className:"act95 tr",style:{padding:"11px 20px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,color:c.td,fontSize:13,fontWeight:500},children:"Clear filters"})
+          ]})
+          :t("div",{className:"f fc",style:{gap:18},children:storeGroups.map(g=>o("div",{key:g.key,children:[
+            storeGroups.length>1&&o("div",{className:"f ia jb",style:{marginBottom:8,padding:"0 2px",gap:8},children:[
+              o("div",{className:"f ia minw0",style:{gap:7},children:[
+                t("span",{style:{fontSize:13,flexShrink:0},children:grocStoreEmoji(data,g.name)}),
+                t("div",{className:"tru",style:{fontFamily:'var(--nf)',fontSize:11,fontWeight:700,color:c.tx,letterSpacing:.4,minWidth:0},children:g.name.toUpperCase()}),
+                t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,flexShrink:0},children:"· "+g.items.length+" trip"+(g.items.length===1?"":"s")})
+              ]}),
+              t("div",{style:{fontFamily:'var(--nf)',fontSize:11.5,fontWeight:600,color:c.td,flexShrink:0},children:fm(g.total,cur)})
+            ]}),
+            o("div",{className:"f fc",style:{gap:10},children:g.items.map(tripCard)})
+          ]}))}),
+        filtered.length>0&&o("div",{className:"f ia noprint",style:{gap:8,marginTop:18},children:[
+          t("button",{onClick:()=>exportGrocXlsx(exportTitle,filtered,cur),className:"act90 trt f ia jc f1",style:{gap:6,padding:"11px 0",background:c.ac,border:"none",borderRadius:12,fontSize:12,fontFamily:'var(--nf)',color:"#0a0a0a",fontWeight:600,letterSpacing:.5},children:[t(Dl,{size:13,color:"#0a0a0a"}),"EXCEL"]}),
+          t("button",{onClick:()=>exportGrocPdf(exportTitle,filtered,cur),className:"act90 trt f ia jc f1",style:{gap:6,padding:"11px 0",background:c.sf3||c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,fontSize:12,fontFamily:'var(--nf)',color:c.tx,fontWeight:600,letterSpacing:.5},children:[t(Dl,{size:13,color:c.tx}),"PDF"]}),
+          t("button",{onClick:()=>dlCSV(_safeName(exportTitle)+".csv",grocRows(filtered,cur)),className:"act90 trt f ia jc f1",style:{gap:6,padding:"11px 0",background:c.sf3||c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,fontSize:12,fontFamily:'var(--nf)',color:c.tx,fontWeight:600,letterSpacing:.5},children:[t(Dl,{size:13,color:c.tx}),"CSV"]})
+        ]})
+      ]}),
+      ...overlays
+    ]});
+  }
+
+  // ---- Home -----------------------------------------------------------------
+  const breakRows=(()=>{
+    const isCat=breakBy==="cat",isSub=breakBy==="sub",isType=breakBy==="type";
+    const base=isCat?catBreak:isSub?subBreak:isType?typeBreak:storeBreak;
+    return (isSub&&subBreakQ.trim())?base.filter(s=>String(s.id).toLowerCase().includes(subBreakQ.trim().toLowerCase())):base;
+  })();
+  const breakModes=[["store","Stores"],hasTypes&&["type","Types"],["cat","Category"],["sub","Subcategory"]].filter(Boolean);
+  return o("div",{style:{padding:"8px 0 40px"},children:[
+    t(SH,{title:t("em",{children:"Groceries"}),onBack:onClose,right:addBtn}),
+    o("div",{style:{padding:"0 24px"},children:[
+      o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,marginBottom:12},children:["month","all"].map(s=>{const on=scope===s;return t("button",{key:s,onClick:()=>sScope(s),className:"act95 tr",style:{flex:1,padding:"9px 0",background:on?c.ac:"transparent",color:on?"#0a0a0a":c.td,borderRadius:9,fontSize:12.5,fontWeight:on?700:400,border:"none"},children:s==="month"?"By month":"All time"})})}),
+      scope==="month"&&o("div",{className:"f ia jb",style:{marginBottom:12},children:[
+        t(IB,{onClick:()=>monShift(-1),children:t(CL,{size:18,color:c.tx})}),
+        o("div",{className:"tc",children:[
+          t("div",{style:{fontFamily:c.hf,fontSize:18,color:c.tx},children:monthLabel}),
+          t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,marginTop:2},children:stat.trips+" trip"+(stat.trips===1?"":"s")})
+        ]}),
+        t(IB,{onClick:()=>monShift(1),children:t(CR,{size:18,color:c.tx})})
+      ]}),
+      o("div",{className:"f",style:{gap:8,marginBottom:8},children:[tile("SPENT",fm(stat.total,cur),c.mt),tile("TRIPS",String(stat.trips)),tile("AVG / TRIP",fm(stat.avg,cur))]}),
+      o("div",{style:{marginBottom:14},children:[
+        (prev&&prev.total>0)&&(()=>{const d=stat.total-prev.total;const up=d>0;return t("div",{style:{fontFamily:'var(--nf)',fontSize:10.5,color:up?c.co:c.mt,marginBottom:8,textAlign:"center"},children:(d===0?"—":(up?"▲ ":"▼ ")+fm(Math.abs(d),cur))+" vs last month"})})(),
+        stat.saved>0&&o("div",{className:"f ia jb",style:{background:`linear-gradient(135deg,${c.mt}14,${c.sfg})`,border:`1px solid ${c.mt}44`,borderRadius:12,padding:"9px 12px"},children:[
+          o("div",{className:"f ia",style:{gap:8},children:[t("span",{style:{fontSize:14},children:"🏷️"}),t("span",{style:{fontFamily:'var(--nf)',fontSize:10.5,color:c.tm,letterSpacing:.5},children:"SAVED VS MRP"})]}),
+          o("div",{className:"f ia",style:{gap:8},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:13.5,fontWeight:700,color:c.mt},children:fm(stat.saved,cur)}),stat.discPct>=0.5&&t("span",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.mt,background:c.mt+"22",borderRadius:5,padding:"2px 6px"},children:stat.discPct.toFixed(0)+"% off"})]})
+        ]})
+      ]}),
+      (scoped.length>0&&(storeBreak.length>1||catBreak.length>1||subBreak.length>1))&&o("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:"12px 14px",marginBottom:16},children:[
+        t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,letterSpacing:1.2,marginBottom:8},children:"WHERE YOU SPENT"}),
+        o("div",{className:"f",style:{gap:2,padding:2,background:c.sf2,borderRadius:9,border:`1px solid ${c.brs}`,marginBottom:10},children:breakModes.map(([k,lbl])=>{const on=breakBy===k;return t("button",{key:k,onClick:()=>{sBreakBy(k);if(k!=="sub")sSubBreakQ("")},className:"act95 tr",style:{flex:1,minWidth:0,padding:"5px 3px",background:on?c.ac:"transparent",color:on?"#0a0a0a":c.td,borderRadius:7,fontSize:9.5,fontWeight:on?700:500,border:"none",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"},children:lbl})})}),
+        breakBy==="sub"&&subBreak.length>6&&t("input",{value:subBreakQ,onChange:e=>sSubBreakQ(e.target.value),placeholder:"Search subcategory…",style:{width:"100%",boxSizing:"border-box",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:999,padding:"7px 12px",color:c.tx,fontSize:12,outline:"none",fontFamily:'var(--nf)',marginBottom:8}}),
+        ...breakRows.map((s,i)=>{
+          const pct=stat.total>0?Math.round(s.total/stat.total*100):0;
+          const isCat=breakBy==="cat",isSub=breakBy==="sub",isType=breakBy==="type";
+          const ci=isCat?co(s.id):null;
+          const tym=isType?(s.id==="unregistered"?{label:"Not in your list",emoji:"🛒"}:grocTypeMeta(s.id)):null;
+          const label=isCat?(ci?ci.label:(s.id||"Other")):isSub?(s.id||"Uncategorised"):isType?tym.label:s.store;
+          const emoji=isCat&&ci?ci.emoji:isType?tym.emoji:!isSub?grocStoreEmoji(data,s.store):null;
+          // Tapping a row applies it as a filter and opens the trip list.
+          const apply=()=>{if(isCat)sCatF(s.id);else if(isSub)sSubF(s.id);else if(isType)sTypeF(s.id);else sStoreF(s.store);gotoTrips()};
+          return o("button",{key:i,onClick:apply,className:"w100 act95 tr",style:{background:"transparent",border:"none",padding:"5px 0",marginTop:i?6:0,cursor:"pointer"},children:[
+            o("div",{className:"f ia jb",style:{marginBottom:4},children:[
+              o("div",{className:"f ia",style:{gap:6,minWidth:0},children:[
+                emoji&&t("span",{style:{fontSize:12,flexShrink:0},children:emoji}),
+                t("div",{className:"tru",style:{fontSize:12.5,color:c.td,minWidth:0},children:label}),
+                isSub&&s.items>0&&t("span",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,flexShrink:0},children:s.items+"×"})
+              ]}),
+              o("div",{className:"f ia",style:{gap:8,flexShrink:0},children:[
+                t("span",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm},children:pct+"%"}),
+                t("span",{style:{fontFamily:'var(--nf)',fontSize:12.5,fontWeight:600,color:c.tx},children:fm(s.total,cur)})
+              ]})
+            ]}),
+            t("div",{style:{height:5,borderRadius:999,background:c.sf2,overflow:"hidden"},children:t("div",{style:{height:"100%",width:pct+"%",background:c.mt,borderRadius:999}})})
+          ]})
+        })
+      ]}),
+      LBL("SECTIONS"),
+      linkCard([
+        linkRow("🧾","Trips",scoped.length?scoped.length+" trip"+(scoped.length===1?"":"s")+" · "+fm(stat.total,cur):"Nothing logged in this period",gotoTrips,false,anyFilter?"FILTERED":null),
+        onView&&linkRow("📅","Calendar","Your trips on a month grid",()=>onView("groceryCalendar")),
+        onView&&linkRow("📊","Analytics","Savings, trends, cheapest stores & ₹/unit",()=>onView("groceryAnalytics")),
+        linkRow("🎯","Price watch","Target prices, alerts & check-ins",()=>sScreen("watch")),
+        itemNames.length>0&&linkRow("🔍","Item prices","Compare an item's price across stores",()=>sScreen("explorer")),
+        candidates.length>0&&linkRow("🔗","Link bills","Expenses waiting to be itemised",()=>sScreen("link"),false,String(candidates.length)),
+        linkRow("⚙️","Settings","Categories, subcategories & stores",()=>sScreen("settings"),true)
+      ])
+    ]}),
+    ...overlays
   ]});
 }
 function GroceryAnalytics({data,onClose}){
@@ -8921,7 +9324,7 @@ const onFile=async e=>{
   }
 };
 const tryRestore=()=>{try{const o2=JSON.parse(txt);if(!o2.expenses||!Array.isArray(o2.expenses))throw new Error("Invalid format — missing expenses array");sConf(o2)}catch(err){sMsg("Error: "+err.message)}};
-const doRestore=async()=>{const o2=conf;sMsg("Restoring…");await Promise.all([restoreStmtFiles(o2.statementFiles),restoreStmtFiles(o2.expensePhotos),restoreStmtFiles(o2.ledgerPhotos),restoreStmtFiles(o2.lasPhotos)].map(p=>p.catch(()=>{})));if(Array.isArray(o2.sidebarOrder)){try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2.sidebarOrder))}catch(e){}}persist({expenses:o2.expenses||[],recurring:o2.recurring||[],accounts:o2.accounts&&o2.accounts.length?o2.accounts:[DA],profiles:o2.profiles||[],cards:o2.cards||[],cardStatements:o2.cardStatements||[],bills:o2.bills||[],goals:o2.goals||[],budgetLoans:o2.budgetLoans||[],ledger:o2.ledger||[],categoryBudgets:o2.categoryBudgets||{},monthlyRestrictionLogs:o2.monthlyRestrictionLogs||[],investments:o2.investments||[],planThreshold:o2.planThreshold??null,customExpenseCategories:o2.customExpenseCategories||[],customIncomeCategories:o2.customIncomeCategories||[],categoryOverrides:o2.categoryOverrides||{},categoryOrder:o2.categoryOrder||{expense:[],income:[]},budget:o2.budget??null,budgetPeriod:o2.budgetPeriod||"monthly",...(o2.morningEnabled!=null?{morningEnabled:o2.morningEnabled,morningTime:o2.morningTime||"08:00",eveningEnabled:o2.eveningEnabled||false,eveningTime:o2.eveningTime||"21:00"}:{}),currency:o2.currency||"$",monthStartDay:o2.monthStartDay||1,merchantRules:o2.merchantRules||{},debtPlan:o2.debtPlan||null,las:o2.las||null,varExpensePlans:o2.varExpensePlans||{},varIncomePlans:o2.varIncomePlans||{},varSavingsPlans:o2.varSavingsPlans||{},advStats:o2.advStats||{},calculators:o2.calculators||{},groceryCategories:o2.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:o2.grocerySubDefaults||{},priceWatch:o2.priceWatch||PW_DEFAULT,threads:o2.threads||[],thresholdRules:o2.thresholdRules||[],netWorthSnapshots:o2.netWorthSnapshots||[]});try{if(o2.aiProvider)sProv(o2.aiProvider);if("aiModel" in o2)sMdl(o2.aiModel||null);sAK(null)}catch(e){}sConf(null);sMsg("✓ Restored. Re-enter your AI API key in Settings (keys are never stored in backups)"+(o2.statementFiles?" (statement PDFs included)":""));sTxt("")};
+const doRestore=async()=>{const o2=conf;sMsg("Restoring…");await Promise.all([restoreStmtFiles(o2.statementFiles),restoreStmtFiles(o2.expensePhotos),restoreStmtFiles(o2.ledgerPhotos),restoreStmtFiles(o2.lasPhotos)].map(p=>p.catch(()=>{})));if(Array.isArray(o2.sidebarOrder)){try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2.sidebarOrder))}catch(e){}}persist({expenses:o2.expenses||[],recurring:o2.recurring||[],accounts:o2.accounts&&o2.accounts.length?o2.accounts:[DA],profiles:o2.profiles||[],cards:o2.cards||[],cardStatements:o2.cardStatements||[],bills:o2.bills||[],goals:o2.goals||[],budgetLoans:o2.budgetLoans||[],ledger:o2.ledger||[],categoryBudgets:o2.categoryBudgets||{},monthlyRestrictionLogs:o2.monthlyRestrictionLogs||[],investments:o2.investments||[],planThreshold:o2.planThreshold??null,customExpenseCategories:o2.customExpenseCategories||[],customIncomeCategories:o2.customIncomeCategories||[],categoryOverrides:o2.categoryOverrides||{},categoryOrder:o2.categoryOrder||{expense:[],income:[]},budget:o2.budget??null,budgetPeriod:o2.budgetPeriod||"monthly",...(o2.morningEnabled!=null?{morningEnabled:o2.morningEnabled,morningTime:o2.morningTime||"08:00",eveningEnabled:o2.eveningEnabled||false,eveningTime:o2.eveningTime||"21:00"}:{}),currency:o2.currency||"$",monthStartDay:o2.monthStartDay||1,merchantRules:o2.merchantRules||{},debtPlan:o2.debtPlan||null,las:o2.las||null,varExpensePlans:o2.varExpensePlans||{},varIncomePlans:o2.varIncomePlans||{},varSavingsPlans:o2.varSavingsPlans||{},advStats:o2.advStats||{},calculators:o2.calculators||{},groceryCategories:o2.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:o2.grocerySubDefaults||{},groceryStores:o2.groceryStores||[],groceryDefaultStore:o2.groceryDefaultStore||"",priceWatch:o2.priceWatch||PW_DEFAULT,threads:o2.threads||[],thresholdRules:o2.thresholdRules||[],netWorthSnapshots:o2.netWorthSnapshots||[]});try{if(o2.aiProvider)sProv(o2.aiProvider);if("aiModel" in o2)sMdl(o2.aiModel||null);sAK(null)}catch(e){}sConf(null);sMsg("✓ Restored. Re-enter your AI API key in Settings (keys are never stored in backups)"+(o2.statementFiles?" (statement PDFs included)":""));sTxt("")};
 const prebuild=async()=>{try{const s=await window.storage.get(KB);if(!s){alert("No prebuild snapshot found");return}sTxt(s.value);sMsg("Loaded prebuild backup — review then tap Restore")}catch{alert("Error loading snapshot")}};
 return o("div",{style:{padding:`8px ${GUT}px 32px`},className:"st",children:[
   t(SH,{title:t("em",{children:"Backup & Restore"}),onBack:onClose}),
