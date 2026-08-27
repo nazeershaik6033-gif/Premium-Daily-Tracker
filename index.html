@@ -1102,9 +1102,9 @@ const NeuImg=({icon,onClick,size=44,col,style={}})=>t("button",{onClick,"aria-la
 // NeuBtn: pill button. flat=blue Synth CTA, else soft neumorphic platform. icon renders in a neumorphic "pit".
 const NeuBtn=({label,icon,onClick,flat=false,full=false,disabled=false,style={}})=>{const bg=flat?`linear-gradient(180deg,${c.sk} 0%,${c.sk}D9 100%)`:c.sfg;const fg=flat?"#fff":c.tx;return o("button",{onClick:disabled?null:onClick,disabled,className:`act98 f ia ${c.dk?("neu-press "+(flat?"neu-flat":"neu")):""}`,style:{gap:icon?12:0,justifyContent:icon?"flex-start":"center",width:full?"100%":"auto",padding:icon?"7px 20px 7px 7px":"13px 24px",borderRadius:999,background:bg,border:flat?"none":`1px solid ${c.brs}`,color:fg,fontFamily:c.hf,fontSize:15,fontWeight:600,opacity:disabled?0.5:1,...style},children:[icon&&t("span",{className:(c.dk?"neu-pit ":"")+"f ia jc",style:{width:38,height:38,borderRadius:999,background:flat?"rgba(0,0,0,0.18)":c.sf2,color:flat?"#fff":(c.dk?c.cu:c.ac),flexShrink:0},children:icon}),t("span",{children:label})]})};
 let _shtOpen=0;
-const Sht=({children,onClose})=>{
+const Sht=({children,onClose,footer})=>{
   useEffect(()=>{_shtOpen++;document.body.classList.add("sheet-open");return()=>{_shtOpen=Math.max(0,_shtOpen-1);if(_shtOpen===0)document.body.classList.remove("sheet-open")}},[]);
-  const pnl=useRef(null),scrim=useRef(null),dr=useRef(null),ov=useRef(null);
+  const pnl=useRef(null),body=useRef(null),scrim=useRef(null),dr=useRef(null),ov=useRef(null);
   // Same mobile-Safari fixed-position gap as the nav bar (see Nav below): inset:0
   // can leave the overlay short of the true visible viewport while the browser
   // chrome/keyboard is animating, exposing page content below the scrim. Only
@@ -1130,37 +1130,48 @@ const Sht=({children,onClose})=>{
     return()=>{timers.forEach(clearTimeout);vv.removeEventListener("resize",sync);vv.removeEventListener("scroll",sync);window.removeEventListener("orientationchange",sync)};
   },[]);
   // Drag-to-dismiss. Driven straight through the DOM rather than React state so
-  // the panel tracks the finger at frame rate. Only engages when the panel is
-  // scrolled to the top, otherwise it would fight the inner scroll.
+  // the panel tracks the finger at frame rate. Only engages when the scrollable
+  // body is scrolled to the top, otherwise it would fight the inner scroll.
   const H=()=>pnl.current?pnl.current.offsetHeight:1;
-  const down=e=>{const el=pnl.current;if(!el||el.scrollTop>0)return;
+  // Capturing the pointer on a tap into a text field fights the browser's own
+  // focus/keyboard handling (the input still focuses, but the page's
+  // scroll-into-view-above-keyboard jumps/re-settles) -- so leave form
+  // controls alone and let them handle their own taps natively.
+  const down=e=>{const el=body.current;if(!el||el.scrollTop>0)return;
+    if(e.target.closest('input,textarea,select,button,[contenteditable="true"]'))return;
     dr.current={y:e.clientY,t:performance.now(),ly:e.clientY,v:0,on:false};
     try{el.setPointerCapture(e.pointerId)}catch{}};
-  const move=e=>{const d=dr.current,el=pnl.current;if(!d||!el)return;
+  const move=e=>{const d=dr.current,panel=pnl.current;if(!d||!panel)return;
     const dy=e.clientY-d.y;
-    if(!d.on){if(dy<6)return;d.on=true;el.style.transition="none";el.style.animation="none"}
+    if(!d.on){if(dy<6)return;d.on=true;panel.style.transition="none";panel.style.animation="none"}
     const now=performance.now(),dt=now-d.t;
     if(dt>0){d.v=(e.clientY-d.ly)/dt;d.t=now;d.ly=e.clientY}
     const y=Math.max(0,dy);
-    el.style.transform="translate3d(0,"+y+"px,0)";
+    panel.style.transform="translate3d(0,"+y+"px,0)";
     if(scrim.current)scrim.current.style.opacity=String(Math.max(0,1-y/(H()*0.9)));};
-  const up=()=>{const d=dr.current,el=pnl.current;dr.current=null;
-    if(!d||!d.on||!el)return;
-    const y=parseFloat((el.style.transform.match(/,\s*(-?[\d.]+)px/)||[0,0])[1])||0;
+  const up=()=>{const d=dr.current,panel=pnl.current;dr.current=null;
+    if(!d||!d.on||!panel)return;
+    const y=parseFloat((panel.style.transform.match(/,\s*(-?[\d.]+)px/)||[0,0])[1])||0;
     // Either dragged far enough, or flicked hard enough to mean it.
     if(y>H()*0.32||d.v>0.55){onClose&&onClose();return}
-    el.style.transition="transform 420ms var(--sp-s)";
-    el.style.transform="translate3d(0,0,0)";
+    panel.style.transition="transform 420ms var(--sp-s)";
+    panel.style.transform="translate3d(0,0,0)";
     if(scrim.current){scrim.current.style.transition="opacity 300ms var(--ez)";scrim.current.style.opacity="1"}};
 
+  // Body scrolls independently inside a flex column, and an optional footer
+  // (the sheet's primary action button, most often) stays pinned below it --
+  // a tall sheet (many fields, photos, etc.) no longer buries that button
+  // past the bottom of the screen where a scroll gesture is needed to reach it.
   return t("div",{ref:ov,className:"fx f iend",style:{inset:0,zIndex:50},onClick:onClose,children:o(Fragment,{children:[
     t("div",{ref:scrim,className:"fx scrimin",style:{inset:0,background:c.dk?"rgba(0,0,0,.6)":"rgba(26,24,20,.34)",backdropFilter:"blur(5px)",WebkitBackdropFilter:"blur(5px)"}}),
     t("div",{ref:pnl,className:"w100 shn r",onClick:e=>e.stopPropagation(),
-      onPointerDown:down,onPointerMove:move,onPointerUp:up,onPointerCancel:up,
-      style:{maxWidth:AW,margin:"0 auto",maxHeight:"85vh",overflowY:"auto",background:c.sfg,borderTopLeftRadius:24,borderTopRightRadius:24,padding:"20px 24px 32px",borderTop:`1px solid ${c.br}`,touchAction:"pan-y",boxShadow:c.dk?"0 -12px 40px rgba(0,0,0,.5)":"0 -12px 40px rgba(92,80,58,.20)"},
+      style:{maxWidth:AW,margin:"0 auto",maxHeight:"85vh",display:"flex",flexDirection:"column",background:c.sfg,borderTopLeftRadius:24,borderTopRightRadius:24,paddingTop:20,borderTop:`1px solid ${c.br}`,boxShadow:c.dk?"0 -12px 40px rgba(0,0,0,.5)":"0 -12px 40px rgba(92,80,58,.20)"},
       children:o(Fragment,{children:[
-        t("div",{style:{width:40,height:4,margin:"0 auto 16px",borderRadius:999,background:c.br}}),
-        children
+        t("div",{style:{width:40,height:4,margin:"0 auto 16px",borderRadius:999,background:c.br,flexShrink:0}}),
+        t("div",{ref:body,onPointerDown:down,onPointerMove:move,onPointerUp:up,onPointerCancel:up,
+          style:{flex:1,minHeight:0,overflowY:"auto",padding:`0 24px ${footer?20:32}px`,touchAction:"pan-y",WebkitOverflowScrolling:"touch"},
+          children}),
+        footer&&t("div",{style:{flexShrink:0,padding:`14px 24px calc(env(safe-area-inset-bottom, 0px) + 20px)`,borderTop:`1px solid ${c.brs}`},children:footer})
       ]})})
   ]})});
 }
@@ -4545,7 +4556,7 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
           t("button",{"aria-label":"Delete entry",onClick:()=>sDelEntry({pid:selP.id,en}),className:"act90 trt",style:{width:36,height:36,borderRadius:10,background:c.sf2,border:`1px solid ${c.brs}`,color:c.co,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(X,{size:14})})
         ]})
       ]}))}),
-      entryFor&&t(Sht,{onClose:()=>{sEntryFor(null);sEditEntryId(null)},children:o(Fragment,{children:[
+      entryFor&&t(Sht,{onClose:()=>{sEntryFor(null);sEditEntryId(null)},footer:t("button",{disabled:!parseFloat(eAmt)||parseFloat(eAmt)<=0,onClick:()=>{try{const orig=selP&&editEntryId&&(selP.entries||[]).find(x=>x.id===editEntryId);((orig&&orig.photos)||[]).forEach(op=>{if(op&&op.id&&!ePhotos.some(p2=>p2.id===op.id))idbDelFile(String(op.id))})}catch(err){}const payload={kind:eKind,amount:parseFloat(eAmt),note:eNote,date:eDate?new Date(eDate).getTime():Date.now(),photos:ePhotos.map(photoPayload)};if(editEntryId)onEditEntry(entryFor,editEntryId,payload);else onAddEntry(entryFor,payload);sEntryFor(null);sEditEntryId(null)},className:"w100 act98 tr",style:{padding:"14px 0",background:parseFloat(eAmt)?c.ac:c.sf2,color:parseFloat(eAmt)?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:parseFloat(eAmt)?`${editEntryId?"Save":"Add"} ${kindLabel(eKind)} ${cashOut(eKind)?"−":"+"}${fm(parseFloat(eAmt),currency)}`:"Enter an amount"}),children:o(Fragment,{children:[
         t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:14},children:editEntryId?"Edit entry":"Add entry"}),
         // Grouped under the same two headers the detail-view action buttons use, instead
         // of a flat 4-up grid -- picking blind between "Lent"/"Received"/"Borrowed"/"Repaid"
@@ -4572,7 +4583,6 @@ function LendingDiary({data,onClose,onAddPerson,onUpdatePerson,onDeletePerson,on
           t("input",{ref:photoRef,type:"file",accept:"image/*",multiple:true,style:{display:"none"},onChange:e=>{addEntryPhotos(Array.from(e.target.files||[]));e.target.value=""}}),
           ePhotos.length===0?o("button",{onClick:()=>photoRef.current?.click(),className:"w100 f ia jc act98 trt",style:{gap:8,padding:"16px 0",border:`1px dashed ${c.br}`,borderRadius:12,color:c.td,fontSize:13,background:"transparent"},children:[t(Camera,{size:14})," Tap to add photo(s)"]}):t("div",{className:"f sx",style:{gap:8,paddingBottom:4,overflowX:"auto"},children:[...ePhotos.map((p,pi)=>o("div",{key:p.id,style:{flexShrink:0,position:"relative",width:80,height:80,borderRadius:10,overflow:"hidden",border:`1px solid ${c.brs}`},children:[entryPhotoSrc(p)?t("img",{src:entryPhotoSrc(p),alt:"",onClick:()=>sGallery({photos:ePhotos,idx:pi}),style:{width:"100%",height:"100%",objectFit:"cover",cursor:"pointer"}}):t("div",{style:{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",background:c.sf2,fontSize:20},children:"📷"}),t("button",{onClick:()=>removeEntryPhoto(p.id),style:{position:"absolute",top:3,right:3,width:20,height:20,borderRadius:6,background:"rgba(0,0,0,.7)",border:"none",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff"},children:t(X,{size:11})})]})),t("button",{key:"add",onClick:()=>photoRef.current?.click(),className:"act95 trt",style:{flexShrink:0,width:80,height:80,borderRadius:10,border:`1px dashed ${c.br}`,background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:c.tm},children:t(Plus,{size:20})})]})
         ]}),
-        t("button",{disabled:!parseFloat(eAmt)||parseFloat(eAmt)<=0,onClick:()=>{try{const orig=selP&&editEntryId&&(selP.entries||[]).find(x=>x.id===editEntryId);((orig&&orig.photos)||[]).forEach(op=>{if(op&&op.id&&!ePhotos.some(p2=>p2.id===op.id))idbDelFile(String(op.id))})}catch(err){}const payload={kind:eKind,amount:parseFloat(eAmt),note:eNote,date:eDate?new Date(eDate).getTime():Date.now(),photos:ePhotos.map(photoPayload)};if(editEntryId)onEditEntry(entryFor,editEntryId,payload);else onAddEntry(entryFor,payload);sEntryFor(null);sEditEntryId(null)},className:"w100 act98 tr",style:{padding:"14px 0",background:parseFloat(eAmt)?c.ac:c.sf2,color:parseFloat(eAmt)?"#0a0a0a":c.tm,borderRadius:12,fontWeight:600,fontSize:15,border:"none"},children:parseFloat(eAmt)?`${editEntryId?"Save":"Add"} ${kindLabel(eKind)} ${cashOut(eKind)?"−":"+"}${fm(parseFloat(eAmt),currency)}`:"Enter an amount"})
       ]})}),
       editP&&t(Sht,{onClose:()=>sEditP(null),children:o(Fragment,{children:[
         t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:14},children:"Edit person"}),
