@@ -1133,7 +1133,12 @@ const Sht=({children,onClose,footer})=>{
   // the panel tracks the finger at frame rate. Only engages when the scrollable
   // body is scrolled to the top, otherwise it would fight the inner scroll.
   const H=()=>pnl.current?pnl.current.offsetHeight:1;
+  // Capturing the pointer on a tap into a text field fights the browser's own
+  // focus/keyboard handling (the input still focuses, but the page's
+  // scroll-into-view-above-keyboard jumps/re-settles) -- so leave form
+  // controls alone and let them handle their own taps natively.
   const down=e=>{const el=body.current;if(!el||el.scrollTop>0)return;
+    if(e.target.closest('input,textarea,select,button,[contenteditable="true"]'))return;
     dr.current={y:e.clientY,t:performance.now(),ly:e.clientY,v:0,on:false};
     try{el.setPointerCapture(e.pointerId)}catch{}};
   const move=e=>{const d=dr.current,panel=pnl.current;if(!d||!panel)return;
