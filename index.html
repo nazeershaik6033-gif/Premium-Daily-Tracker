@@ -383,6 +383,7 @@ const Waves=_i("M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5s2.5 2 5 2 2.5-2 5-2","M2 12c
 const ArrowUpDown=_i("m21 16-4 4-4-4","M17 20V4","m3 8 4-4 4 4","M7 4v16");
 const GripV=(p={})=>ce("svg",{width:p.size||18,height:p.size||18,viewBox:"0 0 18 18",fill:p.color||"currentColor"},ce("circle",{cx:6,cy:4.5,r:1.3}),ce("circle",{cx:6,cy:9,r:1.3}),ce("circle",{cx:6,cy:13.5,r:1.3}),ce("circle",{cx:12,cy:4.5,r:1.3}),ce("circle",{cx:12,cy:9,r:1.3}),ce("circle",{cx:12,cy:13.5,r:1.3}));
 const Gear=_i("M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z",{c:[12,12,3]});
+const PaperClip=_i("M13.234 20.252 21 12.3a3.89 3.89 0 0 0 0-5.5 3.89 3.89 0 0 0-5.5 0l-8.4 8.6a2 2 0 0 0 0 2.83 2 2 0 0 0 2.83 0l7.6-7.78a1 1 0 0 0 0-1.41 1 1 0 0 0-1.41 0l-6.9 7.07");
 const AUR=ADR,Cog=Gear,Coins=Wallet,Flame=Zap,Banknote=Wallet,Paperclip=Clp,FileText=Clp,Receipt=Clp;
 
 const KS="expense-tracker-pro-v3",KB="expense-tracker-pro-v3-prebuild-backup",KK="etp-anthropic-api-key";
@@ -788,10 +789,11 @@ async function restoreStmtFiles(map){if(!map)return;const keys=Object.keys(map);
 // === EXPENSE PHOTO STORAGE (IndexedDB — keeps receipt images out of the localStorage quota) ===
 async function collectPhotoFiles(expenses){const out={};for(const e of (expenses||[])){for(const p of ((e&&e.photos)||[])){if(p&&p.id&&!p.data&&!out[p.id]){try{const b=await idbGetFile(String(p.id));if(b)out[p.id]={name:p.name||"photo.jpg",type:b.type||"image/jpeg",dataUrl:await _blobToDataUrl(b)}}catch(err){}}}}return out}
 async function collectLedgerPhotoFiles(ledger){const out={};for(const p2 of (ledger||[])){const refs=[...(p2.photo?[p2.photo]:[]),...((p2.entries||[]).flatMap(en=>en.photos||[]))];for(const p of refs){if(p&&p.id&&!p.data&&!out[p.id]){try{const b=await idbGetFile(String(p.id));if(b)out[p.id]={name:p.name||"photo.jpg",type:b.type||"image/jpeg",dataUrl:await _blobToDataUrl(b)}}catch(err){}}}}return out}
+async function collectThreadNoteFiles(threads){const out={};for(const th of (threads||[])){for(const n of ((th&&th.notes)||[])){for(const p of [...((n&&n.photos)||[]),...((n&&n.files)||[])]){if(p&&p.id&&!p.data&&!out[p.id]){try{const b=await idbGetFile(String(p.id));if(b)out[p.id]={name:p.name||"file",type:b.type||"application/octet-stream",dataUrl:await _blobToDataUrl(b)}}catch(err){}}}}}return out}
 async function collectLasPhotoFiles(las){const out={};for(const p of ((las&&las.docs)||[])){if(p&&p.id&&!p.data&&!out[p.id]){try{const b=await idbGetFile(String(p.id));if(b)out[p.id]={name:p.name||"doc.jpg",type:b.type||"image/jpeg",dataUrl:await _blobToDataUrl(b)}}catch(err){}}}return out}
 function usePhotoSrc(photos){const[map,sMap]=useState({});useEffect(()=>{let live=true;(async()=>{const need=(photos||[]).filter(p=>p&&p.id&&!p.data&&!map[p.id]);if(!need.length)return;const m={};for(const p of need){try{const b=await idbGetFile(String(p.id));if(b)m[p.id]=await _blobToDataUrl(b)}catch(e){}}if(live&&Object.keys(m).length)sMap(mm=>({...mm,...m}))})();return()=>{live=false}},[photos]);return p=>(p&&p.data)||map[p&&p.id]||null}
 function buildBackupObj(dd){let sidebarOrder=null;try{const s=localStorage.getItem(SB_ORDER_KEY);if(s)sidebarOrder=JSON.parse(s)}catch(e){}return{version:"v3.2",exportedAt:new Date().toISOString(),expenses:dd.expenses,recurring:dd.recurring,accounts:dd.accounts,profiles:dd.profiles,cards:dd.cards||[],cardStatements:dd.cardStatements||[],bills:dd.bills||[],goals:dd.goals||[],budgetLoans:dd.budgetLoans||[],ledger:dd.ledger||[],categoryBudgets:dd.categoryBudgets||{},monthlyRestrictionLogs:dd.monthlyRestrictionLogs||[],investments:dd.investments||[],planThreshold:dd.planThreshold??null,customExpenseCategories:dd.customExpenseCategories||[],customIncomeCategories:dd.customIncomeCategories||[],categoryOverrides:dd.categoryOverrides||{},categoryOrder:dd.categoryOrder||{expense:[],income:[]},sidebarOrder,budget:dd.budget,budgetPeriod:dd.budgetPeriod,morningEnabled:dd.morningEnabled||false,morningTime:dd.morningTime||"08:00",eveningEnabled:dd.eveningEnabled||false,eveningTime:dd.eveningTime||"21:00",currency:dd.currency,monthStartDay:dd.monthStartDay,aiProvider:gProv(),aiModel:gMdl()||null,merchantRules:dd.merchantRules||{},debtPlan:dd.debtPlan||null,las:dd.las||null,varExpensePlans:dd.varExpensePlans||{},varIncomePlans:dd.varIncomePlans||{},varSavingsPlans:dd.varSavingsPlans||{},advStats:dd.advStats||{},calculators:dd.calculators||{},groceryCategories:dd.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:dd.grocerySubDefaults||{},groceryStores:dd.groceryStores||[],groceryDefaultStore:dd.groceryDefaultStore||"",priceWatch:dd.priceWatch||PW_DEFAULT,threads:dd.threads||[],thresholdRules:dd.thresholdRules||[],netWorthSnapshots:dd.netWorthSnapshots||[]}}
-async function buildBackupJSON(dd,withFiles=true){const j=buildBackupObj(dd);if(withFiles){try{j.statementFiles=await collectStmtFiles(j.cardStatements)}catch(e){j.statementFiles={}}try{j.expensePhotos=await collectPhotoFiles(j.expenses)}catch(e){j.expensePhotos={}}try{j.ledgerPhotos=await collectLedgerPhotoFiles(j.ledger)}catch(e){j.ledgerPhotos={}}try{j.lasPhotos=await collectLasPhotoFiles(j.las)}catch(e){j.lasPhotos={}}}return JSON.stringify(j,null,2)}
+async function buildBackupJSON(dd,withFiles=true){const j=buildBackupObj(dd);if(withFiles){try{j.statementFiles=await collectStmtFiles(j.cardStatements)}catch(e){j.statementFiles={}}try{j.expensePhotos=await collectPhotoFiles(j.expenses)}catch(e){j.expensePhotos={}}try{j.ledgerPhotos=await collectLedgerPhotoFiles(j.ledger)}catch(e){j.ledgerPhotos={}}try{j.lasPhotos=await collectLasPhotoFiles(j.las)}catch(e){j.lasPhotos={}}try{j.threadFiles=await collectThreadNoteFiles(j.threads)}catch(e){j.threadFiles={}}}return JSON.stringify(j,null,2)}
 async function gdUpload(json){const token=localStorage.getItem("gd_token");if(!token)throw new Error("Not connected to Google Drive");const fname=`expense-backup-${new Date().toISOString().slice(0,10)}.json`;const meta=JSON.stringify({name:fname,mimeType:"application/json"});const form=new FormData();form.append("metadata",new Blob([meta],{type:"application/json"}));form.append("file",new Blob([json],{type:"application/json"}));const res=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{method:"POST",headers:{Authorization:"Bearer "+token},body:form});if(!res.ok){const txt=await res.text().catch(()=>res.status);throw new Error("Upload failed ("+res.status+"): "+txt)}}
 
 // === CSV EXPORT (card transactions) ===
@@ -1717,6 +1719,25 @@ function App(){
     return()=>{document.removeEventListener("visibilitychange",onVis);window.removeEventListener("focus",onVis);window.removeEventListener("pageshow",onVis)};
   },[]);
 
+  // Month-end home-screen snapshot. A PWA can't wake itself on the last day of the
+  // month, so the capture happens on the first open after the month closes and is
+  // back-dated to that month's final day. The first ever run backfills a year of
+  // history; after that only the month that just ended is considered.
+  const msnapRef=useRef(false);
+  useEffect(()=>{
+    if(d.loading||msnapRef.current)return;
+    msnapRef.current=true;
+    let due=[];try{due=msnapDue(d)}catch(e){return}
+    try{localStorage.setItem(MSNAP_SEED_KEY,"1")}catch(e){}
+    if(!due.length)return;
+    const notes=due.map(({y,m})=>{const s=buildMonthSnapshot(d,y,m);
+      return{id:"n_"+uid(),text:msnapText(s),parentId:null,photos:[],files:[],snap:s,createdAt:new Date(y,m+1,0,23,59,0).getTime()}});
+    const ths=d.threads||[],ex=ths.find(x=>x.system===MSNAP_SYS);
+    pstRef.current({threads:ex
+      ?ths.map(x=>x.id===ex.id?{...x,notes:[...(x.notes||[]),...notes]}:x)
+      :[{id:"th_"+uid(),system:MSNAP_SYS,name:"Monthly Snapshot",emoji:"📸",budget:null,notes,createdAt:Date.now()},...ths]});
+  },[d.loading]);
+
   const aE=(e)=>{const id=uid(),L=[{...e,id,type:e.type||"expense"},...d.expenses].sort((a,b)=>b.date-a.date);pst({expenses:L})};
   const aEMany=(arr)=>{if(!arr||!arr.length)return;const add=arr.map(e=>({...e,id:uid(),type:e.type||"expense",createdAt:e.createdAt||Date.now()}));const L=[...add,...d.expenses].sort((a,b)=>b.date-a.date);pst({expenses:L})};
   const sFE=({expense:e,makeRecurring:r,frequency:f,makeProfile:mp})=>{const id=uid();let rec=d.recurring,pf=d.profiles;
@@ -1732,9 +1753,27 @@ function App(){
   const chThread=(id,threadId)=>{const L=d.expenses.map(x=>x.id===id?{...x,threadId}:x);pst({expenses:L});sAtx(a=>a&&a.id===id?{...a,threadId}:a)};
   const aTh=(th)=>{const id="th_"+uid();pst({threads:[{...th,id,notes:[],createdAt:Date.now()},...(d.threads||[])]});return id};
   const uTh=(id,patch)=>pst({threads:(d.threads||[]).map(x=>x.id===id?{...x,...patch}:x)});
-  const dTh=(id)=>{pst({threads:(d.threads||[]).filter(x=>x.id!==id),expenses:d.expenses.map(e=>e.threadId===id?{...e,threadId:null}:e)});sThId(null);sV(navFromRef.current||"home")};
-  const addThNote=(threadId,text)=>pst({threads:(d.threads||[]).map(x=>x.id===threadId?{...x,notes:[{id:"n_"+uid(),text,createdAt:Date.now()},...(x.notes||[])]}:x)});
-  const delThNote=(threadId,noteId)=>pst({threads:(d.threads||[]).map(x=>x.id===threadId?{...x,notes:(x.notes||[]).filter(n=>n.id!==noteId)}:x)});
+  const dTh=(id)=>{const th=(d.threads||[]).find(x=>x.id===id);
+    for(const n of ((th&&th.notes)||[]))for(const a of thnAtt(n)){if(a&&a.id&&!a.data){try{idbDelFile(String(a.id))}catch(e){}}}
+    pst({threads:(d.threads||[]).filter(x=>x.id!==id),expenses:d.expenses.map(e=>e.threadId===id?{...e,threadId:null}:e)});sThId(null);sV(navFromRef.current||"home")};
+  const mapTh=(threadId,fn)=>pst({threads:(d.threads||[]).map(x=>x.id===threadId?fn(x):x)});
+  const addThNote=(threadId,note)=>{const n=typeof note==="string"?{text:note}:(note||{});
+    mapTh(threadId,x=>({...x,notes:thnInsert(x.notes||[],{id:"n_"+uid(),text:n.text||"",parentId:n.parentId||null,photos:n.photos||[],files:n.files||[],createdAt:Date.now()})}))};
+  const updThNote=(threadId,noteId,patch)=>mapTh(threadId,x=>({...x,notes:(x.notes||[]).map(n=>n.id===noteId?{...n,...patch}:n)}));
+  const setThNotes=(threadId,notes)=>mapTh(threadId,x=>({...x,notes}));
+  // Deleting a note takes its whole subtree, and the attachment blobs with it.
+  const delThNote=(threadId,noteId)=>{const th=(d.threads||[]).find(x=>x.id===threadId);if(!th)return;
+    const notes=th.notes||[],gone=new Set(thnSubtreeIds(notes,noteId));
+    for(const n of notes)if(gone.has(n.id))for(const a of thnAtt(n)){if(a&&a.id&&!a.data){try{idbDelFile(String(a.id))}catch(e){}}}
+    setThNotes(threadId,notes.filter(n=>!gone.has(n.id)))};
+  const snapshotNow=(threadId)=>{const now=new Date(),y=now.getFullYear(),m=now.getMonth(),key=msnapKey(y,m);
+    const th=(d.threads||[]).find(x=>x.id===threadId);if(!th)return{msg:"Thread not found."};
+    if(((th.notes||[]).some(n=>n&&n.snap&&n.snap.key===key)))return{msg:msnapLabel(y,m)+" is already captured. It refreshes automatically once the month closes."};
+    const s=buildMonthSnapshot(d,y,m);
+    if(!s.txCount)return{msg:"Nothing logged in "+msnapLabel(y,m)+" yet."};
+    const rec={...s,partial:true};
+    mapTh(threadId,x=>({...x,notes:thnInsert(x.notes||[],{id:"n_"+uid(),text:msnapText(rec),parentId:null,photos:[],files:[],snap:rec,createdAt:Date.now()})}));
+    return{msg:"Saved a snapshot of "+msnapLabel(y,m)+" so far."}};
   const dE=(id)=>{const e=d.expenses.find(x=>x.id===id);try{(e?.photos||[]).forEach(p=>p&&p.id&&idbDelFile(String(p.id)))}catch(err){}let L;if(e?.transferId)L=d.expenses.filter(x=>x.transferId!==e.transferId);else if(e?.type==="reimbursement")L=d.expenses.filter(x=>x.id!==id).map(x=>x.id===e.reimbFor?{...x,reimbursedBy:null,reimbursedAt:null,reimbursedAmount:null}:x);else if(e?.reimbursedBy)L=d.expenses.filter(x=>x.id!==id&&x.id!==e.reimbursedBy);else L=d.expenses.filter(x=>x.id!==id);pst({expenses:L});sAtx(null);sV(v)};
   const dT=({fromId,toId,amount,currency,date,note})=>{const id=uid(),tid="xfer_"+id;const out={id:"xo_"+id,type:"transfer-out",amount,currency,accountId:fromId,category:"other",merchant:"Transfer",note:note||null,date,source:"transfer",transferId:tid};const inE={id:"xi_"+id,type:"transfer-in",amount,currency,accountId:toId,category:"other",merchant:"Transfer",note:note||null,date,source:"transfer",transferId:tid};pst({expenses:[out,inE,...d.expenses].sort((a,b)=>b.date-a.date)});sV("accounts")};
   const aCP=({cardId,accountId,amount,date})=>{const cr=(d.cards||[]).find(x=>x.id===cardId),id=uid();const p={id:"cp_"+id,type:"card-payment",amount,currency:d.currency,accountId,cardId,category:"other",merchant:`${cr?.name||"Card"} payment`,note:"Credit card bill payment",date,source:"card-payment"};pst({expenses:[p,...d.expenses].sort((a,b)=>b.date-a.date)})};
@@ -1865,7 +1904,7 @@ function App(){
         v==="goals"&&t(Goals,{data:d,onClose:()=>sV(navFromRef.current),onAdd:()=>{sEGo(null);sV("newGoal")},onEdit:g=>{sEGo(g);sV("editGoal")},onDelete:dGo,onContribute:(g,amt)=>uGo({...g,currentBalance:(g.currentBalance||0)+amt})}),
         v==="newGoal"&&t(NewGoal,{data:d,onSave:g=>{aGo(g);sV("goals")},onCancel:()=>sV("goals")}),
         v==="editGoal"&&eGo&&t(NewGoal,{data:d,editing:eGo,onSave:g=>{uGo({...eGo,...g});sEGo(null);sV("goals")},onCancel:()=>{sEGo(null);sV("goals")}}),
-        v==="threadDetail"&&thId&&t(ThreadDetail,{data:d,threadId:thId,onClose:()=>{sThId(null);sV(navFromRef.current||"home")},onEdit:th=>{sETh(th);sV("editThread")},onDelete:dTh,onSelectExpense:e=>sAtx(e),onAddNote:addThNote,onDeleteNote:delThNote}),
+        v==="threadDetail"&&thId&&t(ThreadDetail,{data:d,threadId:thId,onClose:()=>{sThId(null);sV(navFromRef.current||"home")},onEdit:th=>{sETh(th);sV("editThread")},onDelete:dTh,onSelectExpense:e=>sAtx(e),onAddNote:addThNote,onUpdateNote:updThNote,onDeleteNote:delThNote,onSetNotes:setThNotes,onSnapshotNow:snapshotNow}),
         v==="newThread"&&t(NewThread,{data:d,onSave:th=>{const id=aTh(th);sThId(id);sV("threadDetail")},onCancel:()=>sV(navFromRef.current||"home")}),
         v==="editThread"&&eTh&&t(NewThread,{data:d,editing:eTh,onSave:th=>{uTh(eTh.id,th);sETh(null);sV("threadDetail")},onCancel:()=>{sETh(null);sV("threadDetail")}}),
         v==="investments"&&t(Investments,{data:d,onClose:()=>sV(navFromRef.current),onAdd:()=>{sEInv(null);sV("newInvestment")},onEdit:inv=>{sEInv(inv);sV("editInvestment")},onDelete:dInv,onUpdate:uInv,onAddExpense:aE,onView:sV}),
@@ -7883,36 +7922,313 @@ return o("div",{style:{padding:"8px 0 32px"},className:"st",children:[
   ]}),
 ]})}
 
-function ThreadDetail({data,threadId,onClose,onEdit,onDelete,onSelectExpense,onAddNote,onDeleteNote}){
+// === THREAD NOTES — tree model, attachments & monthly snapshots ===
+// Notes are a flat array with a parentId link, so any note can hold child notes to
+// any depth. Sibling order is array order; a node's descendants sit directly after
+// it, which keeps drag-reordering a single splice.
+const THN_MAX_DEPTH=6;
+const thnKids=(notes,pid)=>(notes||[]).filter(n=>(n.parentId||null)===(pid||null));
+function thnDesc(notes,id){const out=[];const walk=p=>{for(const n of (notes||[]))if((n.parentId||null)===p){out.push(n.id);walk(n.id)}};walk(id);return out}
+function thnDepth(notes,id){let d=0,cur=(notes||[]).find(n=>n.id===id);const seen=new Set();while(cur&&cur.parentId&&!seen.has(cur.id)){seen.add(cur.id);cur=(notes||[]).find(n=>n.id===cur.parentId);d++}return d}
+// Flatten to the rows actually on screen — a collapsed node hides its subtree.
+function thnFlat(notes,pid=null,depth=0,out=[]){for(const n of thnKids(notes,pid)){out.push({n,depth});if(!n.collapsed)thnFlat(notes,n.id,depth+1,out)}return out}
+const thnAtt=n=>[...((n&&n.photos)||[]),...((n&&n.files)||[])];
+function thnSubtreeIds(notes,id){return [id,...thnDesc(notes,id)]}
+// Move `id` (with its whole subtree) under newParentId, positioned right after
+// afterId — or first among its new siblings when afterId is null.
+function thnMove(notes,id,newParentId,afterId){
+  const subIds=new Set(thnSubtreeIds(notes,id));
+  if(newParentId&&subIds.has(newParentId))return notes; // never nest a node inside itself
+  const sub=notes.filter(n=>subIds.has(n.id)).map(n=>n.id===id?{...n,parentId:newParentId||null}:n);
+  const rest=notes.filter(n=>!subIds.has(n.id));
+  let idx;
+  if(afterId){const ai=rest.findIndex(n=>n.id===afterId);if(ai<0)idx=rest.length;else{const ds=new Set(thnDesc(rest,afterId));let j=ai+1;while(j<rest.length&&ds.has(rest[j].id))j++;idx=j}}
+  else if(newParentId){const pi=rest.findIndex(n=>n.id===newParentId);idx=pi<0?rest.length:pi+1}
+  else idx=0;
+  return [...rest.slice(0,idx),...sub,...rest.slice(idx)];
+}
+function thnIndent(notes,id){const n=(notes||[]).find(x=>x.id===id);if(!n)return notes;const sibs=thnKids(notes,n.parentId||null);const i=sibs.findIndex(s=>s.id===id);if(i<=0)return notes;const np=sibs[i-1];
+  const deepest=Math.max(...thnSubtreeIds(notes,id).map(k=>thnDepth(notes,k)));const grow=thnDepth(notes,np.id)+1-thnDepth(notes,id);
+  if(deepest+grow>=THN_MAX_DEPTH)return notes;
+  const kids=thnKids(notes,np.id);return thnMove(notes,id,np.id,kids.length?kids[kids.length-1].id:null)}
+function thnOutdent(notes,id){const n=(notes||[]).find(x=>x.id===id);if(!n||!n.parentId)return notes;const par=(notes||[]).find(x=>x.id===n.parentId);if(!par)return notes;return thnMove(notes,id,par.parentId||null,par.id)}
+// Insert a new note at the end of its sibling group so a thread reads top-down.
+function thnInsert(notes,note){const list=notes||[];const pid=note.parentId||null;
+  if(!pid)return [...list,note];
+  const pi=list.findIndex(n=>n.id===pid);if(pi<0)return [...list,{...note,parentId:null}];
+  const ds=new Set(thnDesc(list,pid));let j=pi+1;while(j<list.length&&ds.has(list[j].id))j++;
+  return [...list.slice(0,j),note,...list.slice(j)]}
+
+// Attachments reuse the app-wide IndexedDB blob store: JSON keeps only {id,name}.
+async function thnStorePhotos(files){const out=[];for(const f of Array.from(files||[])){if(!f||!f.type||!f.type.startsWith("image/"))continue;const d2=await resizeImg(f,1400,0.78);const pid="thp_"+uid();let ok=false;try{await idbPutFile(pid,_dataUrlToBlob(d2));ok=true}catch(e){}out.push(ok?{id:pid,name:f.name||null}:{id:pid,name:f.name||null,data:d2})}return out}
+async function thnStoreFiles(files){const ph=[],fl=[];for(const f of Array.from(files||[])){if(!f)continue;
+  if(f.type&&f.type.startsWith("image/")){ph.push(...await thnStorePhotos([f]));continue}
+  if(f.size>20e6){alert(`"${f.name}" is over 20MB — attach a smaller file.`);continue}
+  const fid="thf_"+uid();try{await idbPutFile(fid,f);fl.push({id:fid,name:f.name||"file",size:f.size||0,type:f.type||""})}catch(e){alert("Could not store "+(f.name||"that file")+".")}}
+  return{photos:ph,files:fl}}
+const thnFileSize=b=>!b?"":b<1024?b+" B":b<1048576?(b/1024).toFixed(0)+" KB":(b/1048576).toFixed(1)+" MB";
+const thnFileIcon=f=>{const n=((f&&f.name)||"").toLowerCase(),ty=(f&&f.type)||"";
+  if(ty.includes("pdf")||n.endsWith(".pdf"))return"📕";if(ty.includes("sheet")||/\.(xlsx?|csv|numbers)$/.test(n))return"📊";
+  if(ty.includes("word")||/\.(docx?|pages|rtf)$/.test(n))return"📘";if(ty.startsWith("audio/"))return"🎵";if(ty.startsWith("video/"))return"🎬";
+  if(/\.(zip|rar|7z|tar|gz)$/.test(n))return"🗜️";return"📄"};
+// Preserve line breaks (whiteSpace:pre-wrap on the container) and light **bold** + links.
+function thnInline(s){const parts=[];const re=/(\*\*[^*\n]+\*\*)|((?:https?:\/\/|www\.)[^\s<>"]+)/g;let last=0,m,k=0;
+  while((m=re.exec(s))){if(m.index>last)parts.push(s.slice(last,m.index));
+    if(m[1])parts.push(t("strong",{key:"b"+(k++),style:{fontWeight:700},children:m[1].slice(2,-2)}));
+    else{let u=m[2],tail="";const tm=u.match(/[.,;:!?)\]]+$/);if(tm){tail=tm[0];u=u.slice(0,-tail.length)}
+      parts.push(t("a",{key:"a"+(k++),href:u.startsWith("http")?u:"https://"+u,target:"_blank",rel:"noopener noreferrer",onClick:ev=>ev.stopPropagation(),style:{color:c.ac,textDecoration:"underline",wordBreak:"break-all"},children:u}));
+      if(tail)parts.push(tail)}
+    last=m.index+m[0].length}
+  if(last<s.length)parts.push(s.slice(last));
+  return parts.length?parts:[s]}
+
+// --- Monthly home-screen snapshot ---------------------------------------
+// A PWA can't wake itself on the last day of the month, so the snapshot is written
+// on the first open after the month closes and back-dated to that month's final day.
+const MSNAP_SYS="monthlySnapshot",MSNAP_SEED_KEY="etp-msnap-seeded";
+const msnapKey=(y,m)=>y+"-"+String(m+1).padStart(2,"0");
+const msnapLabel=(y,m)=>new Date(y,m,1).toLocaleDateString("en-US",{month:"long",year:"numeric"});
+function buildMonthSnapshot(d,y,m){
+  const start=new Date(y,m,1).getTime(),end=new Date(y,m+1,1).getTime();
+  const all=d.expenses||[],inMon=all.filter(e=>e.date>=start&&e.date<end&&!e.archived);
+  const spentList=inMon.filter(e=>e.type==="expense");
+  const spent=spentList.reduce((s,e)=>s+netAmt(e),0);
+  const income=inMon.filter(e=>e.type==="income").reduce((s,e)=>s+e.amount,0);
+  const catMap={};for(const e of spentList)catMap[e.category]=(catMap[e.category]||0)+netAmt(e);
+  const cats=Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([id,amt])=>{const k=co(id)||{};return{id,label:k.label||id,emoji:k.emoji||"•",amt}});
+  const upto=all.filter(e=>e.date<end);
+  const accounts=(d.accounts||[]).map(a=>({name:a.name,emoji:a.emoji||"🏦",balance:ab(a,upto,d.openingBalances)}));
+  const invested=(d.investments||[]).reduce((s,i)=>s+(Number(i.invested)||0),0);
+  const invCur=(d.investments||[]).reduce((s,i)=>s+invCurrent(i),0);
+  const budget=Number(d.budget)||0;
+  return{key:msnapKey(y,m),label:msnapLabel(y,m),currency:d.currency||"₹",spent,income,net:income-spent,txCount:inMon.length,
+    budget,budgetPct:budget>0?Math.round((spent/budget)*100):null,cats,accounts,invested,invCur,capturedAt:Date.now()}}
+const msnapText=s=>`📸 ${s.label} — spent ${fm(s.spent,s.currency)} · income ${fm(s.income,s.currency)} · ${s.txCount} entr${s.txCount===1?"y":"ies"}`;
+// Which closed months still need a snapshot. The first ever run backfills up to a
+// year of history; after that only the month that just ended is considered.
+function msnapDue(d){
+  let seeded=false;try{seeded=localStorage.getItem(MSNAP_SEED_KEY)==="1"}catch(e){}
+  const th=(d.threads||[]).find(x=>x.system===MSNAP_SYS);
+  const have=new Set((((th&&th.notes)||[]).filter(n=>n&&n.snap&&n.snap.key)).map(n=>n.snap.key));
+  const now=new Date(),out=[];
+  for(let i=seeded?1:12;i>=1;i--){const dt=new Date(now.getFullYear(),now.getMonth()-i,1),y=dt.getFullYear(),m=dt.getMonth();
+    if(have.has(msnapKey(y,m)))continue;
+    const start=new Date(y,m,1).getTime(),end=new Date(y,m+1,1).getTime();
+    if(!(d.expenses||[]).some(e=>e.date>=start&&e.date<end))continue;
+    out.push({y,m})}
+  return out}
+// Thumbnails + file chips for one note. Photos open in the shared zoom gallery;
+// files open through a blob URL from the IndexedDB store.
+function ThnAtts({photos,files,onOpenPhoto,onRemove,size=58}){
+  const ph=photos||[],fl=files||[];const getSrc=usePhotoSrc(ph);
+  if(!ph.length&&!fl.length)return null;
+  return o("div",{style:{marginTop:8},children:[
+    ph.length>0&&t("div",{className:"f fw",style:{gap:6},children:ph.map((p,i)=>o("div",{key:p.id||i,style:{position:"relative",width:size,height:size,flexShrink:0},children:[
+      (()=>{const src=getSrc(p);return src
+        ?t("img",{src,alt:p.name||"",onClick:()=>onOpenPhoto&&onOpenPhoto(ph,i),style:{width:"100%",height:"100%",objectFit:"cover",borderRadius:9,border:`1px solid ${c.brs}`,cursor:"pointer",display:"block"}})
+        :t("div",{style:{width:"100%",height:"100%",borderRadius:9,background:c.sf2,border:`1px solid ${c.brs}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*0.4},children:"📷"})})(),
+      onRemove&&t("button",{onClick:()=>onRemove("photo",p.id),"aria-label":"Remove photo",style:{position:"absolute",top:-5,right:-5,width:19,height:19,borderRadius:999,background:c.ro,color:"#fff",border:`1.5px solid ${c.sfg}`,display:"flex",alignItems:"center",justifyContent:"center",padding:0,cursor:"pointer"},children:t(X,{size:10,strokeWidth:3})}),
+    ]}))}),
+    fl.length>0&&t("div",{className:"f fw",style:{gap:6,marginTop:ph.length?6:0},children:fl.map((f,i)=>o("div",{key:f.id||i,className:"f ia",style:{gap:6,maxWidth:"100%",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:9,padding:"6px 9px"},children:[
+      t("span",{style:{fontSize:14,flexShrink:0},children:thnFileIcon(f)}),
+      o("button",{onClick:()=>{if(f.data){const a=document.createElement("a");a.href=f.data;a.download=f.name||"file";a.click()}else idbOpenFile(String(f.id)).then(ok=>{if(!ok)alert("That file is no longer stored on this device.")})},className:"f1 minw0 tl",style:{background:"transparent",border:"none",padding:0,color:"inherit",cursor:"pointer"},children:[
+        t("div",{className:"tru",style:{fontSize:11.5,color:c.tx,maxWidth:150},children:f.name||"File"}),
+        f.size?t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm},children:thnFileSize(f.size)}):null]}),
+      onRemove&&t("button",{onClick:()=>onRemove("file",f.id),"aria-label":"Remove file",style:{background:"transparent",border:"none",color:c.tm,padding:2,display:"flex",flexShrink:0,cursor:"pointer"},children:t(X,{size:12})}),
+    ]}))}),
+  ]})
+}
+
+// Shared composer — used both for adding a note (root or reply) and for editing one.
+function ThnEditor({initText="",initPhotos=[],initFiles=[],placeholder,submitLabel="Add",autoFocus,onSubmit,onCancel}){
+  const[text,sText]=useState(initText);
+  const[photos,sPhotos]=useState(initPhotos);
+  const[files,sFiles]=useState(initFiles);
+  const[busy,sBusy]=useState(false);
+  const camRef=useRef(null),galRef=useRef(null),docRef=useRef(null);
+  const addedRef=useRef([]); // blobs stored during this session, dropped if cancelled
+  const taRef=useRef(null);
+  useEffect(()=>{if(autoFocus&&taRef.current)taRef.current.focus()},[autoFocus]);
+  const takePhotos=async fl=>{if(!fl||!fl.length)return;sBusy(true);try{const ps=await thnStorePhotos(fl);addedRef.current.push(...ps.map(p=>p.id));sPhotos(x=>[...x,...ps])}catch(e){alert("Could not attach that photo.")}sBusy(false)};
+  const takeFiles=async fl=>{if(!fl||!fl.length)return;sBusy(true);try{const r=await thnStoreFiles(fl);addedRef.current.push(...r.photos.map(p=>p.id),...r.files.map(f=>f.id));if(r.photos.length)sPhotos(x=>[...x,...r.photos]);if(r.files.length)sFiles(x=>[...x,...r.files])}catch(e){alert("Could not attach that file.")}sBusy(false)};
+  const removeAtt=(kind,id)=>{if(addedRef.current.includes(id)){try{idbDelFile(String(id))}catch(e){}addedRef.current=addedRef.current.filter(x=>x!==id)}
+    if(kind==="photo")sPhotos(x=>x.filter(p=>p.id!==id));else sFiles(x=>x.filter(f=>f.id!==id))};
+  const canSave=!!text.trim()||photos.length>0||files.length>0;
+  const submit=()=>{if(!canSave||busy)return;addedRef.current=[];onSubmit({text:text.trim(),photos,files});sText("");sPhotos([]);sFiles([])};
+  const cancel=()=>{addedRef.current.forEach(id=>{try{idbDelFile(String(id))}catch(e){}});addedRef.current=[];onCancel&&onCancel()};
+  const iconBtn=(icon,label,onClick)=>t("button",{onClick,title:label,"aria-label":label,className:"act90 trt",style:{width:34,height:34,borderRadius:9,background:c.sf2,border:`1px solid ${c.brs}`,color:c.td,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,cursor:"pointer"},children:icon});
+  return o("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,padding:12},children:[
+    t("textarea",{ref:taRef,value:text,onChange:ev=>sText(ev.target.value),
+      onKeyDown:ev=>{if(ev.key==="Enter"&&(ev.metaKey||ev.ctrlKey)){ev.preventDefault();submit()}if(ev.key==="Escape"&&onCancel){ev.preventDefault();cancel()}},
+      placeholder:placeholder||"Jot something down…",rows:Math.min(10,Math.max(2,text.split("\n").length+1)),
+      style:{width:"100%",boxSizing:"border-box",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px",color:c.tx,fontSize:13,lineHeight:1.5,outline:"none",fontFamily:'var(--tf)',resize:"vertical",display:"block"}}),
+    t(ThnAtts,{photos,files,onRemove:removeAtt,size:50}),
+    o("div",{className:"f ia jb",style:{gap:8,marginTop:10},children:[
+      o("div",{className:"f ia",style:{gap:6},children:[
+        iconBtn(t(Camera,{size:15}),"Take a photo",()=>camRef.current&&camRef.current.click()),
+        iconBtn(t(ImgIc,{size:15}),"Add photos",()=>galRef.current&&galRef.current.click()),
+        iconBtn(t(PaperClip,{size:15}),"Attach a file",()=>docRef.current&&docRef.current.click()),
+        busy&&t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm},children:"attaching…"}),
+      ]}),
+      o("div",{className:"f ia",style:{gap:6},children:[
+        onCancel&&t("button",{onClick:cancel,className:"act95 tr",style:{padding:"9px 12px",background:"transparent",color:c.tm,borderRadius:9,border:`1px solid ${c.brs}`,fontSize:12.5,cursor:"pointer"},children:"Cancel"}),
+        t("button",{disabled:!canSave||busy,onClick:submit,className:"act95 tr",style:{padding:"9px 16px",background:canSave&&!busy?c.ac:c.sf2,color:canSave&&!busy?"#0a0a0a":c.tm,borderRadius:9,border:"none",fontSize:12.5,fontWeight:600,flexShrink:0,cursor:canSave&&!busy?"pointer":"default"},children:submitLabel}),
+      ]}),
+    ]}),
+    t("input",{ref:camRef,type:"file",accept:"image/*",capture:"environment",multiple:true,onChange:ev=>{takePhotos(ev.target.files);ev.target.value=""},style:{display:"none"}}),
+    t("input",{ref:galRef,type:"file",accept:"image/*",multiple:true,onChange:ev=>{takePhotos(ev.target.files);ev.target.value=""},style:{display:"none"}}),
+    t("input",{ref:docRef,type:"file",multiple:true,onChange:ev=>{takeFiles(ev.target.files);ev.target.value=""},style:{display:"none"}}),
+  ]})
+}
+
+// A month-end capture of the home screen's numbers, rendered as a card.
+function ThnSnapCard({snap:s}){
+  const cur=s.currency||"₹";
+  const row=(label,val,col)=>o("div",{className:"f ia jb",style:{gap:10,padding:"5px 0"},children:[
+    t("span",{style:{fontSize:11.5,color:c.tm},children:label}),
+    t("span",{style:{fontFamily:'var(--nf)',fontSize:12.5,fontWeight:600,color:col||c.tx},children:val})]});
+  return o("div",{style:{background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 13px",marginTop:2},children:[
+    o("div",{className:"f ia jb",style:{gap:8,marginBottom:8},children:[
+      o("div",{className:"f ia",style:{gap:7,minWidth:0},children:[t("span",{style:{fontSize:15},children:"📸"}),t("div",{className:"tru",style:{fontFamily:c.hf,fontSize:16,color:c.tx},children:s.label})]}),
+      t("span",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1,flexShrink:0},children:s.partial?"MONTH TO DATE":"MONTH END"})]}),
+    o("div",{className:"f",style:{gap:8,marginBottom:8},children:[
+      o("div",{style:{flex:1,background:c.sfg,borderRadius:10,padding:"9px 10px",border:`1px solid ${c.brs}`},children:[
+        t("div",{style:{fontFamily:'var(--nf)',fontSize:8.5,color:c.tm,letterSpacing:1},children:"SPENT"}),
+        t("div",{style:{fontFamily:'var(--nf)',fontSize:17,fontWeight:300,color:c.co,letterSpacing:-.5,marginTop:2},children:fm(s.spent,cur)})]}),
+      o("div",{style:{flex:1,background:c.sfg,borderRadius:10,padding:"9px 10px",border:`1px solid ${c.brs}`},children:[
+        t("div",{style:{fontFamily:'var(--nf)',fontSize:8.5,color:c.tm,letterSpacing:1},children:"INCOME"}),
+        t("div",{style:{fontFamily:'var(--nf)',fontSize:17,fontWeight:300,color:c.mt,letterSpacing:-.5,marginTop:2},children:fm(s.income,cur)})]}),
+    ]}),
+    row("Net",(s.net>=0?"+":"")+fm(s.net,cur),s.net>=0?c.mt:c.co),
+    s.budgetPct!=null&&row("Budget used",s.budgetPct+"% of "+fm(s.budget,cur),s.budgetPct>100?c.ro:c.tx),
+    row("Entries logged",String(s.txCount)),
+    (s.cats||[]).length>0&&o("div",{style:{marginTop:8,paddingTop:8,borderTop:`1px solid ${c.brs}`},children:[
+      t("div",{style:{fontFamily:'var(--nf)',fontSize:8.5,color:c.tm,letterSpacing:1,marginBottom:5},children:"TOP CATEGORIES"}),
+      ...s.cats.map(k=>o("div",{key:k.id,className:"f ia jb",style:{gap:8,padding:"3px 0"},children:[
+        o("span",{className:"tru",style:{fontSize:11.5,color:c.td},children:[k.emoji," ",k.label]}),
+        t("span",{style:{fontFamily:'var(--nf)',fontSize:11.5,color:c.tx,flexShrink:0},children:fm(k.amt,cur)})]}))]}),
+    (s.accounts||[]).length>0&&o("div",{style:{marginTop:8,paddingTop:8,borderTop:`1px solid ${c.brs}`},children:[
+      t("div",{style:{fontFamily:'var(--nf)',fontSize:8.5,color:c.tm,letterSpacing:1,marginBottom:5},children:"BALANCES AT MONTH END"}),
+      ...s.accounts.map((a,i)=>o("div",{key:i,className:"f ia jb",style:{gap:8,padding:"3px 0"},children:[
+        o("span",{className:"tru",style:{fontSize:11.5,color:c.td},children:[a.emoji," ",a.name]}),
+        t("span",{style:{fontFamily:'var(--nf)',fontSize:11.5,color:a.balance<0?c.co:c.tx,flexShrink:0},children:fm(a.balance,cur)})]}))]}),
+    s.invCur>0&&o("div",{className:"f ia jb",style:{gap:8,marginTop:8,paddingTop:8,borderTop:`1px solid ${c.brs}`},children:[
+      t("span",{style:{fontSize:11.5,color:c.tm,flexShrink:0},children:"Investments"}),
+      o("span",{className:"tr",style:{fontFamily:'var(--nf)',fontSize:11,color:c.tx,textAlign:"right",whiteSpace:"nowrap"},children:[fm(s.invCur,cur),t("span",{style:{color:c.tm},children:" of "+fm(s.invested,cur)})]})]}),
+  ]})
+}
+
+function ThreadDetail({data,threadId,onClose,onEdit,onDelete,onSelectExpense,onAddNote,onUpdateNote,onDeleteNote,onSetNotes,onSnapshotNow}){
   const th=(data.threads||[]).find(x=>x.id===threadId);
   const[delConfirm,sDelConfirm]=useState(false);
-  const[noteText,sNoteText]=useState("");
+  const[editId,sEditId]=useState(null);
+  const[replyTo,sReplyTo]=useState(null);
+  const[delNote,sDelNote]=useState(null);
+  const[reorder,sReorder]=useState(false);
+  const[gallery,sGallery]=useState(null);
+  const[dragId,sDragId]=useState(null),[overIdx,sOverIdx]=useState(null);
+  const dragRef=useRef({active:false});
   if(!th)return o("div",{style:{padding:`8px ${GUT}px 32px`},className:"st",children:[t(SH,{title:t("em",{children:"Thread"}),onBack:onClose}),t(ES,{title:t("em",{children:"Thread not found"}),subtitle:"It may have been deleted."})]});
   const currency=data.currency;
   const entries=(data.expenses||[]).filter(e=>e.threadId===threadId).sort((a,b)=>b.date-a.date);
   const notes=th.notes||[];
+  const isSnapThread=th.system===MSNAP_SYS;
   const total=entries.filter(e=>e.type==="expense").reduce((s,e)=>s+netAmt(e),0);
   const pct=th.budget?Math.max(0,Math.min(100,(total/th.budget)*100)):null;
   const over=th.budget&&total>th.budget;
   const barCol=over?c.ro:c.ac;
   const totalCount=entries.length+notes.length;
-  const submitNote=()=>{const v=noteText.trim();if(!v)return;onAddNote(threadId,v);sNoteText("")};
+  const rows=thnFlat(notes);
+  const openPhoto=(photos,idx)=>sGallery({photos,idx});
+  const dropAt=()=>{const{id,list,lastOver}=dragRef.current;dragRef.current={active:false};sDragId(null);sOverIdx(null);
+    if(!id||lastOver==null||!list)return;
+    const prev=lastOver>0?list[lastOver-1]:null;
+    if(prev&&prev.n.id===id)return;
+    onSetNotes(threadId,thnMove(notes,id,prev?(prev.n.parentId||null):null,prev?prev.n.id:null))};
+  // In reorder mode the dragged node's own subtree is excluded, so it can never be
+  // dropped inside itself.
+  const reorderList=(()=>{if(!dragId)return rows;const sub=new Set(thnSubtreeIds(notes,dragId));return rows.filter(r=>!sub.has(r.n.id))})();
+  const noteRow=({n,depth})=>{
+    const kids=thnKids(notes,n.id);
+    const editing=editId===n.id;
+    return o("div",{key:n.id,style:{paddingLeft:depth*16,borderTop:`1px solid ${c.brs}`},children:[
+      o("div",{className:"f",style:{gap:n.snap&&!kids.length?4:8,padding:"11px 13px 11px "+(depth?10:13)+"px",borderLeft:depth?`1px solid ${c.brs}`:"none"},children:[
+        (n.snap&&!kids.length)?null:t("button",{onClick:()=>kids.length&&onUpdateNote(threadId,n.id,{collapsed:!n.collapsed}),"aria-label":kids.length?(n.collapsed?"Expand":"Collapse"):"",
+          style:{width:18,height:18,marginTop:1,flexShrink:0,background:"transparent",border:"none",padding:0,display:"flex",alignItems:"center",justifyContent:"center",color:kids.length?c.td:c.tm,cursor:kids.length?"pointer":"default"},
+          children:kids.length?t(CR,{size:13,style:{transform:n.collapsed?"none":"rotate(90deg)",transition:"transform 150ms"}}):t("span",{style:{fontSize:16,lineHeight:1,opacity:.5},children:"·"})}),
+        editing
+          ?t("div",{className:"f1 minw0",children:t(ThnEditor,{initText:n.text||"",initPhotos:n.photos||[],initFiles:n.files||[],submitLabel:"Save",autoFocus:true,placeholder:"Edit this note…",
+              onSubmit:v=>{onUpdateNote(threadId,n.id,{text:v.text,photos:v.photos,files:v.files,updatedAt:Date.now()});sEditId(null)},onCancel:()=>sEditId(null)})})
+          :o("div",{className:"f1 minw0",children:[
+              n.snap?t(ThnSnapCard,{snap:n.snap})
+                :n.text?t("div",{style:{fontSize:13,color:c.tx,lineHeight:1.5,whiteSpace:"pre-wrap",wordBreak:"break-word"},children:thnInline(n.text)})
+                :t("div",{style:{fontSize:12.5,color:c.tm,fontStyle:"italic"},children:"(attachment only)"}),
+              t(ThnAtts,{photos:n.photos,files:n.files,onOpenPhoto:openPhoto}),
+              o("div",{className:"f ia fw",style:{gap:10,marginTop:6},children:[
+                o("span",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm},children:[agoStr(n.createdAt),n.updatedAt?" · edited":""]}),
+                n.collapsed&&kids.length>0&&t("span",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.ac},children:kids.length+(kids.length===1?" reply hidden":" replies hidden")}),
+              ]}),
+              replyTo===n.id&&t("div",{style:{marginTop:9},children:t(ThnEditor,{placeholder:"Add a note under this one…",submitLabel:"Add",autoFocus:true,
+                onSubmit:v=>{onAddNote(threadId,{...v,parentId:n.id});if(n.collapsed)onUpdateNote(threadId,n.id,{collapsed:false});sReplyTo(null)},onCancel:()=>sReplyTo(null)})}),
+            ]}),
+        !editing&&o("div",{className:"f",style:{gap:1,flexShrink:0,alignSelf:"flex-start"},children:[
+          depth<THN_MAX_DEPTH-1&&t("button",{onClick:()=>{sReplyTo(x=>x===n.id?null:n.id);sEditId(null)},title:"Add a note under this one","aria-label":"Add a sub-note",className:"act90 trt",style:{padding:5,background:"transparent",border:"none",color:replyTo===n.id?c.ac:c.tm,cursor:"pointer"},children:t(Plus,{size:14})}),
+          t("button",{onClick:()=>{sEditId(n.id);sReplyTo(null)},title:"Edit","aria-label":"Edit note",className:"act90 trt",style:{padding:5,background:"transparent",border:"none",color:c.tm,cursor:"pointer"},children:t(Pencil,{size:13})}),
+          t("button",{onClick:()=>sDelNote(n),title:"Delete","aria-label":"Delete note",className:"act90 trt",style:{padding:5,background:"transparent",border:"none",color:c.tm,cursor:"pointer"},children:t(X,{size:14})}),
+        ]}),
+      ]}),
+    ]})};
   return o("div",{style:{padding:`8px ${GUT}px 32px`},className:"st",children:[
     t(SH,{title:t("em",{children:th.name}),onBack:onClose,right:o("div",{className:"f",style:{gap:4},children:[t("button",{onClick:()=>onEdit(th),className:"act90 trt",style:{padding:8,background:"transparent",border:"none",color:c.tm},children:t(Pencil,{size:16})}),t("button",{onClick:()=>sDelConfirm(true),className:"act90 trt",style:{padding:8,background:"transparent",border:"none",color:c.tm},children:t(Trash2,{size:16})})]})}),
     o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:20},children:[
       o("div",{className:"f ia",style:{gap:12,marginBottom:14},children:[t("div",{style:{width:42,height:42,borderRadius:11,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0},children:th.emoji||"🧵"}),o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:16,fontWeight:600,color:c.tx},children:th.name}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:`${totalCount} entr${totalCount===1?"y":"ies"}`})]})]}),
-      o("div",{className:"f ib jb",style:{marginBottom:th.budget?6:0},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:28,fontWeight:300,color:barCol,letterSpacing:-1},children:fm(total,currency)}),th.budget&&t("span",{style:{fontFamily:'var(--nf)',fontSize:14,fontWeight:600,color:barCol},children:pct.toFixed(0)+"%"})]}),
+      !(isSnapThread&&!entries.length)&&o("div",{className:"f ib jb",style:{marginBottom:th.budget?6:0},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:28,fontWeight:300,color:barCol,letterSpacing:-1},children:fm(total,currency)}),th.budget&&t("span",{style:{fontFamily:'var(--nf)',fontSize:14,fontWeight:600,color:barCol},children:pct.toFixed(0)+"%"})]}),
       th.budget&&t("div",{style:{height:8,background:c.sf2,borderRadius:999,overflow:"hidden",marginBottom:8},children:t("div",{style:{width:pct+"%",height:"100%",background:`linear-gradient(90deg,${barCol} 0%,${barCol}cc 100%)`,transition:"width 600ms cubic-bezier(0.2,0.9,0.2,1)"}})}),
       th.budget&&t("div",{style:{fontSize:11,color:c.tm,fontFamily:'var(--nf)',letterSpacing:.3},children:over?`${fm(total-th.budget,currency)} OVER BUDGET`:`${fm(th.budget-total,currency)} LEFT OF ${fm(th.budget,currency)}`}),
     ]}),
-    t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:"NOTES"}),
-    o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:14,marginBottom:12},children:[
-      o("div",{className:"f ia",style:{gap:8},children:[t("input",{type:"text",value:noteText,onChange:ev=>sNoteText(ev.target.value),onKeyDown:ev=>{if(ev.key==="Enter")submitNote()},placeholder:"Jot something down…",style:{flex:1,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px",color:c.tx,fontSize:13,outline:"none",fontFamily:'var(--tf)'}}),t("button",{disabled:!noteText.trim(),onClick:submitNote,className:"act95 tr",style:{padding:"10px 14px",background:noteText.trim()?c.ac:c.sf2,color:noteText.trim()?"#0a0a0a":c.tm,borderRadius:10,border:"none",fontSize:13,fontWeight:600,flexShrink:0},children:"Add"})]}),
+    o("div",{className:"f ia jb",style:{marginBottom:10,gap:8},children:[
+      o("div",{className:"f ia",style:{gap:7,minWidth:0},children:[
+        t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5},children:"NOTES"}),
+        notes.length>0&&t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm},children:"· "+notes.length})]}),
+      o("div",{className:"f ia",style:{gap:6,flexShrink:0},children:[
+        isSnapThread&&onSnapshotNow&&!reorder&&t("button",{onClick:()=>{const r=onSnapshotNow(threadId);if(r&&r.msg)alert(r.msg)},title:"Capture this month now",className:"act90 trt",style:{padding:"5px 10px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:9,color:c.td,fontSize:11,cursor:"pointer"},children:"📸 Snapshot now"}),
+        notes.length>1&&t("button",{onClick:()=>{sReorder(r=>!r);sEditId(null);sReplyTo(null)},title:reorder?"Done reordering":"Reorder notes","aria-label":"Reorder notes",className:"act90 trt",style:{width:32,height:32,borderRadius:9,background:reorder?c.ac+"20":"transparent",color:reorder?c.ac:c.tm,border:reorder?`1px solid ${c.ac}40`:`1px solid ${c.brs}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"},children:t(ArrowUpDown,{size:14})}),
+      ]}),
     ]}),
-    notes.length===0?t("div",{style:{fontSize:12,color:c.tm,textAlign:"center",padding:"8px 0 20px"},children:"No notes yet — jot down appointments, reminders, or anything worth remembering."}):o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden",marginBottom:20},children:notes.map((n,i)=>o("div",{key:n.id,className:"f ia jb",style:{padding:"12px 14px",borderBottom:i===notes.length-1?"none":`1px solid ${c.brs}`,gap:10},children:[o("div",{className:"f1 minw0",children:[t("div",{style:{fontSize:13,color:c.tx,lineHeight:1.4,wordBreak:"break-word"},children:n.text}),t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,marginTop:4},children:agoStr(n.createdAt)})]}),t("button",{onClick:()=>onDeleteNote(threadId,n.id),className:"act90 trt",style:{padding:6,background:"transparent",border:"none",color:c.tm,flexShrink:0},children:t(X,{size:14})})]}))}),
+    reorder
+      ?o("div",{style:{marginBottom:20},children:[
+          t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.ac,letterSpacing:.5,marginBottom:10,padding:"8px 11px",background:c.ac+"12",borderRadius:10,border:`1px solid ${c.ac}30`},children:"Drag the grip to move a note (it lands under the note above it). Use ⇤ and ⇥ to change its level."}),
+          t("div",{style:{display:"flex",flexDirection:"column",gap:6},
+            onPointerDown:ev=>{const g=ev.target.closest("[data-grip-id]");if(!g)return;ev.currentTarget.setPointerCapture(ev.pointerId);const id=g.getAttribute("data-grip-id");const sub=new Set(thnSubtreeIds(notes,id));const list=rows.filter(r=>!sub.has(r.n.id));const at=rows.findIndex(r=>r.n.id===id);dragRef.current={active:true,id,list,lastOver:Math.max(0,Math.min(at,list.length))};sDragId(id);sOverIdx(dragRef.current.lastOver)},
+            onPointerMove:ev=>{if(!dragRef.current.active)return;const its=ev.currentTarget.querySelectorAll("[data-row-idx]");let k=its.length;for(let j=0;j<its.length;j++){const r=its[j].getBoundingClientRect();if(ev.clientY<r.top+r.height/2){k=j;break}}
+              if(dragRef.current.lastOver!==k){dragRef.current.lastOver=k;sOverIdx(k)}},
+            onPointerUp:dropAt,onPointerCancel:()=>{dragRef.current={active:false};sDragId(null);sOverIdx(null)},
+            children:reorderList.map((r,i)=>o("div",{key:r.n.id,"data-row-idx":i,style:{marginLeft:r.depth*16},children:[
+              overIdx===i&&t("div",{style:{height:2,background:c.ac,borderRadius:2,marginBottom:4}}),
+              o("div",{className:"f ia",style:{gap:8,background:dragId===r.n.id?c.ac+"14":c.sfg,border:`1px solid ${dragId===r.n.id?c.ac:c.brs}`,borderRadius:11,padding:"9px 10px",opacity:dragId===r.n.id?.6:1,transition:"background .15s,border-color .15s"},children:[
+                t("div",{"data-grip-id":r.n.id,style:{color:c.td,cursor:"grab",touchAction:"none",padding:"2px 3px",flexShrink:0},children:t(GripV,{size:16})}),
+                t("div",{className:"f1 minw0 tru",style:{fontSize:12.5,color:c.tx},children:(r.n.snap?r.n.snap.label+" snapshot":(r.n.text||"").split("\n")[0])||"(attachment only)"}),
+                thnAtt(r.n).length>0&&t("span",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,flexShrink:0},children:"📎"+thnAtt(r.n).length}),
+                t("button",{onClick:()=>onSetNotes(threadId,thnOutdent(notes,r.n.id)),disabled:!r.n.parentId,title:"Move out one level","aria-label":"Outdent",style:{width:28,height:28,borderRadius:8,background:c.sf2,border:`1px solid ${c.brs}`,color:r.n.parentId?c.td:c.tm,opacity:r.n.parentId?1:.4,flexShrink:0,cursor:r.n.parentId?"pointer":"default",fontSize:13},children:"⇤"}),
+                t("button",{onClick:()=>onSetNotes(threadId,thnIndent(notes,r.n.id)),title:"Make it a sub-note","aria-label":"Indent",style:{width:28,height:28,borderRadius:8,background:c.sf2,border:`1px solid ${c.brs}`,color:c.td,flexShrink:0,cursor:"pointer",fontSize:13},children:"⇥"}),
+              ]}),
+              i===reorderList.length-1&&overIdx===reorderList.length&&t("div",{style:{height:2,background:c.ac,borderRadius:2,marginTop:4}}),
+            ]}))}),
+        ]})
+      :o(Fragment,{children:[
+          t("div",{style:{marginBottom:12},children:t(ThnEditor,{placeholder:"Jot something down…  (Enter for a new line)",submitLabel:"Add",onSubmit:v=>onAddNote(threadId,{...v,parentId:null})})}),
+          notes.length===0
+            ?t("div",{style:{fontSize:12,color:c.tm,textAlign:"center",padding:"8px 0 20px",lineHeight:1.5},children:"No notes yet — jot down appointments, reminders, or anything worth remembering. Attach photos or files, and use + on a note to nest sub-notes under it."})
+            :t("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden",marginBottom:20},children:rows.map(noteRow)}),
+        ]}),
     t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:"EXPENSES"}),
     entries.length===0?t(ES,{title:t("em",{children:"No entries yet"}),subtitle:"Tag an expense to this thread from its detail view to see it here."}):o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden"},children:entries.map((e,i)=>{const cat=co(e.category);return o("button",{key:e.id,onClick:()=>onSelectExpense(e),className:"w100 f ia act99 trt",style:{padding:"12px 14px",borderBottom:i===entries.length-1?"none":`1px solid ${c.brs}`,background:"transparent",border:"none",color:"inherit",gap:12,textAlign:"left"},children:[t("span",{style:{fontSize:18,flexShrink:0},children:cat.emoji}),o("div",{className:"f1 minw0",children:[t("div",{className:"tru",style:{fontSize:13,fontWeight:500,color:c.tx},children:e.merchant||e.payee||e.note||cat.label}),t("div",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.tm},children:rd(e.date)})]}),t("div",{style:{fontFamily:'var(--nf)',fontSize:14,fontWeight:600,flexShrink:0},children:fm(e.amount,e.currency||currency)})]})})}),
-    delConfirm&&t(CSht,{onClose:()=>sDelConfirm(false),title:"Delete this thread?",subtitle:"Entries stay in your expenses — they just won't be grouped under this thread anymore.",onConfirm:()=>{onDelete(threadId);sDelConfirm(false)},confirmLabel:"Delete"}),
+    gallery&&t(GalleryViewer,{photos:gallery.photos,idx:gallery.idx,onClose:()=>sGallery(null),onNav:i=>sGallery(g=>g&&({...g,idx:i}))}),
+    delNote&&(()=>{const kidCount=thnDesc(notes,delNote.id).length,attCount=thnSubtreeIds(notes,delNote.id).reduce((s,id)=>s+thnAtt(notes.find(x=>x.id===id)).length,0);
+      return t(CSht,{onClose:()=>sDelNote(null),title:"Delete this note?",
+        subtitle:[kidCount?`${kidCount} sub-note${kidCount===1?"":"s"} under it will go too`:"",attCount?`${attCount} attachment${attCount===1?"":"s"} will be removed`:""].filter(Boolean).join(" · ")||"This can't be undone.",
+        onConfirm:()=>{onDeleteNote(threadId,delNote.id);sDelNote(null)},confirmLabel:"Delete"})})(),
+    delConfirm&&t(CSht,{onClose:()=>sDelConfirm(false),title:"Delete this thread?",subtitle:"Entries stay in your expenses — they just won't be grouped under this thread anymore. Notes and their attachments are deleted.",onConfirm:()=>{onDelete(threadId);sDelConfirm(false)},confirmLabel:"Delete"}),
   ]})}
 function NewThread({data,editing,onSave,onCancel}){const iE=!!editing;const[n,sN]=useState(iE?editing.name:"");const[em,sEm]=useState(iE?(editing.emoji||"🧵"):"🧵");const[bg,sBg]=useState(iE&&editing.budget?String(editing.budget):"");const va=n.trim().length>0;
 return o("div",{style:{padding:"8px 0 32px"},className:"st",children:[
@@ -9334,7 +9650,7 @@ const onFile=async e=>{
   }
 };
 const tryRestore=()=>{try{const o2=JSON.parse(txt);if(!o2.expenses||!Array.isArray(o2.expenses))throw new Error("Invalid format — missing expenses array");sConf(o2)}catch(err){sMsg("Error: "+err.message)}};
-const doRestore=async()=>{const o2=conf;sMsg("Restoring…");await Promise.all([restoreStmtFiles(o2.statementFiles),restoreStmtFiles(o2.expensePhotos),restoreStmtFiles(o2.ledgerPhotos),restoreStmtFiles(o2.lasPhotos)].map(p=>p.catch(()=>{})));if(Array.isArray(o2.sidebarOrder)){try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2.sidebarOrder))}catch(e){}}persist({expenses:o2.expenses||[],recurring:o2.recurring||[],accounts:o2.accounts&&o2.accounts.length?o2.accounts:[DA],profiles:o2.profiles||[],cards:o2.cards||[],cardStatements:o2.cardStatements||[],bills:o2.bills||[],goals:o2.goals||[],budgetLoans:o2.budgetLoans||[],ledger:o2.ledger||[],categoryBudgets:o2.categoryBudgets||{},monthlyRestrictionLogs:o2.monthlyRestrictionLogs||[],investments:o2.investments||[],planThreshold:o2.planThreshold??null,customExpenseCategories:o2.customExpenseCategories||[],customIncomeCategories:o2.customIncomeCategories||[],categoryOverrides:o2.categoryOverrides||{},categoryOrder:o2.categoryOrder||{expense:[],income:[]},budget:o2.budget??null,budgetPeriod:o2.budgetPeriod||"monthly",...(o2.morningEnabled!=null?{morningEnabled:o2.morningEnabled,morningTime:o2.morningTime||"08:00",eveningEnabled:o2.eveningEnabled||false,eveningTime:o2.eveningTime||"21:00"}:{}),currency:o2.currency||"$",monthStartDay:o2.monthStartDay||1,merchantRules:o2.merchantRules||{},debtPlan:o2.debtPlan||null,las:o2.las||null,varExpensePlans:o2.varExpensePlans||{},varIncomePlans:o2.varIncomePlans||{},varSavingsPlans:o2.varSavingsPlans||{},advStats:o2.advStats||{},calculators:o2.calculators||{},groceryCategories:o2.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:o2.grocerySubDefaults||{},groceryStores:o2.groceryStores||[],groceryDefaultStore:o2.groceryDefaultStore||"",priceWatch:o2.priceWatch||PW_DEFAULT,threads:o2.threads||[],thresholdRules:o2.thresholdRules||[],netWorthSnapshots:o2.netWorthSnapshots||[]});try{if(o2.aiProvider)sProv(o2.aiProvider);if("aiModel" in o2)sMdl(o2.aiModel||null);sAK(null)}catch(e){}sConf(null);sMsg("✓ Restored. Re-enter your AI API key in Settings (keys are never stored in backups)"+(o2.statementFiles?" (statement PDFs included)":""));sTxt("")};
+const doRestore=async()=>{const o2=conf;sMsg("Restoring…");await Promise.all([restoreStmtFiles(o2.statementFiles),restoreStmtFiles(o2.expensePhotos),restoreStmtFiles(o2.ledgerPhotos),restoreStmtFiles(o2.lasPhotos),restoreStmtFiles(o2.threadFiles)].map(p=>p.catch(()=>{})));if(Array.isArray(o2.sidebarOrder)){try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2.sidebarOrder))}catch(e){}}persist({expenses:o2.expenses||[],recurring:o2.recurring||[],accounts:o2.accounts&&o2.accounts.length?o2.accounts:[DA],profiles:o2.profiles||[],cards:o2.cards||[],cardStatements:o2.cardStatements||[],bills:o2.bills||[],goals:o2.goals||[],budgetLoans:o2.budgetLoans||[],ledger:o2.ledger||[],categoryBudgets:o2.categoryBudgets||{},monthlyRestrictionLogs:o2.monthlyRestrictionLogs||[],investments:o2.investments||[],planThreshold:o2.planThreshold??null,customExpenseCategories:o2.customExpenseCategories||[],customIncomeCategories:o2.customIncomeCategories||[],categoryOverrides:o2.categoryOverrides||{},categoryOrder:o2.categoryOrder||{expense:[],income:[]},budget:o2.budget??null,budgetPeriod:o2.budgetPeriod||"monthly",...(o2.morningEnabled!=null?{morningEnabled:o2.morningEnabled,morningTime:o2.morningTime||"08:00",eveningEnabled:o2.eveningEnabled||false,eveningTime:o2.eveningTime||"21:00"}:{}),currency:o2.currency||"$",monthStartDay:o2.monthStartDay||1,merchantRules:o2.merchantRules||{},debtPlan:o2.debtPlan||null,las:o2.las||null,varExpensePlans:o2.varExpensePlans||{},varIncomePlans:o2.varIncomePlans||{},varSavingsPlans:o2.varSavingsPlans||{},advStats:o2.advStats||{},calculators:o2.calculators||{},groceryCategories:o2.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:o2.grocerySubDefaults||{},groceryStores:o2.groceryStores||[],groceryDefaultStore:o2.groceryDefaultStore||"",priceWatch:o2.priceWatch||PW_DEFAULT,threads:o2.threads||[],thresholdRules:o2.thresholdRules||[],netWorthSnapshots:o2.netWorthSnapshots||[]});try{if(o2.aiProvider)sProv(o2.aiProvider);if("aiModel" in o2)sMdl(o2.aiModel||null);sAK(null)}catch(e){}sConf(null);sMsg("✓ Restored. Re-enter your AI API key in Settings (keys are never stored in backups)"+(o2.statementFiles?" (statement PDFs included)":""));sTxt("")};
 const prebuild=async()=>{try{const s=await window.storage.get(KB);if(!s){alert("No prebuild snapshot found");return}sTxt(s.value);sMsg("Loaded prebuild backup — review then tap Restore")}catch{alert("Error loading snapshot")}};
 return o("div",{style:{padding:`8px ${GUT}px 32px`},className:"st",children:[
   t(SH,{title:t("em",{children:"Backup & Restore"}),onBack:onClose}),
