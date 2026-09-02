@@ -1191,7 +1191,24 @@ const Sht=({children,onClose,footer})=>{
   // (the sheet's primary action button, most often) stays pinned below it --
   // a tall sheet (many fields, photos, etc.) no longer buries that button
   // past the bottom of the screen where a scroll gesture is needed to reach it.
-  return t("div",{ref:ov,className:"fx f iend",style:{inset:0,zIndex:50},onClick:onClose,children:o(Fragment,{children:[
+  //
+  // Rendered through a portal onto document.body, not inline in the tree:
+  // every screen in this app is wrapped in a `.st` container, and `.st>*`
+  // carries a `fu` entrance animation (`transform:translateY(...)`) with
+  // `animation-fill-mode:both` -- so the transform never goes away once the
+  // animation ends. Per the CSS spec, ANY non-"none" transform on an
+  // ancestor (even the identity transform the animation settles on)
+  // establishes a new containing block for `position:fixed` descendants.
+  // Left inline, this sheet's "fixed" overlay was actually positioned
+  // relative to that animated screen container instead of the real
+  // viewport -- offsetting the whole overlay down by however far that
+  // container sits below the fixed app header, and clipping exactly that
+  // much off the sheet's bottom, footer/Save button included. It reproduced
+  // on every sheet, immediately on open, regardless of content height --
+  // not the separate, timing-based visualViewport issue above. A portal
+  // renders outside any transformed ancestor, so `position:fixed` always
+  // resolves against the true viewport again.
+  return createPortal(t("div",{ref:ov,className:"fx f iend",style:{inset:0,zIndex:50},onClick:onClose,children:o(Fragment,{children:[
     t("div",{ref:scrim,className:"fx scrimin",style:{inset:0,background:c.dk?"rgba(0,0,0,.6)":"rgba(26,24,20,.34)",backdropFilter:"blur(5px)",WebkitBackdropFilter:"blur(5px)"}}),
     t("div",{ref:pnl,className:"w100 shn r",onClick:e=>e.stopPropagation(),
       style:{maxWidth:AW,margin:"0 auto",maxHeight:"85vh",display:"flex",flexDirection:"column",background:c.sfg,borderTopLeftRadius:24,borderTopRightRadius:24,paddingTop:20,borderTop:`1px solid ${c.br}`,boxShadow:c.dk?"0 -12px 40px rgba(0,0,0,.5)":"0 -12px 40px rgba(92,80,58,.20)"},
@@ -1202,7 +1219,7 @@ const Sht=({children,onClose,footer})=>{
           children}),
         footer&&t("div",{style:{flexShrink:0,padding:`14px 24px calc(env(safe-area-inset-bottom, 0px) + 20px)`,borderTop:`1px solid ${c.brs}`},children:footer})
       ]})})
-  ]})});
+  ]})}),document.body);
 }
 const CSht=({title,subtitle,onClose,onConfirm,confirmLabel="Confirm",danger=true})=>t(Sht,{onClose,children:o(Fragment,{children:[t("div",{style:{fontFamily:c.hf,fontSize:22},children:title}),subtitle&&t("div",{style:{fontSize:13,color:c.td,marginTop:8},children:subtitle}),o("div",{className:"g g2",style:{gap:8,marginTop:20},children:[t("button",{onClick:onClose,className:"act95 trt",style:{padding:"14px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,color:c.tx,fontWeight:500,fontSize:14},children:"Cancel"}),t("button",{onClick:onConfirm,className:"act95 trt",style:{padding:"14px 0",background:danger?c.ro:c.ac,color:danger?"#fff":"#0a0a0a",borderRadius:12,fontWeight:600,fontSize:14,border:"none"},children:confirmLabel})]})]})});
 
@@ -2156,7 +2173,7 @@ function FilteredTxSheet({title,items,accounts,cards,currency,onClose,onHome,onT
   const exportXls=()=>exportTxnsXlsx(title,sorted,accounts,currency);
   const exportPdf=()=>exportTxnsPdf(title,sorted,accounts,currency);
   const exportImg=()=>exportTxnsImage(title,sorted,accounts,currency);
-return t("div",{className:"fx f iend",style:{inset:0,background:"rgba(0,0,0,.6)",zIndex:45},onClick:onClose,children:
+return createPortal(t("div",{className:"fx f iend",style:{inset:0,background:"rgba(0,0,0,.6)",zIndex:45},onClick:onClose,children:
   o("div",{onClick:e=>e.stopPropagation(),className:"w100",style:{maxWidth:AW,margin:"0 auto",maxHeight:"85vh",display:"flex",flexDirection:"column",background:c.sfg,borderTopLeftRadius:24,borderTopRightRadius:24,borderTop:`1px solid ${c.br}`,boxSizing:"border-box",overflow:"hidden"},children:[
     t("div",{style:{width:40,height:4,margin:"12px auto 2px",borderRadius:999,background:c.br,flexShrink:0}}),
     o("div",{style:{padding:"10px 20px 0",flexShrink:0},children:[
@@ -2181,7 +2198,7 @@ return t("div",{className:"fx f iend",style:{inset:0,background:"rgba(0,0,0,.6)"
       t("button",{onClick:exportImg,className:"act90 trt f ia jc f1",style:{gap:5,padding:"11px 0",background:c.sf3,border:`1px solid ${c.brs}`,borderRadius:12,fontSize:10.5,fontFamily:'var(--nf)',color:c.tx,letterSpacing:.3,fontWeight:600},children:[t(Camera,{size:12,color:c.tx}),"PHOTO"]}),
     ]})}),
   ]})
-})}
+}),document.body)}
 function AlertsSection({data}){
   const currency=data.currency;
   const alerts=useMemo(()=>computeThresholdAlerts(data),[data.thresholdRules,data.expenses,data.cards,data.accounts,data.budgetPeriod,data.monthStartDay]);
