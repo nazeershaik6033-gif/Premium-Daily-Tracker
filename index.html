@@ -1110,26 +1110,44 @@ const Sht=({children,onClose,footer})=>{
   // Same mobile-Safari fixed-position gap as the nav bar (see Nav below): inset:0
   // can leave the overlay short of the true visible viewport while the browser
   // chrome/keyboard is animating, exposing page content below the scrim. Only
-  // ever GROW the overlay to close a gap, never shrink it: visualViewport.height
-  // reliably under-reports for the first second or so after a sheet opens on iOS,
-  // and trusting that raw value here previously shrank the overlay on every
-  // settle-timer tick, eating into coverage CSS's inset:0 already had right.
+  // ever GROW the overlay to close a gap, never shrink it, for the first
+  // moment after mount: visualViewport.height reliably under-reports for the
+  // first second or so after a sheet opens on iOS, and trusting that raw
+  // value here previously shrank the overlay on every settle-timer tick,
+  // eating into coverage CSS's inset:0 already had right.
+  //
+  // Once that initial under-report window has passed, fully track the visual
+  // viewport (top AND height, not just growth). Tapping a field like the
+  // entry note input opens the keyboard and mobile browsers pan the page to
+  // bring it into view -- since this overlay is fixed to the *layout*
+  // viewport, the panel (bottom-anchored inside it) stayed pinned to the
+  // layout viewport's bottom edge, which the keyboard now covers, so the
+  // footer/save button ended up hidden below the visible area. Following
+  // visualViewport's offsetTop/height keeps the overlay matched to what's
+  // actually on screen so the footer stays reachable above the keyboard.
   useEffect(()=>{
     const el=ov.current;
     if(!el||!window.visualViewport)return;
     const vv=window.visualViewport;
+    let settled=false;
     const sync=()=>{
-      const rect=el.getBoundingClientRect();
-      const visualBottom=vv.height+vv.offsetTop;
-      const gap=visualBottom-rect.bottom;
-      if(gap>0.5)el.style.height=(el.offsetHeight+gap)+"px";
+      if(!settled){
+        const rect=el.getBoundingClientRect();
+        const visualBottom=vv.height+vv.offsetTop;
+        const gap=visualBottom-rect.bottom;
+        if(gap>0.5)el.style.height=(el.offsetHeight+gap)+"px";
+        return;
+      }
+      el.style.top=vv.offsetTop+"px";
+      el.style.height=vv.height+"px";
     };
     sync();
     const timers=[120,500,1200].map(ms=>setTimeout(sync,ms));
+    const settleTimer=setTimeout(()=>{settled=true;sync()},1300);
     vv.addEventListener("resize",sync);
     vv.addEventListener("scroll",sync);
     window.addEventListener("orientationchange",sync);
-    return()=>{timers.forEach(clearTimeout);vv.removeEventListener("resize",sync);vv.removeEventListener("scroll",sync);window.removeEventListener("orientationchange",sync)};
+    return()=>{clearTimeout(settleTimer);timers.forEach(clearTimeout);vv.removeEventListener("resize",sync);vv.removeEventListener("scroll",sync);window.removeEventListener("orientationchange",sync)};
   },[]);
   // Drag-to-dismiss. Driven straight through the DOM rather than React state so
   // the panel tracks the finger at frame rate. Only engages when the scrollable
