@@ -1620,7 +1620,7 @@ return o("div",{style:{padding:`8px ${GUT}px 32px`},className:"st",children:[
 ]});
 }
 function ReimbLinkSht({prompt,expenses,currency,onLink,onClose}){const[sel,setSel]=useState(new Set());return t(Sht,{onClose,children:o(Fragment,{children:[o("div",{className:"f ia",style:{gap:12,marginBottom:20},children:[t("div",{style:{width:48,height:48,borderRadius:14,background:c.ac+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0},children:"↩️"}),o("div",{children:[t("div",{style:{fontSize:17,fontWeight:700,color:c.tx},children:"Reimbursement received?"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:"This income matches a pending reimbursable expense"})]})]})  ,o("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,overflow:"hidden",marginBottom:20},children:prompt.candidates.map((e,i)=>{const cat=co(e.category),isOn=sel.has(e.id);return o("button",{key:e.id,onClick:()=>setSel(s=>{const ns=new Set(s);ns.has(e.id)?ns.delete(e.id):ns.add(e.id);return ns}),className:"w100 f ia act99 trt",style:{padding:"12px 14px",borderBottom:i===prompt.candidates.length-1?"none":`1px solid ${c.brs}`,background:"transparent",border:"none",color:"inherit",gap:12,textAlign:"left"},children:[t("div",{style:{width:22,height:22,borderRadius:999,border:`2px solid ${isOn?c.ac:c.brs}`,background:isOn?c.ac:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 150ms"},children:isOn?t(Check,{size:12,color:"#0a0a0a",strokeWidth:3}):null}),t("span",{style:{fontSize:18,flexShrink:0},children:cat.emoji}),o("div",{className:"f1 minw0",children:[t("div",{className:"tru",style:{fontSize:13,fontWeight:500,color:c.tx},children:e.merchant||e.payee||cat.label}),t("div",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.tm},children:new Date(e.date).toLocaleDateString("en-US",{month:"short",day:"numeric"})})]}),t("div",{style:{fontFamily:'var(--nf)',fontSize:14,fontWeight:600,flexShrink:0},children:fm(e.amount,currency)})]})})}),o("div",{style:{display:"flex",flexDirection:"column",gap:8},children:[sel.size>0&&t("button",{onClick:()=>{[...sel].forEach(expId=>onLink(expId,prompt.incomeId));onClose()},className:"w100 act98 tr",style:{padding:"14px 0",background:c.ac,color:"#0a0a0a",borderRadius:12,fontWeight:600,fontSize:14,border:"none"},children:`Link ${sel.size} expense${sel.size>1?"s":""} as reimbursed`}),t("button",{onClick:onClose,className:"w100 act98 tr",style:{padding:"12px 0",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:12,color:c.td,fontSize:13},children:"Skip for now"})]})]})})}
-function App(){
+function App({forcedVpH}={}){
   // Real, live viewport height in px, not a CSS dvh string. dvh support and
   // its recalc timing vary enough across mobile browsers/WebViews that the
   // root container could come up short of the true viewport. window.innerHeight
@@ -1628,8 +1628,14 @@ function App(){
   // way dvh sometimes does. The bottom nav is pinned with position:fixed
   // (see .nav-bar), so it always sits flush at the true viewport edge
   // regardless of any residual imprecision here.
-  const[vpH,setVpH]=useState(()=>typeof window!=="undefined"?window.innerHeight:800);
+  // `forcedVpH`, when set, comes from OrientationLock: while it is visually
+  // counter-rotating the app back to portrait (see === PORTRAIT ORIENTATION
+  // LOCK === below), the real window.innerHeight reports the *landscape*
+  // viewport's short edge, which is the wrong number for our rotated box —
+  // so that measurement is skipped entirely in favor of the forced value.
+  const[vpH,setVpH]=useState(()=>forcedVpH||(typeof window!=="undefined"?window.innerHeight:800));
   useEffect(()=>{
+    if(forcedVpH){setVpH(forcedVpH);return}
     // Take the largest of three independent measurements rather than trusting
     // any single one -- on some mobile browsers innerHeight/visualViewport can
     // under-report right after load, before the chrome (toolbar, home
@@ -1643,7 +1649,7 @@ function App(){
     window.addEventListener("orientationchange",upd);
     window.visualViewport?.addEventListener("resize",upd);
     return()=>{timers.forEach(clearTimeout);window.removeEventListener("resize",upd);window.removeEventListener("orientationchange",upd);window.visualViewport?.removeEventListener("resize",upd)};
-  },[]);
+  },[forcedVpH]);
   const[v,sV]=useState("home");
   const navFromRef=useRef("home");
   const scrollRef=useRef(null);
@@ -2556,11 +2562,12 @@ return o("div",{children:[
       ]}),
       o("div",{style:{marginBottom:12},children:[
         t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:"PAY WITH — APPLIES TO ALL SELECTED ITEMS"}),
-        o("select",{value:snapBulkPay,onChange:ev=>{const v=ev.target.value;setSnapBulkPay(v);if(!v)return;const ci=v.indexOf(":");const kind=v.slice(0,ci),pid=v.slice(ci+1);setSnapItems(items=>items?items.map((it,i)=>!snapSel[i]?it:(kind==="acc"?{...it,mop:"account",accountId:pid,cardId:null}:{...it,mop:"card",cardId:pid,accountId:null})):items)},style:{width:"100%",boxSizing:"border-box",background:c.sfg,border:`1px solid ${snapBulkPay?c.ac:c.brs}`,borderRadius:12,padding:"12px",color:snapBulkPay?c.tx:c.tm,fontSize:13,outline:"none",fontFamily:'var(--tf)',colorScheme:"dark"},children:[
+        o("select",{value:snapBulkPay,onChange:ev=>{const v=ev.target.value;setSnapBulkPay(v);if(!v)return;const ci=v.indexOf(":");const kind=v.slice(0,ci),pid=v.slice(ci+1);setSnapItems(items=>items?items.map((it,i)=>(!snapSel[i]||it._payOverridden)?it:(kind==="acc"?{...it,mop:"account",accountId:pid,cardId:null}:{...it,mop:"card",cardId:pid,accountId:null})):items)},style:{width:"100%",boxSizing:"border-box",background:c.sfg,border:`1px solid ${snapBulkPay?c.ac:c.brs}`,borderRadius:12,padding:"12px",color:snapBulkPay?c.tx:c.tm,fontSize:13,outline:"none",fontFamily:'var(--tf)',colorScheme:"dark"},children:[
           t("option",{value:"",children:"Choose account or card for all…"}),
           o("optgroup",{label:"🏦 Accounts",children:data.accounts.map(a=>t("option",{key:a.id,value:"acc:"+a.id,children:(a.emoji||"🏦")+" "+a.name}))}),
           (()=>{const ucr=(data.cards||[]).filter(c2=>!c2.isExternal);return ucr.length?o("optgroup",{label:"💳 Cards",children:ucr.map(cr=>t("option",{key:cr.id,value:"card:"+cr.id,children:"💳 "+cr.name+(cr.last4?" ··"+cr.last4:"")}))}):null})(),
         ]}),
+        (()=>{const n=snapItems.filter((it,i)=>snapSel[i]&&it._payOverridden).length;return n>0&&t("div",{style:{fontSize:10.5,color:c.tm,marginTop:6,lineHeight:1.4},children:`${n} item${n>1?"s":""} kept the account/card you set individually — tap its name below to change it.`})})(),
       ]}),
       !snapMulti&&outCount>0&&!snapMonthOk&&o("div",{style:{background:"#f59e0b18",border:"1px solid #f59e0b44",borderRadius:12,padding:"12px 14px",marginBottom:12},children:[
         t("div",{style:{fontSize:13,color:"#d97706",fontWeight:600,marginBottom:8},children:`⚠ ${outCount} item${outCount>1?"s":""} have dates outside ${monthLabel}`}),
@@ -2582,7 +2589,32 @@ return o("div",{children:[
                 it._photoIdx&&t("span",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,background:c.sfg,borderRadius:5,padding:"2px 5px",flexShrink:0},children:`P${it._photoIdx}`}),
               ]}),
               it.note&&t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:it.note}),
-              (()=>{const acc=data.accounts.find(a=>a.id===it.accountId);const card=(data.cards||[]).find(cr=>cr.id===it.cardId);const pay=it.mop==="card"?(card?("💳 "+card.name):null):(acc?((acc.emoji||"🏦")+" "+acc.name):null);const outDate=!snapMulti&&isOut(it.date);return t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:pay?outDate?"#d97706":c.tm:c.co,marginTop:2},children:String(co(it.category)?.label||it.category||"other").toUpperCase()+(snapMulti?(it.date?"":" · ⚠ NO DATE"):(it.date?(outDate?" · ⚠ "+it.date:" · "+it.date):""))+(pay?" · "+pay:" · ⚠ NO ACCOUNT/CARD")})})(),
+              (()=>{
+                const acc=data.accounts.find(a=>a.id===it.accountId);const card=(data.cards||[]).find(cr=>cr.id===it.cardId);
+                const pay=it.mop==="card"?(card?("💳 "+card.name):null):(acc?((acc.emoji||"🏦")+" "+acc.name):null);
+                const outDate=!snapMulti&&isOut(it.date);
+                const prefix=String(co(it.category)?.label||it.category||"other").toUpperCase()+(snapMulti?(it.date?"":" · ⚠ NO DATE"):(it.date?(outDate?" · ⚠ "+it.date:" · "+it.date):""));
+                const ucr=(data.cards||[]).filter(c2=>!c2.isExternal);
+                const payVal=it.mop==="card"?(it.cardId?"card:"+it.cardId:""):(it.accountId?"acc:"+it.accountId:"");
+                // Tapping the pay label opens a real <select> right there — no need to open the
+                // full pencil-edit panel just to move one item to a different account/card.
+                // Any choice made here is marked _payOverridden so a later bulk "PAY WITH" pick
+                // (which applies to every selected item) leaves this one alone.
+                return o("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:pay?outDate?"#d97706":c.tm:c.co,marginTop:2,display:"flex",flexWrap:"wrap",alignItems:"center"},children:[
+                  t("span",{children:prefix+" · "}),
+                  o("select",{
+                    value:payVal,
+                    onClick:ev=>ev.stopPropagation(),
+                    onChange:ev=>{const v=ev.target.value;if(!v)return;const ci=v.indexOf(":");const kind=v.slice(0,ci),pid=v.slice(ci+1);snapUpd(i,kind==="acc"?{mop:"account",accountId:pid,cardId:null,_payOverridden:true}:{mop:"card",cardId:pid,accountId:null,_payOverridden:true})},
+                    style:{background:"transparent",border:"none",color:"inherit",font:"inherit",letterSpacing:"inherit",padding:0,margin:0,appearance:"none",cursor:"pointer",maxWidth:170},
+                    children:[
+                      t("option",{value:"",children:"⚠ NO ACCOUNT/CARD"}),
+                      o("optgroup",{label:"🏦 Accounts",children:data.accounts.map(a=>t("option",{key:a.id,value:"acc:"+a.id,children:(a.emoji||"🏦")+" "+a.name}))}),
+                      ucr.length?o("optgroup",{label:"💳 Cards",children:ucr.map(cr=>t("option",{key:cr.id,value:"card:"+cr.id,children:"💳 "+cr.name+(cr.last4?" ··"+cr.last4:"")}))}):null,
+                    ]
+                  }),
+                ]})
+              })(),
             ]}),
             t("div",{style:{fontFamily:'var(--nf)',fontSize:13,fontWeight:600,color:c.tx,flexShrink:0},children:fm(it.amount,data.currency)}),
             t("button",{onClick:()=>setSnapEdit(isEd?null:i),title:"Edit item",style:{padding:"6px 7px",background:isEd?c.ac+"22":c.sfg,border:`1px solid ${isEd?c.ac+"55":c.brs}`,borderRadius:8,color:isEd?c.ac:c.td,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"},children:t(Pencil,{size:13})}),
@@ -2597,8 +2629,8 @@ return o("div",{children:[
               o("button",{onClick:()=>snapUpd(i,{mop:"account",cardId:null}),className:"act95 tr f ia jc",style:{flex:1,padding:"9px 0",gap:6,background:it.mop!=="card"?c.ac:"transparent",color:it.mop!=="card"?"#0a0a0a":c.td,borderRadius:9,fontSize:13,fontWeight:it.mop!=="card"?700:400,border:"none"},children:"🏦 Account"}),
               o("button",{onClick:()=>snapUpd(i,{mop:"card",accountId:null}),className:"act95 tr f ia jc",style:{flex:1,padding:"9px 0",gap:6,background:it.mop==="card"?c.ac:"transparent",color:it.mop==="card"?"#0a0a0a":c.td,borderRadius:9,fontSize:13,fontWeight:it.mop==="card"?700:400,border:"none"},children:"💳 Card"}),
             ]})]}),
-            it.mop!=="card"&&o("div",{children:[fldL("ACCOUNT"),t("div",{className:"f sx",style:{gap:8,overflowX:"auto"},children:data.accounts.map(a=>{const s=it.accountId===a.id;return o("button",{key:a.id,onClick:()=>snapUpd(i,{accountId:a.id,cardId:null}),className:"act95 tr f ia",style:{gap:8,padding:"9px 12px",background:s?c.sf3:c.sf,border:`1px solid ${s?c.ac:c.brs}`,borderRadius:11,flexShrink:0,fontSize:13,color:s?c.tx:c.td,fontWeight:s?500:400},children:[t("span",{children:a.emoji}),t("span",{children:a.name})]})})})]}),
-            it.mop==="card"&&o("div",{children:[fldL("CREDIT / DEBIT CARD"),ucr.length===0?t("div",{style:{padding:"12px 14px",background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,fontSize:12,color:c.tm,textAlign:"center"},children:"No cards added yet. Go to Cards section to add one."}):t("div",{className:"f sx",style:{gap:8,overflowX:"auto"},children:ucr.map(cr=>{const s=it.cardId===cr.id;return o("button",{key:cr.id,onClick:()=>snapUpd(i,{cardId:cr.id,accountId:null}),className:"act95 tr f ia",style:{gap:8,padding:"9px 12px",background:s?c.sf3:c.sf,border:`1px solid ${s?c.ac:c.brs}`,borderRadius:11,flexShrink:0,fontSize:13,color:s?c.tx:c.td,fontWeight:s?500:400},children:[t("span",{style:{fontSize:14},children:"💳"}),t("span",{children:cr.name}),cr.last4&&o("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm},children:["··",cr.last4]})]})})})]}),
+            it.mop!=="card"&&o("div",{children:[fldL("ACCOUNT"),t("div",{className:"f sx",style:{gap:8,overflowX:"auto"},children:data.accounts.map(a=>{const s=it.accountId===a.id;return o("button",{key:a.id,onClick:()=>snapUpd(i,{accountId:a.id,cardId:null,_payOverridden:true}),className:"act95 tr f ia",style:{gap:8,padding:"9px 12px",background:s?c.sf3:c.sf,border:`1px solid ${s?c.ac:c.brs}`,borderRadius:11,flexShrink:0,fontSize:13,color:s?c.tx:c.td,fontWeight:s?500:400},children:[t("span",{children:a.emoji}),t("span",{children:a.name})]})})})]}),
+            it.mop==="card"&&o("div",{children:[fldL("CREDIT / DEBIT CARD"),ucr.length===0?t("div",{style:{padding:"12px 14px",background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,fontSize:12,color:c.tm,textAlign:"center"},children:"No cards added yet. Go to Cards section to add one."}):t("div",{className:"f sx",style:{gap:8,overflowX:"auto"},children:ucr.map(cr=>{const s=it.cardId===cr.id;return o("button",{key:cr.id,onClick:()=>snapUpd(i,{cardId:cr.id,accountId:null,_payOverridden:true}),className:"act95 tr f ia",style:{gap:8,padding:"9px 12px",background:s?c.sf3:c.sf,border:`1px solid ${s?c.ac:c.brs}`,borderRadius:11,flexShrink:0,fontSize:13,color:s?c.tx:c.td,fontWeight:s?500:400},children:[t("span",{style:{fontSize:14},children:"💳"}),t("span",{children:cr.name}),cr.last4&&o("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm},children:["··",cr.last4]})]})})})]}),
             !hasPay&&t("div",{style:{fontFamily:'var(--nf)',fontSize:10.5,color:c.co,letterSpacing:.3,padding:"9px 12px",background:c.co+"12",borderRadius:10,border:`1px solid ${c.co}30`},children:"⚠ Select an account or card above to enable saving"}),
             o("div",{children:[
               o("div",{className:"f ia",style:{gap:8,marginBottom:8},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1,flexShrink:0},children:"CATEGORY"}),o("div",{className:"f ia",style:{flex:1,background:c.sfg,border:`1px solid ${cq?c.ac+"66":c.brs}`,borderRadius:8,padding:"5px 9px",gap:5},children:[t(Srch,{size:12,color:cq?c.ac:c.tm}),t("input",{value:cq,onChange:ev=>snapUpd(i,{_catQ:ev.target.value}),placeholder:"search across all groups…",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:12,fontFamily:F.sa,minWidth:0}}),cq&&t("button",{onClick:()=>snapUpd(i,{_catQ:""}),style:{background:"transparent",border:"none",color:c.tm,padding:0,display:"flex"},children:t(X,{size:11})})]})]}),
@@ -3869,7 +3901,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
       sParsed(txns);sFile({name:`Pasted CSV · ${txns.length} rows`});
     }catch(e2){sErr("Parse error: "+e2.message)}
   };
-  const pickPhotos=async(files)=>{const arr=Array.from(files||[]).filter(Boolean);if(!arr.length)return;sErr(null);const tooBig=arr.find(f=>f.size>4.5e6);if(tooBig){sErr(`Each image must be under 4.5MB — "${tooBig.name||"one photo"}" is too large.`);return}const loaded=[];for(const f of arr){try{const b64=await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(f)});loaded.push({id:uid(),file:f,preview:b64})}catch(e2){}}sPhotos(p=>[...p,...loaded])};
+  const pickPhotos=async(files)=>{const arr=Array.from(files||[]).filter(Boolean);if(!arr.length)return;sErr(null);const tooBig=arr.find(f=>f.size>1.2e7);if(tooBig){sErr(`Each image must be under 12MB — "${tooBig.name||"one photo"}" is too large.`);return}const loaded=[];let loadErr=null;for(const f of arr){try{const{b64}=await normalizePhotoForAI(f);loaded.push({id:uid(),file:f,preview:b64})}catch(e2){loadErr=`Could not read "${f.name||"one photo"}" — ${describeErr(e2)||"try a different photo"}.`}}if(loadErr)sErr(loadErr);sPhotos(p=>[...p,...loaded])};
   const removePhoto=(id)=>sPhotos(p=>p.filter(x=>x.id!==id));
   const extractPhoto=async()=>{
     if(!photos.length){sErr("Pick at least one statement photo first.");return}sErr(null);sResult(null);
@@ -3880,11 +3912,12 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
     for(let i=0;i<photos.length;i++){
       const ph=photos[i];
       try{
-        const b64=ph.preview||await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(ph.file)});
-        const u=[{type:"image",source:{type:"base64",media_type:ph.file.type,data:b64.split(",")[1]}},{type:"text",text:(photoPrompt.trim()?photoPrompt.trim()+"\n\n":"")+'Extract ALL spending transactions visible. Return JSON only: {"transactions":[{"date":"YYYY-MM-DD","amount":N,"merchant":"name","amountText":"exact characters printed for the amount, including any currency symbol"}]}.\nAmount rules — read these carefully, they are the most common source of error:\n• Never let a currency symbol become a digit. A ₹ sitting flush against the number is NOT a 3.\n• Never drop the amount\'s own leading digit. ₹350.00 is 350.00, not 50.00.\n• Copy every digit exactly as printed; do not round, reformat or infer.\n• amount must be a positive plain number with no symbol, commas or spaces.'}];
-        const r=await cAPI({max_tokens:3000,system:sys,messages:[{role:"user",content:u}]});
+        const{b64}=ph.preview?{b64:ph.preview}:await normalizePhotoForAI(ph.file);
+        const u=[{type:"image",source:{type:"base64",media_type:"image/jpeg",data:b64.split(",")[1]}},{type:"text",text:(photoPrompt.trim()?photoPrompt.trim()+"\n\n":"")+'Extract ALL spending transactions visible. Respond with ONLY a single JSON object — no markdown fences, no explanation, no apology — in this exact shape: {"transactions":[{"date":"YYYY-MM-DD","amount":N,"merchant":"name","amountText":"exact characters printed for the amount, including any currency symbol"}]}.\nIf the image is blurry, cropped, or you genuinely see no transactions, still return valid JSON with an empty transactions array — never reply with prose alone.\nAmount rules — read these carefully, they are the most common source of error:\n• Never let a currency symbol become a digit. A ₹ sitting flush against the number is NOT a 3.\n• Never drop the amount\'s own leading digit. ₹350.00 is 350.00, not 50.00.\n• Copy every digit exactly as printed; do not round, reformat or infer.\n• amount must be a positive plain number with no symbol, commas or spaces.'}];
+        const r=await cAPI({max_tokens:4096,system:sys,messages:[{role:"user",content:u}]});
         const txt=r.content?.map(x=>x.text||"").join("")||"";
-        const m=txt.match(/\{[\s\S]*\}/);if(!m)throw new Error("Could not read transactions");
+        const m=txt.match(/\{[\s\S]*\}/);
+        if(!m){const hint=txt.trim().slice(0,150);throw new Error(hint?`Could not read transactions — the AI replied: "${hint}${txt.trim().length>150?"…":""}"`:"Could not read transactions — the AI returned an empty reply.")}
         const arr=(JSON.parse(m[0]).transactions)||[];
         for(const it of arr){
           const amt=parseFloat(String(it.amount).replace(/[^0-9.]/g,""));if(!amt||isNaN(amt)||amt<=0)continue;
@@ -5270,25 +5303,58 @@ function ensureTesseract(){
   })();
   return _tesseractLoading;
 }
-// Downscale (for speed) + grayscale/contrast-stretch (for accuracy) before handing the image to OCR.
-async function preprocessImageForOCR(file){
+// Phones write the camera's physical rotation into the EXIF Orientation tag rather than
+// rotating the pixels themselves. Canvas/img draws ignore that tag, so a photo taken in
+// portrait but held sideways at capture time gets sent on as a sideways bitmap — invisible
+// in the <img> preview (browsers apply EXIF rotation there) but very much not invisible to
+// an OCR engine or a vision model reading it. Read the tag ourselves and bake the rotation
+// into the canvas so every consumer downstream always gets an upright image.
+// Loads `file` onto a canvas, downscaled to `maxDim` — shared by both the AI photo
+// extractor and the local OCR path so neither has to special-case a rotated photo.
+//
+// This used to also hand-parse the file's EXIF Orientation tag and apply a matching
+// canvas transform, on the theory that <img>/canvas draws ignore EXIF the way old
+// browsers did. Measured against real EXIF-tagged JPEGs in a Chromium build, that
+// turned out to be false: <img> (and createImageBitmap, even with imageOrientation
+// explicitly set to "none") already decodes the pixels pre-rotated. Applying our own
+// correction on top double-rotated the image right back to sideways. So this now does
+// exactly one thing — decode via <img> and draw to canvas — and relies entirely on the
+// browser's own decode-time correction, which testing confirmed is unconditional.
+// Re-exporting via canvas.toDataURL below then hands the AI/OCR a plain JPEG with no
+// EXIF block left to be misread, upright pixels included.
+async function loadOrientedCanvas(file,maxDim){
   const url=URL.createObjectURL(file);
   try{
     const img=await new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=()=>reject(new Error("Could not read this photo."));im.src=url});
-    const maxDim=1800;let w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
-    if(Math.max(w,h)>maxDim){const scale=maxDim/Math.max(w,h);w=Math.round(w*scale);h=Math.round(h*scale)}
+    let w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
+    if(maxDim&&Math.max(w,h)>maxDim){const scale=maxDim/Math.max(w,h);w=Math.round(w*scale);h=Math.round(h*scale)}
     const canvas=document.createElement("canvas");canvas.width=w;canvas.height=h;
-    const ctx=canvas.getContext("2d");ctx.drawImage(img,0,0,w,h);
-    try{
-      const imgData=ctx.getImageData(0,0,w,h);const d=imgData.data;
-      let min=255,max=0;
-      for(let i=0;i<d.length;i+=4){const g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];if(g<min)min=g;if(g>max)max=g}
-      const range=Math.max(1,max-min);
-      for(let i=0;i<d.length;i+=4){const g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];const v=Math.min(255,Math.max(0,((g-min)/range)*255));d[i]=d[i+1]=d[i+2]=v}
-      ctx.putImageData(imgData,0,0);
-    }catch(e){}
+    const ctx=canvas.getContext("2d");
+    ctx.drawImage(img,0,0,w,h);
     return canvas;
   }finally{try{URL.revokeObjectURL(url)}catch(e){}}
+}
+// Re-encodes a picked photo as an upright, reasonably-sized JPEG before it ever reaches the
+// AI — fixes sideways captures and sidesteps formats (e.g. HEIC) the vision API can't accept.
+async function normalizePhotoForAI(file,maxDim,quality){
+  const canvas=await loadOrientedCanvas(file,maxDim||2200);
+  const b64=canvas.toDataURL("image/jpeg",quality||0.92);
+  return{b64,mediaType:"image/jpeg"};
+}
+// Downscale (for speed) + grayscale/contrast-stretch (for accuracy) before handing the image to OCR.
+async function preprocessImageForOCR(file){
+  const canvas=await loadOrientedCanvas(file,1800);
+  const w=canvas.width,h=canvas.height;
+  const ctx=canvas.getContext("2d");
+  try{
+    const imgData=ctx.getImageData(0,0,w,h);const d=imgData.data;
+    let min=255,max=0;
+    for(let i=0;i<d.length;i+=4){const g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];if(g<min)min=g;if(g>max)max=g}
+    const range=Math.max(1,max-min);
+    for(let i=0;i<d.length;i+=4){const g=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];const v=Math.min(255,Math.max(0,((g-min)/range)*255));d[i]=d[i+1]=d[i+2]=v}
+    ctx.putImageData(imgData,0,0);
+  }catch(e){}
+  return canvas;
 }
 const STMT_MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
 // Find a date ANYWHERE in the line (not just a whole-line match) — real statements often put
@@ -12212,8 +12278,46 @@ function GuidedTour({onDone,force}){const stored=parseInt(localStorage.getItem("
 function WelcomeCard({onView,onTour,onDismiss}){return o("div",{style:{margin:"0 0 16px",background:`linear-gradient(135deg,${c.ac}18 0%,${c.sfg} 100%)`,borderRadius:20,border:`1px solid ${c.ac}35`,padding:"18px 18px 14px",position:"relative"}},[t("button",{onClick:onDismiss,style:{position:"absolute",top:12,right:12,background:"transparent",border:"none",color:c.tm,fontSize:16,lineHeight:1,padding:4},children:"×"}),o("div",{style:{marginBottom:14}},[t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:17,color:c.tx,marginBottom:4},children:"👋 Welcome! Let's get you set up"}),t("div",{style:{fontSize:12,color:c.tm},children:"Complete these steps to start tracking your finances."})]),o("div",{style:{display:"flex",flexDirection:"column",gap:1}},[o("button",{onClick:()=>onView("accounts"),className:"w100 trc act99",style:{display:"flex",alignItems:"center",gap:12,padding:"11px 0",background:"transparent",border:"none",borderBottom:`1px solid ${c.brs}`}},[t("span",{style:{fontSize:18,flexShrink:0},children:"🏦"}),t("div",{style:{flex:1,textAlign:"left"}},[t("div",{style:{fontSize:14,fontWeight:500,color:c.tx},children:"Add your first account"}),t("div",{style:{fontSize:11,color:c.tm},children:"Bank account or wallet"})]),t("span",{style:{color:c.ac,fontSize:16},children:"›"})]),o("button",{onClick:()=>onView("settings"),className:"w100 trc act99",style:{display:"flex",alignItems:"center",gap:12,padding:"11px 0",background:"transparent",border:"none",borderBottom:`1px solid ${c.brs}`}},[t("span",{style:{fontSize:18,flexShrink:0},children:"💰"}),t("div",{style:{flex:1,textAlign:"left"}},[t("div",{style:{fontSize:14,fontWeight:500,color:c.tx},children:"Set a monthly budget"}),t("div",{style:{fontSize:11,color:c.tm},children:"Track how much you've spent"})]),t("span",{style:{color:c.ac,fontSize:16},children:"›"})]),o("button",{onClick:onTour,className:"w100 trc act99",style:{display:"flex",alignItems:"center",gap:12,padding:"11px 0",background:"transparent",border:"none"}},[t("span",{style:{fontSize:18,flexShrink:0},children:"✨"}),t("div",{style:{flex:1,textAlign:"left"}},[t("div",{style:{fontSize:14,fontWeight:500,color:c.tx},children:"Take the quick tour"}),t("div",{style:{fontSize:11,color:c.tm},children:"Learn all features in 2 minutes"})]),t("span",{style:{color:c.ac,fontSize:16},children:"›"})])])])}
 
 
+// === PORTRAIT ORIENTATION LOCK ===
+// The Web Orientation API (screen.orientation.lock) only ever works for an installed
+// Android PWA running in standalone/fullscreen mode, and is undefined entirely on iOS —
+// Apple has never implemented it for web content, "Add to Home Screen" included. Where
+// it's available we still ask for it (harmless no-op otherwise); everywhere else this
+// falls back to visually counter-rotating the whole app back to portrait, so the layout
+// itself never has to cope with a landscape shape.
+function tryNativeOrientationLock(){
+  try{if(screen.orientation&&screen.orientation.lock)screen.orientation.lock("portrait").catch(()=>{})}catch(e){}
+}
+function OrientationLock(){
+  const measure=()=>({w:window.innerWidth,h:window.innerHeight});
+  const[dim,sDim]=useState(measure);
+  const[angle,sAngle]=useState(-90);
+  useEffect(()=>{
+    tryNativeOrientationLock();
+    const upd=()=>{
+      sDim(measure());
+      let a=-90;
+      try{
+        if(screen.orientation&&typeof screen.orientation.angle==="number")a=screen.orientation.angle===270?90:-90;
+        else if(typeof window.orientation==="number")a=window.orientation===-90?90:-90;
+      }catch(e){}
+      sAngle(a);
+      tryNativeOrientationLock();
+    };
+    upd();
+    window.addEventListener("resize",upd);
+    window.addEventListener("orientationchange",upd);
+    document.addEventListener("visibilitychange",upd);
+    return()=>{window.removeEventListener("resize",upd);window.removeEventListener("orientationchange",upd);document.removeEventListener("visibilitychange",upd)};
+  },[]);
+  const landscape=dim.w>dim.h;
+  // Always the same div-wrapping-App tree shape in both orientations (only the style
+  // differs) so React never remounts App -- and loses its in-memory state -- on rotation.
+  const style=landscape?{position:"fixed",top:"50%",left:"50%",width:dim.h,height:dim.w,transform:`translate(-50%,-50%) rotate(${angle}deg)`,background:"#0E0D0B"}:{width:"100%",height:"100%"};
+  return t("div",{style,children:t(App,{forcedVpH:landscape?dim.w:null})});
+}
 // === MOUNT ===
-createRoot(document.getElementById("root")).render(t(App,{}));
+createRoot(document.getElementById("root")).render(t(OrientationLock,{}));
 </script>
 </body>
 </html>
