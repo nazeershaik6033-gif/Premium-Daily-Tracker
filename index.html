@@ -2562,11 +2562,12 @@ return o("div",{children:[
       ]}),
       o("div",{style:{marginBottom:12},children:[
         t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1,marginBottom:6},children:"PAY WITH — APPLIES TO ALL SELECTED ITEMS"}),
-        o("select",{value:snapBulkPay,onChange:ev=>{const v=ev.target.value;setSnapBulkPay(v);if(!v)return;const ci=v.indexOf(":");const kind=v.slice(0,ci),pid=v.slice(ci+1);setSnapItems(items=>items?items.map((it,i)=>!snapSel[i]?it:(kind==="acc"?{...it,mop:"account",accountId:pid,cardId:null}:{...it,mop:"card",cardId:pid,accountId:null})):items)},style:{width:"100%",boxSizing:"border-box",background:c.sfg,border:`1px solid ${snapBulkPay?c.ac:c.brs}`,borderRadius:12,padding:"12px",color:snapBulkPay?c.tx:c.tm,fontSize:13,outline:"none",fontFamily:'var(--tf)',colorScheme:"dark"},children:[
+        o("select",{value:snapBulkPay,onChange:ev=>{const v=ev.target.value;setSnapBulkPay(v);if(!v)return;const ci=v.indexOf(":");const kind=v.slice(0,ci),pid=v.slice(ci+1);setSnapItems(items=>items?items.map((it,i)=>(!snapSel[i]||it._payOverridden)?it:(kind==="acc"?{...it,mop:"account",accountId:pid,cardId:null}:{...it,mop:"card",cardId:pid,accountId:null})):items)},style:{width:"100%",boxSizing:"border-box",background:c.sfg,border:`1px solid ${snapBulkPay?c.ac:c.brs}`,borderRadius:12,padding:"12px",color:snapBulkPay?c.tx:c.tm,fontSize:13,outline:"none",fontFamily:'var(--tf)',colorScheme:"dark"},children:[
           t("option",{value:"",children:"Choose account or card for all…"}),
           o("optgroup",{label:"🏦 Accounts",children:data.accounts.map(a=>t("option",{key:a.id,value:"acc:"+a.id,children:(a.emoji||"🏦")+" "+a.name}))}),
           (()=>{const ucr=(data.cards||[]).filter(c2=>!c2.isExternal);return ucr.length?o("optgroup",{label:"💳 Cards",children:ucr.map(cr=>t("option",{key:cr.id,value:"card:"+cr.id,children:"💳 "+cr.name+(cr.last4?" ··"+cr.last4:"")}))}):null})(),
         ]}),
+        (()=>{const n=snapItems.filter((it,i)=>snapSel[i]&&it._payOverridden).length;return n>0&&t("div",{style:{fontSize:10.5,color:c.tm,marginTop:6,lineHeight:1.4},children:`${n} item${n>1?"s":""} kept the account/card you set individually — tap its name below to change it.`})})(),
       ]}),
       !snapMulti&&outCount>0&&!snapMonthOk&&o("div",{style:{background:"#f59e0b18",border:"1px solid #f59e0b44",borderRadius:12,padding:"12px 14px",marginBottom:12},children:[
         t("div",{style:{fontSize:13,color:"#d97706",fontWeight:600,marginBottom:8},children:`⚠ ${outCount} item${outCount>1?"s":""} have dates outside ${monthLabel}`}),
@@ -2588,7 +2589,32 @@ return o("div",{children:[
                 it._photoIdx&&t("span",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,background:c.sfg,borderRadius:5,padding:"2px 5px",flexShrink:0},children:`P${it._photoIdx}`}),
               ]}),
               it.note&&t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:it.note}),
-              (()=>{const acc=data.accounts.find(a=>a.id===it.accountId);const card=(data.cards||[]).find(cr=>cr.id===it.cardId);const pay=it.mop==="card"?(card?("💳 "+card.name):null):(acc?((acc.emoji||"🏦")+" "+acc.name):null);const outDate=!snapMulti&&isOut(it.date);return t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:pay?outDate?"#d97706":c.tm:c.co,marginTop:2},children:String(co(it.category)?.label||it.category||"other").toUpperCase()+(snapMulti?(it.date?"":" · ⚠ NO DATE"):(it.date?(outDate?" · ⚠ "+it.date:" · "+it.date):""))+(pay?" · "+pay:" · ⚠ NO ACCOUNT/CARD")})})(),
+              (()=>{
+                const acc=data.accounts.find(a=>a.id===it.accountId);const card=(data.cards||[]).find(cr=>cr.id===it.cardId);
+                const pay=it.mop==="card"?(card?("💳 "+card.name):null):(acc?((acc.emoji||"🏦")+" "+acc.name):null);
+                const outDate=!snapMulti&&isOut(it.date);
+                const prefix=String(co(it.category)?.label||it.category||"other").toUpperCase()+(snapMulti?(it.date?"":" · ⚠ NO DATE"):(it.date?(outDate?" · ⚠ "+it.date:" · "+it.date):""));
+                const ucr=(data.cards||[]).filter(c2=>!c2.isExternal);
+                const payVal=it.mop==="card"?(it.cardId?"card:"+it.cardId:""):(it.accountId?"acc:"+it.accountId:"");
+                // Tapping the pay label opens a real <select> right there — no need to open the
+                // full pencil-edit panel just to move one item to a different account/card.
+                // Any choice made here is marked _payOverridden so a later bulk "PAY WITH" pick
+                // (which applies to every selected item) leaves this one alone.
+                return o("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:pay?outDate?"#d97706":c.tm:c.co,marginTop:2,display:"flex",flexWrap:"wrap",alignItems:"center"},children:[
+                  t("span",{children:prefix+" · "}),
+                  o("select",{
+                    value:payVal,
+                    onClick:ev=>ev.stopPropagation(),
+                    onChange:ev=>{const v=ev.target.value;if(!v)return;const ci=v.indexOf(":");const kind=v.slice(0,ci),pid=v.slice(ci+1);snapUpd(i,kind==="acc"?{mop:"account",accountId:pid,cardId:null,_payOverridden:true}:{mop:"card",cardId:pid,accountId:null,_payOverridden:true})},
+                    style:{background:"transparent",border:"none",color:"inherit",font:"inherit",letterSpacing:"inherit",padding:0,margin:0,appearance:"none",cursor:"pointer",maxWidth:170},
+                    children:[
+                      t("option",{value:"",children:"⚠ NO ACCOUNT/CARD"}),
+                      o("optgroup",{label:"🏦 Accounts",children:data.accounts.map(a=>t("option",{key:a.id,value:"acc:"+a.id,children:(a.emoji||"🏦")+" "+a.name}))}),
+                      ucr.length?o("optgroup",{label:"💳 Cards",children:ucr.map(cr=>t("option",{key:cr.id,value:"card:"+cr.id,children:"💳 "+cr.name+(cr.last4?" ··"+cr.last4:"")}))}):null,
+                    ]
+                  }),
+                ]})
+              })(),
             ]}),
             t("div",{style:{fontFamily:'var(--nf)',fontSize:13,fontWeight:600,color:c.tx,flexShrink:0},children:fm(it.amount,data.currency)}),
             t("button",{onClick:()=>setSnapEdit(isEd?null:i),title:"Edit item",style:{padding:"6px 7px",background:isEd?c.ac+"22":c.sfg,border:`1px solid ${isEd?c.ac+"55":c.brs}`,borderRadius:8,color:isEd?c.ac:c.td,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"},children:t(Pencil,{size:13})}),
@@ -2603,8 +2629,8 @@ return o("div",{children:[
               o("button",{onClick:()=>snapUpd(i,{mop:"account",cardId:null}),className:"act95 tr f ia jc",style:{flex:1,padding:"9px 0",gap:6,background:it.mop!=="card"?c.ac:"transparent",color:it.mop!=="card"?"#0a0a0a":c.td,borderRadius:9,fontSize:13,fontWeight:it.mop!=="card"?700:400,border:"none"},children:"🏦 Account"}),
               o("button",{onClick:()=>snapUpd(i,{mop:"card",accountId:null}),className:"act95 tr f ia jc",style:{flex:1,padding:"9px 0",gap:6,background:it.mop==="card"?c.ac:"transparent",color:it.mop==="card"?"#0a0a0a":c.td,borderRadius:9,fontSize:13,fontWeight:it.mop==="card"?700:400,border:"none"},children:"💳 Card"}),
             ]})]}),
-            it.mop!=="card"&&o("div",{children:[fldL("ACCOUNT"),t("div",{className:"f sx",style:{gap:8,overflowX:"auto"},children:data.accounts.map(a=>{const s=it.accountId===a.id;return o("button",{key:a.id,onClick:()=>snapUpd(i,{accountId:a.id,cardId:null}),className:"act95 tr f ia",style:{gap:8,padding:"9px 12px",background:s?c.sf3:c.sf,border:`1px solid ${s?c.ac:c.brs}`,borderRadius:11,flexShrink:0,fontSize:13,color:s?c.tx:c.td,fontWeight:s?500:400},children:[t("span",{children:a.emoji}),t("span",{children:a.name})]})})})]}),
-            it.mop==="card"&&o("div",{children:[fldL("CREDIT / DEBIT CARD"),ucr.length===0?t("div",{style:{padding:"12px 14px",background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,fontSize:12,color:c.tm,textAlign:"center"},children:"No cards added yet. Go to Cards section to add one."}):t("div",{className:"f sx",style:{gap:8,overflowX:"auto"},children:ucr.map(cr=>{const s=it.cardId===cr.id;return o("button",{key:cr.id,onClick:()=>snapUpd(i,{cardId:cr.id,accountId:null}),className:"act95 tr f ia",style:{gap:8,padding:"9px 12px",background:s?c.sf3:c.sf,border:`1px solid ${s?c.ac:c.brs}`,borderRadius:11,flexShrink:0,fontSize:13,color:s?c.tx:c.td,fontWeight:s?500:400},children:[t("span",{style:{fontSize:14},children:"💳"}),t("span",{children:cr.name}),cr.last4&&o("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm},children:["··",cr.last4]})]})})})]}),
+            it.mop!=="card"&&o("div",{children:[fldL("ACCOUNT"),t("div",{className:"f sx",style:{gap:8,overflowX:"auto"},children:data.accounts.map(a=>{const s=it.accountId===a.id;return o("button",{key:a.id,onClick:()=>snapUpd(i,{accountId:a.id,cardId:null,_payOverridden:true}),className:"act95 tr f ia",style:{gap:8,padding:"9px 12px",background:s?c.sf3:c.sf,border:`1px solid ${s?c.ac:c.brs}`,borderRadius:11,flexShrink:0,fontSize:13,color:s?c.tx:c.td,fontWeight:s?500:400},children:[t("span",{children:a.emoji}),t("span",{children:a.name})]})})})]}),
+            it.mop==="card"&&o("div",{children:[fldL("CREDIT / DEBIT CARD"),ucr.length===0?t("div",{style:{padding:"12px 14px",background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,fontSize:12,color:c.tm,textAlign:"center"},children:"No cards added yet. Go to Cards section to add one."}):t("div",{className:"f sx",style:{gap:8,overflowX:"auto"},children:ucr.map(cr=>{const s=it.cardId===cr.id;return o("button",{key:cr.id,onClick:()=>snapUpd(i,{cardId:cr.id,accountId:null,_payOverridden:true}),className:"act95 tr f ia",style:{gap:8,padding:"9px 12px",background:s?c.sf3:c.sf,border:`1px solid ${s?c.ac:c.brs}`,borderRadius:11,flexShrink:0,fontSize:13,color:s?c.tx:c.td,fontWeight:s?500:400},children:[t("span",{style:{fontSize:14},children:"💳"}),t("span",{children:cr.name}),cr.last4&&o("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm},children:["··",cr.last4]})]})})})]}),
             !hasPay&&t("div",{style:{fontFamily:'var(--nf)',fontSize:10.5,color:c.co,letterSpacing:.3,padding:"9px 12px",background:c.co+"12",borderRadius:10,border:`1px solid ${c.co}30`},children:"⚠ Select an account or card above to enable saving"}),
             o("div",{children:[
               o("div",{className:"f ia",style:{gap:8,marginBottom:8},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1,flexShrink:0},children:"CATEGORY"}),o("div",{className:"f ia",style:{flex:1,background:c.sfg,border:`1px solid ${cq?c.ac+"66":c.brs}`,borderRadius:8,padding:"5px 9px",gap:5},children:[t(Srch,{size:12,color:cq?c.ac:c.tm}),t("input",{value:cq,onChange:ev=>snapUpd(i,{_catQ:ev.target.value}),placeholder:"search across all groups…",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:12,fontFamily:F.sa,minWidth:0}}),cq&&t("button",{onClick:()=>snapUpd(i,{_catQ:""}),style:{background:"transparent",border:"none",color:c.tm,padding:0,display:"flex"},children:t(X,{size:11})})]})]}),
