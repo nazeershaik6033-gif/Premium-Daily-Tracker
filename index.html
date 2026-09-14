@@ -674,7 +674,7 @@ const rd=ts=>{const d=new Date(ts),tt=ds(),tx=ds(new Date(ts)),df=(tt-tx)/864e5;
 // AI vision/OCR (and native <input type=date>) hand back bare "YYYY-MM-DD" strings. `new Date(str)`
 // parses those as UTC midnight per spec, which then shows hours off in any non-UTC timezone (e.g.
 // renders as "5:30 AM" for IST). Parse the components directly so it lands on local midnight instead.
-function parseAIDate(s){const m=String(s||"").match(/^(\d{4})-(\d{2})-(\d{2})/);if(!m)return new Date(NaN);return new Date(+m[1],+m[2]-1,+m[3])}
+function parseAIDate(s){const m=String(s||"").match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return new Date(+m[1],+m[2]-1,+m[3]);const iso=SNAP_ISO(s);if(!iso)return new Date(NaN);const p=iso.split("-");return new Date(+p[0],+p[1]-1,+p[2])}
 // Normalise a scanned date to YYYY-MM-DD, or null when the photo had no usable date.
 // Day-first is assumed for slash/dot formats, matching how dates are written in Indian diaries.
 const SNAP_DATE_RE=/^\d{4}-\d{2}-\d{2}$/;
@@ -3965,7 +3965,8 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
   const[toD,sToD]=useState("");
   const win=useMemo(()=>{
     if(useCustom&&fromD&&toD){const s=new Date(fromD+"T00:00:00").getTime(),e=new Date(toD+"T23:59:59").getTime();if(!isNaN(s)&&!isNaN(e)&&s<=e)return{startTs:s,endTs:e,label:fromD+" → "+toD};}
-    return{startTs:Date.now()-period*30*864e5,endTs:Infinity,label:period+" month(s)"};
+    const st=new Date();st.setMonth(st.getMonth()-period);st.setHours(0,0,0,0);
+    return{startTs:st.getTime(),endTs:Infinity,label:period===1?"the last month":"the last "+period+" months"};
   },[useCustom,fromD,toD,period]);
   const[filter,sFilter]=useState("unlogged");
   const[sortDir,sSortDir]=useState("desc");
@@ -4007,7 +4008,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
       const rawAmt=String(row[aI]||"").replace(/[^0-9.]/g,"");
       const amt=parseFloat(rawAmt);if(!amt||isNaN(amt)||amt<=0)continue;
       const rawDate=String(row[dI]||"");let ts=0;
-      if(rawDate){const pd=new Date(rawDate);if(!isNaN(pd.getTime()))ts=pd.getTime()}
+      if(rawDate){const iso=SNAP_ISO(rawDate);if(iso){const pp=iso.split("-");ts=new Date(+pp[0],+pp[1]-1,+pp[2]).getTime()}else{const pd=new Date(rawDate);if(!isNaN(pd.getTime()))ts=pd.getTime()}}
       if(!ts)continue;
       const merchant=mI>=0?String(row[mI]||"").trim().slice(0,60):"";
       // Rows that came from the photo→OCR→CSV path carry their photo + ambiguity flags across,
@@ -4162,6 +4163,18 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
   },[parsed,expenses,win,cmpCardId]);
   const logged=recon.filter(r=>r.match);
   const unlogged=recon.filter(r=>!r.match);
+  // The compare window is a rolling period counted back from today, but a statement covers a past
+  // billing cycle — so rows can sit entirely outside it. That used to hide the whole comparison
+  // with no explanation; keep the statement's own span so the UI can say so and offer a fix.
+  const stmtSpan=useMemo(()=>{
+    if(!parsed||!parsed.length)return null;
+    let mn=Infinity,mx=-Infinity;
+    for(const x of parsed){const d=Number(x.date);if(!isFinite(d))continue;if(d<mn)mn=d;if(d>mx)mx=d}
+    return isFinite(mn)&&isFinite(mx)?{mn,mx}:null;
+  },[parsed]);
+  const dropped=(parsed?parsed.length:0)-recon.length;
+  const spanLabel=stmtSpan?(()=>{const f=ts=>new Date(ts).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});return f(stmtSpan.mn)===f(stmtSpan.mx)?f(stmtSpan.mn):f(stmtSpan.mn)+" → "+f(stmtSpan.mx)})():null;
+  const spanToCustom=()=>{if(!stmtSpan)return;sFromD(tsToYMD(stmtSpan.mn));sToD(tsToYMD(stmtSpan.mx));sUseCustom(true)};
   const mkExp=(tx)=>({type:"expense",amount:tx.amount,currency,accountId:(accounts&&accounts[0]&&accounts[0].id)||null,cardId:cmpCardId||null,category:tx.category||guessCat(tx.merchant),merchant:tx.merchant||null,note:"From statement",date:tx.date,source:"statement",...(tx.verified?{stmtVerified:true}:{})});
   const logOne=(tx)=>onAddExpenses&&onAddExpenses([mkExp(tx)]);
   // Replace one row in the parsed list in place — recon recomputes off `parsed`, so a corrected
@@ -4291,6 +4304,20 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports}){
       cmpCardId&&t("div",{style:{fontSize:11,color:c.tm,marginTop:8,lineHeight:1.5},children:"Matching only this card's transactions. Anything you log will be assigned to this card."})
     ]}),
     err&&t("div",{style:{background:c.co+"20",border:`1px solid ${c.co}40`,borderRadius:12,padding:"10px 14px",marginBottom:16,fontSize:13,color:c.co,lineHeight:1.5},children:err}),
+    // Every statement row fell outside the compare window. Previously this rendered nothing at
+    // all below the period chips — the comparison simply vanished with no reason given.
+    parsed&&parsed.length>0&&recon.length===0&&o("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,padding:"14px 16px",marginBottom:16},children:[
+      t("div",{key:"h",style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:8},children:"NOTHING TO COMPARE"}),
+      t("div",{key:"b",style:{fontSize:13,color:c.tx,lineHeight:1.55},children:`Read ${parsed.length} transaction${parsed.length===1?"":"s"} from the statement, but none of them fall inside ${win.label}.`}),
+      spanLabel&&t("div",{key:"s",style:{fontSize:12.5,color:c.tm,lineHeight:1.55,marginTop:6},children:`The statement covers ${spanLabel}.`}),
+      stmtSpan&&t("button",{key:"w",onClick:spanToCustom,className:"act95 tr",style:{marginTop:12,padding:"9px 16px",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:999,fontSize:12.5,fontWeight:600,fontFamily:'var(--nf)'},children:"Compare across the statement's dates"}),
+      !stmtSpan&&t("div",{key:"n",style:{fontSize:12,color:c.tm,marginTop:8,lineHeight:1.5},children:"None of the rows carried a readable date — check the Date column, or re-scan the statement."})
+    ]}),
+    // Some rows matched and some fell outside — say how many rather than quietly shrinking the list.
+    recon.length>0&&dropped>0&&o("div",{style:{background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,padding:"10px 14px",marginBottom:12},children:[
+      t("div",{key:"b",style:{fontSize:12.5,color:c.tm,lineHeight:1.5},children:`${dropped} of ${parsed.length} statement transaction${parsed.length===1?"":"s"} fall outside ${win.label} and aren't compared.`}),
+      stmtSpan&&t("button",{key:"w",onClick:spanToCustom,className:"act95 tr",style:{marginTop:9,padding:"7px 14px",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:999,fontSize:12,fontFamily:'var(--nf)'},children:"Include them"})
+    ]}),
     recon.length>0&&o(Fragment,{children:[
       o("div",{style:{marginBottom:16},children:t(AiChatBox,{getContext:stmtCtx,label:"ASK ABOUT THIS STATEMENT",intro:"Ask anything about these transactions — e.g. \"What's my biggest unlogged expense?\", \"Group the unlogged ones by merchant\", or \"Any subscriptions I forgot?\"",suggestions:["Biggest unlogged?","Group by merchant","Spot subscriptions"]})}),
       o("div",{className:"g g2",style:{gap:10,marginBottom:14},children:[
