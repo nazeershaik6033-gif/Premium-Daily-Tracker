@@ -1117,7 +1117,31 @@ const SH=({title,onBack,right})=>o("div",{className:"f ia jb",style:{padding:"0 
 // A save action pinned to the viewport so it's always reachable, even on a long
 // scrolling form — unlike a button placed inline in a header or at the bottom
 // of the content, which scrolls out of reach as soon as you scroll past it.
-const FloatingSave=({onClick,disabled,label="Save"})=>t("button",{onClick,disabled,"aria-label":label,title:label,className:"act95 tr",style:{position:"fixed",right:"max(18px, env(safe-area-inset-right))",bottom:"calc(88px + env(safe-area-inset-bottom))",width:52,height:52,borderRadius:"50%",background:disabled?c.sf2:c.ac,color:disabled?c.tm:"#0a0a0a",border:"none",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:disabled?"none":"0 8px 24px rgba(0,0,0,.35)",zIndex:35,cursor:disabled?"default":"pointer"},children:t(Check,{size:22,color:disabled?c.tm:"#0a0a0a",strokeWidth:2.75})});
+// Also draggable (pointer events cover mouse + touch): a plain tap still saves,
+// but a press-and-drag repositions it, for when it lands over something you
+// need to see or tap underneath. The position is remembered across every
+// screen that uses this button (localStorage) and re-clamped to the viewport
+// on load and on resize/rotation, so it can never end up stranded off-screen.
+const FLOAT_SAVE_KEY="etp-floatsave-pos",FLOAT_SAVE_SIZE=52;
+const clampFloatSave=(x,y)=>{const m=8,maxX=window.innerWidth-FLOAT_SAVE_SIZE-m,maxY=window.innerHeight-FLOAT_SAVE_SIZE-m;return{x:Math.max(m,Math.min(x,maxX)),y:Math.max(m,Math.min(y,maxY))}};
+const FloatingSave=({onClick,disabled,label="Save"})=>{
+  const[pos,setPos]=useState(()=>{try{const s=JSON.parse(localStorage.getItem(FLOAT_SAVE_KEY)||"null");if(s&&typeof s.x==="number"&&typeof s.y==="number")return clampFloatSave(s.x,s.y)}catch{}return null});
+  const[dragging,setDragging]=useState(false);
+  const btnRef=useRef(null),dragRef=useRef(null),lastPosRef=useRef(pos);
+  useEffect(()=>{const onResize=()=>setPos(p=>p?clampFloatSave(p.x,p.y):p);window.addEventListener("resize",onResize);return()=>window.removeEventListener("resize",onResize)},[]);
+  const endDrag=(ev,cancelled)=>{
+    const d=dragRef.current;dragRef.current=null;
+    try{btnRef.current.releasePointerCapture(ev.pointerId)}catch{}
+    if(d&&d.moved){setDragging(false);try{localStorage.setItem(FLOAT_SAVE_KEY,JSON.stringify(lastPosRef.current))}catch{}return}
+    if(!cancelled&&!disabled)onClick&&onClick();
+  };
+  return t("button",{ref:btnRef,"aria-label":label,title:label+" — drag to move",className:dragging?"":"act95 tr",
+    onPointerDown:ev=>{const rect=btnRef.current.getBoundingClientRect();dragRef.current={startX:ev.clientX,startY:ev.clientY,origX:rect.left,origY:rect.top,moved:false};try{btnRef.current.setPointerCapture(ev.pointerId)}catch{}},
+    onPointerMove:ev=>{const d=dragRef.current;if(!d)return;const dx=ev.clientX-d.startX,dy=ev.clientY-d.startY;if(!d.moved&&Math.hypot(dx,dy)<6)return;if(!d.moved){d.moved=true;setDragging(true)}const next=clampFloatSave(d.origX+dx,d.origY+dy);lastPosRef.current=next;setPos(next)},
+    onPointerUp:ev=>endDrag(ev,false),onPointerCancel:ev=>endDrag(ev,true),
+    style:{position:"fixed",...(pos?{left:pos.x,top:pos.y}:{right:"max(18px, env(safe-area-inset-right))",bottom:"calc(88px + env(safe-area-inset-bottom))"}),width:FLOAT_SAVE_SIZE,height:FLOAT_SAVE_SIZE,borderRadius:"50%",background:disabled?c.sf2:c.ac,color:disabled?c.tm:"#0a0a0a",border:"none",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:disabled?"none":"0 8px 24px rgba(0,0,0,.35)",zIndex:35,cursor:disabled?"grab":(dragging?"grabbing":"grab"),touchAction:"none",userSelect:"none",WebkitUserSelect:"none"},
+    children:t(Check,{size:22,color:disabled?c.tm:"#0a0a0a",strokeWidth:2.75})})
+};
 const ES=({title,subtitle,cta,onCta})=>o("div",{className:"tc",style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:"48px 24px"},children:[t("div",{style:{fontFamily:c.hf,fontSize:22,color:c.td},children:title}),subtitle&&t("div",{style:{fontSize:13,color:c.tm,marginTop:8},children:subtitle}),cta&&(c.dk?t("div",{className:"f jc",style:{marginTop:20},children:t(NeuBtn,{label:cta,flat:true,onClick:onCta})}):t("button",{onClick:onCta,className:"act95 trt",style:{marginTop:20,padding:"10px 18px",background:c.ac,color:"#0a0a0a",borderRadius:11,fontSize:13,fontWeight:600,border:"none"},children:cta}))]});
 // === Synth-style neumorphic buttons (ref: CRED Synth) ===
 // NeuImg: circular neumorphic image/icon button (Synth SynthImageButton)
