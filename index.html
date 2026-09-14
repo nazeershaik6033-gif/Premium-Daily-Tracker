@@ -424,7 +424,17 @@ const paintNavVars=(nc,name)=>{const r=document.documentElement.style;
 // === LAYOUT TOKENS ===
 // One content width and one card radius for the whole app. The app previously
 // hardcoded maxWidth:AW in 7 places and used 8 different card radii.
-const AW=560;          // max content width
+let AW=560;            // max content width — widened in landscape, see computeAW()
+const AW_PORTRAIT=560;
+// In landscape, let content use more of the width instead of sitting in a
+// narrow phone-width column with empty space on both sides. ~72% of the
+// landscape width reads well without stretching cards into unreadable
+// full-bleed rows; floored at the portrait width and capped so it's never
+// wider than the viewport nor absurdly wide on a large desktop window.
+const computeAW=(w,h)=>{
+  if(w<=h)return AW_PORTRAIT;
+  return Math.max(AW_PORTRAIT,Math.min(1100,Math.round(w*0.72),w-32));
+};
 const R=18;            // card radius
 const GUT=12;          // side gutter: cards inset this much from the screen edge
 // One card recipe: no border, a single soft elevation. Cards are figure, the
@@ -653,6 +663,8 @@ function monthWeeks(start,end){const out=[];let s=start,wk=1;while(s<end){const 
 const ys=(d=new Date())=>new Date(d.getFullYear(),0,1).getTime();
 // Per-section minimise/maximise defaults (true = maximised/open). Controlled from Settings → Sections.
 const SEC_META=[{id:"budget",label:"Monthly Budget",grp:"Home"},{id:"safe",label:"Safe to Spend",grp:"Home"},{id:"statsReimb",label:"Reimbursement expenses",grp:"Stats"},{id:"ldSettled",label:"Settled up",grp:"Lending diary"},{id:"lasCharges",label:"Charges breakdown",grp:"LAS Tracker"}];
+// Per-section "maximised by default" overrides — anything not listed here defaults to minimised (false).
+const SEC_DEFAULTS={budget:true};
 const SEC_KEY="etp-section-prefs";
 let _secPrefs=(()=>{try{return JSON.parse(localStorage.getItem(SEC_KEY))||{}}catch{return{}}})();
 const gSec=(id,def=false)=>_secPrefs[id]!=null?!!_secPrefs[id]:def;
@@ -1097,6 +1109,10 @@ function CountUp({v,fmt,style,className}){
 const IB=({onClick,children,size=36})=>t("button",{onClick,className:"act90 trt neu neu-press",style:{width:size,height:size,borderRadius:12,background:c.sfg,border:`1px solid ${c.brs}`,display:"flex",alignItems:"center",justifyContent:"center"},children});
 const BB=({onClick})=>c.dk?t("button",{onClick,"aria-label":"back",className:"neu-circ neu-press act95 f ia jc",style:{width:38,height:38,borderRadius:999,background:c.sfg,border:`1px solid ${c.brs}`},children:t(CL,{size:18,color:c.cu})}):t(IB,{onClick,size:38,children:t(CL,{size:20,color:c.tx})});
 const SH=({title,onBack,right})=>o("div",{className:"f ia jb",style:{padding:"0 24px",marginBottom:20},children:[onBack?t(BB,{onClick:onBack}):t("div",{style:{width:38}}),t("div",{style:{fontFamily:c.hf,fontSize:24},children:title}),right||t("div",{style:{width:38}})]});
+// A save action pinned to the viewport so it's always reachable, even on a long
+// scrolling form — unlike a button placed inline in a header or at the bottom
+// of the content, which scrolls out of reach as soon as you scroll past it.
+const FloatingSave=({onClick,disabled,label="Save"})=>t("button",{onClick,disabled,"aria-label":label,title:label,className:"act95 tr",style:{position:"fixed",right:"max(18px, env(safe-area-inset-right))",bottom:"calc(88px + env(safe-area-inset-bottom))",width:52,height:52,borderRadius:"50%",background:disabled?c.sf2:c.ac,color:disabled?c.tm:"#0a0a0a",border:"none",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:disabled?"none":"0 8px 24px rgba(0,0,0,.35)",zIndex:35,cursor:disabled?"default":"pointer"},children:t(Check,{size:22,color:disabled?c.tm:"#0a0a0a",strokeWidth:2.75})});
 const ES=({title,subtitle,cta,onCta})=>o("div",{className:"tc",style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:"48px 24px"},children:[t("div",{style:{fontFamily:c.hf,fontSize:22,color:c.td},children:title}),subtitle&&t("div",{style:{fontSize:13,color:c.tm,marginTop:8},children:subtitle}),cta&&(c.dk?t("div",{className:"f jc",style:{marginTop:20},children:t(NeuBtn,{label:cta,flat:true,onClick:onCta})}):t("button",{onClick:onCta,className:"act95 trt",style:{marginTop:20,padding:"10px 18px",background:c.ac,color:"#0a0a0a",borderRadius:11,fontSize:13,fontWeight:600,border:"none"},children:cta}))]});
 // === Synth-style neumorphic buttons (ref: CRED Synth) ===
 // NeuImg: circular neumorphic image/icon button (Synth SynthImageButton)
@@ -1620,7 +1636,7 @@ return o("div",{style:{padding:`8px ${GUT}px 32px`},className:"st",children:[
 ]});
 }
 function ReimbLinkSht({prompt,expenses,currency,onLink,onClose}){const[sel,setSel]=useState(new Set());return t(Sht,{onClose,children:o(Fragment,{children:[o("div",{className:"f ia",style:{gap:12,marginBottom:20},children:[t("div",{style:{width:48,height:48,borderRadius:14,background:c.ac+"22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0},children:"↩️"}),o("div",{children:[t("div",{style:{fontSize:17,fontWeight:700,color:c.tx},children:"Reimbursement received?"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:"This income matches a pending reimbursable expense"})]})]})  ,o("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,overflow:"hidden",marginBottom:20},children:prompt.candidates.map((e,i)=>{const cat=co(e.category),isOn=sel.has(e.id);return o("button",{key:e.id,onClick:()=>setSel(s=>{const ns=new Set(s);ns.has(e.id)?ns.delete(e.id):ns.add(e.id);return ns}),className:"w100 f ia act99 trt",style:{padding:"12px 14px",borderBottom:i===prompt.candidates.length-1?"none":`1px solid ${c.brs}`,background:"transparent",border:"none",color:"inherit",gap:12,textAlign:"left"},children:[t("div",{style:{width:22,height:22,borderRadius:999,border:`2px solid ${isOn?c.ac:c.brs}`,background:isOn?c.ac:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 150ms"},children:isOn?t(Check,{size:12,color:"#0a0a0a",strokeWidth:3}):null}),t("span",{style:{fontSize:18,flexShrink:0},children:cat.emoji}),o("div",{className:"f1 minw0",children:[t("div",{className:"tru",style:{fontSize:13,fontWeight:500,color:c.tx},children:e.merchant||e.payee||cat.label}),t("div",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.tm},children:new Date(e.date).toLocaleDateString("en-US",{month:"short",day:"numeric"})})]}),t("div",{style:{fontFamily:'var(--nf)',fontSize:14,fontWeight:600,flexShrink:0},children:fm(e.amount,currency)})]})})}),o("div",{style:{display:"flex",flexDirection:"column",gap:8},children:[sel.size>0&&t("button",{onClick:()=>{[...sel].forEach(expId=>onLink(expId,prompt.incomeId));onClose()},className:"w100 act98 tr",style:{padding:"14px 0",background:c.ac,color:"#0a0a0a",borderRadius:12,fontWeight:600,fontSize:14,border:"none"},children:`Link ${sel.size} expense${sel.size>1?"s":""} as reimbursed`}),t("button",{onClick:onClose,className:"w100 act98 tr",style:{padding:"12px 0",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:12,color:c.td,fontSize:13},children:"Skip for now"})]})]})})}
-function App({forcedVpH}={}){
+function App(){
   // Real, live viewport height in px, not a CSS dvh string. dvh support and
   // its recalc timing vary enough across mobile browsers/WebViews that the
   // root container could come up short of the true viewport. window.innerHeight
@@ -1628,28 +1644,24 @@ function App({forcedVpH}={}){
   // way dvh sometimes does. The bottom nav is pinned with position:fixed
   // (see .nav-bar), so it always sits flush at the true viewport edge
   // regardless of any residual imprecision here.
-  // `forcedVpH`, when set, comes from OrientationLock: while it is visually
-  // counter-rotating the app back to portrait (see === PORTRAIT ORIENTATION
-  // LOCK === below), the real window.innerHeight reports the *landscape*
-  // viewport's short edge, which is the wrong number for our rotated box —
-  // so that measurement is skipped entirely in favor of the forced value.
-  const[vpH,setVpH]=useState(()=>forcedVpH||(typeof window!=="undefined"?window.innerHeight:800));
+  const[vpH,setVpH]=useState(()=>typeof window!=="undefined"?window.innerHeight:800);
+  const[vpW,setVpW]=useState(()=>typeof window!=="undefined"?window.innerWidth:400);
   useEffect(()=>{
-    if(forcedVpH){setVpH(forcedVpH);return}
     // Take the largest of three independent measurements rather than trusting
     // any single one -- on some mobile browsers innerHeight/visualViewport can
     // under-report right after load, before the chrome (toolbar, home
     // indicator) has finished settling. Re-measure a few times after mount to
     // catch that late settling, since a single resize listener can miss it.
     const measure=()=>Math.max(window.innerHeight||0,window.visualViewport?.height||0,document.documentElement.clientHeight||0);
-    const upd=()=>setVpH(measure());
+    const measureW=()=>Math.max(window.innerWidth||0,window.visualViewport?.width||0,document.documentElement.clientWidth||0);
+    const upd=()=>{setVpH(measure());setVpW(measureW())};
     upd();
     const timers=[120,500,1200].map(ms=>setTimeout(upd,ms));
     window.addEventListener("resize",upd);
     window.addEventListener("orientationchange",upd);
     window.visualViewport?.addEventListener("resize",upd);
     return()=>{timers.forEach(clearTimeout);window.removeEventListener("resize",upd);window.removeEventListener("orientationchange",upd);window.visualViewport?.removeEventListener("resize",upd)};
-  },[forcedVpH]);
+  },[]);
   const[v,sV]=useState("home");
   const navFromRef=useRef("home");
   const scrollRef=useRef(null);
@@ -2003,8 +2015,17 @@ function App({forcedVpH}={}){
   const nav=!["newAccount","editAccount","newCard","editCard","newRecurring","editRecurring","newBill","editBill","newGoal","editGoal","newInvestment","editInvestment","newTransfer","newProfile","editProfile","backup","howToUse"].includes(v);
   const fzScale=d.fontSize==="small"?0.88:d.fontSize==="large"?1.12:1;
   const fzH=`${(vpH/fzScale).toFixed(2)}px`;
+  const fzW=fzScale!==1?`${(100/fzScale).toFixed(4)}%`:"100%";
+  // Text-size scaling used to rely on the CSS `zoom` property, which several
+  // browsers/WebViews don't implement (it silently no-ops there, so "Small"/
+  // "Large" appeared to do nothing at all). `transform:scale` is universally
+  // supported; we size the shell to its pre-scale dimensions the same way
+  // `zoom` used to, then visually scale it up/down so the rendered result
+  // still exactly fills the viewport.
+  AW=computeAW(vpW,vpH);
+  document.documentElement.style.setProperty("--aw",AW+"px");
   const dv={...d,expenses:(d.expenses||[]).filter(e=>!e.archived),openingBalances:d.openingBalances||[]};
-  return o("div",{id:"app-shell",style:{background:c.bgg,color:c.tx,fontFamily:'var(--tf)',height:fzH,maxHeight:fzH,width:"100%",overflow:"hidden",display:"flex",flexDirection:"column",alignItems:"center",zoom:fzScale,transformOrigin:"top left",boxSizing:"border-box",paddingTop:"calc(52px + env(safe-area-inset-top))"},className:"",children:[
+  return o("div",{id:"app-shell",style:{background:c.bgg,color:c.tx,fontFamily:'var(--tf)',height:fzH,maxHeight:fzH,width:fzW,overflow:"hidden",display:"flex",flexDirection:"column",alignItems:"center",transform:fzScale!==1?`scale(${fzScale})`:undefined,transformOrigin:"top left",boxSizing:"border-box",paddingTop:"calc(52px + env(safe-area-inset-top))"},className:"",children:[
     t(Gr,{}),
     t(AppHeader,{onMenu:()=>{sSbFocus(null);sSbar(true)},onSearch:()=>sV("search"),onToggleTheme:toggleTheme,isDark,theme,onHome:()=>{sFlt(null);sAtx(null);if(scrollRef.current)scrollRef.current.scrollTop=0;sV("home")},onAI:()=>{sSbFocus("AI");sSbar(true)},onDiary:()=>{navFromRef.current=v;sV("diary")}}),
     d.expenses.some(e=>e.archived)&&(d.openingBalances||[]).length>0&&o("div",{style:{margin:"10px 16px 0",padding:"14px 16px",background:"#7f1d1d",border:"1px solid #ef4444",borderRadius:14,display:"flex",alignItems:"flex-start",gap:12,width:"calc(100% - 32px)",maxWidth:408,boxSizing:"border-box"},children:[t("span",{style:{fontSize:22,flexShrink:0},children:"⚠️"}),o("div",{className:"f1",children:[t("div",{style:{fontSize:14,fontWeight:700,color:"#fef2f2",marginBottom:4},children:"Reconcile archived your transactions"}),t("div",{style:{fontSize:12,color:"#fca5a5",lineHeight:1.5,marginBottom:10},children:d.expenses.filter(e=>e.archived).length+" transactions were archived. Tap below to restore all of them immediately."}),t("button",{onClick:doRevertAllReconcile,className:"act98 tr",style:{padding:"10px 20px",background:"#ef4444",border:"none",borderRadius:10,color:"#fff",fontWeight:700,fontSize:14},children:"Restore all transactions now"})]})]})  ,
@@ -3370,7 +3391,7 @@ const weekRows=useMemo(()=>{if(!isMonthly)return null;const wks=monthWeeks(st,en
 // (rent on the 1st, etc.) trivially blows past it -- a huge, meaningless "over" figure
 // rather than a real overspending signal.
 const over=state!=="future"&&days>=7&&fairShare!=null&&spent>fairShare;const sd=new Date(w.s),ed=new Date(w.e-864e5);const range=sd.toLocaleDateString("en-US",{month:"short",day:"numeric"})+(days>1?"–"+ed.toLocaleDateString("en-US",{day:"numeric"}):"");return{wk:w.wk,range,spent,left,state,over,overBy:over?spent-fairShare:0}})},[expenses,st,en,isMonthly,budget,netSp]);
-const[budOpen,sBudOpen]=useState(()=>gSec("budget",false));const toggleBud=()=>{sBudOpen(v=>{const nv=!v;sSec("budget",nv);return nv})};
+const[budOpen,sBudOpen]=useState(()=>gSec("budget",SEC_DEFAULTS.budget));const toggleBud=()=>{sBudOpen(v=>{const nv=!v;sSec("budget",nv);return nv})};
 return o("div",{style:{background:c.sfg,borderRadius:16,border:`1px solid ${ov?c.co+"50":c.brs}`,overflow:"hidden",marginBottom:10},children:[
   o("div",{style:{padding:"12px 16px 10px",borderBottom:budOpen?`1px solid ${c.brs}`:"none",background:`linear-gradient(135deg,${dot}12 0%,transparent 60%)`},children:[
     t("button",{onClick:toggleBud,"aria-expanded":budOpen,className:"w100 tl act98 trt",style:{display:"block",background:"transparent",border:"none",padding:0,cursor:"pointer"},children:o("div",{className:"f ia jb",children:[
@@ -3407,8 +3428,8 @@ return o("div",{style:{background:c.sfg,borderRadius:16,border:`1px solid ${ov?c
   budOpen&&weekRows&&weekRows.length>0&&o("div",{className:"stg",style:{padding:"2px 16px 14px",borderTop:`1px solid ${c.brs}`},children:[
     t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1,margin:"10px 0 6px"},children:"THIS MONTH · BY WEEK"}),
     ...weekRows.map((w,i)=>{const stateLbl=w.state==="past"?"spent":w.state==="current"?"spent so far":"left to spend";const isFut=w.state==="future";const val=isFut?(w.left!=null?fm(w.left,currency):"—"):fm(w.spent,currency);const valCol=w.over?c.co:isFut?c.mt:w.state==="current"?c.tx:c.td;return o("div",{key:i,className:"f ia jb",style:{padding:"7px 0",borderTop:i?`1px solid ${c.brs}`:"none"},children:[
-      o("div",{className:"f ia",style:{gap:8,minWidth:0},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:11,color:w.state==="current"?dot:c.td,fontWeight:w.state==="current"?700:500,flexShrink:0},children:"W"+w.wk}),t("span",{className:"tru",style:{fontSize:11,color:c.tm},children:w.range}),w.state==="current"&&t("span",{style:{fontFamily:'var(--nf)',fontSize:7.5,letterSpacing:.5,textTransform:"uppercase",padding:"1px 5px",borderRadius:999,color:dot,background:dot+"1a",flexShrink:0},children:"now"}),w.over&&t("span",{title:`${fm(w.overBy,currency)} over this week's fair share`,style:{fontFamily:'var(--nf)',fontSize:7.5,letterSpacing:.5,textTransform:"uppercase",padding:"1px 5px",borderRadius:999,color:c.co,background:c.co+"1a",flexShrink:0},children:"⚠ over"})]}),
-      o("div",{style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:12,fontWeight:600,color:valCol},children:val}),t("div",{style:{fontFamily:'var(--nf)',fontSize:8,color:w.over?c.co:c.tm,letterSpacing:.3,marginTop:1},children:w.over?`+${fm(w.overBy,currency)} over share`:stateLbl})]}),
+      o("div",{className:"f ia",style:{gap:8,minWidth:0},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:'calc(var(--ns) * 0.79)',color:w.state==="current"?dot:c.td,fontWeight:w.state==="current"?700:500,flexShrink:0},children:"W"+w.wk}),t("span",{className:"tru",style:{fontSize:'calc(var(--ns) * 0.79)',color:c.tm},children:w.range}),w.state==="current"&&t("span",{style:{fontFamily:'var(--nf)',fontSize:'calc(var(--ns) * 0.54)',letterSpacing:.5,textTransform:"uppercase",padding:"1px 5px",borderRadius:999,color:dot,background:dot+"1a",flexShrink:0},children:"now"}),w.over&&t("span",{title:`${fm(w.overBy,currency)} over this week's fair share`,style:{fontFamily:'var(--nf)',fontSize:'calc(var(--ns) * 0.54)',letterSpacing:.5,textTransform:"uppercase",padding:"1px 5px",borderRadius:999,color:c.co,background:c.co+"1a",flexShrink:0},children:"⚠ over"})]}),
+      o("div",{style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:'calc(var(--ns) * 0.86)',fontWeight:600,color:valCol},children:val}),t("div",{style:{fontFamily:'var(--nf)',fontSize:'calc(var(--ns) * 0.57)',color:w.over?c.co:c.tm,letterSpacing:.3,marginTop:1},children:w.over?`+${fm(w.overBy,currency)} over share`:stateLbl})]}),
     ]})}),
   ]}),
 ]})}
@@ -7372,6 +7393,10 @@ return o(Fragment,{children:[o("div",{className:"fi",style:{paddingTop:48,paddin
   iE&&!iI&&_grocCats.includes(ct)&&onView&&t("div",{style:{padding:"0 24px",marginBottom:14},children:t("button",{onClick:()=>onView("groceries"),className:"w100 act95 tr f ia jc",style:{gap:7,padding:"11px 0",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:12,color:c.td,fontSize:12.5,fontWeight:500},children:[t("span",{style:{fontSize:13},children:"🧺"}),"View in Groceries"]})}),
   t("div",{style:{padding:"0 24px",marginTop:billLikely?12:24},children:t("button",{disabled:!canSave,onClick:()=>{split?svSplit():sv()},className:"w100 act98 tr",style:{padding:"16px 0",background:canSave?(billLikely?"transparent":(iI?c.mt:c.ac)):c.sf2,color:canSave?(billLikely?c.td:"#0a0a0a"):c.tm,borderRadius:14,fontWeight:600,fontSize:15,letterSpacing:.3,border:billLikely?`1px solid ${c.brs}`:"none"},children:!canSave?(split&&ev2>0?(remaining<0?"Split exceeds the total":(remaining>0?`${fm(remaining,acc?.currency||currency)} left to assign`:"Add at least 2 categories")):"Enter an amount"):(split?`Save split · ${lines.length} entries`:(iE?"Save changes":(billLikely?"Save as expense anyway":(rc?"Save & start recurring":(iI?"Save income":"Save expense")))))})}),
 ]}),
+  // Long form, easy to be scrolled away from the bottom Save button above —
+  // this floating twin stays reachable the whole time, mirroring the same
+  // save action (split vs. single).
+  t(FloatingSave,{onClick:()=>{split?svSplit():sv()},disabled:!canSave}),
   splitPickFor&&(()=>{const q2=splitCatQ.trim().toLowerCase();const fc=q2?cs.filter(x=>x.label.toLowerCase().includes(q2)||x.emoji.includes(splitCatQ.trim())):cs;return t(Sht,{onClose:()=>{sSplitPickFor(null);sSplitCatQ("")},children:o(Fragment,{children:[
     t("div",{style:{fontFamily:c.hf,fontSize:18,fontWeight:700,color:c.tx,marginBottom:14},children:"Pick a category"}),
     o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${splitCatQ?c.ac+"66":c.brs}`,borderRadius:10,padding:"9px 12px",marginBottom:12},children:[t(Srch,{size:14,color:splitCatQ?c.ac:c.tm}),t("input",{value:splitCatQ,onChange:e=>sSplitCatQ(e.target.value),placeholder:"Search categories…",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:13.5,fontFamily:'var(--tf)',minWidth:0}}),splitCatQ&&t("button",{onClick:()=>sSplitCatQ(""),style:{background:"transparent",border:"none",color:c.tm,display:"flex",flexShrink:0},children:t(X,{size:13})})]}),
@@ -10252,7 +10277,7 @@ function ThresholdRulesBlock({data,persist}){
     ]}))}),
   ]});
 }
-function Settings({data,persist,onClose,onBackup,onCategories,onView,theme,onSetTheme}){const{budget,budgetPeriod,currency,monthStartDay,financeProfile}=data;const fp=financeProfile||{};const[b,sB]=useState(budget==null?"":String(budget));const[bp,sBp]=useState(budgetPeriod||"monthly");const[cu,sCu]=useState(currency||"₹");const[ms,sMs]=useState(monthStartDay||1);const[ak,sAk]=useState(gAK()||"");const[show,sShow]=useState(false);const[prov,sPr]=useState(gProv());const[mdl2,sMdl2]=useState(gMdl()||"");const[aiMode,sAiMode]=useState(gAIMode());const[fz,sFz]=useState(data.fontSize||"medium");const[at,sAt]=useState(data.alertThreshold!=null?String(data.alertThreshold):"");const[secSt,sSecSt]=useState(()=>Object.fromEntries(SEC_META.map(s=>[s.id,gSec(s.id,false)])));
+function Settings({data,persist,onClose,onBackup,onCategories,onView,theme,onSetTheme}){const{budget,budgetPeriod,currency,monthStartDay,financeProfile}=data;const fp=financeProfile||{};const[b,sB]=useState(budget==null?"":String(budget));const[bp,sBp]=useState(budgetPeriod||"monthly");const[cu,sCu]=useState(currency||"₹");const[ms,sMs]=useState(monthStartDay||1);const[ak,sAk]=useState(gAK()||"");const[show,sShow]=useState(false);const[prov,sPr]=useState(gProv());const[mdl2,sMdl2]=useState(gMdl()||"");const[aiMode,sAiMode]=useState(gAIMode());const[fz,sFz]=useState(data.fontSize||"medium");const[at,sAt]=useState(data.alertThreshold!=null?String(data.alertThreshold):"");const[secSt,sSecSt]=useState(()=>Object.fromEntries(SEC_META.map(s=>[s.id,gSec(s.id,SEC_DEFAULTS[s.id]||false)])));
 const[showResetCur,sShowResetCur]=useState(false);
 const[stgQ,sStgQ]=useState("");
 const[mEn,sMEn]=useState(data.morningEnabled||false);const[mTime,sMTime]=useState(data.morningTime||"08:00");const[eEn,sEEn]=useState(data.eveningEnabled??(data.reminderEnabled||false));const[eTime,sETime]=useState(data.eveningTime||data.reminderTime||"21:00");const[notifPerm,sNotifPerm]=useState(typeof Notification!=='undefined'?Notification.permission:'unsupported');
@@ -10280,7 +10305,8 @@ const showAppUpdates=stgHit("app updates","force reload","cache","refresh","serv
 const showFinance=stgHit("finance profile","income","fixed expenses","savings goal","emergency fund","debt");
 const stgNoneVisible=stgWords.length>0&&![showHowTo,showAI,showBudget,showCurrency,showAlert,showTextSize,showSections,showTheme,showFonts,showMonthStart,showNotif,showBackup,showAppUpdates,showFinance].some(Boolean);
 return o("div",{style:{padding:`8px ${GUT}px 104px`},className:"st",children:[
-  t(SH,{title:t("em",{children:"Settings"}),onBack:onClose,right:t("button",{onClick:save,className:"act95 trt",style:{padding:"8px 14px",background:c.ac,color:"#0a0a0a",borderRadius:10,fontSize:12,fontWeight:600,border:"none"},children:"Save"})}),
+  t(SH,{title:t("em",{children:"Settings"}),onBack:onClose}),
+  t(FloatingSave,{onClick:save}),
   o("div",{style:{marginBottom:14},children:[o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${stgQ?c.ac+"66":c.brs}`,borderRadius:12,padding:"10px 14px"},children:[t(Srch,{size:14,color:stgQ?c.ac:c.tm}),t("input",{value:stgQ,onChange:e=>sStgQ(e.target.value),placeholder:"Search settings…",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:13.5,fontFamily:'var(--tf)',minWidth:0}}),stgQ&&t("button",{onClick:()=>sStgQ(""),style:{background:"transparent",border:"none",color:c.tm,display:"flex",flexShrink:0},children:t(X,{size:13})})]})]}),
   stgNoneVisible&&t("div",{style:{padding:"20px 0",textAlign:"center",color:c.tm,fontSize:13},children:`No settings match "${stgQ.trim()}"`}),
   showHowTo&&o("button",{onClick:()=>onView&&onView("howToUse"),className:"w100 f ia trc act95",style:{gap:12,padding:"14px 18px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:18,marginBottom:12},children:[t("div",{style:{width:36,height:36,borderRadius:10,background:c.ac+"20",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t(Help,{size:20,color:c.ac})}),o("div",{className:"f1 tl",children:[t("div",{style:{fontSize:14,color:c.tx,fontWeight:500},children:"How to use"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:"Guide, tips, and feature tour"})]}),t(CR,{size:14,color:c.tm})]}),
@@ -12339,46 +12365,14 @@ function GuidedTour({onDone,force}){const stored=parseInt(localStorage.getItem("
 function WelcomeCard({onView,onTour,onDismiss}){return o("div",{style:{margin:"0 0 16px",background:`linear-gradient(135deg,${c.ac}18 0%,${c.sfg} 100%)`,borderRadius:20,border:`1px solid ${c.ac}35`,padding:"18px 18px 14px",position:"relative"}},[t("button",{onClick:onDismiss,style:{position:"absolute",top:12,right:12,background:"transparent",border:"none",color:c.tm,fontSize:16,lineHeight:1,padding:4},children:"×"}),o("div",{style:{marginBottom:14}},[t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:17,color:c.tx,marginBottom:4},children:"👋 Welcome! Let's get you set up"}),t("div",{style:{fontSize:12,color:c.tm},children:"Complete these steps to start tracking your finances."})]),o("div",{style:{display:"flex",flexDirection:"column",gap:1}},[o("button",{onClick:()=>onView("accounts"),className:"w100 trc act99",style:{display:"flex",alignItems:"center",gap:12,padding:"11px 0",background:"transparent",border:"none",borderBottom:`1px solid ${c.brs}`}},[t("span",{style:{fontSize:18,flexShrink:0},children:"🏦"}),t("div",{style:{flex:1,textAlign:"left"}},[t("div",{style:{fontSize:14,fontWeight:500,color:c.tx},children:"Add your first account"}),t("div",{style:{fontSize:11,color:c.tm},children:"Bank account or wallet"})]),t("span",{style:{color:c.ac,fontSize:16},children:"›"})]),o("button",{onClick:()=>onView("settings"),className:"w100 trc act99",style:{display:"flex",alignItems:"center",gap:12,padding:"11px 0",background:"transparent",border:"none",borderBottom:`1px solid ${c.brs}`}},[t("span",{style:{fontSize:18,flexShrink:0},children:"💰"}),t("div",{style:{flex:1,textAlign:"left"}},[t("div",{style:{fontSize:14,fontWeight:500,color:c.tx},children:"Set a monthly budget"}),t("div",{style:{fontSize:11,color:c.tm},children:"Track how much you've spent"})]),t("span",{style:{color:c.ac,fontSize:16},children:"›"})]),o("button",{onClick:onTour,className:"w100 trc act99",style:{display:"flex",alignItems:"center",gap:12,padding:"11px 0",background:"transparent",border:"none"}},[t("span",{style:{fontSize:18,flexShrink:0},children:"✨"}),t("div",{style:{flex:1,textAlign:"left"}},[t("div",{style:{fontSize:14,fontWeight:500,color:c.tx},children:"Take the quick tour"}),t("div",{style:{fontSize:11,color:c.tm},children:"Learn all features in 2 minutes"})]),t("span",{style:{color:c.ac,fontSize:16},children:"›"})])])])}
 
 
-// === PORTRAIT ORIENTATION LOCK ===
-// The Web Orientation API (screen.orientation.lock) only ever works for an installed
-// Android PWA running in standalone/fullscreen mode, and is undefined entirely on iOS —
-// Apple has never implemented it for web content, "Add to Home Screen" included. Where
-// it's available we still ask for it (harmless no-op otherwise); everywhere else this
-// falls back to visually counter-rotating the whole app back to portrait, so the layout
-// itself never has to cope with a landscape shape.
-function tryNativeOrientationLock(){
-  try{if(screen.orientation&&screen.orientation.lock)screen.orientation.lock("portrait").catch(()=>{})}catch(e){}
-}
-function OrientationLock(){
-  const measure=()=>({w:window.innerWidth,h:window.innerHeight});
-  const[dim,sDim]=useState(measure);
-  const[angle,sAngle]=useState(-90);
-  useEffect(()=>{
-    tryNativeOrientationLock();
-    const upd=()=>{
-      sDim(measure());
-      let a=-90;
-      try{
-        if(screen.orientation&&typeof screen.orientation.angle==="number")a=screen.orientation.angle===270?90:-90;
-        else if(typeof window.orientation==="number")a=window.orientation===-90?90:-90;
-      }catch(e){}
-      sAngle(a);
-      tryNativeOrientationLock();
-    };
-    upd();
-    window.addEventListener("resize",upd);
-    window.addEventListener("orientationchange",upd);
-    document.addEventListener("visibilitychange",upd);
-    return()=>{window.removeEventListener("resize",upd);window.removeEventListener("orientationchange",upd);document.removeEventListener("visibilitychange",upd)};
-  },[]);
-  const landscape=dim.w>dim.h;
-  // Always the same div-wrapping-App tree shape in both orientations (only the style
-  // differs) so React never remounts App -- and loses its in-memory state -- on rotation.
-  const style=landscape?{position:"fixed",top:"50%",left:"50%",width:dim.h,height:dim.w,transform:`translate(-50%,-50%) rotate(${angle}deg)`,background:"#0E0D0B"}:{width:"100%",height:"100%"};
-  return t("div",{style,children:t(App,{forcedVpH:landscape?dim.w:null})});
-}
 // === MOUNT ===
-createRoot(document.getElementById("root")).render(t(OrientationLock,{}));
+// Previously the whole app was visually counter-rotated back to portrait
+// whenever the device was in landscape, so the layout never had to cope
+// with a landscape shape. The app now lays out responsively in either
+// orientation (see computeAW() and the app-shell sizing in App()), so it
+// mounts directly and simply renders in whatever orientation the device is
+// actually in.
+createRoot(document.getElementById("root")).render(t(App,{}));
 </script>
 </body>
 </html>
