@@ -2921,14 +2921,11 @@ function DailyLesson({onClose}){
             t("span",{style:{fontSize:18,flexShrink:0},children:f.emoji}),
             t("div",{className:"tru",style:{fontSize:13,color:c.tx},children:f.title}),
           ]}),
-          t("button",{onClick:e=>{e.stopPropagation();sFavs(toggleFavLesson(f))},"aria-label":"Remove from favourites",style:{background:"transparent",border:"none",padding:2,display:"flex",flexShrink:0,color:c.gd},children:t(Star,{size:15,color:c.gd,fill:c.gd})}),
+          t("button",{onClick:e=>{e.stopPropagation();sFavs(toggleFavLesson(f))},"aria-label":"Remove from favourites",title:"Remove from favourites",style:{background:"transparent",border:"none",padding:4,display:"flex",flexShrink:0,color:c.tm,cursor:"pointer"},children:t(X,{size:15,color:c.tm})}),
         ]}))}),
     }),
-    favOpen&&t(Sht,{onClose:()=>sFavOpen(null),children:o(Fragment,{children:[
-      o("div",{className:"f ia jb",style:{marginBottom:12},children:[
-        t("span",{style:{fontFamily:'var(--nf)',fontSize:9.5,letterSpacing:1,padding:"3px 10px",borderRadius:999,background:c.gd+"1c",color:c.gd,border:`1px solid ${c.gd}40`},children:"FAVOURITE"}),
-        t("button",{onClick:()=>{sFavs(toggleFavLesson(favOpen));sFavOpen(null)},"aria-label":"Remove from favourites",style:{background:"transparent",border:"none",padding:2,display:"flex",color:c.gd},children:t(Star,{size:18,color:c.gd,fill:c.gd})}),
-      ]}),
+    favOpen&&t(Sht,{onClose:()=>sFavOpen(null),footer:t("button",{onClick:()=>{sFavs(toggleFavLesson(favOpen));sFavOpen(null)},className:"w100 act98 tr f ia jc",style:{gap:8,padding:"13px 0",background:c.co,color:"#0a0a0a",border:"none",borderRadius:12,fontSize:14,fontWeight:600},children:[t(X,{size:15,color:"#0a0a0a"}),"Remove from Favourites"]}),children:o(Fragment,{children:[
+      t("span",{style:{fontFamily:'var(--nf)',fontSize:9.5,letterSpacing:1,padding:"3px 10px",borderRadius:999,background:c.gd+"1c",color:c.gd,border:`1px solid ${c.gd}40`,display:"inline-block",marginBottom:12},children:"FAVOURITE"}),
       o("div",{className:"f ia",style:{gap:10,marginBottom:10},children:[
         t("span",{style:{fontSize:28,flexShrink:0},children:favOpen.emoji}),
         t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:19,color:c.tx,lineHeight:1.25},children:favOpen.title}),
