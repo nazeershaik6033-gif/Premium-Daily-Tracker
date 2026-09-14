@@ -327,7 +327,7 @@ const t=(type,props,key)=>{
 };
 const o=t;
 // === Inline SVG icons (replacing lucide-react) ===
-const _i=(...els)=>(p={})=>ce("svg",{width:p.size||24,height:p.size||24,viewBox:"0 0 24 24",fill:"none",stroke:p.color||"currentColor",strokeWidth:p.strokeWidth||2,strokeLinecap:"round",strokeLinejoin:"round",style:p.style},...els.map((e,i)=>{
+const _i=(...els)=>(p={})=>ce("svg",{width:p.size||24,height:p.size||24,viewBox:"0 0 24 24",fill:p.fill||"none",stroke:p.color||"currentColor",strokeWidth:p.strokeWidth||2,strokeLinecap:"round",strokeLinejoin:"round",style:p.style},...els.map((e,i)=>{
   if(typeof e==="string")return ce("path",{key:i,d:e});
   if(e.c)return ce("circle",{key:i,cx:e.c[0],cy:e.c[1],r:e.c[2]});
   if(e.r)return ce("rect",{key:i,x:e.r[0],y:e.r[1],width:e.r[2],height:e.r[3],rx:e.r[4]||0});
@@ -335,6 +335,7 @@ const _i=(...els)=>(p={})=>ce("svg",{width:p.size||24,height:p.size||24,viewBox:
   return null;
 }));
 const Plus=_i("M12 5v14","M5 12h14");
+const Star=_i("M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z");
 const X=_i("M18 6 6 18","m6 6 12 12");
 const Trash2=_i("M3 6h18","m19 6-3 18a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L3 6","M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2","M10 11v6","M14 11v6");
 const Hm=_i("m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z","M9 22V12h6v10");
@@ -1404,6 +1405,19 @@ const lessonIdxOfDay=()=>Math.floor(Date.now()/864e5)%LESSONS.length;
 const lessonOfDay=()=>LESSONS[lessonIdxOfDay()];
 const lessonsRead=()=>{try{return JSON.parse(localStorage.getItem("etp-lessons-read")||"[]")}catch{return[]}};
 const markLessonRead=(id)=>{try{const r=lessonsRead();if(!r.includes(id))localStorage.setItem("etp-lessons-read",JSON.stringify([...r,id]))}catch{}};
+// Favourite lessons are stored as full content snapshots, not just ids — Trending
+// lessons regenerate daily (AI-fetched ones get a fresh id each day), so there's
+// nothing stable to look back up later. Standard lessons never change, so
+// snapshotting them too costs nothing and keeps both kinds handled the same way.
+const FAV_LESSONS_KEY="etp-fav-lessons";
+const favLessons=()=>{try{return JSON.parse(localStorage.getItem(FAV_LESSONS_KEY)||"[]")}catch{return[]}};
+const isFavLesson=(id)=>favLessons().some(f=>f.id===id);
+const toggleFavLesson=(snap)=>{
+  const cur=favLessons();
+  const next=cur.some(f=>f.id===snap.id)?cur.filter(f=>f.id!==snap.id):[{...snap,favoritedAt:Date.now()},...cur];
+  try{localStorage.setItem(FAV_LESSONS_KEY,JSON.stringify(next))}catch{}
+  return next;
+};
 
 // === MERCHANT MEMORY (learns category/account per merchant from history; data.merchantRules overrides) ===
 const _mmNorm=s=>(s||"").trim().toLowerCase();
@@ -2795,6 +2809,15 @@ function DailyLesson({onClose}){
   const readCount=lessonsRead().length;
   const nav=(dir)=>sIdx(i=>(i+dir+LESSONS.length)%LESSONS.length);
 
+  // Favourites store a full content snapshot (not just an id) so a favourited
+  // Trending lesson still opens correctly after its original entry is gone —
+  // AI-fetched Trending items get a fresh id every day.
+  const[favs,sFavs]=useState(()=>favLessons());
+  const[favOpen,sFavOpen]=useState(null);
+  const snapOf=(item,source)=>({id:item.id,source,emoji:item.emoji||"📰",title:item.title,body:item.body,takeaway:item.takeaway,quote:item.quote||null,author:item.author||null,cat:source==="standard"?item.cat:null});
+  const onToggleFav=(item,source)=>sFavs(toggleFavLesson(snapOf(item,source)));
+  const favBtn=(item,source)=>{const on=favs.some(f=>f.id===item.id);return t("button",{onClick:()=>onToggleFav(item,source),"aria-label":on?"Remove from favourites":"Add to favourites",style:{background:"transparent",border:"none",padding:2,display:"flex",flexShrink:0,cursor:"pointer",color:on?c.gd:c.tm},children:t(Star,{size:16,color:on?c.gd:c.tm,fill:on?c.gd:"none"})})};
+
   const[trend,sTrend]=useState(null);
   const[trendIdx,sTrendIdx]=useState(0);
   const[trendLoading,sTrendLoading]=useState(false);
@@ -2832,7 +2855,10 @@ function DailyLesson({onClose}){
       o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,borderLeft:`3px solid ${cat.col}`,padding:"18px 18px 16px"},children:[
         o("div",{className:"f ia jb",style:{marginBottom:12},children:[
           t("span",{style:{fontFamily:'var(--nf)',fontSize:9.5,letterSpacing:1,padding:"3px 10px",borderRadius:999,background:cat.col+"1c",color:cat.col,border:`1px solid ${cat.col}40`},children:cat.l.toUpperCase()}),
-          lessonsRead().includes(L.id)&&t("span",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.mt,letterSpacing:.5},children:"✓ READ"}),
+          o("div",{className:"f ia",style:{gap:10,flexShrink:0},children:[
+            lessonsRead().includes(L.id)&&t("span",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.mt,letterSpacing:.5},children:"✓ READ"}),
+            favBtn(L,"standard"),
+          ]}),
         ]}),
         o("div",{className:"f ia",style:{gap:10,marginBottom:10},children:[
           t("span",{style:{fontSize:28,flexShrink:0},children:L.emoji}),
@@ -2865,6 +2891,7 @@ function DailyLesson({onClose}){
         o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,borderLeft:`3px solid ${c.ac}`,padding:"18px 18px 16px"},children:[
           o("div",{className:"f ia jb",style:{marginBottom:12},children:[
             t("span",{style:{fontFamily:'var(--nf)',fontSize:9.5,letterSpacing:1,padding:"3px 10px",borderRadius:999,background:c.ac+"1c",color:c.ac,border:`1px solid ${c.ac}40`},children:isAITrend?"AI · TODAY":"CURATED"}),
+            favBtn(T,"trending"),
           ]}),
           o("div",{className:"f ia",style:{gap:10,marginBottom:10},children:[
             t("span",{style:{fontSize:28,flexShrink:0},children:T.emoji||"📰"}),
@@ -2886,6 +2913,33 @@ function DailyLesson({onClose}){
         ]}),
       ]}),
     ]}),
+    t(Collapsible,{title:"FAVOURITES",badge:favs.length>0?t(Pl,{col:c.gd,children:favs.length}):null,defaultOpen:false,children:
+      favs.length===0
+        ?t("div",{style:{fontSize:12,color:c.tm,textAlign:"center",padding:"16px 0"},children:"Tap the star on any lesson to save it here."})
+        :o("div",{style:{display:"flex",flexDirection:"column"},children:favs.map((f,i)=>o("div",{key:f.id,onClick:()=>sFavOpen(f),className:"act99 trt f ia jb",style:{padding:"10px 0",borderTop:i?`1px solid ${c.brs}`:"none",cursor:"pointer"},children:[
+          o("div",{className:"f ia minw0",style:{gap:10},children:[
+            t("span",{style:{fontSize:18,flexShrink:0},children:f.emoji}),
+            t("div",{className:"tru",style:{fontSize:13,color:c.tx},children:f.title}),
+          ]}),
+          t("button",{onClick:e=>{e.stopPropagation();sFavs(toggleFavLesson(f))},"aria-label":"Remove from favourites",title:"Remove from favourites",style:{background:"transparent",border:"none",padding:4,display:"flex",flexShrink:0,color:c.tm,cursor:"pointer"},children:t(X,{size:15,color:c.tm})}),
+        ]}))}),
+    }),
+    favOpen&&t(Sht,{onClose:()=>sFavOpen(null),footer:t("button",{onClick:()=>{sFavs(toggleFavLesson(favOpen));sFavOpen(null)},className:"w100 act98 tr f ia jc",style:{gap:8,padding:"13px 0",background:c.co,color:"#0a0a0a",border:"none",borderRadius:12,fontSize:14,fontWeight:600},children:[t(X,{size:15,color:"#0a0a0a"}),"Remove from Favourites"]}),children:o(Fragment,{children:[
+      t("span",{style:{fontFamily:'var(--nf)',fontSize:9.5,letterSpacing:1,padding:"3px 10px",borderRadius:999,background:c.gd+"1c",color:c.gd,border:`1px solid ${c.gd}40`,display:"inline-block",marginBottom:12},children:"FAVOURITE"}),
+      o("div",{className:"f ia",style:{gap:10,marginBottom:10},children:[
+        t("span",{style:{fontSize:28,flexShrink:0},children:favOpen.emoji}),
+        t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:19,color:c.tx,lineHeight:1.25},children:favOpen.title}),
+      ]}),
+      t("div",{style:{fontSize:13.5,color:c.td,lineHeight:1.65},children:favOpen.body}),
+      favOpen.takeaway&&o("div",{style:{marginTop:14,padding:"12px 14px",background:c.gd+"10",border:`1px solid ${c.gd}30`,borderRadius:12},children:[
+        t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.gd,letterSpacing:1,marginBottom:4},children:"TAKEAWAY"}),
+        t("div",{style:{fontSize:13,color:c.tx,fontWeight:500,lineHeight:1.5},children:favOpen.takeaway}),
+      ]}),
+      favOpen.quote&&o("div",{style:{marginTop:14,paddingLeft:12,borderLeft:`2px solid ${c.gd}`},children:[
+        t("div",{style:{fontFamily:c.hf,fontSize:13,color:c.tx,fontStyle:"italic",lineHeight:1.5},children:`“${favOpen.quote}”`}),
+        favOpen.author&&t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.gd,letterSpacing:1,marginTop:6},children:"— "+favOpen.author.toUpperCase()}),
+      ]}),
+    ]})}),
   ]})
 }
 
