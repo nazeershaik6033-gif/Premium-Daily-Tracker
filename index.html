@@ -4391,7 +4391,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked}){
         return o("div",{key:i,style:{background:c.sfg,borderRadius:12,border:`1px solid ${susp?c.gd||c.co:r.match?c.brs:c.co+"40"}`,padding:"12px 14px"},children:[
         o("div",{className:"f ia jb",style:{gap:8},children:[
           o("div",{className:"f1 minw0",children:[
-            t("div",{className:"tru",style:{fontSize:14,color:c.tx,fontWeight:500},children:r.tx.merchant||"Unknown"}),
+            o("div",{className:"f ia minw0",style:{gap:6},children:[t("div",{className:"tru minw0",style:{fontSize:14,color:c.tx,fontWeight:500},children:r.tx.merchant||"Unknown"}),r.match&&r.match.stmtChecked&&t(StmtTick,{key:"vt",size:12})]}),
             t("div",{style:{fontSize:11,color:c.tm,marginTop:3},children:new Date(r.tx.date).toLocaleDateString("en-US",{day:"numeric",month:"short",year:"numeric"})}),
             !r.match&&t("div",{style:{fontSize:10.5,color:c.td,marginTop:3,fontFamily:'var(--nf)'},children:co(r.tx.category||guessCat(r.tx.merchant)).emoji+" "+co(r.tx.category||guessCat(r.tx.merchant)).label}),
             susp&&t("div",{style:{fontSize:10,color:c.gd||c.co,marginTop:4,fontFamily:'var(--nf)',letterSpacing:.3},children:r.tx.amtFix==="stripped3"?"⚠ ₹ REMOVED FROM AMOUNT — CHECK PHOTO":"⚠ AMOUNT MAY START WITH A MISREAD ₹"}),
