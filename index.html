@@ -809,7 +809,7 @@ async function collectLedgerPhotoFiles(ledger){const out={};for(const p2 of (led
 async function collectThreadNoteFiles(threads){const out={};for(const th of (threads||[])){for(const n of ((th&&th.notes)||[])){for(const p of [...((n&&n.photos)||[]),...((n&&n.files)||[])]){if(p&&p.id&&!p.data&&!out[p.id]){try{const b=await idbGetFile(String(p.id));if(b)out[p.id]={name:p.name||"file",type:b.type||"application/octet-stream",dataUrl:await _blobToDataUrl(b)}}catch(err){}}}}}return out}
 async function collectLasPhotoFiles(las){const out={};for(const p of ((las&&las.docs)||[])){if(p&&p.id&&!p.data&&!out[p.id]){try{const b=await idbGetFile(String(p.id));if(b)out[p.id]={name:p.name||"doc.jpg",type:b.type||"image/jpeg",dataUrl:await _blobToDataUrl(b)}}catch(err){}}}return out}
 function usePhotoSrc(photos){const[map,sMap]=useState({});useEffect(()=>{let live=true;(async()=>{const need=(photos||[]).filter(p=>p&&p.id&&!p.data&&!map[p.id]);if(!need.length)return;const m={};for(const p of need){try{const b=await idbGetFile(String(p.id));if(b)m[p.id]=await _blobToDataUrl(b)}catch(e){}}if(live&&Object.keys(m).length)sMap(mm=>({...mm,...m}))})();return()=>{live=false}},[photos]);return p=>(p&&p.data)||map[p&&p.id]||null}
-function buildBackupObj(dd){let sidebarOrder=null;try{const s=localStorage.getItem(SB_ORDER_KEY);if(s)sidebarOrder=JSON.parse(s)}catch(e){}return{version:"v3.2",exportedAt:new Date().toISOString(),expenses:dd.expenses,recurring:dd.recurring,accounts:dd.accounts,profiles:dd.profiles,cards:dd.cards||[],cardStatements:dd.cardStatements||[],bills:dd.bills||[],goals:dd.goals||[],budgetLoans:dd.budgetLoans||[],ledger:dd.ledger||[],categoryBudgets:dd.categoryBudgets||{},monthlyRestrictionLogs:dd.monthlyRestrictionLogs||[],investments:dd.investments||[],planThreshold:dd.planThreshold??null,customExpenseCategories:dd.customExpenseCategories||[],customIncomeCategories:dd.customIncomeCategories||[],categoryOverrides:dd.categoryOverrides||{},categoryOrder:dd.categoryOrder||{expense:[],income:[]},sidebarOrder,budget:dd.budget,budgetPeriod:dd.budgetPeriod,morningEnabled:dd.morningEnabled||false,morningTime:dd.morningTime||"08:00",eveningEnabled:dd.eveningEnabled||false,eveningTime:dd.eveningTime||"21:00",currency:dd.currency,monthStartDay:dd.monthStartDay,aiProvider:gProv(),aiModel:gMdl()||null,merchantRules:dd.merchantRules||{},debtPlan:dd.debtPlan||null,las:dd.las||null,varExpensePlans:dd.varExpensePlans||{},varIncomePlans:dd.varIncomePlans||{},varSavingsPlans:dd.varSavingsPlans||{},advStats:dd.advStats||{},calculators:dd.calculators||{},groceryCategories:dd.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:dd.grocerySubDefaults||{},groceryStores:dd.groceryStores||[],groceryDefaultStore:dd.groceryDefaultStore||"",priceWatch:dd.priceWatch||PW_DEFAULT,threads:dd.threads||[],thresholdRules:dd.thresholdRules||[],netWorthSnapshots:dd.netWorthSnapshots||[],savingsPots:dd.savingsPots||[],savingsTarget:dd.savingsTarget??null}}
+function buildBackupObj(dd){let sidebarOrder=null;try{const s=localStorage.getItem(SB_ORDER_KEY);if(s)sidebarOrder=JSON.parse(s)}catch(e){}return{version:"v3.2",exportedAt:new Date().toISOString(),expenses:dd.expenses,recurring:dd.recurring,accounts:dd.accounts,profiles:dd.profiles,cards:dd.cards||[],cardStatements:dd.cardStatements||[],bills:dd.bills||[],goals:dd.goals||[],budgetLoans:dd.budgetLoans||[],ledger:dd.ledger||[],categoryBudgets:dd.categoryBudgets||{},monthlyRestrictionLogs:dd.monthlyRestrictionLogs||[],investments:dd.investments||[],planThreshold:dd.planThreshold??null,customExpenseCategories:dd.customExpenseCategories||[],customIncomeCategories:dd.customIncomeCategories||[],categoryOverrides:dd.categoryOverrides||{},categoryOrder:dd.categoryOrder||{expense:[],income:[]},sidebarOrder,myQuotes:dd.myQuotes||[],favLessons:dd.favLessons||[],budget:dd.budget,budgetPeriod:dd.budgetPeriod,morningEnabled:dd.morningEnabled||false,morningTime:dd.morningTime||"08:00",eveningEnabled:dd.eveningEnabled||false,eveningTime:dd.eveningTime||"21:00",currency:dd.currency,monthStartDay:dd.monthStartDay,aiProvider:gProv(),aiModel:gMdl()||null,merchantRules:dd.merchantRules||{},debtPlan:dd.debtPlan||null,las:dd.las||null,varExpensePlans:dd.varExpensePlans||{},varIncomePlans:dd.varIncomePlans||{},varSavingsPlans:dd.varSavingsPlans||{},advStats:dd.advStats||{},calculators:dd.calculators||{},groceryCategories:dd.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:dd.grocerySubDefaults||{},groceryStores:dd.groceryStores||[],groceryDefaultStore:dd.groceryDefaultStore||"",priceWatch:dd.priceWatch||PW_DEFAULT,threads:dd.threads||[],thresholdRules:dd.thresholdRules||[],netWorthSnapshots:dd.netWorthSnapshots||[],savingsPots:dd.savingsPots||[],savingsTarget:dd.savingsTarget??null}}
 async function buildBackupJSON(dd,withFiles=true){const j=buildBackupObj(dd);if(withFiles){try{j.statementFiles=await collectStmtFiles(j.cardStatements)}catch(e){j.statementFiles={}}try{j.expensePhotos=await collectPhotoFiles(j.expenses)}catch(e){j.expensePhotos={}}try{j.ledgerPhotos=await collectLedgerPhotoFiles(j.ledger)}catch(e){j.ledgerPhotos={}}try{j.lasPhotos=await collectLasPhotoFiles(j.las)}catch(e){j.lasPhotos={}}try{j.threadFiles=await collectThreadNoteFiles(j.threads)}catch(e){j.threadFiles={}}}return JSON.stringify(j,null,2)}
 async function gdUpload(json){const token=localStorage.getItem("gd_token");if(!token)throw new Error("Not connected to Google Drive");const fname=`expense-backup-${new Date().toISOString().slice(0,10)}.json`;const meta=JSON.stringify({name:fname,mimeType:"application/json"});const form=new FormData();form.append("metadata",new Blob([meta],{type:"application/json"}));form.append("file",new Blob([json],{type:"application/json"}));const res=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{method:"POST",headers:{Authorization:"Bearer "+token},body:form});if(!res.ok){const txt=await res.text().catch(()=>res.status);throw new Error("Upload failed ("+res.status+"): "+txt)}}
 
@@ -1433,19 +1433,19 @@ const lessonIdxOfDay=()=>Math.floor(Date.now()/864e5)%LESSONS.length;
 const lessonOfDay=()=>LESSONS[lessonIdxOfDay()];
 const lessonsRead=()=>{try{return JSON.parse(localStorage.getItem("etp-lessons-read")||"[]")}catch{return[]}};
 const markLessonRead=(id)=>{try{const r=lessonsRead();if(!r.includes(id))localStorage.setItem("etp-lessons-read",JSON.stringify([...r,id]))}catch{}};
-// Favourite lessons are stored as full content snapshots, not just ids — Trending
-// lessons regenerate daily (AI-fetched ones get a fresh id each day), so there's
-// nothing stable to look back up later. Standard lessons never change, so
-// snapshotting them too costs nothing and keeps both kinds handled the same way.
-const FAV_LESSONS_KEY="etp-fav-lessons";
-const favLessons=()=>{try{return JSON.parse(localStorage.getItem(FAV_LESSONS_KEY)||"[]")}catch{return[]}};
-const isFavLesson=(id)=>favLessons().some(f=>f.id===id);
-const toggleFavLesson=(snap)=>{
-  const cur=favLessons();
-  const next=cur.some(f=>f.id===snap.id)?cur.filter(f=>f.id!==snap.id):[{...snap,favoritedAt:Date.now()},...cur];
-  try{localStorage.setItem(FAV_LESSONS_KEY,JSON.stringify(next))}catch{}
-  return next;
-};
+// Favourite lessons are stored as full content snapshots, not just ids, so a
+// favourite keeps rendering correctly however its source entry changes later.
+// They live on the data object (data.favLessons) rather than in localStorage so
+// they ride along in JSON/Drive backups and belong to the active user profile.
+const FAV_LESSONS_KEY="etp-fav-lessons";              // retired device-local store
+const FAV_MIGRATED_KEY="etp-fav-lessons-migrated-v2"; // set once it has been folded in
+const legacyFavLessons=()=>{try{return JSON.parse(localStorage.getItem(FAV_LESSONS_KEY)||"[]")}catch{return[]}};
+const favLessonsOf=(d)=>Array.isArray(d&&d.favLessons)?d.favLessons:[];
+const toggleFavLessonIn=(list,snap)=>list.some(f=>f.id===snap.id)?list.filter(f=>f.id!==snap.id):[{...snap,favoritedAt:Date.now()},...list];
+
+// === MY QUOTES (your own writing: unlimited length + optional author, in data.myQuotes) ===
+const myQuotesOf=(d)=>Array.isArray(d&&d.myQuotes)?d.myQuotes:[];
+const newQuote=(text,author)=>({id:"q_"+uid(),text:String(text||"").trim(),author:String(author||"").trim(),fav:false,createdAt:Date.now(),updatedAt:Date.now()});
 
 // === MERCHANT MEMORY (learns category/account per merchant from history; data.merchantRules overrides) ===
 const _mmNorm=s=>(s||"").trim().toLowerCase();
@@ -1707,7 +1707,7 @@ function App(){
   const[v,sV]=useState("home");
   const navFromRef=useRef("home");
   const scrollRef=useRef(null);
-  const[d,sD]=useState({expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],bills:[],goals:[],budgetLoans:[],ledger:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},categoryOrder:{expense:[],income:[]},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,fontSize:"medium",loading:true,investmentPlans:[],investments:[],planThreshold:null,monthlyRestrictionLogs:[],reminderEnabled:false,reminderTime:"21:00",rules:[],backupFreq:"off",backupGDrive:false,lastBackupAt:0,threads:[],netWorthSnapshots:[],savingsPots:[],savingsTarget:null});
+  const[d,sD]=useState({expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],bills:[],goals:[],budgetLoans:[],ledger:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},categoryOrder:{expense:[],income:[]},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,fontSize:"medium",loading:true,investmentPlans:[],investments:[],planThreshold:null,monthlyRestrictionLogs:[],reminderEnabled:false,reminderTime:"21:00",rules:[],backupFreq:"off",backupGDrive:false,lastBackupAt:0,threads:[],netWorthSnapshots:[],savingsPots:[],savingsTarget:null,myQuotes:[],favLessons:[]});
   const dRef=useRef(null);dRef.current=d;
   const[atx,sAtx]=useState(null);const[reimbPrompt,sReimbPrompt]=useState(null);const[reimbT,sReimbT]=useState(null);
   // Editing a savings movement / a plain transfer -- both have their own editor,
@@ -1773,8 +1773,8 @@ function App(){
   const cu=usrs.find(u=>u.id===auid)||usrs[0];
   setUsers(usrs);setActiveUser(cu);
   const dk="etp-data-"+cu.id;
-  let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],cardStatements:[],bills:[],goals:[],budgetLoans:[],ledger:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},categoryOrder:{expense:[],income:[]},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,thresholdRules:[],expensePlans:[],investmentPlans:[],investments:[],planThreshold:null,monthlyRestrictionLogs:[],openingBalances:[],reminderEnabled:false,reminderTime:"21:00",rules:[],backupFreq:"off",backupGDrive:false,lastBackupAt:0,merchantRules:{},debtPlan:null,las:null,varExpensePlans:{},varIncomePlans:{},varSavingsPlans:{},advStats:{},calculators:{},groceryCategories:GROC_CATS_DEFAULT,grocerySubDefaults:{},groceryStores:[],groceryDefaultStore:"",priceWatch:PW_DEFAULT,threads:[],netWorthSnapshots:[],savingsPots:[],savingsTarget:null};
-  try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,expenses:p.expenses||[],recurring:p.recurring||[],accounts:p.accounts&&p.accounts.length?p.accounts:[DA],profiles:p.profiles||[],cards:p.cards||[],cardStatements:p.cardStatements||[],bills:p.bills||[],goals:p.goals||[],budgetLoans:p.budgetLoans||[],ledger:p.ledger||[],categoryBudgets:p.categoryBudgets||{},customExpenseCategories:p.customExpenseCategories||[],customIncomeCategories:p.customIncomeCategories||[],categoryOverrides:p.categoryOverrides||{},categoryOrder:p.categoryOrder||{expense:[],income:[]},financeProfile:p.financeProfile||null,budget:p.budget??null,budgetPeriod:p.budgetPeriod||"monthly",currency:p.currency||"₹",monthStartDay:p.monthStartDay||1,fontSize:p.fontSize||"medium",upcomingExpenses:p.upcomingExpenses||[],alertThreshold:p.alertThreshold??null,thresholdRules:p.thresholdRules||[],expensePlans:p.expensePlans||[],investmentPlans:p.investmentPlans||[],investments:p.investments||[],planThreshold:p.planThreshold??null,monthlyRestrictionLogs:p.monthlyRestrictionLogs||[],openingBalances:p.openingBalances||[],reminderEnabled:p.reminderEnabled||false,reminderTime:p.reminderTime||"21:00",morningEnabled:p.morningEnabled||false,morningTime:p.morningTime||"08:00",eveningEnabled:p.eveningEnabled??(p.reminderEnabled||false),eveningTime:p.eveningTime||p.reminderTime||"21:00",rules:p.rules||[],backupFreq:p.backupFreq||"off",backupGDrive:p.backupGDrive||false,lastBackupAt:p.lastBackupAt||0,merchantRules:p.merchantRules||{},debtPlan:p.debtPlan||null,las:p.las||null,varExpensePlans:p.varExpensePlans||{},varIncomePlans:p.varIncomePlans||{},varSavingsPlans:p.varSavingsPlans||{},advStats:p.advStats||{},calculators:p.calculators||{},incomeTracker:p.incomeTracker||{},groceryCategories:p.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:p.grocerySubDefaults||{},groceryStores:p.groceryStores||[],groceryDefaultStore:p.groceryDefaultStore||"",priceWatch:p.priceWatch||PW_DEFAULT,threads:p.threads||[],netWorthSnapshots:p.netWorthSnapshots||[],savingsPots:p.savingsPots||[],savingsTarget:p.savingsTarget??null};_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[];_catOv=i.categoryOverrides||{};_catOrder=i.categoryOrder||{expense:[],income:[]};_grocCats=i.groceryCategories||GROC_CATS_DEFAULT;
+  let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],cardStatements:[],bills:[],goals:[],budgetLoans:[],ledger:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},categoryOrder:{expense:[],income:[]},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,thresholdRules:[],expensePlans:[],investmentPlans:[],investments:[],planThreshold:null,monthlyRestrictionLogs:[],openingBalances:[],reminderEnabled:false,reminderTime:"21:00",rules:[],backupFreq:"off",backupGDrive:false,lastBackupAt:0,merchantRules:{},debtPlan:null,las:null,varExpensePlans:{},varIncomePlans:{},varSavingsPlans:{},advStats:{},calculators:{},groceryCategories:GROC_CATS_DEFAULT,grocerySubDefaults:{},groceryStores:[],groceryDefaultStore:"",priceWatch:PW_DEFAULT,threads:[],netWorthSnapshots:[],savingsPots:[],savingsTarget:null,myQuotes:[],favLessons:[]};
+  try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,expenses:p.expenses||[],recurring:p.recurring||[],accounts:p.accounts&&p.accounts.length?p.accounts:[DA],profiles:p.profiles||[],cards:p.cards||[],cardStatements:p.cardStatements||[],bills:p.bills||[],goals:p.goals||[],budgetLoans:p.budgetLoans||[],ledger:p.ledger||[],categoryBudgets:p.categoryBudgets||{},customExpenseCategories:p.customExpenseCategories||[],customIncomeCategories:p.customIncomeCategories||[],categoryOverrides:p.categoryOverrides||{},categoryOrder:p.categoryOrder||{expense:[],income:[]},financeProfile:p.financeProfile||null,budget:p.budget??null,budgetPeriod:p.budgetPeriod||"monthly",currency:p.currency||"₹",monthStartDay:p.monthStartDay||1,fontSize:p.fontSize||"medium",upcomingExpenses:p.upcomingExpenses||[],alertThreshold:p.alertThreshold??null,thresholdRules:p.thresholdRules||[],expensePlans:p.expensePlans||[],investmentPlans:p.investmentPlans||[],investments:p.investments||[],planThreshold:p.planThreshold??null,monthlyRestrictionLogs:p.monthlyRestrictionLogs||[],openingBalances:p.openingBalances||[],reminderEnabled:p.reminderEnabled||false,reminderTime:p.reminderTime||"21:00",morningEnabled:p.morningEnabled||false,morningTime:p.morningTime||"08:00",eveningEnabled:p.eveningEnabled??(p.reminderEnabled||false),eveningTime:p.eveningTime||p.reminderTime||"21:00",rules:p.rules||[],backupFreq:p.backupFreq||"off",backupGDrive:p.backupGDrive||false,lastBackupAt:p.lastBackupAt||0,merchantRules:p.merchantRules||{},debtPlan:p.debtPlan||null,las:p.las||null,varExpensePlans:p.varExpensePlans||{},varIncomePlans:p.varIncomePlans||{},varSavingsPlans:p.varSavingsPlans||{},advStats:p.advStats||{},calculators:p.calculators||{},incomeTracker:p.incomeTracker||{},groceryCategories:p.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:p.grocerySubDefaults||{},groceryStores:p.groceryStores||[],groceryDefaultStore:p.groceryDefaultStore||"",priceWatch:p.priceWatch||PW_DEFAULT,threads:p.threads||[],netWorthSnapshots:p.netWorthSnapshots||[],savingsPots:p.savingsPots||[],savingsTarget:p.savingsTarget??null,myQuotes:p.myQuotes||[],favLessons:p.favLessons||[]};_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[];_catOv=i.categoryOverrides||{};_catOrder=i.categoryOrder||{expense:[],income:[]};_grocCats=i.groceryCategories||GROC_CATS_DEFAULT;
   if(i.currency==="₹"){i.accounts=i.accounts.map(a=>a.currency==="$"?{...a,currency:"₹"}:a);const accMap=Object.fromEntries(i.accounts.map(a=>[a.id,a]));i.expenses=i.expenses.map(e=>e.currency==="$"?{...e,currency:accMap[e.accountId]?.currency||i.currency}:e)}
   if(!localStorage.getItem("etp-cash-unlinked")){const cashIds=new Set(i.accounts.filter(a=>a.id==="acc_default"||a.name==="Cash").map(a=>a.id));i.expenses=i.expenses.map(e=>cashIds.has(e.accountId)?{...e,accountId:null}:e);localStorage.setItem("etp-cash-unlinked","1")}}}catch(e){console.error("load",e)}
   // Backfill stmtChecked onto every pre-existing statement import: the flag was added after this
@@ -1814,7 +1814,7 @@ function App(){
   try{await window.storage.set(dk,JSON.stringify(strip(i)))}catch{}
 })()},[]);
 
-  const strip=x=>({expenses:x.expenses,recurring:x.recurring,accounts:x.accounts,profiles:x.profiles,cards:x.cards||[],cardStatements:x.cardStatements||[],bills:x.bills||[],goals:x.goals||[],budgetLoans:x.budgetLoans||[],ledger:x.ledger||[],categoryBudgets:x.categoryBudgets||{},monthlyRestrictionLogs:x.monthlyRestrictionLogs||[],openingBalances:x.openingBalances||[],customExpenseCategories:x.customExpenseCategories||[],customIncomeCategories:x.customIncomeCategories||[],categoryOverrides:x.categoryOverrides||{},categoryOrder:x.categoryOrder||{expense:[],income:[]},financeProfile:x.financeProfile||null,budget:x.budget,budgetPeriod:x.budgetPeriod,currency:x.currency,monthStartDay:x.monthStartDay,fontSize:x.fontSize||"medium",upcomingExpenses:x.upcomingExpenses||[],alertThreshold:x.alertThreshold??null,thresholdRules:x.thresholdRules||[],expensePlans:x.expensePlans||[],investmentPlans:x.investmentPlans||[],investments:x.investments||[],planThreshold:x.planThreshold??null,reminderEnabled:x.reminderEnabled||false,reminderTime:x.reminderTime||"21:00",morningEnabled:x.morningEnabled||false,morningTime:x.morningTime||"08:00",eveningEnabled:x.eveningEnabled||false,eveningTime:x.eveningTime||"21:00",backupFreq:x.backupFreq||"off",backupGDrive:x.backupGDrive||false,lastBackupAt:x.lastBackupAt||0,merchantRules:x.merchantRules||{},debtPlan:x.debtPlan||null,las:x.las||null,threads:x.threads||[],varExpensePlans:x.varExpensePlans||{},varIncomePlans:x.varIncomePlans||{},varSavingsPlans:x.varSavingsPlans||{},advStats:x.advStats||{},calculators:x.calculators||{},incomeTracker:x.incomeTracker||{},groceryCategories:x.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:x.grocerySubDefaults||{},groceryStores:x.groceryStores||[],groceryDefaultStore:x.groceryDefaultStore||"",priceWatch:x.priceWatch||PW_DEFAULT,netWorthSnapshots:x.netWorthSnapshots||[],savingsPots:x.savingsPots||[],savingsTarget:x.savingsTarget??null});
+  const strip=x=>({expenses:x.expenses,recurring:x.recurring,accounts:x.accounts,profiles:x.profiles,cards:x.cards||[],cardStatements:x.cardStatements||[],bills:x.bills||[],goals:x.goals||[],budgetLoans:x.budgetLoans||[],ledger:x.ledger||[],categoryBudgets:x.categoryBudgets||{},monthlyRestrictionLogs:x.monthlyRestrictionLogs||[],openingBalances:x.openingBalances||[],customExpenseCategories:x.customExpenseCategories||[],customIncomeCategories:x.customIncomeCategories||[],categoryOverrides:x.categoryOverrides||{},categoryOrder:x.categoryOrder||{expense:[],income:[]},financeProfile:x.financeProfile||null,budget:x.budget,budgetPeriod:x.budgetPeriod,currency:x.currency,monthStartDay:x.monthStartDay,fontSize:x.fontSize||"medium",upcomingExpenses:x.upcomingExpenses||[],alertThreshold:x.alertThreshold??null,thresholdRules:x.thresholdRules||[],expensePlans:x.expensePlans||[],investmentPlans:x.investmentPlans||[],investments:x.investments||[],planThreshold:x.planThreshold??null,reminderEnabled:x.reminderEnabled||false,reminderTime:x.reminderTime||"21:00",morningEnabled:x.morningEnabled||false,morningTime:x.morningTime||"08:00",eveningEnabled:x.eveningEnabled||false,eveningTime:x.eveningTime||"21:00",backupFreq:x.backupFreq||"off",backupGDrive:x.backupGDrive||false,lastBackupAt:x.lastBackupAt||0,merchantRules:x.merchantRules||{},debtPlan:x.debtPlan||null,las:x.las||null,threads:x.threads||[],varExpensePlans:x.varExpensePlans||{},varIncomePlans:x.varIncomePlans||{},varSavingsPlans:x.varSavingsPlans||{},advStats:x.advStats||{},calculators:x.calculators||{},incomeTracker:x.incomeTracker||{},groceryCategories:x.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:x.grocerySubDefaults||{},groceryStores:x.groceryStores||[],groceryDefaultStore:x.groceryDefaultStore||"",priceWatch:x.priceWatch||PW_DEFAULT,netWorthSnapshots:x.netWorthSnapshots||[],savingsPots:x.savingsPots||[],savingsTarget:x.savingsTarget??null,myQuotes:x.myQuotes||[],favLessons:x.favLessons||[]});
 
   const pst=async(p)=>{const n={...d,...p};_custCE=n.customExpenseCategories||[];_custCI=n.customIncomeCategories||[];_catOv=n.categoryOverrides||{};_catOrder=n.categoryOrder||{expense:[],income:[]};_grocCats=n.groceryCategories||GROC_CATS_DEFAULT;sD(n);const dk=activeUser?"etp-data-"+activeUser.id:KS;try{await window.storage.set(dk,JSON.stringify(strip(n)))}catch(e){console.error(e);try{if(!window.__pstErrWarned){window.__pstErrWarned=true;alert("⚠ Could not save your data — device storage looks full. Recent changes may disappear when the app closes. Free up space, then make any small edit to retry saving.")}}catch(e2){}}};
   const pstRef=useRef(null);pstRef.current=pst;
@@ -2140,7 +2140,7 @@ function App(){
         v==="settings"&&t(Settings,{data:d,persist:pst,onClose:()=>sV("home"),onBackup:()=>sV("backup"),onCategories:()=>{navFromRef.current="settings";sV("categories")},onView:sV,theme,onSetTheme:applyTheme}),
         v==="backup"&&t(Backup,{data:d,persist:pst,onClose:()=>sV("home")}),
         v==="tips"&&t(Tips,{data:d,onClose:()=>sV(navFromRef.current)}),
-        v==="dailyLesson"&&t(DailyLesson,{onClose:()=>sV(navFromRef.current||"home")}),
+        v==="dailyLesson"&&t(DailyLesson,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"home")}),
         v==="autopilot"&&t(Autopilot,{data:d,onClose:()=>sV(navFromRef.current||"home")}),
         v==="wrapped"&&t(Wrapped,{data:d,onClose:()=>sV(navFromRef.current||"home")}),
         v==="debtPlan"&&t(DebtPlan,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"home")}),
@@ -2837,12 +2837,7 @@ const row=(lbl,val,col,sign,kind,total)=>o("div",{className:"f ia jb",children:[
 
 // === DAILY MONEY LESSON ===
 const LESSON_CATS={basics:{l:"Basics",col:"#7FDBFF"},saving:{l:"Saving",col:"#A8E6CF"},investing:{l:"Investing",col:"#DBFF4D"},credit:{l:"Credit & Debt",col:"#FF8C5A"},mindset:{l:"Mindset",col:"#E08CFF"},habits:{l:"Habits",col:"#FFD56B"}};
-const TRENDING_FALLBACK=[{id:"t_aijobs",emoji:"🤖",title:"AI Is Reshaping Income, Not Just Jobs",body:"AI tools are compressing the time skilled work takes — which is quietly shifting pay from 'hours worked' toward 'value delivered'. The safest response isn't fearing AI, it's using it to do your current work faster and spending the freed time building a second income skill.",takeaway:"Learn one AI tool that speeds up your actual job this month. Time saved is income potential, if you redirect it.",quote:null,author:null},{id:"t_higherrates",emoji:"📈",title:"The Higher-Rate World Changed the Math",body:"After years of near-zero rates, savings accounts, FDs, and bonds pay meaningfully more than they did a few years ago — which also means borrowing costs more. The playbook has flipped: idle cash in a good savings product now earns real money, while carrying debt is more expensive than it's been in over a decade.",takeaway:"Re-shop your savings and FD rates now — many banks are paying noticeably more than a 'default' account.",quote:null,author:null},{id:"t_bnplcreep",emoji:"🧾",title:"Buy-Now-Pay-Later Is the New Credit Card Trap",body:"BNPL splits purchases into painless installments across multiple apps, which makes it easy to lose track of how many small commitments are stacking up simultaneously — unlike a single credit card statement. Regulators are starting to treat it like credit because, functionally, it is.",takeaway:"If you use BNPL, track every active plan in one place. Scattered installments hide the true total owed.",quote:null,author:null},{id:"t_doomspend",emoji:"🛒",title:"'Doom Spending' Is a Named Trend Now",body:"Economists have a term for stress-driven spending on small treats when the future feels uncertain — it trades long-term security for short-term relief, and social media makes it feel normalized. Naming the pattern is often the first step to noticing it in yourself before the card bill does.",takeaway:"Notice when a purchase is about the item or about the mood. Naming 'doom spending' in the moment often stops it.",quote:null,author:null},{id:"t_subfatigue",emoji:"🔔",title:"Subscription Fatigue Is Finally a Cultural Moment",body:"Streaming, software, fitness, meal kits, cloud storage — the average household now juggles a double-digit number of recurring charges, and 'subscription audits' have become a genuine trending habit as prices creep up across the board. Consolidation and cancellation are back in fashion.",takeaway:"Ride the trend: do a subscription audit this week. It's a genuinely modern habit worth adopting.",quote:null,author:null},{id:"t_creatoreconomy",emoji:"🎥",title:"The Creator Economy Needs Old-School Discipline",body:"Side income from content, freelancing, or platforms is more accessible than ever, but it's also famously irregular — a viral month followed by three quiet ones. Treating variable income with the same 'lowest month as baseline' budgeting used by commission-based earners for decades is what makes it sustainable.",takeaway:"If your income varies, budget off your worst realistic month, not your best one. Save the upside separately.",quote:null,author:null},{id:"t_neobanks",emoji:"📱",title:"Neobanks and Embedded Finance Are Mainstream Now",body:"Digital-only banks and 'finance built into every app' (buy-now-pay-later at checkout, investing inside a shopping app) mean money decisions are increasingly made in the moment, inside apps not designed to slow you down. The convenience is real; so is the reduced friction that used to make you pause before spending.",takeaway:"The more finance is embedded in an app, the more deliberately you need to pause before confirming.",quote:null,author:null},{id:"t_quietluxury",emoji:"🤍",title:"'Quiet Luxury' Reflects a Real Shift in Spending Values",body:"The trend away from loud logos toward understated, durable quality mirrors a broader move many younger earners are making: fewer, better purchases over frequent disposable ones. It's a values shift with a genuine financial upside when it's about quality, not just aesthetics.",takeaway:"Buying less but better isn't just a trend — check if it actually saves you money over a year, not just looks good.",quote:null,author:null},{id:"t_coastfire",emoji:"🏖️",title:"Coast FIRE and Barista FIRE: FIRE Gets Flexible",body:"The rigid 'retire at 35 forever' version of FIRE has evolved into more realistic variants — Coast FIRE (save aggressively early, then let compounding coast) and Barista FIRE (partial financial independence plus part-time work). The trend reflects people wanting flexibility, not just an exit date.",takeaway:"You don't need the extreme version of FIRE. Even a 'coast' number gives you real, usable flexibility later.",quote:null,author:null},{id:"t_microinvest",emoji:"🪙",title:"Micro-Investing Apps Lowered the Entry Bar",body:"Investing platforms now let you start with amounts that would have been impractical a decade ago, spreading tiny sums across diversified baskets automatically. The barrier to starting has nearly disappeared — which shifts the real obstacle from 'access' to simply 'starting today instead of waiting'.",takeaway:"The entry barrier to investing is lower than it's ever been. The only remaining excuse is starting.",quote:null,author:null},{id:"t_roboadvisor",emoji:"🧭",title:"Robo-Advisors Are Normalizing Low-Cost Investing",body:"Automated portfolio tools that rebalance and diversify for a small fee are pulling market share from expensive traditional advisory purely by being transparent about cost — a trend pushing the whole industry toward lower fees for ordinary investors.",takeaway:"Compare any advisor's fee against a robo-advisor's fee for similar service. The gap is often larger than expected.",quote:null,author:null},{id:"t_influencerrisk",emoji:"⚠️",title:"Vet Finance Influencers Like You'd Vet a Stranger's Advice",body:"Short-form finance content is more popular than ever, and some of it is genuinely useful — but incentives (sponsorships, affiliate links, engagement bait) aren't always disclosed clearly. Treat viral financial advice as a starting point for your own research, never as a final answer.",takeaway:"Before acting on finance content you saw today, ask who benefits if you follow it. Then verify independently.",quote:null,author:null},{id:"t_gigsmooth",emoji:"🧰",title:"Gig and Freelance Income Needs Its Own Smoothing System",body:"With more people earning through multiple gig platforms simultaneously, income smoothing — moving surplus from good weeks into a buffer that pays yourself a steady 'salary' from — has become an essential, increasingly common skill rather than a niche one.",takeaway:"Pay yourself a fixed 'salary' from a gig-income buffer account, even if the actual income varies week to week.",quote:null,author:null},{id:"t_cryptomature",emoji:"🪙",title:"Crypto Is Maturing From Speculation Toward Allocation",body:"The conversation has shifted from 'will it 10x' toward 'what small allocation makes sense as one volatile asset among many' — a more measured, portfolio-theory approach replacing pure speculation for increasingly mainstream investors. Sizing and volatility tolerance matter more than timing calls.",takeaway:"If you hold crypto, size it as a small, deliberate allocation you could lose entirely — not a core holding.",quote:null,author:null},{id:"t_priceopacity",emoji:"🏷️",title:"'Shrinkflation' and 'Skimpflation' Are Now Household Terms",body:"Shrinking pack sizes at the same price, and quietly reduced service quality at the same cost, have become common and openly discussed enough to earn their own names — a sign that price awareness now needs to include quality and quantity, not just the sticker price.",takeaway:"Check unit price and quantity, not just the price tag — shrinkflation hides cost increases in plain sight.",quote:null,author:null},{id:"t_financialwellness",emoji:"🧘",title:"Employers Are Investing in 'Financial Wellness' Benefits",body:"Financial coaching, salary-advance apps, and literacy programs are increasingly offered as workplace benefits alongside health insurance — a trend worth actually using if your employer provides it, since it's often free value left completely unclaimed.",takeaway:"Check if your employer offers any financial wellness benefit. It's frequently free and genuinely underused.",quote:null,author:null}];
-const trendCacheKey=()=>"etp-trend-lessons-"+new Date().toISOString().slice(0,10);
-function getCachedTrending(){try{const raw=localStorage.getItem(trendCacheKey());const j=raw?JSON.parse(raw):null;return Array.isArray(j)&&j.length?j:null}catch{return null}}
-function setCachedTrending(arr){try{localStorage.setItem(trendCacheKey(),JSON.stringify(arr))}catch{}}
-async function fetchTrendingLessons(){const sys=`You are a personal finance editor curating a "what's trending in money right now" feed for 2026. Generate 8 short, punchy lessons about CURRENT and UPCOMING real-world personal finance trends and themes (examples: AI's effect on jobs and investing, interest-rate shifts, inflation, gig/creator economy income, crypto maturing as an asset class, buy-now-pay-later, subscription fatigue, neobanks and embedded finance, FIRE movement variants, financial wellness benefits, shrinkflation). Be specific and current, not generic textbook advice. Return JSON only, no markdown:\n{"lessons":[{"emoji":"single emoji","title":"short punchy title","body":"2-4 sentence explanation, concrete and grounded in the present moment","takeaway":"one punchy actionable line","quote":"a real, correctly-attributed quote related to the theme, or null if none fits","author":"quote author, or null"}]}`;const r=await cAPI({max_tokens:2000,system:sys,messages:[{role:"user",content:"Give me 8 trending personal finance lessons relevant right now, covering a mix of the themes above."}]});const txt=r.content?.map(x=>x.text||"").join("")||"";const parsed=extractJSON(txt);if(!parsed||!Array.isArray(parsed.lessons)||!parsed.lessons.length)throw new Error("Could not parse trending lessons from AI response.");return parsed.lessons.slice(0,10).map((l,i)=>({id:"ai_"+trendCacheKey()+"_"+i,emoji:l.emoji||"📰",title:String(l.title||"Trending in money").slice(0,120),body:String(l.body||"").slice(0,800),takeaway:String(l.takeaway||"").slice(0,300),quote:l.quote?String(l.quote).slice(0,300):null,author:l.author?String(l.author).slice(0,80):null}))}
-function DailyLesson({onClose}){
+function DailyLesson({data,persist,onClose}){
   const[tab,sTab]=useState("standard");
   const todayIdx=lessonIdxOfDay();
   const[idx,sIdx]=useState(todayIdx);
@@ -2852,41 +2847,62 @@ function DailyLesson({onClose}){
   const readCount=lessonsRead().length;
   const nav=(dir)=>sIdx(i=>(i+dir+LESSONS.length)%LESSONS.length);
 
-  // Favourites store a full content snapshot (not just an id) so a favourited
-  // Trending lesson still opens correctly after its original entry is gone —
-  // AI-fetched Trending items get a fresh id every day.
-  const[favs,sFavs]=useState(()=>favLessons());
+  // The two tabs keep entirely separate favourites: Standard stars lessons into
+  // data.favLessons, My Quotes stars your own writing via each quote's own `fav`
+  // flag. Nothing crosses over.
+  const favs=favLessonsOf(data);
+  const quotes=myQuotesOf(data);
   const[favOpen,sFavOpen]=useState(null);
-  const snapOf=(item,source)=>({id:item.id,source,emoji:item.emoji||"📰",title:item.title,body:item.body,takeaway:item.takeaway,quote:item.quote||null,author:item.author||null,cat:source==="standard"?item.cat:null});
-  const onToggleFav=(item,source)=>sFavs(toggleFavLesson(snapOf(item,source)));
-  const favBtn=(item,source)=>{const on=favs.some(f=>f.id===item.id);return t("button",{onClick:()=>onToggleFav(item,source),"aria-label":on?"Remove from favourites":"Add to favourites",style:{background:"transparent",border:"none",padding:2,display:"flex",flexShrink:0,cursor:"pointer",color:on?c.gd:c.tm},children:t(Star,{size:16,color:on?c.gd:c.tm,fill:on?c.gd:"none"})})};
+  const snapOf=(item)=>({id:item.id,source:"standard",emoji:item.emoji||"📖",title:item.title,body:item.body,takeaway:item.takeaway,quote:item.quote||null,author:item.author||null,cat:item.cat||null});
+  const onToggleFav=(item)=>persist({favLessons:toggleFavLessonIn(favs,snapOf(item))});
+  const favBtn=(item)=>{const on=favs.some(f=>f.id===item.id);return t("button",{onClick:()=>onToggleFav(item),"aria-label":on?"Remove from favourites":"Add to favourites",style:{background:"transparent",border:"none",padding:2,display:"flex",flexShrink:0,cursor:"pointer",color:on?c.gd:c.tm},children:t(Star,{size:16,color:on?c.gd:c.tm,fill:on?c.gd:"none"})})};
 
-  const[trend,sTrend]=useState(null);
-  const[trendIdx,sTrendIdx]=useState(0);
-  const[trendLoading,sTrendLoading]=useState(false);
-  const[trendErr,sTrendErr]=useState(null);
-  const trendList=trend||TRENDING_FALLBACK;
-  const isAITrend=!!(trend&&trend.length&&String(trend[0].id||"").startsWith("ai_"));
-  const T=trendList[Math.min(trendIdx,trendList.length-1)];
+  // One-time fold-in of the retired device-local favourites store. Starred
+  // Standard lessons keep their snapshot; anything starred from the old Trending
+  // tab becomes an editable quote, so removing that tab loses nothing.
+  useEffect(()=>{
+    try{if(localStorage.getItem(FAV_MIGRATED_KEY))return}catch{return}
+    const legacy=legacyFavLessons();
+    const done=()=>{try{localStorage.setItem(FAV_MIGRATED_KEY,"1")}catch{}};
+    if(!legacy.length){done();return}
+    const isStd=f=>f.source==="standard"||(!f.source&&!!f.cat);
+    const haveFav=new Set(favs.map(f=>f.id));
+    const addFavs=legacy.filter(f=>isStd(f)&&f.id&&!haveFav.has(f.id));
+    const haveQ=new Set(quotes.map(q=>q.fromId).filter(Boolean));
+    const addQs=legacy.filter(f=>!isStd(f)&&f.id&&!haveQ.has(f.id)).map(f=>({
+      ...newQuote([f.body,f.takeaway?"Takeaway: "+f.takeaway:""].filter(Boolean).join("\n\n"),f.title),
+      fav:true,fromId:f.id,createdAt:f.favoritedAt||Date.now(),
+    }));
+    if(addFavs.length||addQs.length)persist({favLessons:[...addFavs,...favs],myQuotes:[...addQs,...quotes]});
+    done();
+  },[]);
 
-  const loadTrending=async(force)=>{
-    if(!gAK()){sTrend(TRENDING_FALLBACK);sTrendErr(null);return}
-    if(!force){const cached=getCachedTrending();if(cached){sTrend(cached);return}}
-    sTrendLoading(true);sTrendErr(null);
-    try{
-      const fresh=await fetchTrendingLessons();
-      setCachedTrending(fresh);
-      sTrend(fresh);
-      sTrendIdx(0);
-    }catch(e){
-      sTrendErr(friendlyAPIError(e));
-      sTrend(t2=>t2||TRENDING_FALLBACK);
-    }finally{sTrendLoading(false)}
-  };
-  useEffect(()=>{if(tab==="trending"&&trend==null)loadTrending(false)},[tab]);
-  const navTrend=(dir)=>sTrendIdx(i=>(i+dir+trendList.length)%trendList.length);
+  // --- My Quotes ---
+  const[qOpen,sQOpen]=useState(null);   // quote being read full-screen
+  const[qEdit,sQEdit]=useState(null);   // draft in the add/edit sheet
+  const[qArm,sQArm]=useState(false);    // delete needs a second tap
+  const[qq,sQq]=useState("");           // search box
+  useEffect(()=>{sQArm(false)},[qOpen]);
+  const saveQuote=(q)=>{const clean={...q,text:String(q.text||"").trim(),author:String(q.author||"").trim(),updatedAt:Date.now()};delete clean.isNew;
+    persist({myQuotes:quotes.some(x=>x.id===clean.id)?quotes.map(x=>x.id===clean.id?clean:x):[clean,...quotes]});return clean};
+  const delQuote=(id)=>persist({myQuotes:quotes.filter(x=>x.id!==id)});
+  const toggleQFav=(id)=>persist({myQuotes:quotes.map(x=>x.id===id?{...x,fav:!x.fav}:x)});
+  const qFavs=quotes.filter(q=>q.fav);
+  const needle=qq.trim().toLowerCase();
+  const shown=needle?quotes.filter(q=>(q.text+" "+(q.author||"")).toLowerCase().includes(needle)):quotes;
 
-  const TABS=[{id:"standard",l:"Standard"},{id:"trending",l:"Trending"}];
+  const starBtn=(q)=>t("button",{onClick:e=>{e.stopPropagation();toggleQFav(q.id)},"aria-label":q.fav?"Remove from favourites":"Add to favourites",style:{background:"transparent",border:"none",padding:2,marginTop:1,display:"flex",flexShrink:0,cursor:"pointer"},children:t(Star,{size:15,color:q.fav?c.gd:c.tm,fill:q.fav?c.gd:"none"})});
+  const qRow=(q,i)=>o("div",{key:q.id,onClick:()=>sQOpen(q),className:"act99 trt f",style:{gap:10,alignItems:"flex-start",padding:"12px 0",borderTop:i?`1px solid ${c.brs}`:"none",cursor:"pointer"},children:[
+    starBtn(q),
+    o("div",{className:"minw0 f1",children:[
+      t("div",{style:{fontSize:13,color:c.tx,lineHeight:1.5,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"},children:`“${q.text}”`}),
+      q.author&&t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.gd,letterSpacing:1,marginTop:5},children:"— "+q.author.toUpperCase()}),
+    ]}),
+  ]});
+  const lbl=(s)=>t("label",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:s});
+  const fieldSt={width:"100%",boxSizing:"border-box",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,padding:"10px 14px",color:c.tx,fontSize:14,outline:"none",fontFamily:'var(--tf)'};
+
+  const TABS=[{id:"standard",l:"Standard"},{id:"quotes",l:"My Quotes"}];
   return o("div",{style:{padding:`8px ${GUT}px 32px`},children:[
     t(SH,{title:t("em",{children:"Daily money lesson"}),onBack:onClose}),
     o("div",{className:"f ia",style:{gap:4,background:c.sfg,borderRadius:10,padding:3,border:`1px solid ${c.brs}`,marginTop:8,marginBottom:14},children:TABS.map(tb=>t("button",{key:tb.id,onClick:()=>sTab(tb.id),className:"act95 tr f1",style:{padding:"8px 0",background:tab===tb.id?c.ac:"transparent",color:tab===tb.id?"#0a0a0a":c.td,borderRadius:8,fontSize:12,fontFamily:'var(--nf)',fontWeight:tab===tb.id?700:400,border:"none"},children:tb.l}))}),
@@ -2900,7 +2916,7 @@ function DailyLesson({onClose}){
           t("span",{style:{fontFamily:'var(--nf)',fontSize:9.5,letterSpacing:1,padding:"3px 10px",borderRadius:999,background:cat.col+"1c",color:cat.col,border:`1px solid ${cat.col}40`},children:cat.l.toUpperCase()}),
           o("div",{className:"f ia",style:{gap:10,flexShrink:0},children:[
             lessonsRead().includes(L.id)&&t("span",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.mt,letterSpacing:.5},children:"✓ READ"}),
-            favBtn(L,"standard"),
+            favBtn(L),
           ]}),
         ]}),
         o("div",{className:"f ia",style:{gap:10,marginBottom:10},children:[
@@ -2923,51 +2939,41 @@ function DailyLesson({onClose}){
       ]}),
       o("div",{style:{marginTop:14,textAlign:"center",fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:.5},children:[`${Math.min(readCount,LESSONS.length)} of ${LESSONS.length} lessons read`]}),
       t("div",{style:{marginTop:4,height:4,background:c.sf2,borderRadius:99,overflow:"hidden"},children:t("div",{style:{height:"100%",width:`${Math.min(100,(readCount/LESSONS.length)*100)}%`,background:c.ac,borderRadius:99}})}),
+      t(Collapsible,{title:"LESSON FAVOURITES",badge:favs.length>0?t(Pl,{col:c.gd,children:favs.length}):null,defaultOpen:false,children:
+        favs.length===0
+          ?t("div",{style:{fontSize:12,color:c.tm,textAlign:"center",padding:"16px 0"},children:"Tap the star on any lesson to save it here."})
+          :o("div",{style:{display:"flex",flexDirection:"column"},children:favs.map((f,i)=>o("div",{key:f.id,onClick:()=>sFavOpen(f),className:"act99 trt f ia jb",style:{padding:"10px 0",borderTop:i?`1px solid ${c.brs}`:"none",cursor:"pointer"},children:[
+            o("div",{className:"f ia minw0",style:{gap:10},children:[
+              t("span",{style:{fontSize:18,flexShrink:0},children:f.emoji}),
+              t("div",{className:"tru",style:{fontSize:13,color:c.tx},children:f.title}),
+            ]}),
+            t("button",{onClick:e=>{e.stopPropagation();persist({favLessons:toggleFavLessonIn(favs,f)})},"aria-label":"Remove from favourites",title:"Remove from favourites",style:{background:"transparent",border:"none",padding:4,display:"flex",flexShrink:0,color:c.tm,cursor:"pointer"},children:t(X,{size:15,color:c.tm})}),
+          ]}))}),
+      }),
     ]}):o(Fragment,{children:[
-      o("div",{className:"f ia jb",style:{marginBottom:10},children:[
-        t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.ac,letterSpacing:1},children:isAITrend?`TRENDING NOW · ${trendIdx+1} OF ${trendList.length}`:"TRENDING · CURATED"}),
-        gAK()&&t("button",{onClick:()=>loadTrending(true),disabled:trendLoading,style:{background:"transparent",border:"none",color:trendLoading?c.tm:c.ac,fontSize:11,fontFamily:'var(--nf)',letterSpacing:.5,cursor:trendLoading?"default":"pointer"},children:trendLoading?"↻ REFRESHING…":"↻ REFRESH"}),
+      o("div",{className:"f ia jb",style:{marginBottom:12},children:[
+        t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1},children:quotes.length?`MY QUOTES · ${quotes.length}`:"MY QUOTES"}),
+        o("button",{onClick:()=>sQEdit({id:"q_"+uid(),text:"",author:"",fav:false,createdAt:Date.now(),isNew:true}),className:"act95 tr f ia",style:{gap:5,padding:"7px 13px",background:c.ac,border:"none",borderRadius:999,color:"#0a0a0a",fontFamily:'var(--nf)',fontSize:10.5,fontWeight:700,letterSpacing:.5,cursor:"pointer"},children:[t(Plus,{size:13,color:"#0a0a0a"}),"ADD QUOTE"]}),
       ]}),
-      !gAK()&&o("div",{style:{marginBottom:12,padding:"10px 14px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,fontSize:12,color:c.tm,lineHeight:1.5},children:"Showing a curated set of current money trends. Add an AI API key in Settings → AI Assistant for a feed that refreshes daily."}),
-      trendErr&&o("div",{style:{marginBottom:12,padding:"10px 14px",background:c.co+"14",border:`1px solid ${c.co}40`,borderRadius:12,fontSize:12,color:c.co,lineHeight:1.5},children:trendErr}),
-      trendLoading&&!trend?o("div",{style:{textAlign:"center",padding:"48px 0",color:c.tm,fontSize:13},children:"Fetching what's trending in money right now…"}):o(Fragment,{children:[
-        o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,borderLeft:`3px solid ${c.ac}`,padding:"18px 18px 16px"},children:[
-          o("div",{className:"f ia jb",style:{marginBottom:12},children:[
-            t("span",{style:{fontFamily:'var(--nf)',fontSize:9.5,letterSpacing:1,padding:"3px 10px",borderRadius:999,background:c.ac+"1c",color:c.ac,border:`1px solid ${c.ac}40`},children:isAITrend?"AI · TODAY":"CURATED"}),
-            favBtn(T,"trending"),
+      quotes.length>5&&t("input",{value:qq,onChange:e=>sQq(e.target.value),placeholder:"Search your quotes…",style:{...fieldSt,background:c.sfg,fontSize:13,marginBottom:12}}),
+      qFavs.length>0&&t(Collapsible,{title:"QUOTE FAVOURITES",badge:t(Pl,{col:c.gd,children:qFavs.length}),defaultOpen:true,children:
+        o("div",{style:{display:"flex",flexDirection:"column",marginTop:-12},children:qFavs.map((q,i)=>qRow(q,i))}),
+      }),
+      quotes.length===0
+        ?o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:"40px 24px",textAlign:"center"},children:[
+            t("div",{style:{fontSize:34,marginBottom:12},children:"🖋️"}),
+            t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:17,color:c.tx,marginBottom:8},children:"No quotes yet"}),
+            t("div",{style:{fontSize:12.5,color:c.tm,lineHeight:1.65},children:"Save the lines that stick with you — a money rule, a mantra, something a friend said. Write as much as you like and add who said it."}),
+          ]})
+        :o("div",{style:{marginTop:qFavs.length?16:0,background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:"6px 18px 14px"},children:[
+            t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,paddingTop:12},children:needle?`${shown.length} MATCH${shown.length===1?"":"ES"}`:"ALL QUOTES"}),
+            shown.length===0
+              ?t("div",{style:{fontSize:12,color:c.tm,textAlign:"center",padding:"20px 0"},children:"Nothing matches that search."})
+              :o("div",{style:{display:"flex",flexDirection:"column",marginTop:2},children:shown.map((q,i)=>qRow(q,i))}),
           ]}),
-          o("div",{className:"f ia",style:{gap:10,marginBottom:10},children:[
-            t("span",{style:{fontSize:28,flexShrink:0},children:T.emoji||"📰"}),
-            t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:19,color:c.tx,lineHeight:1.25},children:T.title}),
-          ]}),
-          t("div",{style:{fontSize:13.5,color:c.td,lineHeight:1.65},children:T.body}),
-          T.takeaway&&o("div",{style:{marginTop:14,padding:"12px 14px",background:c.ac+"10",border:`1px solid ${c.ac}30`,borderRadius:12},children:[
-            t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.ac,letterSpacing:1,marginBottom:4},children:"TAKEAWAY"}),
-            t("div",{style:{fontSize:13,color:c.tx,fontWeight:500,lineHeight:1.5},children:T.takeaway}),
-          ]}),
-          T.quote&&o("div",{style:{marginTop:14,paddingLeft:12,borderLeft:`2px solid ${c.gd}`},children:[
-            t("div",{style:{fontFamily:c.hf,fontSize:13,color:c.tx,fontStyle:"italic",lineHeight:1.5},children:`“${T.quote}”`}),
-            T.author&&t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.gd,letterSpacing:1,marginTop:6},children:"— "+T.author.toUpperCase()}),
-          ]}),
-        ]}),
-        o("div",{className:"g g2",style:{gap:8,marginTop:12},children:[
-          t("button",{onClick:()=>navTrend(-1),className:"act95 tr",style:{padding:"12px 0",background:c.sf,border:`1px solid ${c.brs}`,borderRadius:12,color:c.tx,fontSize:13,fontWeight:500},children:"← Previous"}),
-          t("button",{onClick:()=>navTrend(1),className:"act95 tr",style:{padding:"12px 0",background:c.sf,border:`1px solid ${c.brs}`,borderRadius:12,color:c.tx,fontSize:13,fontWeight:500},children:"Next →"}),
-        ]}),
-      ]}),
     ]}),
-    t(Collapsible,{title:"FAVOURITES",badge:favs.length>0?t(Pl,{col:c.gd,children:favs.length}):null,defaultOpen:false,children:
-      favs.length===0
-        ?t("div",{style:{fontSize:12,color:c.tm,textAlign:"center",padding:"16px 0"},children:"Tap the star on any lesson to save it here."})
-        :o("div",{style:{display:"flex",flexDirection:"column"},children:favs.map((f,i)=>o("div",{key:f.id,onClick:()=>sFavOpen(f),className:"act99 trt f ia jb",style:{padding:"10px 0",borderTop:i?`1px solid ${c.brs}`:"none",cursor:"pointer"},children:[
-          o("div",{className:"f ia minw0",style:{gap:10},children:[
-            t("span",{style:{fontSize:18,flexShrink:0},children:f.emoji}),
-            t("div",{className:"tru",style:{fontSize:13,color:c.tx},children:f.title}),
-          ]}),
-          t("button",{onClick:e=>{e.stopPropagation();sFavs(toggleFavLesson(f))},"aria-label":"Remove from favourites",title:"Remove from favourites",style:{background:"transparent",border:"none",padding:4,display:"flex",flexShrink:0,color:c.tm,cursor:"pointer"},children:t(X,{size:15,color:c.tm})}),
-        ]}))}),
-    }),
-    favOpen&&t(Sht,{onClose:()=>sFavOpen(null),footer:t("button",{onClick:()=>{sFavs(toggleFavLesson(favOpen));sFavOpen(null)},className:"w100 act98 tr f ia jc",style:{gap:8,padding:"13px 0",background:c.co,color:"#0a0a0a",border:"none",borderRadius:12,fontSize:14,fontWeight:600},children:[t(X,{size:15,color:"#0a0a0a"}),"Remove from Favourites"]}),children:o(Fragment,{children:[
+
+    favOpen&&t(Sht,{onClose:()=>sFavOpen(null),footer:t("button",{onClick:()=>{persist({favLessons:toggleFavLessonIn(favs,favOpen)});sFavOpen(null)},className:"w100 act98 tr f ia jc",style:{gap:8,padding:"13px 0",background:c.co,color:"#0a0a0a",border:"none",borderRadius:12,fontSize:14,fontWeight:600},children:[t(X,{size:15,color:"#0a0a0a"}),"Remove from Favourites"]}),children:o(Fragment,{children:[
       t("span",{style:{fontFamily:'var(--nf)',fontSize:9.5,letterSpacing:1,padding:"3px 10px",borderRadius:999,background:c.gd+"1c",color:c.gd,border:`1px solid ${c.gd}40`,display:"inline-block",marginBottom:12},children:"FAVOURITE"}),
       o("div",{className:"f ia",style:{gap:10,marginBottom:10},children:[
         t("span",{style:{fontSize:28,flexShrink:0},children:favOpen.emoji}),
@@ -2983,6 +2989,34 @@ function DailyLesson({onClose}){
         favOpen.author&&t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.gd,letterSpacing:1,marginTop:6},children:"— "+favOpen.author.toUpperCase()}),
       ]}),
     ]})}),
+
+    qOpen&&t(Sht,{onClose:()=>sQOpen(null),footer:o("div",{className:"g g2",style:{gap:8},children:[
+      o("button",{onClick:()=>{sQEdit({...qOpen,isNew:false});sQOpen(null)},className:"act95 tr f ia jc",style:{gap:7,padding:"13px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,color:c.tx,fontSize:14,fontWeight:500},children:[t(Pencil,{size:15,color:c.tx}),"Edit"]}),
+      o("button",{onClick:()=>{if(!qArm){sQArm(true);return}delQuote(qOpen.id);sQOpen(null)},className:"act95 tr f ia jc",style:{gap:7,padding:"13px 0",background:qArm?c.co:c.sf2,border:qArm?"none":`1px solid ${c.brs}`,borderRadius:12,color:qArm?"#0a0a0a":c.co,fontSize:14,fontWeight:qArm?600:500},children:[t(Trash2,{size:15,color:qArm?"#0a0a0a":c.co}),qArm?"Tap again":"Delete"]}),
+    ]}),children:o(Fragment,{children:[
+      o("div",{className:"f ia jb",style:{marginBottom:14},children:[
+        t("span",{style:{fontFamily:'var(--nf)',fontSize:9.5,letterSpacing:1,padding:"3px 10px",borderRadius:999,background:c.gd+"1c",color:c.gd,border:`1px solid ${c.gd}40`},children:qOpen.fav?"FAVOURITE":"MY QUOTE"}),
+        o("div",{className:"f ia",style:{gap:14,flexShrink:0},children:[
+          t("button",{onClick:()=>{cpTxt(qOpen.text+(qOpen.author?"\n— "+qOpen.author:""))},style:{background:"transparent",border:"none",color:c.tm,fontFamily:'var(--nf)',fontSize:10,letterSpacing:1,cursor:"pointer",padding:0},children:"⧉ COPY"}),
+          t("button",{onClick:()=>{toggleQFav(qOpen.id);sQOpen(q=>({...q,fav:!q.fav}))},"aria-label":qOpen.fav?"Remove from favourites":"Add to favourites",style:{background:"transparent",border:"none",padding:2,display:"flex",cursor:"pointer"},children:t(Star,{size:17,color:qOpen.fav?c.gd:c.tm,fill:qOpen.fav?c.gd:"none"})}),
+        ]}),
+      ]}),
+      t("div",{style:{paddingLeft:14,borderLeft:`2px solid ${c.gd}`,fontFamily:c.hf,fontSize:16,color:c.tx,fontStyle:"italic",lineHeight:1.6,whiteSpace:"pre-wrap",wordBreak:"break-word"},children:`“${qOpen.text}”`}),
+      qOpen.author&&t("div",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.gd,letterSpacing:1.2,marginTop:14,paddingLeft:14},children:"— "+qOpen.author.toUpperCase()}),
+      t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,letterSpacing:.5,marginTop:18},children:`${qOpen.text.length} characters · added ${new Date(qOpen.createdAt||Date.now()).toLocaleDateString()}`}),
+    ]})}),
+
+    qEdit&&(()=>{const canSave=qEdit.text.trim().length>0;return t(Sht,{onClose:()=>sQEdit(null),footer:o("div",{className:"g g2",style:{gap:8},children:[
+      t("button",{onClick:()=>sQEdit(null),className:"act95 tr",style:{padding:"13px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,color:c.tx,fontSize:14,fontWeight:500},children:"Cancel"}),
+      t("button",{disabled:!canSave,onClick:()=>{const saved=saveQuote(qEdit);sQEdit(null);if(!qEdit.isNew)sQOpen(saved)},className:"act95 tr",style:{padding:"13px 0",background:canSave?c.ac:c.sf2,border:"none",borderRadius:12,color:canSave?"#0a0a0a":c.tm,fontSize:14,fontWeight:600},children:qEdit.isNew?"Add quote":"Save changes"}),
+    ]}),children:o(Fragment,{children:[
+      t("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:19,color:c.tx,marginBottom:16},children:qEdit.isNew?"New quote":"Edit quote"}),
+      lbl("QUOTE"),
+      t("textarea",{value:qEdit.text,onChange:e=>sQEdit(q=>({...q,text:e.target.value})),placeholder:"Write it out in full — there's no length limit…",rows:9,autoFocus:qEdit.isNew,style:{...fieldSt,resize:"vertical",lineHeight:1.6,minHeight:140}}),
+      t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,letterSpacing:.5,marginTop:6,marginBottom:16,textAlign:"right"},children:`${qEdit.text.length} character${qEdit.text.length===1?"":"s"} · no limit`}),
+      lbl("AUTHOR (OPTIONAL)"),
+      t("input",{value:qEdit.author,onChange:e=>sQEdit(q=>({...q,author:e.target.value})),placeholder:"Who said it?",style:fieldSt}),
+    ]})})})(),
   ]})
 }
 
@@ -10606,7 +10640,7 @@ const onFile=async e=>{
   }
 };
 const tryRestore=()=>{try{const o2=JSON.parse(txt);if(!o2.expenses||!Array.isArray(o2.expenses))throw new Error("Invalid format — missing expenses array");sConf(o2)}catch(err){sMsg("Error: "+err.message)}};
-const doRestore=async()=>{const o2=conf;sMsg("Restoring…");await Promise.all([restoreStmtFiles(o2.statementFiles),restoreStmtFiles(o2.expensePhotos),restoreStmtFiles(o2.ledgerPhotos),restoreStmtFiles(o2.lasPhotos),restoreStmtFiles(o2.threadFiles)].map(p=>p.catch(()=>{})));if(Array.isArray(o2.sidebarOrder)){try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2.sidebarOrder))}catch(e){}}persist({expenses:o2.expenses||[],recurring:o2.recurring||[],accounts:o2.accounts&&o2.accounts.length?o2.accounts:[DA],profiles:o2.profiles||[],cards:o2.cards||[],cardStatements:o2.cardStatements||[],bills:o2.bills||[],goals:o2.goals||[],budgetLoans:o2.budgetLoans||[],ledger:o2.ledger||[],categoryBudgets:o2.categoryBudgets||{},monthlyRestrictionLogs:o2.monthlyRestrictionLogs||[],investments:o2.investments||[],planThreshold:o2.planThreshold??null,customExpenseCategories:o2.customExpenseCategories||[],customIncomeCategories:o2.customIncomeCategories||[],categoryOverrides:o2.categoryOverrides||{},categoryOrder:o2.categoryOrder||{expense:[],income:[]},budget:o2.budget??null,budgetPeriod:o2.budgetPeriod||"monthly",...(o2.morningEnabled!=null?{morningEnabled:o2.morningEnabled,morningTime:o2.morningTime||"08:00",eveningEnabled:o2.eveningEnabled||false,eveningTime:o2.eveningTime||"21:00"}:{}),currency:o2.currency||"$",monthStartDay:o2.monthStartDay||1,merchantRules:o2.merchantRules||{},debtPlan:o2.debtPlan||null,las:o2.las||null,varExpensePlans:o2.varExpensePlans||{},varIncomePlans:o2.varIncomePlans||{},varSavingsPlans:o2.varSavingsPlans||{},advStats:o2.advStats||{},calculators:o2.calculators||{},groceryCategories:o2.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:o2.grocerySubDefaults||{},groceryStores:o2.groceryStores||[],groceryDefaultStore:o2.groceryDefaultStore||"",priceWatch:o2.priceWatch||PW_DEFAULT,threads:o2.threads||[],thresholdRules:o2.thresholdRules||[],netWorthSnapshots:o2.netWorthSnapshots||[],savingsPots:o2.savingsPots||[],savingsTarget:o2.savingsTarget??null});try{if(o2.aiProvider)sProv(o2.aiProvider);if("aiModel" in o2)sMdl(o2.aiModel||null);sAK(null)}catch(e){}sConf(null);sMsg("✓ Restored. Re-enter your AI API key in Settings (keys are never stored in backups)"+(o2.statementFiles?" (statement PDFs included)":""));sTxt("")};
+const doRestore=async()=>{const o2=conf;sMsg("Restoring…");await Promise.all([restoreStmtFiles(o2.statementFiles),restoreStmtFiles(o2.expensePhotos),restoreStmtFiles(o2.ledgerPhotos),restoreStmtFiles(o2.lasPhotos),restoreStmtFiles(o2.threadFiles)].map(p=>p.catch(()=>{})));if(Array.isArray(o2.sidebarOrder)){try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2.sidebarOrder))}catch(e){}}persist({expenses:o2.expenses||[],recurring:o2.recurring||[],accounts:o2.accounts&&o2.accounts.length?o2.accounts:[DA],profiles:o2.profiles||[],cards:o2.cards||[],cardStatements:o2.cardStatements||[],bills:o2.bills||[],goals:o2.goals||[],budgetLoans:o2.budgetLoans||[],ledger:o2.ledger||[],categoryBudgets:o2.categoryBudgets||{},monthlyRestrictionLogs:o2.monthlyRestrictionLogs||[],investments:o2.investments||[],planThreshold:o2.planThreshold??null,customExpenseCategories:o2.customExpenseCategories||[],customIncomeCategories:o2.customIncomeCategories||[],categoryOverrides:o2.categoryOverrides||{},categoryOrder:o2.categoryOrder||{expense:[],income:[]},budget:o2.budget??null,budgetPeriod:o2.budgetPeriod||"monthly",...(o2.morningEnabled!=null?{morningEnabled:o2.morningEnabled,morningTime:o2.morningTime||"08:00",eveningEnabled:o2.eveningEnabled||false,eveningTime:o2.eveningTime||"21:00"}:{}),currency:o2.currency||"$",monthStartDay:o2.monthStartDay||1,merchantRules:o2.merchantRules||{},debtPlan:o2.debtPlan||null,las:o2.las||null,varExpensePlans:o2.varExpensePlans||{},varIncomePlans:o2.varIncomePlans||{},varSavingsPlans:o2.varSavingsPlans||{},advStats:o2.advStats||{},calculators:o2.calculators||{},groceryCategories:o2.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:o2.grocerySubDefaults||{},groceryStores:o2.groceryStores||[],groceryDefaultStore:o2.groceryDefaultStore||"",priceWatch:o2.priceWatch||PW_DEFAULT,threads:o2.threads||[],thresholdRules:o2.thresholdRules||[],netWorthSnapshots:o2.netWorthSnapshots||[],savingsPots:o2.savingsPots||[],savingsTarget:o2.savingsTarget??null,myQuotes:o2.myQuotes||[],favLessons:o2.favLessons||[]});try{if(o2.aiProvider)sProv(o2.aiProvider);if("aiModel" in o2)sMdl(o2.aiModel||null);sAK(null)}catch(e){}sConf(null);sMsg("✓ Restored. Re-enter your AI API key in Settings (keys are never stored in backups)"+(o2.statementFiles?" (statement PDFs included)":""));sTxt("")};
 const prebuild=async()=>{try{const s=await window.storage.get(KB);if(!s){alert("No prebuild snapshot found");return}sTxt(s.value);sMsg("Loaded prebuild backup — review then tap Restore")}catch{alert("Error loading snapshot")}};
 return o("div",{style:{padding:`8px ${GUT}px 32px`},className:"st",children:[
   t(SH,{title:t("em",{children:"Backup & Restore"}),onBack:onClose}),
