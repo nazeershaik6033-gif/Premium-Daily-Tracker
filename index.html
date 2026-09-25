@@ -7294,6 +7294,7 @@ const[gsLines,sGsLines]=useState(()=>{
 const[splitPickFor,sSplitPickFor]=useState(null);
 const[splitCatQ,sSplitCatQ]=useState("");
   const[newCat,sNewCat]=useState(null);
+  const[newThreadSheet,sNewThreadSheet]=useState(false);
 const r2=x=>Math.round((Number(x)||0)*100)/100;
 const linesSum=r2(lines.reduce((s,x)=>s+(parseFloat(x.amt)||0),0));
 const remaining=r2((ev2||0)-linesSum);
@@ -7477,9 +7478,9 @@ return o(Fragment,{children:[o("div",{className:"fi",style:{paddingTop:48,paddin
       t("span",{style:{color:c.tm,fontSize:12,fontFamily:'var(--nf)',display:"inline-block",transform:threadPickOpen?"rotate(180deg)":"none",transition:"transform .2s"},children:"▾"})
     ]}),
     threadPickOpen&&o("div",{style:{position:"relative",zIndex:1,marginTop:8,background:c.sfg,borderRadius:14,border:`1px solid ${c.ac}55`,overflow:"hidden",boxShadow:"0 16px 48px rgba(0,0,0,.5)"},children:[
-      t("button",{onClick:()=>{sExpThread(null);sThreadPickOpen(false)},className:"w100 f ia act99 trt",style:{padding:"12px 14px",borderBottom:(data.threads&&data.threads.length)?`1px solid ${c.brs}`:"none",background:!expThread?c.sf3:"transparent",border:"none",color:"inherit",gap:12,textAlign:"left",width:"100%"},children:[t("span",{style:{fontSize:18,flexShrink:0},children:"🚫"}),t("span",{className:"f1",style:{fontSize:13.5,fontWeight:!expThread?600:400},children:"No thread"}),!expThread&&t(Check,{size:15,color:c.ac})]}),
+      t("button",{onClick:()=>{sExpThread(null);sThreadPickOpen(false)},className:"w100 f ia act99 trt",style:{padding:"12px 14px",borderBottom:`1px solid ${c.brs}`,background:!expThread?c.sf3:"transparent",border:"none",color:"inherit",gap:12,textAlign:"left",width:"100%"},children:[t("span",{style:{fontSize:18,flexShrink:0},children:"🚫"}),t("span",{className:"f1",style:{fontSize:13.5,fontWeight:!expThread?600:400},children:"No thread"}),!expThread&&t(Check,{size:15,color:c.ac})]}),
+      t("button",{key:"__newthread",onClick:()=>{sThreadPickOpen(false);sNewThreadSheet(true)},className:"w100 f ia act99 trt",style:{padding:"12px 14px",borderBottom:(data.threads&&data.threads.length)?`1px solid ${c.brs}`:"none",background:"transparent",border:"none",color:c.ac,gap:12,textAlign:"left",width:"100%"},children:[t(Plus,{size:16,color:c.ac,style:{flexShrink:0}}),t("span",{className:"f1",style:{fontSize:13.5,fontWeight:600,color:c.ac},children:"New thread"})]}),
       ...(data.threads||[]).map((th2,i)=>{const on=expThread===th2.id;return t("button",{key:th2.id,onClick:()=>{sExpThread(th2.id);sThreadPickOpen(false)},className:"w100 f ia act99 trt",style:{padding:"12px 14px",borderBottom:i===data.threads.length-1?"none":`1px solid ${c.brs}`,background:on?c.sf3:"transparent",border:"none",color:"inherit",gap:12,textAlign:"left",width:"100%"},children:[t("span",{style:{fontSize:18,flexShrink:0},children:th2.emoji||"🧵"}),t("span",{className:"f1 tru",style:{fontSize:13.5,fontWeight:on?600:400},children:th2.name}),on&&t(Check,{size:15,color:c.ac})]})}),
-      (!data.threads||data.threads.length===0)&&t("div",{style:{fontSize:12,color:c.tm,textAlign:"center",padding:"16px 14px"},children:"No threads yet — create one from the sidebar."})
     ]})
   ]}),
   !iI&&!split&&o("div",{style:{padding:"0 24px",marginBottom:20},children:[
@@ -7577,6 +7578,7 @@ return o(Fragment,{children:[o("div",{className:"fi",style:{paddingTop:48,paddin
       return t("div",{className:"g g3",style:{gap:8,maxHeight:"52vh",overflowY:"auto"},children:tiles})})()
   ]})})})(),
   newCat&&persist&&t(QuickCatSheet,{data,persist,initialLabel:newCat.label,group:newCat.group,onCreated:id=>{newCat.onPick&&newCat.onPick(id)},onClose:()=>sNewCat(null)}),
+  newThreadSheet&&persist&&t(NewThreadSheet,{data,persist,onCreated:id=>sExpThread(id),onClose:()=>sNewThreadSheet(false)}),
 ]})}
 function KV({label,value,full}){return o("div",{style:full?{gridColumn:"1 / -1"}:{},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1,marginBottom:2},children:label.toUpperCase()}),t("div",{className:"tru",style:{fontSize:14},children:value})]})}
 
@@ -12202,6 +12204,46 @@ function QuickCatSheet({data,persist,initialLabel,group,onCreated,onClose}){
     o("div",{className:"g g2",style:{gap:8,marginTop:18},children:[
       t("button",{onClick:onClose,className:"act95 trt",style:{padding:"13px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,color:c.tx,fontSize:14,fontWeight:500},children:"Cancel"}),
       t("button",{onClick:create,disabled:!trimmed,className:"act95 trt",style:{padding:"13px 0",background:trimmed?c.ac:c.sf2,border:"none",borderRadius:12,color:trimmed?"#0a0a0a":c.tm,fontSize:14,fontWeight:600},children:dupe?"Use "+dupe.label:"Create & use"}),
+    ]}),
+  ]})});
+}
+// Quick-create sheet for threads, opened from the "Add to thread" picker on the
+// expense form. Mirrors QuickCatSheet: stays on top of the expense form (no
+// navigating away, nothing typed is lost) and selects the new thread right away.
+// Keep it name+icon only — a budget can always be added later by editing the
+// thread from the sidebar.
+function NewThreadSheet({data,persist,onCreated,onClose}){
+  const[n,sN]=useState("");
+  const[em,sEm]=useState("🧵");
+  const trimmed=n.trim();
+  // An existing thread with the same name is reused rather than duplicated.
+  const dupe=useMemo(()=>{const l=trimmed.toLowerCase();return l?(data.threads||[]).find(x=>String(x.name||"").toLowerCase()===l):null},[trimmed,data.threads]);
+  const create=()=>{
+    if(!trimmed)return;
+    if(dupe){onCreated(dupe.id);onClose();return}
+    const th={id:"th_"+uid(),name:trimmed,emoji:em.trim()||"🧵",budget:null,notes:[],createdAt:Date.now()};
+    persist({threads:[th,...(data.threads||[])]});
+    onCreated(th.id);onClose();
+  };
+  const inpSty={width:"100%",boxSizing:"border-box",background:c.sf,border:`1px solid ${c.brs}`,borderRadius:11,padding:"11px 12px",color:c.tx,fontSize:14,outline:"none",fontFamily:"var(--tf)"};
+  return t(Sht,{onClose,children:o(Fragment,{children:[
+    t("div",{style:{fontFamily:c.hf,fontSize:19,fontWeight:700,color:c.tx,marginBottom:4},children:"New thread"}),
+    t("div",{style:{fontSize:12.5,color:c.tm,marginBottom:16,lineHeight:1.45},children:"It's added to your threads and picked for this entry right away — you won't lose what you've typed."}),
+    o("div",{className:"f",style:{gap:10},children:[
+      o("div",{style:{flexShrink:0},children:[
+        t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1,marginBottom:7},children:"ICON"}),
+        t("input",{value:em,onChange:e=>sEm([...String(e.target.value||"")].slice(0,2).join("")),style:{width:46,height:46,background:c.sf,border:`1px solid ${c.brs}`,borderRadius:11,padding:0,color:c.tx,fontSize:20,outline:"none",fontFamily:'var(--tf)',textAlign:"center"}}),
+      ]}),
+      o("div",{style:{flex:1},children:[
+        t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1,marginBottom:7},children:"NAME"}),
+        t("input",{value:n,onChange:e=>sN(e.target.value),placeholder:"e.g., Car loan EMI",autoFocus:true,onKeyDown:e=>{if(e.key==="Enter")create()},style:inpSty}),
+      ]}),
+    ]}),
+    dupe&&t("div",{style:{fontSize:11.5,color:"#d97706",marginTop:10,lineHeight:1.4},children:`“${dupe.name}” already exists — tapping below just selects it.`}),
+    !dupe&&t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,letterSpacing:.4,marginTop:14},children:"NO BUDGET SET · ADD ONE ANY TIME FROM THE THREAD"}),
+    o("div",{className:"g g2",style:{gap:8,marginTop:18},children:[
+      t("button",{onClick:onClose,className:"act95 trt",style:{padding:"13px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,color:c.tx,fontSize:14,fontWeight:500},children:"Cancel"}),
+      t("button",{onClick:create,disabled:!trimmed,className:"act95 trt",style:{padding:"13px 0",background:trimmed?c.ac:c.sf2,border:"none",borderRadius:12,color:trimmed?"#0a0a0a":c.tm,fontSize:14,fontWeight:600},children:dupe?"Use "+dupe.name:(trimmed?"Create & select":"Give it a name")}),
     ]}),
   ]})});
 }
