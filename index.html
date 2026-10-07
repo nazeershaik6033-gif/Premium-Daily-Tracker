@@ -111,7 +111,7 @@ body{background:#fff!important;color:#000!important}
   display:flex;
   justify-content:center;
 }
-body.sheet-open .nav-bar{display:none!important}
+body.sheet-open .nav-bar,body.kb-open .nav-bar{display:none!important}
 /* === Motion system ===
    One set of easings for the whole app so nothing feels hand-rolled.
    --sp overshoots (things that should feel physical: taps, pops, indicators)
@@ -1250,6 +1250,19 @@ const NeuImg=({icon,onClick,size=44,col,style={}})=>t("button",{onClick,"aria-la
 // NeuBtn: pill button. flat=blue Synth CTA, else soft neumorphic platform. icon renders in a neumorphic "pit".
 const NeuBtn=({label,icon,onClick,flat=false,full=false,disabled=false,style={}})=>{const bg=flat?`linear-gradient(180deg,${c.sk} 0%,${c.sk}D9 100%)`:c.sfg;const fg=flat?"#fff":c.tx;return o("button",{onClick:disabled?null:onClick,disabled,className:`act98 f ia ${c.dk?("neu-press "+(flat?"neu-flat":"neu")):""}`,style:{gap:icon?12:0,justifyContent:icon?"flex-start":"center",width:full?"100%":"auto",padding:icon?"7px 20px 7px 7px":"13px 24px",borderRadius:999,background:bg,border:flat?"none":`1px solid ${c.brs}`,color:fg,fontFamily:c.hf,fontSize:15,fontWeight:600,opacity:disabled?0.5:1,...style},children:[icon&&t("span",{className:(c.dk?"neu-pit ":"")+"f ia jc",style:{width:38,height:38,borderRadius:999,background:flat?"rgba(0,0,0,0.18)":c.sf2,color:flat?"#fff":(c.dk?c.cu:c.ac),flexShrink:0},children:icon}),t("span",{children:label})]})};
 let _shtOpen=0;
+// While a text field has focus and the on-screen keyboard is up, hide the fixed
+// bottom nav so it can't float mid-screen above the keyboard and break page forms.
+(()=>{
+  const vv=window.visualViewport;if(!vv)return;
+  const upd=()=>{
+    const ae=document.activeElement;
+    const typing=!!ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)&&!/^(checkbox|radio|button|submit|file|date)$/.test(ae.type||"");
+    document.body.classList.toggle("kb-open",typing&&(window.innerHeight-vv.height)>100);
+  };
+  vv.addEventListener("resize",upd);
+  document.addEventListener("focusin",()=>setTimeout(upd,50));
+  document.addEventListener("focusout",()=>setTimeout(upd,50));
+})();
 const Sht=({children,onClose,footer})=>{
   useEffect(()=>{_shtOpen++;document.body.classList.add("sheet-open");return()=>{_shtOpen=Math.max(0,_shtOpen-1);if(_shtOpen===0)document.body.classList.remove("sheet-open")}},[]);
   const pnl=useRef(null),body=useRef(null),scrim=useRef(null),dr=useRef(null),ov=useRef(null);
@@ -11801,15 +11814,26 @@ function LnRemindSheet({L,onClose,onSave}){
   ]})});
 }
 function LnEditSheet({L,data,onClose,onSave}){
-  const[f,sF]=useState({lender:L.lender||"",purpose:L.purpose||"",desc:L.desc||"",charges:String(L.charges||""),emi:L.emiManual?String(L.emi):""});
+  const[f,sF]=useState({lender:L.lender||"",purpose:L.purpose||"",desc:L.desc||"",charges:String(L.charges||""),emi:L.emiManual?String(L.emi):"",amount:String(L.kind==="od"?(L.limit||""):(L.principal||"")),rate:String(L.rate||0),tenure:String(L.tenure||""),sanction:lnYMD(L.sanction||Date.now()),start:L.emiStart?lnYMD(L.emiStart):""});
   const up=p=>sF(x=>({...x,...p}));const isOD=L.kind==="od";
-  const field=(lab,k,opts={})=>o("div",{children:[lnLbl(lab),t("input",{value:f[k],inputMode:opts.num?"decimal":undefined,onChange:e=>up({[k]:opts.num?e.target.value.replace(/[^\d.]/g,""):e.target.value}),placeholder:opts.ph,style:lnInp()})]});
+  const field=(lab,k,opts={})=>o("div",{children:[lnLbl(lab),t("input",{value:f[k],type:opts.type||"text",inputMode:opts.num?"decimal":undefined,onChange:e=>up({[k]:opts.num?e.target.value.replace(/[^\d.]/g,""):e.target.value}),placeholder:opts.ph,style:lnInp()})]});
   return t(Sht,{onClose,children:o(Fragment,{children:[
     lnSheetTitle("Edit loan details"),
-    field(L.kind==="friends"?"PERSON":"LENDER","lender"),field("PURPOSE","purpose"),field("DESCRIPTION","desc"),field("HIDDEN / EXTRA CHARGES ("+data.currency+")","charges",{num:true,ph:"0"}),
+    field(L.kind==="friends"?"PERSON":"LENDER","lender"),field("PURPOSE","purpose"),field("DESCRIPTION","desc"),field(isOD?"OD LIMIT ("+data.currency+")":"LOAN AMOUNT ("+data.currency+")","amount",{num:true,ph:"0"}),field("INTEREST RATE % (YEARLY)","rate",{num:true,ph:"0"}),
+    !isOD&&field("TENURE (MONTHS)","tenure",{num:true,ph:"e.g., 12"}),
+    field(isOD?"START DATE":"SANCTION DATE","sanction",{type:"date"}),
+    !isOD&&field("FIRST EMI DATE","start",{type:"date"}),
+    field("HIDDEN / EXTRA CHARGES ("+data.currency+")","charges",{num:true,ph:"0"}),
     !isOD&&field("MONTHLY EMI OVERRIDE (BLANK = AUTO)","emi",{num:true,ph:"Auto-calculated"}),
     !isOD&&t("div",{style:{fontSize:11,color:c.tm,marginTop:6,lineHeight:1.4},children:"Changing the EMI re-computes the remaining schedule; installments already marked paid keep their recorded amounts."}),
-    o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn("Save",()=>{if(!f.lender.trim())return;if(!isOD&&f.emi!==""&&parseFloat(f.emi)<=loanState(L).outstanding*(L.rate||0)/1200+0.005){alert("EMI must be more than the monthly interest on the outstanding balance.");return}onSave({lender:f.lender.trim(),purpose:f.purpose.trim(),desc:f.desc.trim(),charges:parseFloat(f.charges)||0,...(isOD?{}:(f.emi!==""&&parseFloat(f.emi)>0?{emi:parseFloat(f.emi),emiManual:true}:{emi:0,emiManual:false}))})},!!f.lender.trim())]})
+    o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn("Save",()=>{if(!f.lender.trim())return;
+      const amt=parseFloat(f.amount),rate=parseFloat(f.rate),ten=parseFloat(f.tenure),sTs=lnFromYMD(f.sanction),eTs=lnFromYMD(f.start);
+      if(!(amt>0)){alert("Enter a valid amount.");return}
+      if(!(rate>=0)){alert("Enter a valid interest rate.");return}
+      if(!sTs){alert("Pick a valid date.");return}
+      if(!isOD){if(!(Number.isInteger(ten)&&ten>=1&&ten<=600)){alert("Tenure must be 1–600 months.");return}if(!eTs||eTs<=sTs){alert("First EMI date must be after the sanction date.");return}}
+      if(!isOD&&f.emi!==""&&parseFloat(f.emi)<=amt*rate/1200+0.005){alert("EMI must be more than the monthly interest on the loan amount.");return}
+      onSave({lender:f.lender.trim(),purpose:f.purpose.trim(),desc:f.desc.trim(),charges:parseFloat(f.charges)||0,rate,sanction:sTs,...(isOD?{limit:amt}:{principal:amt,tenure:ten,emiStart:eTs}),...(isOD?{}:(f.emi!==""&&parseFloat(f.emi)>0?{emi:parseFloat(f.emi),emiManual:true}:{emi:0,emiManual:false}))})},!!f.lender.trim())]})
   ]})});
 }
 function LnOdSheet({L,data,kind,onClose,onSave}){
@@ -11937,7 +11961,7 @@ function LnDetail({L,data,persist,onBack}){
       ]})
     ]),
     lnCard([
-      t("div",{key:"t",style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx,marginBottom:4},children:"Loan Health"}),
+      o("div",{key:"t",className:"f ia jb",style:{marginBottom:4},children:[t("span",{style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx},children:"Loan Health"}),t("button",{onClick:()=>sSheet({k:"edit"}),className:"act95 trt",style:{background:"transparent",border:`1px solid ${c.brs}`,borderRadius:8,color:c.ac,fontSize:12,padding:"4px 10px"},children:"✏️ Edit"})]}),
       kv(isOD?"Amount Used":"Principal Outstanding",fm(st.outstanding,cur)),kv("Interest Rate",(L.rate||0).toFixed(2)+"% Yearly"),!isOD&&kv("Remaining Tenure",st.remainingN+" month"+(st.remainingN===1?"":"s"))
     ].filter(Boolean)),
     breakdown,
