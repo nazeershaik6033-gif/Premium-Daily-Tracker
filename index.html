@@ -111,7 +111,7 @@ body{background:#fff!important;color:#000!important}
   display:flex;
   justify-content:center;
 }
-body.sheet-open .nav-bar,body.kb-open .nav-bar{display:none!important}
+body.sheet-open .nav-bar,body.kb-open .nav-bar,body.sel-open .nav-bar{display:none!important}
 /* === Motion system ===
    One set of easings for the whole app so nothing feels hand-rolled.
    --sp overshoots (things that should feel physical: taps, pops, indicators)
@@ -1996,6 +1996,7 @@ function App(){
   const markStmtChecked=(ids)=>{const idSet=new Set(ids);let changed=false;const L=d.expenses.map(x=>{if(idSet.has(x.id)&&!x.stmtChecked){changed=true;return{...x,stmtChecked:true}}return x});if(changed)pst({expenses:L})};
   const toggleStmtChecked=(id)=>{const L=d.expenses.map(x=>x.id===id?{...x,stmtChecked:false}:x);pst({expenses:L});sAtx(a=>a&&a.id===id?{...a,stmtChecked:false}:a)};
   const chThread=(id,threadId)=>{const L=d.expenses.map(x=>x.id===id?{...x,threadId}:x);pst({expenses:L});sAtx(a=>a&&a.id===id?{...a,threadId}:a)};
+  const bulkEdit=(ids,patch)=>{const idSet=new Set(ids);const{__date,...rest}=patch;pst({expenses:d.expenses.map(x=>{if(!idSet.has(x.id))return x;let y={...x,...rest};if(__date){const o0=new Date(x.date),nd=new Date(__date);if(x.hasTime)nd.setHours(o0.getHours(),o0.getMinutes(),o0.getSeconds(),0);y.date=nd.getTime()}return y}).sort((a,b)=>b.date-a.date)})};
   const aTh=(th)=>{const id="th_"+uid();pst({threads:[{...th,id,notes:[],createdAt:Date.now()},...(d.threads||[])]});return id};
   const uTh=(id,patch)=>pst({threads:(d.threads||[]).map(x=>x.id===id?{...x,...patch}:x)});
   const dTh=(id)=>{const th=(d.threads||[]).find(x=>x.id===id);
@@ -2240,7 +2241,7 @@ function App(){
         v==="goals"&&t(Goals,{data:d,onClose:()=>sV(navFromRef.current),onAdd:()=>{sEGo(null);sV("newGoal")},onEdit:g=>{sEGo(g);sV("editGoal")},onDelete:dGo,onContribute:(g,amt)=>uGo({...g,currentBalance:(g.currentBalance||0)+amt})}),
         v==="newGoal"&&t(NewGoal,{data:d,onSave:g=>{aGo(g);sV("goals")},onCancel:()=>sV("goals")}),
         v==="editGoal"&&eGo&&t(NewGoal,{data:d,editing:eGo,onSave:g=>{uGo({...eGo,...g});sEGo(null);sV("goals")},onCancel:()=>{sEGo(null);sV("goals")}}),
-        v==="threadDetail"&&thId&&t(ThreadDetail,{data:d,threadId:thId,onClose:()=>{sThId(null);sV(navFromRef.current||"home")},onEdit:th=>{sETh(th);sV("editThread")},onDelete:dTh,onSelectExpense:e=>sAtx(e),onAddNote:addThNote,onUpdateNote:updThNote,onDeleteNote:delThNote,onSetNotes:setThNotes,onSnapshotNow:snapshotNow}),
+        v==="threadDetail"&&thId&&t(ThreadDetail,{data:d,threadId:thId,onClose:()=>{sThId(null);sV(navFromRef.current||"home")},onEdit:th=>{sETh(th);sV("editThread")},onDelete:dTh,onSelectExpense:e=>sAtx(e),onAddNote:addThNote,onUpdateNote:updThNote,onDeleteNote:delThNote,onSetNotes:setThNotes,onSnapshotNow:snapshotNow,onBulkEdit:bulkEdit}),
         v==="newThread"&&t(NewThread,{data:d,onSave:th=>{const id=aTh(th);sThId(id);sV("threadDetail")},onCancel:()=>sV(navFromRef.current||"home")}),
         v==="editThread"&&eTh&&t(NewThread,{data:d,editing:eTh,onSave:th=>{uTh(eTh.id,th);sETh(null);sV("threadDetail")},onCancel:()=>{sETh(null);sV("threadDetail")}}),
         v==="investments"&&t(Investments,{data:d,onClose:()=>sV(navFromRef.current),onAdd:()=>{sEInv(null);sV("newInvestment")},onEdit:inv=>{sEInv(inv);sV("editInvestment")},onDelete:dInv,onUpdate:uInv,onAddExpense:aE,onView:sV}),
@@ -9410,7 +9411,7 @@ function ThreadSummary({entries,f,setF,data}){
     ]})
   ]});
 }
-function ThreadDetail({data,threadId,onClose,onEdit,onDelete,onSelectExpense,onAddNote,onUpdateNote,onDeleteNote,onSetNotes,onSnapshotNow}){
+function ThreadDetail({data,threadId,onClose,onEdit,onDelete,onSelectExpense,onAddNote,onUpdateNote,onDeleteNote,onSetNotes,onSnapshotNow,onBulkEdit}){
   const th=(data.threads||[]).find(x=>x.id===threadId);
   const[delConfirm,sDelConfirm]=useState(false);
   const[editId,sEditId]=useState(null);
@@ -9419,6 +9420,11 @@ function ThreadDetail({data,threadId,onClose,onEdit,onDelete,onSelectExpense,onA
   const[reorder,sReorder]=useState(false);
   const[gallery,sGallery]=useState(null);
   const[tf,sTf]=useState(THREAD_F0);
+  const[notesOpen,sNotesOpen]=useState(false);
+  const[sel,sSel]=useState(()=>new Set());
+  const[bulk,sBulk]=useState(null);
+  const lpRef=useRef({timer:null,fired:false});
+  useEffect(()=>{if(!sel.size)return;document.body.classList.add("sel-open");return()=>document.body.classList.remove("sel-open")},[sel.size>0]);
   const[dragId,sDragId]=useState(null),[overIdx,sOverIdx]=useState(null);
   const dragRef=useRef({active:false});
   const editorRef=useRef(null);
@@ -9478,20 +9484,28 @@ function ThreadDetail({data,threadId,onClose,onEdit,onDelete,onSelectExpense,onA
         ]}),
       ]}),
     ]})};
+  const selMode=sel.size>0;
+  const dayGroups=(()=>{const m=new Map();shownEntries.forEach(e=>{const d=new Date(e.date),k=d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate();if(!m.has(k))m.set(k,{key:k,label:rd(e.date),items:[],total:0});const g=m.get(k);g.items.push(e);if(e.type==="expense")g.total+=netAmt(e)});return[...m.values()]})();
+  const toggleMany=(ids,on)=>sSel(prev=>{const n=new Set(prev);ids.forEach(id=>on?n.add(id):n.delete(id));return n});
+  const rowDown=e=>{lpRef.current.fired=false;clearTimeout(lpRef.current.timer);if(selMode)return;lpRef.current.timer=setTimeout(()=>{lpRef.current.fired=true;try{navigator.vibrate&&navigator.vibrate(12)}catch{}toggleMany([e.id],true)},450)};
+  const rowCancel=()=>clearTimeout(lpRef.current.timer);
+  const rowClick=e=>{if(lpRef.current.fired){lpRef.current.fired=false;return}if(selMode)toggleMany([e.id],!sel.has(e.id));else onSelectExpense(e)};
   return o("div",{style:{padding:`8px ${GUT}px 32px`},className:"st",children:[
     t(SH,{title:t("em",{children:th.name}),onBack:onClose,right:o("div",{className:"f",style:{gap:4},children:[t("button",{onClick:()=>onEdit(th),className:"act90 trt",style:{padding:8,background:"transparent",border:"none",color:c.tm},children:t(Pencil,{size:16})}),t("button",{onClick:()=>sDelConfirm(true),className:"act90 trt",style:{padding:8,background:"transparent",border:"none",color:c.tm},children:t(Trash2,{size:16})})]})}),
     o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:20},children:[
-      o("div",{className:"f ia",style:{gap:12,marginBottom:14},children:[t("div",{style:{width:42,height:42,borderRadius:11,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0},children:th.emoji||"🧵"}),o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:16,fontWeight:600,color:c.tx},children:th.name}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:`${totalCount} entr${totalCount===1?"y":"ies"}`})]})]}),
+      o("div",{className:"f ia",style:{gap:12,marginBottom:14},children:[t("div",{style:{width:42,height:42,borderRadius:11,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0},children:th.emoji||"🧵"}),o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:16,fontWeight:600,color:c.tx},children:th.name}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:`${totalCount} entr${totalCount===1?"y":"ies"}`})]}),
+        notes.length===0&&!notesOpen&&t("button",{onClick:()=>sNotesOpen(true),"aria-label":"Add notes",className:"act95 trt",style:{marginLeft:"auto",flexShrink:0,display:"flex",alignItems:"center",gap:6,padding:"6px 11px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:999,color:c.td,fontSize:12,cursor:"pointer"},children:[t("span",{style:{fontSize:13},children:"📝"}),"Notes"]})]}),
       !(isSnapThread&&!entries.length)&&o("div",{className:"f ib jb",style:{marginBottom:th.budget?6:0},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:28,fontWeight:300,color:barCol,letterSpacing:-1},children:fm(total,currency)}),th.budget&&t("span",{style:{fontFamily:'var(--nf)',fontSize:14,fontWeight:600,color:barCol},children:pct.toFixed(0)+"%"})]}),
       th.budget&&t("div",{style:{height:8,background:c.sf2,borderRadius:999,overflow:"hidden",marginBottom:8},children:t("div",{style:{width:pct+"%",height:"100%",background:`linear-gradient(90deg,${barCol} 0%,${barCol}cc 100%)`,transition:"width 600ms cubic-bezier(0.2,0.9,0.2,1)"}})}),
       th.budget&&t("div",{style:{fontSize:11,color:c.tm,fontFamily:'var(--nf)',letterSpacing:.3},children:over?`${fm(total-th.budget,currency)} OVER BUDGET`:`${fm(th.budget-total,currency)} LEFT OF ${fm(th.budget,currency)}`}),
     ]}),
-    t(ThreadSummary,{entries,f:tf,setF:sTf,data}),
+    (notes.length>0||notesOpen)&&o(Fragment,{children:[
     o("div",{className:"f ia jb",style:{marginBottom:10,gap:8},children:[
       o("div",{className:"f ia",style:{gap:7,minWidth:0},children:[
         t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5},children:"NOTES"}),
         notes.length>0&&t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm},children:"· "+notes.length})]}),
       o("div",{className:"f ia",style:{gap:6,flexShrink:0},children:[
+        notes.length===0&&t("button",{onClick:()=>sNotesOpen(false),className:"act90 trt",style:{padding:"5px 10px",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:9,color:c.tm,fontSize:11,cursor:"pointer"},children:"Hide"}),
         isSnapThread&&onSnapshotNow&&!reorder&&t("button",{onClick:()=>{const r=onSnapshotNow(threadId);if(r&&r.msg)alert(r.msg)},title:"Capture this month now",className:"act90 trt",style:{padding:"5px 10px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:9,color:c.td,fontSize:11,cursor:"pointer"},children:"📸 Snapshot now"}),
         notes.length>1&&t("button",{onClick:()=>{sReorder(r=>!r);sEditId(null);sReplyTo(null)},title:reorder?"Done reordering":"Reorder notes","aria-label":"Reorder notes",className:"act90 trt",style:{width:32,height:32,borderRadius:9,background:reorder?c.ac+"20":"transparent",color:reorder?c.ac:c.tm,border:reorder?`1px solid ${c.ac}40`:`1px solid ${c.brs}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"},children:t(ArrowUpDown,{size:14})}),
       ]}),
@@ -9522,8 +9536,22 @@ function ThreadDetail({data,threadId,onClose,onEdit,onDelete,onSelectExpense,onA
             ?t("div",{style:{fontSize:12,color:c.tm,textAlign:"center",padding:"8px 0 20px",lineHeight:1.5},children:"No notes yet — jot down appointments, reminders, or anything worth remembering. Attach photos or files, and use + on a note to nest sub-notes under it."})
             :t("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden",marginBottom:20},children:rows.map(noteRow)}),
         ]}),
+    ]}),
+    t(ThreadSummary,{entries,f:tf,setF:sTf,data}),
     t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:"EXPENSES"+(thrActive(tf)?` · ${shownEntries.length} of ${entries.length}`:"")}),
-    entries.length===0?t(ES,{title:t("em",{children:"No entries yet"}),subtitle:"Tag an expense to this thread from its detail view to see it here."}):shownEntries.length===0?t("div",{style:{padding:"24px 0",textAlign:"center",color:c.tm,fontSize:13},children:"No entries match these filters"}):o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden"},children:shownEntries.map((e,i)=>{const cat=co(e.category);return o("button",{key:e.id,onClick:()=>onSelectExpense(e),className:"w100 f ia act99 trt",style:{padding:"12px 14px",borderBottom:i===shownEntries.length-1?"none":`1px solid ${c.brs}`,background:"transparent",border:"none",color:"inherit",gap:12,textAlign:"left"},children:[t("span",{style:{fontSize:18,flexShrink:0},children:cat.emoji}),o("div",{className:"f1 minw0",children:[t("div",{className:"tru",style:{fontSize:13,fontWeight:500,color:c.tx},children:e.merchant||e.payee||e.note||cat.label}),t("div",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.tm},children:rdt(e)})]}),t("div",{style:{fontFamily:'var(--nf)',fontSize:14,fontWeight:600,flexShrink:0},children:fm(e.amount,e.currency||currency)})]})})}),
+    entries.length===0?t(ES,{title:t("em",{children:"No entries yet"}),subtitle:"Tag an expense to this thread from its detail view, or use Add entries."}):shownEntries.length===0?t("div",{style:{padding:"24px 0",textAlign:"center",color:c.tm,fontSize:13},children:"No entries match these filters"}):o("div",{style:{display:"flex",flexDirection:"column",gap:12},children:dayGroups.map(g=>{const ids=g.items.map(e=>e.id),allOn=ids.every(id=>sel.has(id));return o("div",{key:g.key,style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden"},children:[
+      o("div",{className:"f ia jb",style:{padding:"9px 14px",borderBottom:`1px solid ${c.brs}`,background:c.sf2},children:[
+        o("button",{onClick:()=>toggleMany(ids,!allOn),className:"f ia act95 trt",style:{gap:8,background:"transparent",border:"none",color:"inherit",padding:0,cursor:"pointer"},children:[t("span",{style:{width:16,height:16,borderRadius:5,border:`1.5px solid ${allOn?c.ac:c.td}`,background:allOn?c.ac:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:allOn&&t(Check,{size:11,color:"#0a0a0a"})}),t("span",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.td,letterSpacing:.5},children:g.label})]}),
+        t("span",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.tm},children:fm(g.total,currency)})]}),
+      ...g.items.map((e,i)=>{const cat=co(e.category),on=sel.has(e.id);return o("button",{key:e.id,onClick:()=>rowClick(e),onPointerDown:()=>rowDown(e),onPointerUp:rowCancel,onPointerLeave:rowCancel,onPointerCancel:rowCancel,onContextMenu:ev=>ev.preventDefault(),className:"w100 f ia act99 trt",style:{padding:"12px 14px",borderBottom:i===g.items.length-1?"none":`1px solid ${c.brs}`,background:on?c.ac+"1a":"transparent",border:"none",color:"inherit",gap:12,textAlign:"left",WebkitUserSelect:"none",userSelect:"none",WebkitTouchCallout:"none"},children:[
+        selMode?t("span",{style:{width:20,height:20,borderRadius:6,border:`1.5px solid ${on?c.ac:c.td}`,background:on?c.ac:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:on&&t(Check,{size:13,color:"#0a0a0a"})}):t("span",{style:{fontSize:18,flexShrink:0},children:cat.emoji}),
+        o("div",{className:"f1 minw0",children:[t("div",{className:"tru",style:{fontSize:13,fontWeight:500,color:c.tx},children:e.merchant||e.payee||e.note||cat.label}),t("div",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.tm},children:rdt(e)})]}),t("div",{style:{fontFamily:'var(--nf)',fontSize:14,fontWeight:600,flexShrink:0},children:fm(e.amount,e.currency||currency)})]})})]})})}),
+    t("button",{onClick:()=>sBulk({k:"add"}),className:"w100 act95 trt",style:{marginTop:14,padding:"12px 0",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:12,color:c.tx,fontSize:13},children:"+ Add entries to this thread"}),
+    selMode&&t("div",{style:{height:84}}),
+    selMode&&createPortal(t("div",{style:{position:"fixed",left:0,right:0,bottom:0,zIndex:45,display:"flex",justifyContent:"center"},children:o("div",{style:{width:"100%",maxWidth:AW,background:c.sfg,borderTop:`1px solid ${c.br}`,boxShadow:"0 -8px 30px rgba(0,0,0,.45)",padding:"10px 12px calc(env(safe-area-inset-bottom,0px) + 10px)"},children:[
+      o("div",{className:"f ia jb",style:{marginBottom:8},children:[t("span",{style:{fontSize:13,color:c.tx,fontWeight:600},children:sel.size+" selected"}),o("div",{className:"f ia",style:{gap:12},children:[t("button",{onClick:()=>toggleMany(shownEntries.map(e=>e.id),sel.size<shownEntries.length),style:{background:"transparent",border:"none",color:c.ac,fontSize:12,cursor:"pointer"},children:sel.size<shownEntries.length?"Select all":"Clear"}),t("button",{onClick:()=>sSel(new Set()),style:{background:"transparent",border:"none",color:c.tm,fontSize:12,cursor:"pointer"},children:"Done"})]})]}),
+      t("div",{style:{display:"flex",gap:8,overflowX:"auto"},children:[["category","🏷️ Category"],["pay","💳 Paid with"],["thread","🧵 Thread"],["date","📅 Date"],["merchant","🏪 Merchant"]].map(([k,l])=>t("button",{key:k,onClick:()=>sBulk({k}),className:"act95 trt",style:{flexShrink:0,padding:"9px 13px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,color:c.tx,fontSize:12.5,whiteSpace:"nowrap",cursor:"pointer"},children:l}))})]})}),document.body),
+    bulk&&t(ThreadBulkSheet,{kind:bulk.k,data,threadId,ids:[...sel],onClose:()=>sBulk(null),onApply:(ids,patch)=>{onBulkEdit(ids,patch);const k=bulk.k;sBulk(null);if(k!=="add")sSel(new Set())}}),
     gallery&&t(GalleryViewer,{photos:gallery.photos,idx:gallery.idx,onClose:()=>sGallery(null),onNav:i=>sGallery(g=>g&&({...g,idx:i}))}),
     delNote&&(()=>{const kidCount=thnDesc(notes,delNote.id).length,attCount=thnSubtreeIds(notes,delNote.id).reduce((s,id)=>s+thnAtt(notes.find(x=>x.id===id)).length,0);
       return t(CSht,{onClose:()=>sDelNote(null),title:"Delete this note?",
@@ -9531,6 +9559,40 @@ function ThreadDetail({data,threadId,onClose,onEdit,onDelete,onSelectExpense,onA
         onConfirm:()=>{onDeleteNote(threadId,delNote.id);sDelNote(null)},confirmLabel:"Delete"})})(),
     delConfirm&&t(CSht,{onClose:()=>sDelConfirm(false),title:"Delete this thread?",subtitle:"Entries stay in your expenses — they just won't be grouped under this thread anymore. Notes and their attachments are deleted.",onConfirm:()=>{onDelete(threadId);sDelConfirm(false)},confirmLabel:"Delete"}),
   ]})}
+function ThreadBulkSheet({kind,data,threadId,ids,onClose,onApply}){
+  const[q,sQ]=useState(""),[cat,sCat]=useState(null),[date,sDate]=useState(lnYMD(Date.now())),[pick,sPick]=useState(()=>new Set());
+  const accs=data.accounts||[],cards=data.cards||[],threads=(data.threads||[]).filter(x=>x.id!==threadId&&x.system!==MSNAP_SYS);
+  const row=(key,left,label,onClick,on)=>t("button",{key,onClick,className:"w100 f ia act99 trt",style:{padding:"12px 4px",gap:12,background:on?c.ac+"1a":"transparent",border:"none",borderBottom:`1px solid ${c.brs}`,color:"inherit",textAlign:"left"},children:[t("span",{style:{fontSize:18,width:26,textAlign:"center"},children:left}),t("span",{className:"f1",style:{fontSize:14,color:c.tx},children:label}),on&&t(Check,{size:15,color:c.ac})]});
+  const n=ids.length,ttl=lnSheetTitle,cnt=`${n} entr${n===1?"y":"ies"}`;
+  if(kind==="category"){
+    const cc=cat?co(cat):null;
+    return t(Sht,{onClose,children:o(Fragment,{children:[ttl(cc?cc.emoji+" "+cc.label:"Change category",cc?"Pick a subcategory (optional)":"Applies to "+cnt),
+      !cc&&ceAll().map(x=>row(x.id,x.emoji,x.label,()=>sCat(x.id),false)),
+      cc&&o(Fragment,{children:[row("_all","✅","Just the category",()=>onApply(ids,{category:cat,subcategory:null}),false),...(cc.subs||[]).map(sb=>row(sb,"·",sb,()=>onApply(ids,{category:cat,subcategory:sb}),false)),lnBtn("Back",()=>sCat(null),false,{marginTop:14,flex:"none",width:"100%"})]})]})});
+  }
+  if(kind==="pay")return t(Sht,{onClose,children:o(Fragment,{children:[ttl("Paid with","Applies to "+cnt),
+    ...accs.map(a=>row("a"+a.id,a.emoji||"🏦",a.name,()=>onApply(ids,{accountId:a.id,cardId:null,payMode:"account"}),false)),
+    ...cards.map(cd=>row("c"+cd.id,"💳",cd.name,()=>onApply(ids,{accountId:null,cardId:cd.id,payMode:"card"}),false)),
+    !accs.length&&!cards.length&&t("div",{style:{color:c.tm,fontSize:13,padding:"10px 0"},children:"No accounts or cards yet."})]})});
+  if(kind==="thread")return t(Sht,{onClose,children:o(Fragment,{children:[ttl("Move to thread","Moves "+cnt),
+    row("none","🚫","No thread",()=>onApply(ids,{threadId:null}),false),...threads.map(x=>row(x.id,x.emoji||"🧵",x.name,()=>onApply(ids,{threadId:x.id}),false))]})});
+  if(kind==="date")return t(Sht,{onClose,children:o(Fragment,{children:[ttl("Change date","Applies to "+cnt+" (time of day is kept)"),
+    t("input",{type:"date",value:date,onChange:e=>sDate(e.target.value),style:lnInp()}),
+    o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn("Apply",()=>{const ts=lnFromYMD(date);if(!ts)return;onApply(ids,{__date:ts})},true)]})]})});
+  if(kind==="merchant")return t(Sht,{onClose,children:o(Fragment,{children:[ttl("Change merchant","Applies to "+cnt),
+    t("input",{value:q,autoFocus:true,onChange:e=>sQ(e.target.value),placeholder:"Merchant name",style:lnInp()}),
+    o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn("Apply",()=>{if(q.trim())onApply(ids,{merchant:q.trim()})},!!q.trim())]})]})});
+  const cand=(data.expenses||[]).filter(e=>e.threadId!==threadId).sort((a,b)=>b.date-a.date).filter(e=>{const s=q.trim().toLowerCase();return !s||((e.merchant||"")+" "+(e.note||"")+" "+co(e.category).label).toLowerCase().includes(s)}).slice(0,200);
+  const groups=[];cand.forEach(e=>{const l=rd(e.date),g=groups[groups.length-1];if(g&&g.label===l)g.items.push(e);else groups.push({label:l,items:[e]})});
+  const tog=ids2=>sPick(p=>{const m=new Set(p),all=ids2.every(i=>m.has(i));ids2.forEach(i=>all?m.delete(i):m.add(i));return m});
+  return t(Sht,{onClose,children:o(Fragment,{children:[ttl("Add entries to thread","Tick any entries, or a whole day, then add them at once"),
+    t("input",{value:q,onChange:e=>sQ(e.target.value),placeholder:"Search merchant, note, category",style:lnInp()}),
+    ...groups.map(g=>{const gi=g.items.map(e=>e.id),allOn=gi.every(i=>pick.has(i));return o("div",{key:g.label,children:[
+      t("button",{onClick:()=>tog(gi),className:"w100 f ia act95 trt",style:{marginTop:12,padding:"6px 2px",gap:8,background:"transparent",border:"none",color:c.td,fontFamily:'var(--nf)',fontSize:11,letterSpacing:.5,textAlign:"left"},children:[t("span",{style:{width:16,height:16,borderRadius:5,border:`1.5px solid ${allOn?c.ac:c.td}`,background:allOn?c.ac:"transparent",display:"flex",alignItems:"center",justifyContent:"center"},children:allOn&&t(Check,{size:11,color:"#0a0a0a"})}),g.label]}),
+      ...g.items.map(e=>row(e.id,co(e.category).emoji,(e.merchant||e.note||co(e.category).label)+" · "+fm(e.amount,e.currency||data.currency),()=>tog([e.id]),pick.has(e.id)))]})}),
+    !groups.length&&t("div",{style:{color:c.tm,fontSize:13,padding:"14px 0"},children:"No other entries found."}),
+    o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn(pick.size?"Add "+pick.size:"Add",()=>{if(pick.size)onApply([...pick],{threadId})},pick.size>0,{opacity:pick.size?1:.5})]})]})});
+}
 function NewThread({data,editing,onSave,onCancel}){const iE=!!editing;const[n,sN]=useState(iE?editing.name:"");const[em,sEm]=useState(iE?(editing.emoji||"🧵"):"🧵");const[bg,sBg]=useState(iE&&editing.budget?String(editing.budget):"");const va=n.trim().length>0;
 return o("div",{style:{padding:"8px 0 32px"},className:"st",children:[
   t(SH,{title:t("em",{children:iE?"Edit thread":"New thread"}),onBack:onCancel}),
