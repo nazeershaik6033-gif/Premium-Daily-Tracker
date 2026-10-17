@@ -55,7 +55,7 @@ input:focus,textarea:focus,select:focus{outline:none}
 .grain{display:none}
 @keyframes fu{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .fi{animation:fu 380ms cubic-bezier(.2,.9,.2,1) both}
-.st>*{animation:fu 420ms cubic-bezier(.2,.9,.2,1) both}
+.st>*{animation:fu 420ms cubic-bezier(.2,.9,.2,1) backwards}
 .st>*:nth-child(1){animation-delay:0}
 .st>*:nth-child(2){animation-delay:50ms}
 .st>*:nth-child(3){animation-delay:100ms}
@@ -2273,6 +2273,7 @@ function App(){
         v==="netWorth"&&t(NetWorth,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"home")}),
         v==="advStats"&&t(AdvancedStats,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"stats"),onTx:sAtx,onFlt:sFlt}),
         v==="monthlyReport"&&t(MReport,{data:d,onClose:()=>sV(navFromRef.current)}),
+        v==="budgetCalc"&&t(BudgetPage,{data:d,persist:pst,onClose:()=>sV("calculators"),onView:sV}),
         v==="loanTracker"&&t(LoanTracker,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"calculators"),onView:(id)=>{navFromRef.current="loanTracker";sV(id)}}),
         v==="categoryBudgets"&&t(CatBud,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
         v==="settings"&&t(Settings,{data:d,persist:pst,onClose:()=>sV("home"),onBackup:()=>sV("backup"),onCategories:()=>{navFromRef.current="settings";sV("categories")},onView:sV,theme,onSetTheme:applyTheme}),
@@ -11432,7 +11433,22 @@ const BUD_SECTIONS=[
   ]},
 ];
 const BUD_SECTION_PALETTE=["#4F8DFD","#F59E0B","#9CA3AF","#F5B301","#2FC59B","#FF6B9D","#A78BFA","#5EB1FF"];
-function BudgetCalculator({data,persist,cur,spendFlt,onView}){
+function BudgetShell({mode,onOpen,onClose,cur,monthLabel,income,outTotal,leftout,children}){
+  if(mode==="page")return o("div",{style:{padding:"8px 20px 140px"},children:[
+    o("div",{className:"f ia jb",style:{marginBottom:14},children:[t(BB,{onClick:onClose}),t("div",{style:{fontFamily:c.hf,fontSize:24},children:t("em",{children:"Monthly Budget"})}),t("div",{style:{width:38}})]}),
+    children]});
+  const used=income>0?Math.min(100,Math.max(0,outTotal/income*100)):0,over=leftout<0;
+  return t("button",{onClick:onOpen,className:"w100 act98 trt",style:{display:"block",textAlign:"left",marginTop:14,padding:18,background:c.sfg,border:`1px solid ${over?c.ro+"66":c.brs}`,borderRadius:18,color:"inherit"},children:[
+    o("div",{className:"f ia jb",children:[o("div",{className:"f ia",style:{gap:12},children:[t("span",{style:{width:42,height:42,borderRadius:12,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:21},children:"🧮"}),o("div",{className:"tl",children:[t("div",{style:{fontFamily:c.hf,fontSize:17,fontWeight:600,color:c.tx},children:"Monthly Budget"}),t("div",{style:{fontSize:12.5,color:c.tm,marginTop:2},children:monthLabel})]})]}),t("span",{style:{color:c.tm,fontSize:20},children:"›"})]}),
+    income>0&&t("div",{style:{height:6,borderRadius:3,background:c.sf2,margin:"14px 0 0",overflow:"hidden"},children:t("div",{style:{width:used+"%",height:"100%",background:over?c.ro:c.mt}})}),
+    o("div",{className:"f",style:{gap:10,marginTop:14,paddingTop:12,borderTop:`1px solid ${c.brs}`},children:[
+      o("div",{className:"f1 minw0",children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1},children:"INCOME"}),t("div",{style:{fontFamily:'var(--nf)',fontSize:15,color:c.tx,marginTop:3},children:fm(income,cur)})]}),
+      o("div",{className:"f1 minw0",children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1},children:"PLANNED"}),t("div",{style:{fontFamily:'var(--nf)',fontSize:15,color:c.tx,marginTop:3},children:fm(outTotal,cur)})]}),
+      o("div",{className:"f1 minw0",children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1},children:over?"OVER":"LEFT"}),t("div",{style:{fontFamily:'var(--nf)',fontSize:15,color:over?c.ro:c.mt,marginTop:3},children:fm(Math.abs(leftout),cur)})]})
+    ]})
+  ]});
+}
+function BudgetCalculator({data,persist,cur,spendFlt,onView,mode="card",onClose}){
   const cals=data.calculators||{};
   const B=cals.budget||{};
   const links=B.links||{};
@@ -11543,7 +11559,7 @@ function BudgetCalculator({data,persist,cur,spendFlt,onView}){
   const linkGroups=[{id:"inflow",title:"INFLOWS",kind:"income",lines:effInflows},...effSections.map(s=>({id:s.id,title:s.label.toUpperCase(),kind:"expense",lines:s.lines}))];
   const overriddenIds=[...effInflows.map(l=>l.id),...effSections.flatMap(s=>s.lines.map(l=>l.id))].filter(id=>(links[id]||[]).length>0&&values[id]!=null);
   const resetAllOverrides=()=>{const nv={...values};overriddenIds.forEach(id=>{nv[id]=null});saveMonth(nv)};
-  return o(Fragment,{children:[t(Collapsible,{title:"🧮 MONTHLY BUDGET",badge:t(Pl,{col:c.gd,children:"CALCULATOR"}),summary:fm(leftout,cur),defaultOpen:false,children:o(Fragment,{children:[
+  return o(Fragment,{children:[t(BudgetShell,{mode,onOpen:()=>onView&&onView("budgetCalc"),onClose,cur,monthLabel,income,outTotal,leftout,children:o(Fragment,{children:[
     t("div",{style:{fontSize:11.5,color:c.tm,marginBottom:12,lineHeight:1.5},children:"A Money-Purse style monthly planner. Link any line to your categories and it auto-fills from actual transactions — or type to override."}),
     t("button",{onClick:()=>sShowStats(v=>!v),className:"w100 act97 trt f ia jb",style:{padding:"12px 14px",background:showStats?c.mt+"14":c.sf2,border:`1px solid ${showStats?c.mt+"55":c.brs}`,borderRadius:12},children:[o("div",{className:"f ia",style:{gap:8},children:[t("span",{style:{fontSize:15},children:"📊"}),o("div",{className:"tl",children:[t("div",{style:{fontSize:13,fontWeight:600,color:c.tx},children:"Stats"}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:monthLabel+" · category breakdown & status"})]})]}),o("div",{className:"f ia",style:{gap:8,flexShrink:0},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:12,fontWeight:600,color:leftout>=0?c.mt:c.co},children:fm(leftout,cur)}),t("span",{style:{color:c.tm,fontSize:12,fontFamily:'var(--nf)',transform:showStats?"rotate(180deg)":"none",display:"inline-block",transition:"transform .2s"},children:"▾"})]})]}),
     showStats&&o(Fragment,{children:[
@@ -12105,8 +12121,9 @@ function LnSummary(data){
   const act=loans.map(L=>({L,st:loanState(L)})).filter(x=>!x.st.closed);
   const owe=act.filter(x=>x.L.direction!=="lent"),recv=act.filter(x=>x.L.direction==="lent");
   const sum=(a,f)=>lnR2(a.reduce((s,x)=>s+f(x),0));
+  const las=Math.max(0,Number(data.las&&data.las.loan)||0),lasN=las>0?1:0;
   const soon=act.filter(x=>x.st.next&&x.L.direction!=="lent"&&lnDay(x.st.next.due)-today<=30*864e5);
-  return{act,owe,recv,totalLoan:sum(owe,x=>x.L.kind==="od"?(x.L.limit||0):x.L.principal),outstanding:sum(owe,x=>x.st.outstanding),toReceive:sum(recv,x=>x.st.outstanding),
+  return{act,owe,recv,las,lasN,totalLoan:lnR2(las+sum(owe,x=>x.L.kind==="od"?(x.L.limit||0):x.L.principal)),outstanding:lnR2(las+sum(owe,x=>x.st.outstanding)),toReceive:sum(recv,x=>x.st.outstanding),
     upcoming:sum(soon,x=>x.st.next.emi),upcomingN:soon.length,overdueN:act.reduce((s,x)=>s+(x.L.direction==="lent"?0:x.st.overdue.length),0),
     nextAll:act.filter(x=>x.st.next&&x.L.direction!=="lent").sort((a,b)=>a.st.next.due-b.st.next.due)[0]||null};
 }
@@ -12129,7 +12146,7 @@ function LnOverview({data,persist,onOpen,onAdd,onView,onTab}){
   const act=sm.act;
   const owe=sm.owe,recv=sm.recv;
   const val=x=>inc?x.st.remaining:x.st.outstanding;
-  const youPay=lnR2(owe.reduce((a,x)=>a+val(x),0)),youRecv=lnR2(recv.reduce((a,x)=>a+val(x),0));
+  const youPay=lnR2(sm.las+owe.reduce((a,x)=>a+val(x),0)),youRecv=lnR2(recv.reduce((a,x)=>a+val(x),0));
   // debt-free ETA + progress across loans you owe
   const lastDue=owe.reduce((m,x)=>{const r=x.st.unpaid[x.st.unpaid.length-1];return r&&r.due>m?r.due:m},0);
   const months=lastDue?Math.max(0,Math.round((lastDue-today)/(30.44*864e5))):0;
@@ -12156,7 +12173,7 @@ function LnOverview({data,persist,onOpen,onAdd,onView,onTab}){
   const card=(children,extra)=>lnCard(children,extra);
   const sect=(x,right)=>o("div",{className:"f ia jb",style:{marginBottom:8},children:[t("div",{style:{fontFamily:c.hf,fontSize:17,fontWeight:600,color:c.tx},children:x}),right]});
   const pct=v=>mixTot>0?Math.round(v/mixTot*100):0;
-  if(!loans.length)return o("div",{children:[
+  if(!loans.length&&!sm.lasN)return o("div",{children:[
     o("div",{style:{textAlign:"center",margin:"26px 0 22px"},children:[t("div",{style:{fontSize:34,marginBottom:8},children:"🏦"}),t("div",{style:{fontFamily:c.hf,fontSize:21,fontWeight:600,color:c.tx},children:"You're all set to begin"}),t("div",{style:{fontSize:12.5,color:c.td,marginTop:6,lineHeight:1.5},children:"Add your existing loan or expense to get started. Tap + Add below."})]}),
     ...[["🏦","Bank Loan","Loans taken from banks",()=>onAdd("pick"),"#4F8DFD"],["🤝","Friends / Family Loan","Track loans with friends & family",()=>onAdd("friends"),"#F0735A"],["🔁","Recurring Expense","Track recurring payments",()=>onView&&onView("recurring"),"#7B8CFF"]].map(([e,tt,s,f,col])=>t("button",{key:tt,onClick:f,className:"w100 f ia jb act98 trt",style:{padding:"14px 16px",marginBottom:10,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,textAlign:"left",color:"inherit"},children:[o("div",{className:"f ia",style:{gap:12},children:[t("span",{style:{width:40,height:40,borderRadius:11,background:col+"26",display:"flex",alignItems:"center",justifyContent:"center",fontSize:19},children:e}),o("div",{className:"tl",children:[t("div",{style:{fontSize:14.5,color:c.tx,fontWeight:500},children:tt}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:2},children:s})]})]}),t("span",{style:{color:c.tm,fontSize:20},children:"+"})]}))
   ]});
@@ -12172,7 +12189,7 @@ function LnOverview({data,persist,onOpen,onAdd,onView,onTab}){
     // Loans overview
     card([
       o("div",{key:"h",className:"f ia jb",style:{marginBottom:6},children:[t("div",{style:{fontFamily:c.hf,fontSize:17,fontWeight:600,color:c.tx},children:"Loans Overview"}),o("span",{className:"f ia",style:{gap:8,fontSize:11.5,color:c.td},children:["Include Interest",t("button",{onClick:()=>setInc(!inc),"aria-label":"Include interest",className:"act95 trt",style:{width:40,height:22,borderRadius:11,border:"none",background:inc?c.ac:c.sf3,position:"relative",padding:0},children:t("span",{style:{position:"absolute",top:3,left:inc?21:3,width:16,height:16,borderRadius:8,background:inc?"#0a0a0a":c.tm,transition:"left .15s"}})})]})]}),
-      [["↗","You'll Pay",youPay,owe.length,c.co],["↙","You'll Receive",youRecv,recv.length,c.mt]].map(([ic,l,v,n,col],i)=>o("div",{key:l,className:"f ia jb",style:{padding:"13px 0",borderTop:i?`1px solid ${c.brs}`:"none"},children:[o("div",{className:"f ia",style:{gap:12},children:[t("span",{style:{width:42,height:42,borderRadius:11,background:col+"30",color:col,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20},children:ic}),o("div",{className:"tl",children:[t("div",{style:{fontSize:12.5,color:c.td},children:l}),t("div",{style:{fontFamily:'var(--nf)',fontSize:20,color:c.tx,marginTop:2},children:fm(v,cur)})]})]}),t(LnPill,{children:n+" loan"+(n===1?"":"s")})]})),
+      [["↗","You'll Pay",youPay,owe.length+sm.lasN,c.co],["↙","You'll Receive",youRecv,recv.length,c.mt]].map(([ic,l,v,n,col],i)=>o("div",{key:l,className:"f ia jb",style:{padding:"13px 0",borderTop:i?`1px solid ${c.brs}`:"none"},children:[o("div",{className:"f ia",style:{gap:12},children:[t("span",{style:{width:42,height:42,borderRadius:11,background:col+"30",color:col,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20},children:ic}),o("div",{className:"tl",children:[t("div",{style:{fontSize:12.5,color:c.td},children:l}),t("div",{style:{fontFamily:'var(--nf)',fontSize:20,color:c.tx,marginTop:2},children:fm(v,cur)})]})]}),t(LnPill,{children:n+" loan"+(n===1?"":"s")})]})),
       owe.length>0&&o("div",{key:"d",style:{paddingTop:13,borderTop:`1px solid ${c.brs}`},children:[o("div",{className:"f ia jb",children:[o("div",{style:{fontSize:17,color:c.td},children:["You'll be debt-free in ",t("b",{style:{color:c.tx},children:lnDur(months)})]}),t(LnPill,{children:pctDone+"% completed"})]}),t("div",{style:{height:8,borderRadius:4,background:c.sf2,marginTop:12,overflow:"hidden"},children:t("div",{style:{width:pctDone+"%",height:"100%",background:c.mt}})})]})
     ]),
     // Upcoming loan payments
@@ -12194,17 +12211,18 @@ function LnOverview({data,persist,onOpen,onAdd,onView,onTab}){
       o("div",{key:"b",className:"f",style:{height:12,borderRadius:6,overflow:"hidden",marginBottom:10},children:Object.entries(mixK).map(([k,v])=>t("div",{key:k,style:{width:pct(v)+"%",background:KCOL[k]}}))}),
       ...Object.entries(mixK).sort((a,b)=>b[1]-a[1]).map(([k,v])=>o("div",{key:k,className:"f ia jb",style:{padding:"5px 0"},children:[o("span",{className:"f ia",style:{gap:8,fontSize:12.5,color:c.td},children:[t("span",{style:{width:10,height:10,borderRadius:3,background:KCOL[k]}}),LOAN_KINDS[k].l]}),o("span",{style:{fontFamily:'var(--nf)',fontSize:12,color:c.tx},children:[fm(v,cur)," ",t("span",{style:{color:c.tm},children:pct(v)+"%"})]})]}))
     ]),
-    t("button",{onClick:()=>onTab("loans"),className:"w100 act95 trt",style:{padding:"13px 0",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:12,color:c.tx,fontSize:13.5},children:`See all ${loans.length} loan${loans.length===1?"":"s"}`}),
+    t("button",{onClick:()=>onTab("loans"),className:"w100 act95 trt",style:{padding:"13px 0",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:12,color:c.tx,fontSize:13.5},children:`See all ${loans.length+sm.lasN} loan${loans.length+sm.lasN===1?"":"s"}`}),
     sched&&t(Sht,{onClose:()=>sSched(false),children:o(Fragment,{children:[lnSheetTitle("Full schedule","Every upcoming EMI across your loans."),...groups.slice(0,60).map((g,i)=>o("div",{key:g.key+i,children:[grpRow({...g,items:[g.items[0]]&&g.items.length===1?g.items:g.items},i),g.items.length>1&&o("div",{style:{paddingLeft:26,marginTop:-4,marginBottom:6},children:g.items.map(it=>t("button",{key:it.id+it.n,onClick:()=>{sSched(false);onOpen(it.id)},className:"w100 f ia jb act95 trt",style:{background:"transparent",border:"none",color:c.td,fontSize:12,padding:"4px 0",textAlign:"left"},children:[o("span",{children:it.lender||"Loan"}),t("span",{style:{fontFamily:'var(--nf)'},children:fm(it.emi,cur)})]}))})]}))]})}),
     incSheet&&t(LnIncomeSheet,{data,persist,onClose:()=>sIncSheet(false)})
   ]});
 }
-function LnList({data,onOpen}){
-  const cur=data.currency,loans=data.loanTracker||[];const[tab,sTab]=useState("active");
+function LnList({data,onOpen,onView}){
+  const cur=data.currency,loans=data.loanTracker||[];const las=data.las||{},lasLoan=Math.max(0,Number(las.loan)||0),lasPledged=(las.holdings||[]).reduce((q,h)=>q+(Number(h.value)||0),0);const[tab,sTab]=useState("active");
   const shown=loans.filter(L=>loanState(L).closed===(tab==="closed")).sort((a,b)=>b.createdAt-a.createdAt);
   return o("div",{children:[
     o("div",{className:"f",style:{gap:6,marginBottom:12},children:[["active","Active"],["closed","Closed"]].map(([k,l])=>t("button",{key:k,onClick:()=>sTab(k),className:"act95 trt",style:{padding:"7px 16px",borderRadius:999,fontSize:13,background:tab===k?c.ac+"26":c.sf2,border:`1px solid ${tab===k?c.ac:c.brs}`,color:tab===k?c.tx:c.td},children:l}))}),
-    shown.length===0&&t("div",{style:{textAlign:"center",color:c.tm,fontSize:13,padding:"18px 0"},children:tab==="active"?"No active loans. Tap + Add to create one.":"No closed loans yet."}),
+    tab==="active"&&lasLoan>0&&t("button",{key:"las",onClick:()=>onView&&onView("las"),className:"w100 act98 trt",style:{display:"block",padding:"14px 16px",marginBottom:10,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,color:"inherit",textAlign:"left"},children:o("div",{className:"f ia jb",style:{gap:10},children:[o("div",{className:"f ia minw0",style:{gap:11},children:[t("span",{style:{width:38,height:38,borderRadius:11,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0},children:"📈"}),o("div",{className:"tl minw0",children:[t("div",{className:"tru",style:{fontSize:15,fontWeight:600,color:c.tx},children:"Loan Against Securities"}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:2},children:(Number(las.rate)||0).toFixed(2)+"% · "+(lasPledged>0?"LTV "+(lasLoan/lasPledged*100).toFixed(0)+"%":"no holdings pledged")})]})]}),o("div",{className:"tr",children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:15,color:c.tx},children:fm(lasLoan,cur)}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:2},children:"outstanding"})]})]})}),
+    shown.length===0&&!(tab==="active"&&lasLoan>0)&&t("div",{style:{textAlign:"center",color:c.tm,fontSize:13,padding:"18px 0"},children:tab==="active"?"No active loans. Tap + Add to create one.":"No closed loans yet."}),
     ...shown.map(L=>{const st=loanState(L),K=LOAN_KINDS[L.kind],lent=L.direction==="lent";return t("button",{key:L.id,onClick:()=>onOpen(L.id),className:"w100 act98 trt",style:{display:"block",padding:"14px 16px",marginBottom:10,background:c.sfg,border:`1px solid ${st.overdue.length?c.ro+"66":c.brs}`,borderRadius:14,textAlign:"left",color:"inherit"},children:[
       o("div",{className:"f ia jb",style:{gap:10},children:[o("div",{className:"f ia minw0",style:{gap:11},children:[t("span",{style:{width:38,height:38,borderRadius:11,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0},children:K.e}),o("div",{className:"tl minw0",children:[t("div",{className:"tru",style:{fontSize:14.5,color:c.tx,fontWeight:500},children:L.lender||K.l}),t("div",{className:"tru",style:{fontSize:11.5,color:c.tm,marginTop:1},children:K.l+(lent?" · Given":"")+(L.purpose?" · "+L.purpose:"")})]})]}),o("div",{className:"tr",style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:14,color:lent?c.mt:c.tx},children:fm(st.outstanding,cur)}),t("div",{style:{fontSize:10.5,color:c.tm},children:L.kind==="od"?"used":lent?"to receive":"outstanding"})]})]}),
       L.kind!=="od"&&t("div",{style:{height:5,borderRadius:3,background:c.sf2,margin:"11px 0 7px",overflow:"hidden"},children:t("div",{style:{width:st.progress+"%",height:"100%",background:c.mt}})}),
@@ -12217,7 +12235,7 @@ function LnAddSheet({onClose,onAdd,onView,onIncome}){
   const hdr=x=>t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.2,margin:"12px 0 2px"},children:x});
   return t(Sht,{onClose,children:o(Fragment,{children:[
     lnSheetTitle("Add"),
-    hdr("BANK LOAN · SECURED"),...["home","vehicle"].map(k=>row(LOAN_KINDS[k].e,LOAN_KINDS[k].l,LOAN_KINDS[k].s,()=>onAdd(k))),
+    hdr("BANK LOAN · SECURED"),...["home","vehicle"].map(k=>row(LOAN_KINDS[k].e,LOAN_KINDS[k].l,LOAN_KINDS[k].s,()=>onAdd(k))),row("📈","Loan Against Securities","Shares & mutual funds pledged for credit",()=>onView&&onView("las")),
     hdr("BANK LOAN · UNSECURED"),...["personal","cc_emi","od"].map(k=>row(LOAN_KINDS[k].e,LOAN_KINDS[k].l,LOAN_KINDS[k].s,()=>onAdd(k))),
     hdr("PEOPLE"),row("🤝","Friends / Family Loan","Money you borrowed or lent",()=>onAdd("friends"),"#F0735A"),
     hdr("OTHER"),row("🔁","Recurring Expense","Track recurring payments",()=>onView&&onView("recurring"),"#7B8CFF"),row("💼","Monthly income","For your debt-to-income ratio",onIncome,"#2FC59B")
@@ -12226,7 +12244,7 @@ function LnAddSheet({onClose,onAdd,onView,onIncome}){
 // --- Container: Overview (default) / Loans list → wizard / detail, with a floating + Add ---
 function LoanTracker({data,persist,onClose,onView}){
   const[v,sV]=useState({n:"home"});const[tab,sTab]=useState("overview");const[add,sAdd]=useState(false);const[inc,sInc]=useState(false);
-  const loans=data.loanTracker||[];
+  const loans=data.loanTracker||[];const nLoans=loans.length+(Number(data.las&&data.las.loan)>0?1:0);
   const L=v.n==="detail"?loans.find(x=>x.id===v.id):null;
   const save=(loan)=>{persist({loanTracker:[loan,...loans]});sV({n:"detail",id:loan.id})};
   const onAdd=k=>k==="pick"?sAdd(true):sV({n:"wizard",kind:k});
@@ -12236,8 +12254,8 @@ function LoanTracker({data,persist,onClose,onView}){
   return o("div",{style:{padding:"8px 20px 150px"},children:[
     o("div",{className:"f ia jb",style:{marginBottom:14},children:[t(BB,{onClick:onClose}),t("div",{style:{fontFamily:c.hf,fontSize:24},children:t("em",{children:"Loan Tracker"})}),
       loans.length>0?t("button",{onClick:()=>sV({n:"home",exp:true}),"aria-label":"Export",className:"act90 trt",style:{width:38,height:38,borderRadius:19,background:c.sf2,border:`1px solid ${c.brs}`,color:c.tx,fontSize:15},children:"⤓"}):t("div",{style:{width:38}})]}),
-    loans.length>0&&o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,marginBottom:14},children:[["overview","Overview"],["loans","Loans"]].map(([k,l])=>t("button",{key:k,onClick:()=>sTab(k),className:"act95 tr",style:{flex:1,padding:"9px 0",borderRadius:9,border:"none",fontSize:13.5,fontWeight:tab===k?600:400,background:tab===k?c.sf3:"transparent",color:tab===k?c.tx:c.td},children:l}))}),
-    (tab==="overview"||!loans.length)?t(LnOverview,{data,persist,onOpen:open,onAdd,onView,onTab:sTab}):t(LnList,{data,onOpen:open}),
+    nLoans>0&&o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,marginBottom:14},children:[["overview","Overview"],["loans","Loans"]].map(([k,l])=>t("button",{key:k,onClick:()=>sTab(k),className:"act95 tr",style:{flex:1,padding:"9px 0",borderRadius:9,border:"none",fontSize:13.5,fontWeight:tab===k?600:400,background:tab===k?c.sf3:"transparent",color:tab===k?c.tx:c.td},children:l}))}),
+    (tab==="overview"||!nLoans)?t(LnOverview,{data,persist,onOpen:open,onAdd,onView,onTab:sTab}):t(LnList,{data,onOpen:open,onView}),
     t("button",{onClick:()=>sAdd(true),className:"act95 tr f ia",style:{position:"fixed",right:20,bottom:96,zIndex:60,gap:8,padding:"13px 20px",borderRadius:16,border:"none",background:c.ac,color:"#0a0a0a",fontSize:14,fontWeight:600,boxShadow:"0 8px 24px rgba(0,0,0,.45)"},children:[t("span",{style:{fontSize:16},children:"🏦"}),"Add"]}),
     add&&t(LnAddSheet,{onClose:()=>sAdd(false),onAdd:k=>{sAdd(false);onAdd(k)},onView,onIncome:()=>sInc(true)}),
     inc&&t(LnIncomeSheet,{data,persist,onClose:()=>sInc(false)}),
@@ -12257,6 +12275,7 @@ function LoanTrackerCard({data,onView}){
   ]});
 }
 
+function BudgetPage({data,persist,onClose,onView}){const[spendFlt]=useState(()=>{try{const x=localStorage.getItem("etp-spend-flt");return x?JSON.parse(x):{from:"",to:""}}catch{return{from:"",to:""}}});return t(BudgetCalculator,{data,persist,cur:data.currency,spendFlt,onView,mode:"page",onClose})}
 const CALCULATORS=[{id:"loans",label:"Loan Tracker",emoji:"🏦",component:LoanTrackerCard},{id:"budget",label:"Monthly Budget",emoji:"🧮",component:BudgetCalculator}];
 function CalculatorsScreen({data,persist,onView}){
   const[spendFlt]=useState(()=>{try{const s=localStorage.getItem("etp-spend-flt");return s?JSON.parse(s):{from:"",to:""}}catch{return{from:"",to:""}}});
