@@ -9729,7 +9729,8 @@ function InvCard({inv,currency,loan,onEdit,onDelete,onLog}){
       o("div",{children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:26,fontWeight:300,color:c.tx,letterSpacing:-0.5},children:fm(cur,currency)}),t("div",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.tm,marginTop:2},children:"invested "+fm(iv,currency)})]}),
       o("div",{style:{textAlign:"right"},children:[o("div",{style:{fontFamily:'var(--nf)',fontSize:14,fontWeight:600,color:ac},children:[(pct>=0?"+":"")+pct.toFixed(1),"%"]}),t("div",{style:{fontFamily:'var(--nf)',fontSize:11,color:ac,marginTop:2},children:(gain>=0?"+":"")+fm(gain,currency)})]}),
     ]}),
-    (r!=null||dl!=null||loan)&&o("div",{className:"f ia fw",style:{gap:8,marginTop:12,paddingTop:12,borderTop:`1px solid ${c.brs}`},children:[
+    (r!=null||dl!=null||loan||inv.exitValue!=null)&&o("div",{className:"f ia fw",style:{gap:8,marginTop:12,paddingTop:12,borderTop:`1px solid ${c.brs}`},children:[
+      inv.exitValue!=null&&inv.exitValue!==""&&t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.td,background:c.sf2,borderRadius:999,padding:"4px 10px"},children:"Exited"+(inv.exitDate?" · "+new Date(inv.exitDate).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"")}),
       loan&&t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.ac,background:c.ac+"18",borderRadius:999,padding:"4px 10px"},children:"🏦 Funded by "+(loan.lender||"loan")}),
       (inv.payouts||[]).length>0&&t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.mt,background:c.mt+"15",borderRadius:999,padding:"4px 10px"},children:"+"+fm((inv.payouts||[]).reduce((a,p)=>a+(Number(p.amount)||0),0),currency)+" paid out"}),
       r!=null&&o("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.td,background:c.sf2,borderRadius:999,padding:"4px 10px"},children:["XIRR ",(r>=0?"+":"")+r.toFixed(1),"%"]}),
@@ -12093,15 +12094,19 @@ const RI_YR=365*864e5;
 const riOf=(data,loanId)=>(data.investments||[]).filter(i=>i.loanId===loanId);
 const riPct=x=>x==null?"—":(x>=0?"":"−")+Math.abs(x).toFixed(2)+"%";
 const riSigned=(x,cur)=>(x>=0?"+":"−")+fm(Math.abs(x),cur);
+// Stocks and mutual funds don't pay interest: they take a sell (exit) value instead of an expected rate.
+const riMarket=tp=>tp==="stock"||tp==="mf";
+const riExited=inv=>inv.exitValue!=null&&inv.exitValue!=="";
 function riStats(inv,rate,now){
   const P=Number(inv.invested)||0,start=inv.startDate||inv.createdAt||Date.now();
-  const yrs=Math.max(0,((now||Date.now())-start)/RI_YR);
-  const value=invCurrent(inv),payouts=lnR2((inv.payouts||[]).reduce((a,p)=>a+(Number(p.amount)||0),0));
+  const closed=riExited(inv),end=closed?(inv.exitDate||now||Date.now()):(now||Date.now());
+  const yrs=Math.max(0,(end-start)/RI_YR);
+  const value=closed?(Number(inv.exitValue)||0):invCurrent(inv),payouts=lnR2((inv.payouts||[]).reduce((a,p)=>a+(Number(p.amount)||0),0));
   const ret=lnR2(value+payouts-P);
   const annual=P>0&&yrs>=1/12?ret/P/yrs*100:null;
   // What the loan charges for this much money over the same time (simple interest at the loan rate).
   const cost=lnR2(P*(rate||0)/100*yrs);
-  return{P,yrs,value,payouts,ret,annual,cost,net:lnR2(ret-cost),spread:annual==null?null:annual-(rate||0)};
+  return{P,yrs,value,payouts,ret,annual,cost,closed,end,pnlPct:P>0?ret/P*100:null,net:lnR2(ret-cost),spread:annual==null?null:annual-(rate||0)};
 }
 // Interest the loan has charged up to today: schedule interest of EMIs already due, plus extra charges.
 function riLoanCost(L,now){
@@ -12123,26 +12128,33 @@ function riRateBars(annual,rate){
   const bar=(l,v,col)=>o("div",{key:l,style:{marginBottom:8},children:[o("div",{className:"f jb",style:{fontSize:12,color:c.td,marginBottom:4},children:[t("span",{children:l}),t("span",{style:{fontFamily:'var(--nf)',color:col},children:v==null?"too early":riPct(v)+" / yr"})]}),t("div",{style:{height:8,borderRadius:4,background:c.sf2,overflow:"hidden"},children:t("div",{style:{width:(v==null?0:Math.min(100,Math.abs(v)/mx*100))+"%",height:"100%",background:col,borderRadius:4}})})]});
   return o("div",{children:[bar("Reinvestment earns",annual,annual==null?c.tm:good?c.mt:c.co),bar("Loan charges",rate,c.gd)]});
 }
+const riDateInp=()=>({...lnInp(),display:"block",minWidth:0,maxWidth:"100%",minHeight:50,textAlign:"left",WebkitAppearance:"none",appearance:"none"});
 function RiFormSheet({L,data,inv,onClose,onSave}){
   const iE=!!inv;
-  const[f,sF]=useState({type:iE?(inv.type||"other"):"other",name:iE?(inv.name||""):"",invested:iE?String(inv.invested??""):"",date:lnYMD(iE&&inv.startDate?inv.startDate:Date.now()),rate:iE&&inv.rate!=null?String(inv.rate):"",current:iE&&inv.current!=null?String(inv.current):"",maturity:iE&&inv.maturityDate?lnYMD(inv.maturityDate):"",note:iE?(inv.note||""):""});
+  const[f,sF]=useState({type:iE?(inv.type||"other"):"other",name:iE?(inv.name||""):"",invested:iE?String(inv.invested??""):"",date:lnYMD(iE&&inv.startDate?inv.startDate:Date.now()),rate:iE&&inv.rate!=null?String(inv.rate):"",current:iE&&inv.current!=null?String(inv.current):"",maturity:iE&&inv.maturityDate?lnYMD(inv.maturityDate):"",exit:iE&&riExited(inv)?String(inv.exitValue):"",exitDate:iE&&inv.exitDate?lnYMD(inv.exitDate):lnYMD(Date.now()),note:iE?(inv.note||""):""});
   const set=(k,v)=>sF(p=>({...p,[k]:v}));
   const num=(k,ph)=>t("input",{value:f[k],inputMode:"decimal",placeholder:ph||"",onChange:e=>set(k,e.target.value.replace(/[^\d.]/g,"")),style:lnInp()});
-  const ok=!!(f.name.trim()&&parseFloat(f.invested)>0&&lnFromYMD(f.date));
-  const save=()=>{if(!ok)return;const cv=f.current!==""?parseFloat(f.current)||0:null;
-    const patch={type:f.type,name:f.name.trim(),emoji:iE&&inv.type===f.type&&inv.emoji?inv.emoji:invType(f.type).emoji,invested:parseFloat(f.invested),startDate:lnFromYMD(f.date),rate:f.rate!==""?parseFloat(f.rate)||0:null,current:cv,maturityDate:f.maturity?lnFromYMD(f.maturity):null,note:f.note.trim()};
+  const mkt=riMarket(f.type),hasExit=f.exit!=="";
+  const ok=!!(f.name.trim()&&parseFloat(f.invested)>0&&lnFromYMD(f.date)&&(!hasExit||lnFromYMD(f.exitDate)));
+  const save=()=>{if(!ok)return;let cv=f.current!==""?parseFloat(f.current)||0:null;
+    // Selling sets the holding's value to the exit value so My Investments shows the realised figure; clearing the exit restores the last known value.
+    const ev=hasExit?parseFloat(f.exit)||0:null;
+    if(hasExit)cv=ev;else if(iE&&riExited(inv)){const vl=[...(inv.valueLog||[])].sort((a,b)=>b.date-a.date)[0];cv=vl?vl.value:null}
+    const patch={type:f.type,name:f.name.trim(),emoji:iE&&inv.type===f.type&&inv.emoji?inv.emoji:invType(f.type).emoji,invested:parseFloat(f.invested),startDate:lnFromYMD(f.date),rate:mkt||f.rate===""?null:parseFloat(f.rate)||0,current:cv,maturityDate:!mkt&&f.maturity?lnFromYMD(f.maturity):null,exitValue:ev,exitDate:hasExit?lnFromYMD(f.exitDate):null,note:f.note.trim()};
     // A changed current value is also kept in the value history.
-    if(cv!=null&&(!iE||cv!==inv.current))patch.valueLog=[...((iE&&inv.valueLog)||[]),{id:"rv_"+uid(),date:Date.now(),value:cv}];
+    if(!hasExit&&cv!=null&&(!iE||cv!==inv.current))patch.valueLog=[...((iE&&inv.valueLog)||[]),{id:"rv_"+uid(),date:Date.now(),value:cv}];
     onSave(patch)};
   return t(Sht,{onClose,children:o(Fragment,{children:[
     lnSheetTitle(iE?"Edit reinvestment":"Add reinvestment",`Money from ${L.lender||"this loan"} put into an investment. It also shows in My Investments.`),
     lnLbl("TYPE"),t("div",{className:"f fw",style:{gap:6},children:INV_TYPES.map(x=>t("button",{key:x.id,onClick:()=>set("type",x.id),className:"act95 tr",style:{padding:"7px 12px",borderRadius:999,fontSize:12,background:f.type===x.id?c.sf3:"transparent",border:`1px solid ${f.type===x.id?x.color:c.brs}`,color:f.type===x.id?c.tx:c.td},children:x.emoji+" "+x.label}))}),
     lnLbl("NAME (E.G., SGB 2026 SERIES I, BANK FD)"),t("input",{value:f.name,autoFocus:!iE,onChange:e=>set("name",e.target.value),style:lnInp()}),
     lnLbl("AMOUNT INVESTED ("+data.currency+")"),num("invested","0"),
-    lnLbl("DATE INVESTED"),t("input",{type:"date",value:f.date,onChange:e=>set("date",e.target.value),style:lnInp()}),
-    lnLbl("EXPECTED RETURN % YEARLY (OPTIONAL)"),num("rate",(L.rate||0)+" is what the loan charges"),
-    lnLbl("CURRENT VALUE (OPTIONAL)"),num("current",f.type==="fd"?"Leave empty to grow at the expected rate":"Leave empty if unchanged"),
-    lnLbl("MATURITY DATE (OPTIONAL)"),t("input",{type:"date",value:f.maturity,onChange:e=>set("maturity",e.target.value),style:lnInp()}),
+    lnLbl(mkt?"BUY DATE":"DATE INVESTED"),t("input",{type:"date",value:f.date,onChange:e=>set("date",e.target.value),style:riDateInp()}),
+    !mkt&&lnLbl("EXPECTED RETURN % YEARLY (OPTIONAL)"),!mkt&&num("rate",(L.rate||0)+" is what the loan charges"),
+    !hasExit&&lnLbl(mkt?"CURRENT MARKET VALUE (OPTIONAL)":"CURRENT VALUE (OPTIONAL)"),!hasExit&&num("current",f.type==="fd"?"Leave empty to grow at the expected rate":"Leave empty if unchanged"),
+    !mkt&&lnLbl("MATURITY DATE (OPTIONAL)"),!mkt&&t("input",{type:"date",value:f.maturity,onChange:e=>set("maturity",e.target.value),style:riDateInp()}),
+    lnLbl(mkt?"SOLD FOR / EXIT VALUE (OPTIONAL)":"EXIT / REDEEMED VALUE (OPTIONAL)"),num("exit","Fill in once you sell to lock in the P&L"),
+    hasExit&&lnLbl(mkt?"SELL DATE":"EXIT DATE"),hasExit&&t("input",{type:"date",value:f.exitDate,onChange:e=>set("exitDate",e.target.value),style:riDateInp()}),
     lnLbl("NOTE (OPTIONAL)"),t("input",{value:f.note,onChange:e=>set("note",e.target.value),style:lnInp()}),
     o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn(iE?"Save":"Add",save,true,ok?null:{opacity:.5})]})
   ]})});
@@ -12155,29 +12167,30 @@ function RiEntrySheet({data,inv,kind,entry,onClose,onSave,onDelete}){
   return t(Sht,{onClose,children:o(Fragment,{children:[
     lnSheetTitle(pay?(entry?"Edit payout":"Payout received"):(entry?"Edit value update":"Update value"),pay?"Interest, dividend, coupon or part redemption you received from "+inv.name+".":"What "+inv.name+" is worth on this date. The latest update is used as its current value."),
     lnLbl((pay?"AMOUNT RECEIVED":"VALUE")+" ("+data.currency+")"),t("input",{value:amt,inputMode:"decimal",autoFocus:true,onChange:e=>sAmt(e.target.value.replace(/[^\d.]/g,"")),style:lnInp()}),
-    lnLbl("DATE"),t("input",{type:"date",value:date,onChange:e=>sDate(e.target.value),style:lnInp()}),
+    lnLbl("DATE"),t("input",{type:"date",value:date,onChange:e=>sDate(e.target.value),style:riDateInp()}),
     pay&&lnLbl("NOTE (OPTIONAL)"),pay&&t("input",{value:note,placeholder:"e.g., Half-yearly interest",onChange:e=>sNote(e.target.value),style:lnInp()}),
     o("div",{className:"f",style:{gap:10,marginTop:18},children:[entry?lnBtn("Delete",onDelete,false,{color:c.ro}):lnBtn("Cancel",onClose),lnBtn("Save",()=>{if(!ok)return;const d=lnFromYMD(date),a=parseFloat(amt);onSave(pay?{id:entry?entry.id:"rp_"+uid(),date:d,amount:a,note:note.trim()}:{id:entry?entry.id:"rv_"+uid(),date:d,value:a})},true,ok?null:{opacity:.5})]})
   ]})});
 }
 // Details of one reinvestment: numbers vs the loan, full history, and every action.
 function RiDetailSheet({L,data,inv,onClose,onAct}){
-  const cur=data.currency,s=riStats(inv,L.rate),tp=invType(inv.type),good=s.net>=0;
-  const hist=[{k:"start",date:inv.startDate||inv.createdAt,l:"Invested",v:"−"+fm(s.P,cur),col:c.tx},
-    ...(inv.payouts||[]).map(p=>({k:"pay",e:p,date:p.date,l:"Payout"+(p.note?" · "+p.note:""),v:"+"+fm(p.amount,cur),col:c.mt})),
+  const cur=data.currency,s=riStats(inv,L.rate),tp=invType(inv.type),good=s.net>=0,mkt=riMarket(inv.type),pl=s.closed?"Realised P&L":mkt?"Unrealised P&L":"Total return";
+  const hist=[{k:"start",date:inv.startDate||inv.createdAt,l:mkt?"Bought":"Invested",v:"−"+fm(s.P,cur),col:c.tx},
+    ...(s.closed?[{k:"exit",date:s.end,l:mkt?"Sold":"Exited",v:"+"+fm(s.value,cur),col:c.mt}]:[]),
+    ...(inv.payouts||[]).map(p=>({k:"pay",e:p,date:p.date,l:(mkt?"Dividend":"Payout")+(p.note?" · "+p.note:""),v:"+"+fm(p.amount,cur),col:c.mt})),
     ...(inv.valueLog||[]).map(v=>({k:"val",e:v,date:v.date,l:"Value updated",v:fm(v.value,cur),col:c.td}))].sort((a,b)=>b.date-a.date);
   const kv=(k,v,col)=>o("div",{key:k,className:"f jb",style:{padding:"7px 0",borderBottom:`1px solid ${c.brs}`,gap:12,fontSize:13},children:[t("span",{style:{color:c.td},children:k}),t("span",{style:{color:col||c.tx,fontFamily:'var(--nf)',textAlign:"right"},children:v})]});
   const act=(l,f,primary)=>lnBtn(l,f,primary,{fontSize:13,padding:"11px 0"});
   return t(Sht,{onClose,children:o(Fragment,{children:[
-    lnSheetTitle(tp.emoji+" "+inv.name,`${tp.label} · since ${lnFmtD(inv.startDate||inv.createdAt)}${inv.maturityDate?" · matures "+lnFmtD(inv.maturityDate):""}`),
+    lnSheetTitle(tp.emoji+" "+inv.name,`${tp.label} · ${mkt?"bought":"since"} ${lnFmtD(inv.startDate||inv.createdAt)}${s.closed?" · "+(mkt?"sold ":"exited ")+lnFmtD(s.end):inv.maturityDate?" · matures "+lnFmtD(inv.maturityDate):""}`),
     o("div",{style:{background:(good?c.mt:c.co)+"18",border:`1px solid ${(good?c.mt:c.co)}55`,borderRadius:12,padding:"12px 14px",marginBottom:12},children:[
       t("div",{style:{fontSize:12,color:c.td},children:good?"Ahead of the loan by":"Behind the loan by"}),
       t("div",{style:{fontFamily:'var(--nf)',fontSize:24,color:good?c.mt:c.co,marginTop:2},children:fm(Math.abs(s.net),cur)}),
-      t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:`Return ${riSigned(s.ret,cur)} minus ${fm(s.cost,cur)} the loan charges for ${fm(s.P,cur)} over ${s.yrs<1?Math.max(0,Math.round(s.yrs*12))+" mo":s.yrs.toFixed(1)+" yrs"}`})]}),
+      t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:`${pl} ${riSigned(s.ret,cur)}${s.pnlPct!=null?" ("+(s.pnlPct>=0?"+":"−")+Math.abs(s.pnlPct).toFixed(1)+"%)":""} minus ${fm(s.cost,cur)} the loan charges for ${fm(s.P,cur)} over ${s.yrs<1?Math.max(0,Math.round(s.yrs*12))+" mo":s.yrs.toFixed(1)+" yrs"}`})]}),
     riRateBars(s.annual,L.rate||0),
-    inv.rate!=null&&t("div",{style:{fontSize:11.5,color:c.tm,margin:"-2px 0 8px"},children:`Expected ${riPct(inv.rate)} / yr`+(s.annual!=null?` · actual ${riPct(s.annual)}`:"")}),
-    kv("Invested",fm(s.P,cur)),kv("Current value",fm(s.value,cur)),kv("Payouts received",fm(s.payouts,cur),c.mt),kv("Total return",riSigned(s.ret,cur),s.ret>=0?c.mt:c.co),kv("Loan cost for this money",fm(s.cost,cur),c.gd),
-    o("div",{className:"f",style:{gap:8,marginTop:14},children:[act("+ Payout",()=>onAct("pay"),true),act("Update value",()=>onAct("val"))]}),
+    !mkt&&inv.rate!=null&&t("div",{style:{fontSize:11.5,color:c.tm,margin:"-2px 0 8px"},children:`Expected ${riPct(inv.rate)} / yr`+(s.annual!=null?` · actual ${riPct(s.annual)}`:"")}),
+    kv(mkt?"Buy value":"Invested",fm(s.P,cur)),kv(s.closed?(mkt?"Exit (sell) value":"Exit value"):"Current value",fm(s.value,cur)),kv(mkt?"Dividends received":"Payouts received",fm(s.payouts,cur),c.mt),kv(pl,riSigned(s.ret,cur)+(s.pnlPct!=null?" · "+(s.pnlPct>=0?"+":"−")+Math.abs(s.pnlPct).toFixed(1)+"%":""),s.ret>=0?c.mt:c.co),kv("Loan cost for this money",fm(s.cost,cur),c.gd),
+    o("div",{className:"f",style:{gap:8,marginTop:14},children:[act(mkt?"+ Dividend":"+ Payout",()=>onAct("pay"),true),!s.closed&&act("Update value",()=>onAct("val"))]}),
     o("div",{className:"f",style:{gap:8,marginTop:8},children:[act("✏️ Edit",()=>onAct("edit")),act("Remove",()=>onAct("del"),false)]}),
     t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,letterSpacing:1,margin:"18px 0 4px"},children:"HISTORY · TAP AN ENTRY TO EDIT"}),
     ...hist.map((h,i)=>t("button",{key:h.k+(h.e?h.e.id:i),onClick:()=>h.e&&onAct(h.k==="pay"?"pay":"val",h.e),className:"w100 f ia jb act99 trt",style:{padding:"9px 0",background:"transparent",border:"none",borderBottom:`1px solid ${c.brs}`,color:"inherit",textAlign:"left",gap:10},children:[o("div",{className:"tl minw0",children:[t("div",{className:"tru",style:{fontSize:13,color:c.tx},children:h.l}),t("div",{style:{fontSize:11,color:c.tm},children:lnFmtD(h.date)})]}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:h.col,flexShrink:0},children:h.v})]}))
@@ -12237,8 +12250,8 @@ function LnDetail({L,data,persist,onBack,initTab}){
   const riDelEntry=(inv,kind,e)=>{if(kind==="pay")updInv(inv.id,{payouts:(inv.payouts||[]).filter(x=>x.id!==e.id)});else updInv(inv.id,withLog(inv,(inv.valueLog||[]).filter(x=>x.id!==e.id)));sSheet({k:"ri",id:inv.id})};
   const riRow=({inv,s},i)=>{const tp=invType(inv.type),good=s.net>=0;return t("button",{key:inv.id,onClick:()=>sSheet({k:"ri",id:inv.id}),className:"w100 act98 trt",style:{display:"block",padding:"12px 0",background:"transparent",border:"none",borderTop:i?`1px solid ${c.brs}`:"none",color:"inherit",textAlign:"left"},children:[
     o("div",{className:"f ia jb",style:{gap:10},children:[o("div",{className:"f ia minw0",style:{gap:10},children:[t("span",{style:{width:36,height:36,borderRadius:10,background:tp.color+"26",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0},children:inv.emoji||tp.emoji}),o("div",{className:"tl minw0",children:[t("div",{className:"tru",style:{fontSize:14,color:c.tx,fontWeight:500},children:inv.name}),t("div",{className:"tru",style:{fontSize:11,color:c.tm,marginTop:1},children:`${tp.label} · ${fs(s.P,cur)} on ${lnFmtD(inv.startDate||inv.createdAt)}`})]})]}),
-      o("div",{className:"tr",style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:14,color:c.tx},children:fm(s.value,cur)}),t("div",{style:{fontSize:10.5,color:c.tm},children:s.payouts>0?"+ "+fm(s.payouts,cur)+" paid out":"value"})]})]}),
-    o("div",{className:"f ia fw",style:{gap:6,marginTop:8},children:[t(LnPill,{col:s.annual==null?c.tm:s.annual>=(L.rate||0)?c.mt:c.co,children:s.annual==null?"Too early for a yearly %":`${riPct(s.annual)} vs ${riPct(L.rate||0)} / yr`}),t(LnPill,{col:good?c.mt:c.co,children:(good?"Ahead ":"Behind ")+fm(Math.abs(s.net),cur)})]})]})};
+      o("div",{className:"tr",style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:14,color:c.tx},children:fm(s.value,cur)}),t("div",{style:{fontSize:10.5,color:c.tm},children:s.payouts>0?"+ "+fm(s.payouts,cur)+" paid out":s.closed?"exit value":"value"})]})]}),
+    o("div",{className:"f ia fw",style:{gap:6,marginTop:8},children:[riMarket(inv.type)?t(LnPill,{col:s.ret>=0?c.mt:c.co,children:`${s.closed?"Realised":"Unrealised"} ${riSigned(s.ret,cur)}${s.pnlPct!=null?" · "+(s.pnlPct>=0?"+":"−")+Math.abs(s.pnlPct).toFixed(1)+"%":""}`}):t(LnPill,{col:s.annual==null?c.tm:s.annual>=(L.rate||0)?c.mt:c.co,children:s.annual==null?"Too early for a yearly %":`${riPct(s.annual)} vs ${riPct(L.rate||0)} / yr`}),t(LnPill,{col:good?c.mt:c.co,children:(good?"Ahead ":"Behind ")+fm(Math.abs(s.net),cur)})]})]})};
   const riTab=o(Fragment,{children:[
     ri.items.length>0&&riSummaryCard(ri,cur),
     lnCard([
