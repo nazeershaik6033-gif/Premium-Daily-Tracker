@@ -9705,7 +9705,7 @@ function Investments({data,onClose,onAdd,onEdit,onDelete,onUpdate,onAddExpense,o
         ]}),
         groups.map(g=>o("div",{key:g.tp.id,style:{marginBottom:18},children:[
           o("div",{className:"f ib jb",style:{marginBottom:10},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5},children:(g.tp.emoji+" "+g.tp.label).toUpperCase()}),t(Pl,{col:g.tp.color,children:`${g.items.length}`})]}),
-          t("div",{style:{display:"flex",flexDirection:"column",gap:12},children:g.items.map(inv=>t(InvCard,{key:inv.id,inv,currency,onEdit:()=>onEdit(inv),onDelete:()=>sDelId(inv.id),onLog:()=>{sLogTarget(inv);sLogAmt("");sLogTx(false)}}))}),
+          t("div",{style:{display:"flex",flexDirection:"column",gap:12},children:g.items.map(inv=>t(InvCard,{key:inv.id,inv,currency,loan:inv.loanId?(data.loanTracker||[]).find(l=>l.id===inv.loanId):null,onEdit:()=>onEdit(inv),onDelete:()=>sDelId(inv.id),onLog:()=>{sLogTarget(inv);sLogAmt("");sLogTx(false)}}))}),
         ]})),
       ]}),
     delId&&t(CSht,{onClose:()=>sDelId(null),title:"Delete holding?",subtitle:"This investment will be removed from your portfolio.",onConfirm:()=>{onDelete(delId);sDelId(null)},confirmLabel:"Delete"}),
@@ -9718,7 +9718,7 @@ function Investments({data,onClose,onAdd,onEdit,onDelete,onUpdate,onAddExpense,o
     ]})}),
   ]});
 }
-function InvCard({inv,currency,onEdit,onDelete,onLog}){
+function InvCard({inv,currency,loan,onEdit,onDelete,onLog}){
   const cur=invCurrent(inv),iv=Number(inv.invested)||0,gain=cur-iv,pct=invGainPct(inv),r=xirr(inv),dl=fdDaysLeft(inv),ac=gain>=0?c.mt:c.co,tp=invType(inv.type);
   return o("div",{style:{background:c.sf,borderRadius:18,border:`1px solid ${c.brs}`,padding:16},children:[
     o("div",{className:"f ist jb",style:{marginBottom:12},children:[
@@ -9729,7 +9729,9 @@ function InvCard({inv,currency,onEdit,onDelete,onLog}){
       o("div",{children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:26,fontWeight:300,color:c.tx,letterSpacing:-0.5},children:fm(cur,currency)}),t("div",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.tm,marginTop:2},children:"invested "+fm(iv,currency)})]}),
       o("div",{style:{textAlign:"right"},children:[o("div",{style:{fontFamily:'var(--nf)',fontSize:14,fontWeight:600,color:ac},children:[(pct>=0?"+":"")+pct.toFixed(1),"%"]}),t("div",{style:{fontFamily:'var(--nf)',fontSize:11,color:ac,marginTop:2},children:(gain>=0?"+":"")+fm(gain,currency)})]}),
     ]}),
-    (r!=null||dl!=null)&&o("div",{className:"f ia fw",style:{gap:8,marginTop:12,paddingTop:12,borderTop:`1px solid ${c.brs}`},children:[
+    (r!=null||dl!=null||loan)&&o("div",{className:"f ia fw",style:{gap:8,marginTop:12,paddingTop:12,borderTop:`1px solid ${c.brs}`},children:[
+      loan&&t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.ac,background:c.ac+"18",borderRadius:999,padding:"4px 10px"},children:"🏦 Funded by "+(loan.lender||"loan")}),
+      (inv.payouts||[]).length>0&&t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.mt,background:c.mt+"15",borderRadius:999,padding:"4px 10px"},children:"+"+fm((inv.payouts||[]).reduce((a,p)=>a+(Number(p.amount)||0),0),currency)+" paid out"}),
       r!=null&&o("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.td,background:c.sf2,borderRadius:999,padding:"4px 10px"},children:["XIRR ",(r>=0?"+":"")+r.toFixed(1),"%"]}),
       dl!=null&&t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:dl<=30?c.co:c.td,background:(dl<=30?c.co:c.gd)+"15",borderRadius:999,padding:"4px 10px"},children:dl<0?"Matured":dl===0?"Matures today":"Matures in "+dl+"d"}),
     ]}),
@@ -12066,10 +12068,150 @@ function LnOdSheet({L,data,kind,onClose,onSave}){
   ]})});
 }
 
+// --- Floating buttons: full label at the top of the page, slide away while scrolling down, and come back as a
+// small round button on scroll up, so they never sit on top of what you're reading. Pages that already show
+// the action in their header pass atTop="hidden" ---
+function useFabHidden(atTop){
+  const top=atTop||"full";const[h,sH]=useState(top);
+  useEffect(()=>{
+    const last=new WeakMap();
+    const on=e=>{const el=e.target===document?document.scrollingElement:e.target;if(!el||!(el.scrollHeight-el.clientHeight>120))return;
+      const y=el.scrollTop,p=last.has(el)?last.get(el):y;if(y<40){last.set(el,y);sH(top);return}if(Math.abs(y-p)<8){if(!last.has(el))last.set(el,y);return}last.set(el,y);sH(y>p?"hidden":"mini")};
+    document.addEventListener("scroll",on,true);return()=>document.removeEventListener("scroll",on,true);
+  },[]);
+  return h;
+}
+const lnFab=(mode,{onClick,icon,label,aria})=>{const hidden=mode==="hidden",mini=mode==="mini";
+  return t("div",{style:{position:"fixed",right:20,bottom:96,zIndex:60,transform:hidden?"translateY(200%)":"none",opacity:hidden?0:1,pointerEvents:hidden?"none":"auto",transition:"transform .25s ease, opacity .2s ease"},children:
+    t("button",{onClick,"aria-label":aria||label,className:"act95 tr f ia jc",style:{gap:8,height:mini?52:"auto",width:mini?52:"auto",padding:mini?0:"13px 20px",borderRadius:mini?26:15,border:"none",background:c.ac,color:"#0a0a0a",fontSize:mini?22:14,fontWeight:600,boxShadow:"0 8px 24px rgba(0,0,0,.45)"},children:mini?icon:[t("span",{key:"i",style:{fontSize:16},children:icon}),t("span",{key:"l",children:label})]})})};
+
+// === LOAN-FUNDED REINVESTMENTS ===
+// A reinvestment is an ordinary holding in data.investments tagged with loanId, so it also shows in My Investments.
+// Extra fields: payouts:[{id,date,amount,note}] (interest/dividends/coupons received), valueLog:[{id,date,value}] (value updates).
+// Returns = current value + payouts − invested. They are compared with what the loan charges for the same money.
+const RI_YR=365*864e5;
+const riOf=(data,loanId)=>(data.investments||[]).filter(i=>i.loanId===loanId);
+const riPct=x=>x==null?"—":(x>=0?"":"−")+Math.abs(x).toFixed(2)+"%";
+const riSigned=(x,cur)=>(x>=0?"+":"−")+fm(Math.abs(x),cur);
+function riStats(inv,rate,now){
+  const P=Number(inv.invested)||0,start=inv.startDate||inv.createdAt||Date.now();
+  const yrs=Math.max(0,((now||Date.now())-start)/RI_YR);
+  const value=invCurrent(inv),payouts=lnR2((inv.payouts||[]).reduce((a,p)=>a+(Number(p.amount)||0),0));
+  const ret=lnR2(value+payouts-P);
+  const annual=P>0&&yrs>=1/12?ret/P/yrs*100:null;
+  // What the loan charges for this much money over the same time (simple interest at the loan rate).
+  const cost=lnR2(P*(rate||0)/100*yrs);
+  return{P,yrs,value,payouts,ret,annual,cost,net:lnR2(ret-cost),spread:annual==null?null:annual-(rate||0)};
+}
+// Interest the loan has charged up to today: schedule interest of EMIs already due, plus extra charges.
+function riLoanCost(L,now){
+  const today=lnDay(now||Date.now());
+  if(L.kind==="od")return lnR2((L.principal||0)*(L.rate||0)/100*Math.max(0,(today-(L.sanction||today))/RI_YR)+(L.charges||0));
+  return lnR2(loanSchedule(L).filter(r=>lnDay(r.due)<=today).reduce((a,r)=>a+r.interest,0)+(L.charges||0));
+}
+function riLoanSummary(data,L){
+  const items=riOf(data,L.id).map(inv=>({inv,s:riStats(inv,L.rate)}));
+  const sum=f=>lnR2(items.reduce((a,x)=>a+f(x.s),0));
+  const P=sum(s=>s.P),ret=sum(s=>s.ret),cost=riLoanCost(L),moneyYrs=items.reduce((a,x)=>a+x.s.P*x.s.yrs,0);
+  const base=L.kind==="od"?(L.limit||L.principal||0):(L.principal||0);
+  return{items,P,value:sum(s=>s.value),payouts:sum(s=>s.payouts),ret,cost,net:lnR2(ret-cost),hurdleNet:sum(s=>s.net),
+    annual:items.some(x=>x.s.annual!=null)&&moneyYrs>0?ret/moneyYrs*100:null,rate:L.rate||0,base,deployed:base>0?Math.min(100,P/base*100):0};
+}
+// Earning vs paying, as two bars.
+function riRateBars(annual,rate){
+  const mx=Math.max(Math.abs(annual||0),rate||0,1),good=annual!=null&&annual>=rate;
+  const bar=(l,v,col)=>o("div",{key:l,style:{marginBottom:8},children:[o("div",{className:"f jb",style:{fontSize:12,color:c.td,marginBottom:4},children:[t("span",{children:l}),t("span",{style:{fontFamily:'var(--nf)',color:col},children:v==null?"too early":riPct(v)+" / yr"})]}),t("div",{style:{height:8,borderRadius:4,background:c.sf2,overflow:"hidden"},children:t("div",{style:{width:(v==null?0:Math.min(100,Math.abs(v)/mx*100))+"%",height:"100%",background:col,borderRadius:4}})})]});
+  return o("div",{children:[bar("Reinvestment earns",annual,annual==null?c.tm:good?c.mt:c.co),bar("Loan charges",rate,c.gd)]});
+}
+function RiFormSheet({L,data,inv,onClose,onSave}){
+  const iE=!!inv;
+  const[f,sF]=useState({type:iE?(inv.type||"other"):"other",name:iE?(inv.name||""):"",invested:iE?String(inv.invested??""):"",date:lnYMD(iE&&inv.startDate?inv.startDate:Date.now()),rate:iE&&inv.rate!=null?String(inv.rate):"",current:iE&&inv.current!=null?String(inv.current):"",maturity:iE&&inv.maturityDate?lnYMD(inv.maturityDate):"",note:iE?(inv.note||""):""});
+  const set=(k,v)=>sF(p=>({...p,[k]:v}));
+  const num=(k,ph)=>t("input",{value:f[k],inputMode:"decimal",placeholder:ph||"",onChange:e=>set(k,e.target.value.replace(/[^\d.]/g,"")),style:lnInp()});
+  const ok=!!(f.name.trim()&&parseFloat(f.invested)>0&&lnFromYMD(f.date));
+  const save=()=>{if(!ok)return;const cv=f.current!==""?parseFloat(f.current)||0:null;
+    const patch={type:f.type,name:f.name.trim(),emoji:iE&&inv.type===f.type&&inv.emoji?inv.emoji:invType(f.type).emoji,invested:parseFloat(f.invested),startDate:lnFromYMD(f.date),rate:f.rate!==""?parseFloat(f.rate)||0:null,current:cv,maturityDate:f.maturity?lnFromYMD(f.maturity):null,note:f.note.trim()};
+    // A changed current value is also kept in the value history.
+    if(cv!=null&&(!iE||cv!==inv.current))patch.valueLog=[...((iE&&inv.valueLog)||[]),{id:"rv_"+uid(),date:Date.now(),value:cv}];
+    onSave(patch)};
+  return t(Sht,{onClose,children:o(Fragment,{children:[
+    lnSheetTitle(iE?"Edit reinvestment":"Add reinvestment",`Money from ${L.lender||"this loan"} put into an investment. It also shows in My Investments.`),
+    lnLbl("TYPE"),t("div",{className:"f fw",style:{gap:6},children:INV_TYPES.map(x=>t("button",{key:x.id,onClick:()=>set("type",x.id),className:"act95 tr",style:{padding:"7px 12px",borderRadius:999,fontSize:12,background:f.type===x.id?c.sf3:"transparent",border:`1px solid ${f.type===x.id?x.color:c.brs}`,color:f.type===x.id?c.tx:c.td},children:x.emoji+" "+x.label}))}),
+    lnLbl("NAME (E.G., SGB 2026 SERIES I, BANK FD)"),t("input",{value:f.name,autoFocus:!iE,onChange:e=>set("name",e.target.value),style:lnInp()}),
+    lnLbl("AMOUNT INVESTED ("+data.currency+")"),num("invested","0"),
+    lnLbl("DATE INVESTED"),t("input",{type:"date",value:f.date,onChange:e=>set("date",e.target.value),style:lnInp()}),
+    lnLbl("EXPECTED RETURN % YEARLY (OPTIONAL)"),num("rate",(L.rate||0)+" is what the loan charges"),
+    lnLbl("CURRENT VALUE (OPTIONAL)"),num("current",f.type==="fd"?"Leave empty to grow at the expected rate":"Leave empty if unchanged"),
+    lnLbl("MATURITY DATE (OPTIONAL)"),t("input",{type:"date",value:f.maturity,onChange:e=>set("maturity",e.target.value),style:lnInp()}),
+    lnLbl("NOTE (OPTIONAL)"),t("input",{value:f.note,onChange:e=>set("note",e.target.value),style:lnInp()}),
+    o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn(iE?"Save":"Add",save,true,ok?null:{opacity:.5})]})
+  ]})});
+}
+// One sheet for a payout received or a value update (add or edit).
+function RiEntrySheet({data,inv,kind,entry,onClose,onSave,onDelete}){
+  const pay=kind==="pay";
+  const[amt,sAmt]=useState(entry?String(pay?entry.amount:entry.value):"");const[date,sDate]=useState(lnYMD(entry?entry.date:Date.now()));const[note,sNote]=useState(entry&&entry.note||"");
+  const ok=parseFloat(amt)>=(pay?0.01:0)&&amt!==""&&lnFromYMD(date);
+  return t(Sht,{onClose,children:o(Fragment,{children:[
+    lnSheetTitle(pay?(entry?"Edit payout":"Payout received"):(entry?"Edit value update":"Update value"),pay?"Interest, dividend, coupon or part redemption you received from "+inv.name+".":"What "+inv.name+" is worth on this date. The latest update is used as its current value."),
+    lnLbl((pay?"AMOUNT RECEIVED":"VALUE")+" ("+data.currency+")"),t("input",{value:amt,inputMode:"decimal",autoFocus:true,onChange:e=>sAmt(e.target.value.replace(/[^\d.]/g,"")),style:lnInp()}),
+    lnLbl("DATE"),t("input",{type:"date",value:date,onChange:e=>sDate(e.target.value),style:lnInp()}),
+    pay&&lnLbl("NOTE (OPTIONAL)"),pay&&t("input",{value:note,placeholder:"e.g., Half-yearly interest",onChange:e=>sNote(e.target.value),style:lnInp()}),
+    o("div",{className:"f",style:{gap:10,marginTop:18},children:[entry?lnBtn("Delete",onDelete,false,{color:c.ro}):lnBtn("Cancel",onClose),lnBtn("Save",()=>{if(!ok)return;const d=lnFromYMD(date),a=parseFloat(amt);onSave(pay?{id:entry?entry.id:"rp_"+uid(),date:d,amount:a,note:note.trim()}:{id:entry?entry.id:"rv_"+uid(),date:d,value:a})},true,ok?null:{opacity:.5})]})
+  ]})});
+}
+// Details of one reinvestment: numbers vs the loan, full history, and every action.
+function RiDetailSheet({L,data,inv,onClose,onAct}){
+  const cur=data.currency,s=riStats(inv,L.rate),tp=invType(inv.type),good=s.net>=0;
+  const hist=[{k:"start",date:inv.startDate||inv.createdAt,l:"Invested",v:"−"+fm(s.P,cur),col:c.tx},
+    ...(inv.payouts||[]).map(p=>({k:"pay",e:p,date:p.date,l:"Payout"+(p.note?" · "+p.note:""),v:"+"+fm(p.amount,cur),col:c.mt})),
+    ...(inv.valueLog||[]).map(v=>({k:"val",e:v,date:v.date,l:"Value updated",v:fm(v.value,cur),col:c.td}))].sort((a,b)=>b.date-a.date);
+  const kv=(k,v,col)=>o("div",{key:k,className:"f jb",style:{padding:"7px 0",borderBottom:`1px solid ${c.brs}`,gap:12,fontSize:13},children:[t("span",{style:{color:c.td},children:k}),t("span",{style:{color:col||c.tx,fontFamily:'var(--nf)',textAlign:"right"},children:v})]});
+  const act=(l,f,primary)=>lnBtn(l,f,primary,{fontSize:13,padding:"11px 0"});
+  return t(Sht,{onClose,children:o(Fragment,{children:[
+    lnSheetTitle(tp.emoji+" "+inv.name,`${tp.label} · since ${lnFmtD(inv.startDate||inv.createdAt)}${inv.maturityDate?" · matures "+lnFmtD(inv.maturityDate):""}`),
+    o("div",{style:{background:(good?c.mt:c.co)+"18",border:`1px solid ${(good?c.mt:c.co)}55`,borderRadius:12,padding:"12px 14px",marginBottom:12},children:[
+      t("div",{style:{fontSize:12,color:c.td},children:good?"Ahead of the loan by":"Behind the loan by"}),
+      t("div",{style:{fontFamily:'var(--nf)',fontSize:24,color:good?c.mt:c.co,marginTop:2},children:fm(Math.abs(s.net),cur)}),
+      t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:`Return ${riSigned(s.ret,cur)} minus ${fm(s.cost,cur)} the loan charges for ${fm(s.P,cur)} over ${s.yrs<1?Math.max(0,Math.round(s.yrs*12))+" mo":s.yrs.toFixed(1)+" yrs"}`})]}),
+    riRateBars(s.annual,L.rate||0),
+    inv.rate!=null&&t("div",{style:{fontSize:11.5,color:c.tm,margin:"-2px 0 8px"},children:`Expected ${riPct(inv.rate)} / yr`+(s.annual!=null?` · actual ${riPct(s.annual)}`:"")}),
+    kv("Invested",fm(s.P,cur)),kv("Current value",fm(s.value,cur)),kv("Payouts received",fm(s.payouts,cur),c.mt),kv("Total return",riSigned(s.ret,cur),s.ret>=0?c.mt:c.co),kv("Loan cost for this money",fm(s.cost,cur),c.gd),
+    o("div",{className:"f",style:{gap:8,marginTop:14},children:[act("+ Payout",()=>onAct("pay"),true),act("Update value",()=>onAct("val"))]}),
+    o("div",{className:"f",style:{gap:8,marginTop:8},children:[act("✏️ Edit",()=>onAct("edit")),act("Remove",()=>onAct("del"),false)]}),
+    t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,letterSpacing:1,margin:"18px 0 4px"},children:"HISTORY · TAP AN ENTRY TO EDIT"}),
+    ...hist.map((h,i)=>t("button",{key:h.k+(h.e?h.e.id:i),onClick:()=>h.e&&onAct(h.k==="pay"?"pay":"val",h.e),className:"w100 f ia jb act99 trt",style:{padding:"9px 0",background:"transparent",border:"none",borderBottom:`1px solid ${c.brs}`,color:"inherit",textAlign:"left",gap:10},children:[o("div",{className:"tl minw0",children:[t("div",{className:"tru",style:{fontSize:13,color:c.tx},children:h.l}),t("div",{style:{fontSize:11,color:c.tm},children:lnFmtD(h.date)})]}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:h.col,flexShrink:0},children:h.v})]}))
+  ]})});
+}
+function RiLinkSheet({L,data,onClose,onLink}){
+  const free=(data.investments||[]).filter(i=>!i.loanId);
+  return t(Sht,{onClose,children:o(Fragment,{children:[
+    lnSheetTitle("Link an existing holding",`Pick an investment from My Investments that was funded by ${L.lender||"this loan"}.`),
+    free.length===0&&t("div",{style:{fontSize:12.5,color:c.tm,padding:"8px 0"},children:"Every holding in My Investments is already linked to a loan."}),
+    ...free.map(i=>{const tp=invType(i.type);return t("button",{key:i.id,onClick:()=>onLink(i.id),className:"w100 f ia jb act99 trt",style:{padding:"11px 0",background:"transparent",border:"none",borderBottom:`1px solid ${c.brs}`,color:"inherit",textAlign:"left",gap:10},children:[t("span",{className:"tru",style:{fontSize:14,color:c.tx},children:(i.emoji||tp.emoji)+" "+i.name}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:c.td,flexShrink:0},children:fm(Number(i.invested)||0,data.currency)})]})})
+  ]})});
+}
+// Summary for one loan: deployed, value, payouts, interest so far, net, earning vs paying.
+function riSummaryCard(sm,cur,onTap){
+  const good=sm.net>=0;
+  const kv=(k,v,col)=>o("div",{key:k,className:"f jb",style:{padding:"7px 0",borderTop:`1px solid ${c.brs}`,gap:12,fontSize:13},children:[t("span",{style:{color:c.td},children:k}),t("span",{style:{color:col||c.tx,fontFamily:'var(--nf)',textAlign:"right"},children:v})]});
+  return lnCard([
+    t("div",{key:"t",style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx,marginBottom:2},children:"Is the reinvestment beating the loan?"}),
+    o("div",{key:"v",style:{margin:"6px 0 12px"},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:26,fontWeight:300,color:good?c.mt:c.co},children:riSigned(sm.net,cur)}),t("span",{style:{fontSize:12.5,color:c.td},children:good?" ahead so far":" behind so far"})]}),
+    o("div",{key:"b",children:[riRateBars(sm.annual,sm.rate)]}),
+    o("div",{key:"d",style:{marginTop:6},children:[
+      o("div",{className:"f jb",style:{fontSize:12,color:c.td,marginBottom:4},children:[t("span",{children:"Reinvested"}),t("span",{style:{fontFamily:'var(--nf)'},children:`${fs(sm.P,cur)} of ${fs(sm.base,cur)} · ${Math.round(sm.deployed)}%`})]}),
+      t("div",{style:{height:6,borderRadius:3,background:c.sf2,overflow:"hidden",marginBottom:8},children:t("div",{style:{width:sm.deployed+"%",height:"100%",background:c.ac}})})]}),
+    kv("Current value",fm(sm.value,cur)),kv("Payouts received",fm(sm.payouts,cur),c.mt),kv("Total return",riSigned(sm.ret,cur),sm.ret>=0?c.mt:c.co),kv("Loan interest so far",fm(sm.cost,cur),c.gd),
+    t("div",{key:"n",style:{fontSize:10.5,color:c.tm,marginTop:8,lineHeight:1.45},children:"Return = current value + payouts − invested. Loan interest = interest on EMIs due up to today plus charges."}),
+    onTap&&t("button",{key:"go",onClick:onTap,className:"w100 act95 trt",style:{marginTop:10,background:"transparent",border:"none",color:c.ac,fontSize:13,padding:"4px 0"},children:"See each reinvestment ›"})
+  ]);
+}
+
 // --- Loan detail page ---
-function LnDetail({L,data,persist,onBack}){
+function LnDetail({L,data,persist,onBack,initTab}){
   const cur=data.currency,st=loanState(L),isOD=L.kind==="od",lent=L.direction==="lent",K=LOAN_KINDS[L.kind];
-  const[tab,sTab]=useState("details");const[open,sOpen]=useState(false);const[sheet,sSheet]=useState(null);const[yr,sYr]=useState(new Date().getFullYear());
+  const[tab,sTab]=useState(initTab||"details");const fabHidden=useFabHidden("hidden");const[open,sOpen]=useState(false);const[sheet,sSheet]=useState(null);const[yr,sYr]=useState(new Date().getFullYear());
   const[brk,sBrk]=useState(false);const[del,sDel]=useState(false);const[tip,sTip]=useState(true);const docRef=useRef(null);
   const list=data.loanTracker||[];
   const upd=(patch,extra)=>persist({loanTracker:list.map(x=>x.id===L.id?{...x,...patch}:x),...(extra||{})});
@@ -12083,7 +12225,30 @@ function LnDetail({L,data,persist,onBack}){
   const doOd=(tx)=>{upd({odTxns:[tx,...(L.odTxns||[])],principal:Math.max(0,lnR2((L.principal||0)+(tx.kind==="draw"?tx.amount:-tx.amount)))});sSheet(null)};
   const delPre=(id)=>{const p=(L.prepayments||[]).find(x=>x.id===id);upd({prepayments:(L.prepayments||[]).filter(x=>x.id!==id)},p&&p.expenseId?{expenses:(data.expenses||[]).filter(e=>e.id!==p.expenseId)}:{})};
   const kv=(k,v,key)=>o("div",{key:key||k,className:"f jb",style:{padding:"9px 0",borderBottom:`1px solid ${c.brs}`,gap:12},children:[t("span",{style:{fontSize:13,color:c.td},children:k}),t("span",{style:{fontSize:13,color:c.tx,textAlign:"right"},children:v})]});
-  const tabs=[["details","Loan Details"],["history","Payment History"],["docs","Documents"],["activity","Loan Activity"]].filter(([k])=>!(isOD&&k==="history"));
+  const tabs=[["details","Loan Details"],["reinvest","Reinvestments"],["history","Payment History"],["docs","Documents"],["activity","Loan Activity"]].filter(([k])=>!(isOD&&k==="history")&&!(lent&&k==="reinvest"));
+  // ---- reinvestments (holdings in data.investments with loanId === L.id) ----
+  const ri=riLoanSummary(data,L);
+  const invs=data.investments||[];
+  const updInv=(id,patch)=>persist({investments:invs.map(x=>x.id===id?{...x,...patch}:x)});
+  const riFind=id=>invs.find(x=>x.id===id);
+  // Latest value update becomes the holding's current value; with none left it falls back to invested.
+  const withLog=(inv,log)=>{const last=[...log].sort((a,b)=>b.date-a.date)[0];return{valueLog:log,current:last?last.value:null}};
+  const riSaveEntry=(inv,kind,e)=>{if(kind==="pay"){const ps=inv.payouts||[];updInv(inv.id,{payouts:ps.some(x=>x.id===e.id)?ps.map(x=>x.id===e.id?e:x):[...ps,e]})}else{const vs=inv.valueLog||[];updInv(inv.id,withLog(inv,vs.some(x=>x.id===e.id)?vs.map(x=>x.id===e.id?e:x):[...vs,e]))}sSheet({k:"ri",id:inv.id})};
+  const riDelEntry=(inv,kind,e)=>{if(kind==="pay")updInv(inv.id,{payouts:(inv.payouts||[]).filter(x=>x.id!==e.id)});else updInv(inv.id,withLog(inv,(inv.valueLog||[]).filter(x=>x.id!==e.id)));sSheet({k:"ri",id:inv.id})};
+  const riRow=({inv,s},i)=>{const tp=invType(inv.type),good=s.net>=0;return t("button",{key:inv.id,onClick:()=>sSheet({k:"ri",id:inv.id}),className:"w100 act98 trt",style:{display:"block",padding:"12px 0",background:"transparent",border:"none",borderTop:i?`1px solid ${c.brs}`:"none",color:"inherit",textAlign:"left"},children:[
+    o("div",{className:"f ia jb",style:{gap:10},children:[o("div",{className:"f ia minw0",style:{gap:10},children:[t("span",{style:{width:36,height:36,borderRadius:10,background:tp.color+"26",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0},children:inv.emoji||tp.emoji}),o("div",{className:"tl minw0",children:[t("div",{className:"tru",style:{fontSize:14,color:c.tx,fontWeight:500},children:inv.name}),t("div",{className:"tru",style:{fontSize:11,color:c.tm,marginTop:1},children:`${tp.label} · ${fs(s.P,cur)} on ${lnFmtD(inv.startDate||inv.createdAt)}`})]})]}),
+      o("div",{className:"tr",style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:14,color:c.tx},children:fm(s.value,cur)}),t("div",{style:{fontSize:10.5,color:c.tm},children:s.payouts>0?"+ "+fm(s.payouts,cur)+" paid out":"value"})]})]}),
+    o("div",{className:"f ia fw",style:{gap:6,marginTop:8},children:[t(LnPill,{col:s.annual==null?c.tm:s.annual>=(L.rate||0)?c.mt:c.co,children:s.annual==null?"Too early for a yearly %":`${riPct(s.annual)} vs ${riPct(L.rate||0)} / yr`}),t(LnPill,{col:good?c.mt:c.co,children:(good?"Ahead ":"Behind ")+fm(Math.abs(s.net),cur)})]})]})};
+  const riTab=o(Fragment,{children:[
+    ri.items.length>0&&riSummaryCard(ri,cur),
+    lnCard([
+      o("div",{key:"h",className:"f ia jb",style:{marginBottom:6},children:[t("span",{style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx},children:"Reinvestments"}),t("button",{onClick:()=>sSheet({k:"riAdd"}),"aria-label":"Add reinvestment",className:"act90 trt",style:{width:30,height:30,borderRadius:15,border:"none",background:c.ac,color:"#0a0a0a",fontSize:18,lineHeight:1},children:"+"})]}),
+      ri.items.length===0&&o("div",{key:"e",style:{textAlign:"center",color:c.td,fontSize:12.5,lineHeight:1.5,padding:"6px 0 10px"},children:[t("div",{style:{color:c.tx,fontWeight:600,marginBottom:4},children:"Reinvested this loan?"}),"Add where the money went (bonds, SGB, FD, funds, stocks…). Log payouts and value updates over time and see if it earns more than the "+riPct(L.rate||0)+" this loan charges."]}),
+      ...ri.items.map(riRow),
+      o("div",{key:"b",className:"f",style:{gap:8,marginTop:12},children:[lnBtn("+ Add reinvestment",()=>sSheet({k:"riAdd"}),ri.items.length===0,{fontSize:13,padding:"11px 0"}),invs.some(i=>!i.loanId)&&lnBtn("🔗 Link existing",()=>sSheet({k:"riLink"}),false,{fontSize:13,padding:"11px 0"})]}),
+      t("div",{key:"s",style:{fontSize:10.5,color:c.tm,textAlign:"center",marginTop:8},children:"These also appear in My Investments. Edits on either screen stay in sync."})
+    ])
+  ]});
   const last=st.rows[st.rows.length-1];
   // ---- tab bodies ----
   const detailsTab=lnCard([
@@ -12157,6 +12322,7 @@ function LnDetail({L,data,persist,onBack}){
     !isOD&&!st.closed&&{e:"🏁",l:"Foreclose loan",s:"Close it today with one payment",f:()=>sSheet({k:"fore"})},
     isOD&&{e:"⬇️",l:"Add withdrawal",s:"Money you drew from the limit",f:()=>sSheet({k:"od",kind:"draw"})},
     isOD&&{e:"⬆️",l:"Add repayment",s:"Money you put back",f:()=>sSheet({k:"od",kind:"repay"})},
+    !lent&&{e:"📈",l:"Add reinvestment",s:"Track where this loan's money is invested",f:()=>sSheet({k:"riAdd"})},
     !isOD&&!lent&&{e:"🔔",l:"EMI reminders",s:L.remindDays>0?L.remindDays+" day(s) before due date":"Off",f:()=>sSheet({k:"remind"})},
     {e:"📄",l:"Export PDF",s:"Summary and full schedule",f:()=>exportLoanPdf([L],cur,(L.lender||"Loan")+" loan")},
     {e:"📊",l:"Export Excel",s:"Schedule and payment history",f:()=>exportLoanXlsx([L],cur,(L.lender||"Loan")+" loan")},
@@ -12164,7 +12330,7 @@ function LnDetail({L,data,persist,onBack}){
     {e:"🗑️",l:"Delete loan",s:"Removes the loan and its schedule",f:()=>sDel(true),danger:true}
   ].filter(Boolean);
   return o("div",{style:{padding:"8px 20px 140px"},children:[
-    o("div",{className:"f ia",style:{gap:12,marginBottom:14},children:[t(BB,{onClick:onBack}),o("div",{className:"tl minw0",children:[t("div",{className:"tru",style:{fontFamily:c.hf,fontSize:21,fontWeight:600,color:c.tx},children:(K.e)+" "+(L.lender||K.l)}),t("div",{style:{fontFamily:'var(--nf)',fontSize:10.5,color:c.tm},children:`${L.loanNo||""} (${lent?"Given":"Taken"})${L.purpose?" · "+L.purpose:""}`})]})]}),
+    o("div",{className:"f ia",style:{gap:12,marginBottom:14},children:[t(BB,{onClick:onBack}),o("div",{className:"tl minw0",children:[t("div",{className:"tru",style:{fontFamily:c.hf,fontSize:21,fontWeight:600,color:c.tx},children:(K.e)+" "+(L.lender||K.l)}),t("div",{style:{fontFamily:'var(--nf)',fontSize:10.5,color:c.tm},children:`${L.loanNo||""} (${lent?"Given":"Taken"})${L.purpose?" · "+L.purpose:""}`})]}),t("button",{onClick:()=>sOpen(true),"aria-label":"Manage loan",className:"act90 trt",style:{marginLeft:"auto",flexShrink:0,height:34,padding:"0 12px",borderRadius:17,background:c.sf2,border:`1px solid ${c.brs}`,color:c.tx,fontSize:12.5},children:"⋯ Manage"})]}),
     tip&&t("div",{className:"f ia jb",style:{background:c.sk+"18",border:`1px solid ${c.sk}40`,borderRadius:10,padding:"8px 12px",fontSize:11.5,color:c.td,marginBottom:12,gap:10},children:[t("span",{children:"Please refer to official bank statements for precise figures."}),t("button",{onClick:()=>sTip(false),className:"act90 trt",style:{background:"transparent",border:"none",color:c.ac,fontSize:12,flexShrink:0},children:"Got it ✕"})]}),
     st.closed&&t("div",{style:{background:c.mt+"22",border:`1px solid ${c.mt}`,borderRadius:10,padding:"9px 12px",fontSize:13,color:c.tx,marginBottom:12,textAlign:"center"},children:"🎉 This loan is closed"+(L.closedAt?" on "+lnFmtD(L.closedAt):"")}),
     !isOD&&lnCard([
@@ -12184,9 +12350,10 @@ function LnDetail({L,data,persist,onBack}){
       kv(isOD?"Amount Used":"Principal Outstanding",fm(st.outstanding,cur)),kv("Interest Rate",(L.rate||0).toFixed(2)+"% Yearly"),!isOD&&kv("Remaining Tenure",st.remainingN+" month"+(st.remainingN===1?"":"s"))
     ].filter(Boolean)),
     breakdown,
+    !lent&&ri.items.length>0&&tab!=="reinvest"&&t("button",{onClick:()=>sTab("reinvest"),className:"w100 f ia jb act98 trt",style:{padding:"12px 16px",marginBottom:12,background:c.sfg,border:`1px solid ${(ri.net>=0?c.mt:c.co)}55`,borderRadius:16,color:"inherit",textAlign:"left",gap:10},children:[o("div",{className:"tl minw0",children:[t("div",{style:{fontSize:13,color:c.tx},children:`📈 ${fm(ri.P,cur)} reinvested`}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:2},children:`Earning ${riPct(ri.annual)} vs paying ${riPct(ri.rate)} / yr`})]}),o("div",{className:"tr",style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:15,color:ri.net>=0?c.mt:c.co},children:riSigned(ri.net,cur)}),t("div",{style:{fontSize:10.5,color:c.tm},children:ri.net>=0?"ahead ›":"behind ›"})]})]}),
     o("div",{className:"f",style:{borderBottom:`1px solid ${c.brs}`,margin:"16px 0 12px",overflowX:"auto"},children:tabs.map(([k,l])=>t("button",{key:k,onClick:()=>sTab(k),className:"act95 trt",style:{flexShrink:0,padding:"11px 14px",background:"transparent",border:"none",borderBottom:`2px solid ${tab===k?c.ac:"transparent"}`,color:tab===k?c.ac:c.td,fontSize:13.5,whiteSpace:"nowrap"},children:l}))}),
-    tab==="details"&&detailsTab,tab==="history"&&!isOD&&histTab,tab==="docs"&&docsTab,tab==="activity"&&actTab,
-    t("button",{onClick:()=>sOpen(true),className:"act95 tr",style:{position:"fixed",right:20,bottom:96,zIndex:60,padding:"13px 20px",borderRadius:14,border:"none",background:c.ac,color:"#0a0a0a",fontSize:14,fontWeight:600,boxShadow:"0 8px 24px rgba(0,0,0,.45)"},children:"+ Manage Loan"}),
+    tab==="details"&&detailsTab,tab==="reinvest"&&!lent&&riTab,tab==="history"&&!isOD&&histTab,tab==="docs"&&docsTab,tab==="activity"&&actTab,
+    lnFab(fabHidden,{onClick:()=>sOpen(true),icon:"+",label:"Manage Loan"}),
     open&&t(Sht,{onClose:()=>sOpen(false),children:o(Fragment,{children:[lnSheetTitle("Manage Loan"),...actions.map(a=>t("button",{key:a.l,onClick:()=>{sOpen(false);a.f()},className:"w100 f ia act99 trt",style:{padding:"12px 4px",gap:12,background:"transparent",border:"none",borderBottom:`1px solid ${c.brs}`,color:"inherit",textAlign:"left"},children:[t("span",{style:{fontSize:20,width:28,textAlign:"center"},children:a.e}),o("div",{className:"tl",children:[t("div",{style:{fontSize:14,color:a.danger?c.ro:c.tx},children:a.l}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:1},children:a.s})]})]}))]})}),
     sheet&&sheet.k==="pay"&&t(LnPaySheet,{L,data,row:sheet.row,onClose:()=>sSheet(null),onSave:doPay}),
     sheet&&sheet.k==="pre"&&t(LnPrepaySheet,{L,data,onClose:()=>sSheet(null),onSave:doPre}),
@@ -12194,7 +12361,14 @@ function LnDetail({L,data,persist,onBack}){
     sheet&&sheet.k==="remind"&&t(LnRemindSheet,{L,onClose:()=>sSheet(null),onSave:d=>{upd({remindDays:d});sSheet(null)}}),
     sheet&&sheet.k==="edit"&&t(LnEditSheet,{L,data,onClose:()=>sSheet(null),onSave:p=>{upd(p);sSheet(null)}}),
     sheet&&sheet.k==="od"&&t(LnOdSheet,{L,data,kind:sheet.kind,onClose:()=>sSheet(null),onSave:doOd}),
-    del&&t(CSht,{onClose:()=>sDel(false),title:"Delete this loan?",subtitle:"The loan, its schedule and payment history are removed. Expenses already logged stay in your spending.",onConfirm:()=>{(L.docs||[]).forEach(d=>idbDelFile(d.id));persist({loanTracker:list.filter(x=>x.id!==L.id)});sDel(false);onBack()},confirmLabel:"Delete"})
+    sheet&&sheet.k==="riAdd"&&t(RiFormSheet,{L,data,onClose:()=>sSheet(null),onSave:p=>{const id="inv_"+uid();persist({investments:[...invs,{...p,id,loanId:L.id,payouts:[],valueLog:p.valueLog||[],createdAt:Date.now()}]});sTab("reinvest");sSheet({k:"ri",id})}}),
+    sheet&&sheet.k==="riLink"&&t(RiLinkSheet,{L,data,onClose:()=>sSheet(null),onLink:id=>{updInv(id,{loanId:L.id});sTab("reinvest");sSheet({k:"ri",id})}}),
+    sheet&&sheet.k==="ri"&&riFind(sheet.id)&&t(RiDetailSheet,{L,data,inv:riFind(sheet.id),onClose:()=>sSheet(null),onAct:(a,e)=>sSheet({k:"ri_"+a,id:sheet.id,e})}),
+    sheet&&sheet.k==="ri_edit"&&riFind(sheet.id)&&t(RiFormSheet,{L,data,inv:riFind(sheet.id),onClose:()=>sSheet({k:"ri",id:sheet.id}),onSave:p=>{updInv(sheet.id,p);sSheet({k:"ri",id:sheet.id})}}),
+    sheet&&(sheet.k==="ri_pay"||sheet.k==="ri_val")&&riFind(sheet.id)&&t(RiEntrySheet,{data,inv:riFind(sheet.id),kind:sheet.k==="ri_pay"?"pay":"val",entry:sheet.e,onClose:()=>sSheet({k:"ri",id:sheet.id}),onSave:e=>riSaveEntry(riFind(sheet.id),sheet.k==="ri_pay"?"pay":"val",e),onDelete:()=>riDelEntry(riFind(sheet.id),sheet.k==="ri_pay"?"pay":"val",sheet.e)}),
+    sheet&&sheet.k==="ri_del"&&riFind(sheet.id)&&t(Sht,{onClose:()=>sSheet({k:"ri",id:sheet.id}),children:o(Fragment,{children:[lnSheetTitle("Remove this reinvestment?","Unlink keeps it in My Investments but stops comparing it with this loan. Delete removes the holding everywhere, including its payout and value history."),
+      o("div",{className:"f fc",style:{gap:8,marginTop:8},children:[lnBtn("Unlink only",()=>{updInv(sheet.id,{loanId:null});sSheet(null)},true),lnBtn("Delete everywhere",()=>{persist({investments:invs.filter(x=>x.id!==sheet.id)});sSheet(null)},false,{color:c.ro}),lnBtn("Cancel",()=>sSheet({k:"ri",id:sheet.id}),false,{border:"none"})]})]})}),
+    del&&t(CSht,{onClose:()=>sDel(false),title:"Delete this loan?",subtitle:"The loan, its schedule and payment history are removed. Expenses already logged stay in your spending, and reinvestments stay in My Investments.",onConfirm:()=>{(L.docs||[]).forEach(d=>idbDelFile(d.id));persist({loanTracker:list.filter(x=>x.id!==L.id),...(ri.items.length?{investments:invs.map(x=>x.loanId===L.id?{...x,loanId:null}:x)}:{})});sDel(false);onBack()},confirmLabel:"Delete"})
   ]});
 }
 
@@ -12256,6 +12430,8 @@ function LnOverview({data,persist,onOpen,onAdd,onView,onTab}){
   const card=(children,extra)=>lnCard(children,extra);
   const sect=(x,right)=>o("div",{className:"f ia jb",style:{marginBottom:8},children:[t("div",{style:{fontFamily:c.hf,fontSize:17,fontWeight:600,color:c.tx},children:x}),right]});
   const pct=v=>mixTot>0?Math.round(v/mixTot*100):0;
+  const riAll=loans.filter(L=>L.direction!=="lent").map(L=>({L,sm:riLoanSummary(data,L)})).filter(x=>x.sm.items.length);
+  const riTot=f=>lnR2(riAll.reduce((a,x)=>a+f(x.sm),0)),riNet=riTot(x=>x.net);
   if(!loans.length&&!sm.lasN)return o("div",{children:[
     o("div",{style:{textAlign:"center",margin:"26px 0 22px"},children:[t("div",{style:{fontSize:34,marginBottom:8},children:"🏦"}),t("div",{style:{fontFamily:c.hf,fontSize:21,fontWeight:600,color:c.tx},children:"You're all set to begin"}),t("div",{style:{fontSize:12.5,color:c.td,marginTop:6,lineHeight:1.5},children:"Add your existing loan or expense to get started. Tap + Add below."})]}),
     ...[["🏦","Bank Loan","Loans taken from banks",()=>onAdd("pick"),"#4F8DFD"],["🤝","Friends / Family Loan","Track loans with friends & family",()=>onAdd("friends"),"#F0735A"],["🔁","Recurring Expense","Track recurring payments",()=>onView&&onView("recurring"),"#7B8CFF"]].map(([e,tt,s,f,col])=>t("button",{key:tt,onClick:f,className:"w100 f ia jb act98 trt",style:{padding:"14px 16px",marginBottom:10,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,textAlign:"left",color:"inherit"},children:[o("div",{className:"f ia",style:{gap:12},children:[t("span",{style:{width:40,height:40,borderRadius:11,background:col+"26",display:"flex",alignItems:"center",justifyContent:"center",fontSize:19},children:e}),o("div",{className:"tl",children:[t("div",{style:{fontSize:14.5,color:c.tx,fontWeight:500},children:tt}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:2},children:s})]})]}),t("span",{style:{color:c.tm,fontSize:20},children:"+"})]}))
@@ -12274,6 +12450,14 @@ function LnOverview({data,persist,onOpen,onAdd,onView,onTab}){
       o("div",{key:"h",className:"f ia jb",style:{marginBottom:6},children:[t("div",{style:{fontFamily:c.hf,fontSize:17,fontWeight:600,color:c.tx},children:"Loans Overview"}),o("span",{className:"f ia",style:{gap:8,fontSize:11.5,color:c.td},children:["Include Interest",t("button",{onClick:()=>setInc(!inc),"aria-label":"Include interest",className:"act95 trt",style:{width:40,height:22,borderRadius:11,border:"none",background:inc?c.ac:c.sf3,position:"relative",padding:0},children:t("span",{style:{position:"absolute",top:3,left:inc?21:3,width:16,height:16,borderRadius:8,background:inc?"#0a0a0a":c.tm,transition:"left .15s"}})})]})]}),
       [["↗","You'll Pay",youPay,owe.length+sm.lasN,c.co],["↙","You'll Receive",youRecv,recv.length,c.mt]].map(([ic,l,v,n,col],i)=>o("div",{key:l,className:"f ia jb",style:{padding:"13px 0",borderTop:i?`1px solid ${c.brs}`:"none"},children:[o("div",{className:"f ia",style:{gap:12},children:[t("span",{style:{width:42,height:42,borderRadius:11,background:col+"30",color:col,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20},children:ic}),o("div",{className:"tl",children:[t("div",{style:{fontSize:12.5,color:c.td},children:l}),t("div",{style:{fontFamily:'var(--nf)',fontSize:20,color:c.tx,marginTop:2},children:fm(v,cur)})]})]}),t(LnPill,{children:n+" loan"+(n===1?"":"s")})]})),
       owe.length>0&&o("div",{key:"d",style:{paddingTop:13,borderTop:`1px solid ${c.brs}`},children:[o("div",{className:"f ia jb",children:[o("div",{style:{fontSize:17,color:c.td},children:["You'll be debt-free in ",t("b",{style:{color:c.tx},children:lnDur(months)})]}),t(LnPill,{children:pctDone+"% completed"})]}),t("div",{style:{height:8,borderRadius:4,background:c.sf2,marginTop:12,overflow:"hidden"},children:t("div",{style:{width:pctDone+"%",height:"100%",background:c.mt}})})]})
+    ]),
+    // Loan-funded investments across all loans
+    riAll.length>0&&card([
+      sect("Loan-funded Investments"),
+      o("div",{key:"v",style:{margin:"2px 0 10px"},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:24,fontWeight:300,color:riNet>=0?c.mt:c.co},children:riSigned(riNet,cur)}),t("span",{style:{fontSize:12.5,color:c.td},children:riNet>=0?" ahead of loan interest":" behind loan interest"})]}),
+      o("div",{key:"k",className:"f",style:{gap:10,marginBottom:6},children:[["INVESTED",riTot(x=>x.P)],["RETURN",riTot(x=>x.ret)],["INTEREST",riTot(x=>x.cost)]].map(([l,v])=>o("div",{key:l,className:"f1 minw0",children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1},children:l}),t("div",{className:"tru",style:{fontFamily:'var(--nf)',fontSize:13.5,color:c.tx,marginTop:3},children:fs(v,cur)})]}))}),
+      ...riAll.map(({L,sm},i)=>t("button",{key:L.id,onClick:()=>onOpen(L.id,"reinvest"),className:"w100 f ia jb act98 trt",style:{padding:"10px 0",background:"transparent",border:"none",borderTop:`1px solid ${c.brs}`,color:"inherit",textAlign:"left",gap:10},children:[o("div",{className:"tl minw0",children:[t("div",{className:"tru",style:{fontSize:13.5,color:c.tx},children:(LOAN_KINDS[L.kind].e)+" "+(L.lender||LOAN_KINDS[L.kind].l)}),t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:`${sm.items.length} holding${sm.items.length===1?"":"s"} · ${riPct(sm.annual)} vs ${riPct(sm.rate)} / yr`})]}),o("div",{className:"tr",style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:13.5,color:sm.net>=0?c.mt:c.co},children:riSigned(sm.net,cur)}),t("div",{style:{fontSize:10.5,color:c.tm},children:fm(sm.P,cur)+" in ›"})]})]})),
+      t("div",{key:"n",style:{fontSize:10.5,color:c.tm,marginTop:6,lineHeight:1.45},children:"Return = value + payouts − invested. Interest = what each loan has charged up to today."})
     ]),
     // Upcoming loan payments
     card([
@@ -12326,20 +12510,20 @@ function LnAddSheet({onClose,onAdd,onView,onIncome}){
 }
 // --- Container: Overview (default) / Loans list → wizard / detail, with a floating + Add ---
 function LoanTracker({data,persist,onClose,onView}){
-  const[v,sV]=useState({n:"home"});const[tab,sTab]=useState("overview");const[add,sAdd]=useState(false);const[inc,sInc]=useState(false);
+  const[v,sV]=useState({n:"home"});const[tab,sTab]=useState("overview");const[add,sAdd]=useState(false);const[inc,sInc]=useState(false);const fabHidden=useFabHidden("hidden");
   const loans=data.loanTracker||[];const nLoans=loans.length+(Number(data.las&&data.las.loan)>0?1:0);
   const L=v.n==="detail"?loans.find(x=>x.id===v.id):null;
   const save=(loan)=>{persist({loanTracker:[loan,...loans]});sV({n:"detail",id:loan.id})};
   const onAdd=k=>k==="pick"?sAdd(true):sV({n:"wizard",kind:k});
   if(v.n==="wizard")return t(LnWizard,{key:v.kind,kind:v.kind,data,onSave:save,onCancel:()=>sV({n:"home"})});
-  if(v.n==="detail"&&L)return t(LnDetail,{key:L.id,L,data,persist,onBack:()=>sV({n:"home"})});
-  const open=id=>sV({n:"detail",id});
+  if(v.n==="detail"&&L)return t(LnDetail,{key:L.id,L,data,persist,initTab:v.tab,onBack:()=>sV({n:"home"})});
+  const open=(id,tb)=>sV({n:"detail",id,tab:tb});
   return o("div",{style:{padding:"8px 20px 150px"},children:[
     o("div",{className:"f ia jb",style:{marginBottom:14},children:[t(BB,{onClick:onClose}),t("div",{style:{fontFamily:c.hf,fontSize:24},children:t("em",{children:"Loan Tracker"})}),
-      loans.length>0?t("button",{onClick:()=>sV({n:"home",exp:true}),"aria-label":"Export",className:"act90 trt",style:{width:38,height:38,borderRadius:19,background:c.sf2,border:`1px solid ${c.brs}`,color:c.tx,fontSize:15},children:"⤓"}):t("div",{style:{width:38}})]}),
+      o("div",{className:"f ia",style:{gap:8},children:[loans.length>0&&t("button",{onClick:()=>sV({n:"home",exp:true}),"aria-label":"Export",className:"act90 trt",style:{width:38,height:38,borderRadius:19,background:c.sf2,border:`1px solid ${c.brs}`,color:c.tx,fontSize:15},children:"⤓"}),t("button",{onClick:()=>sAdd(true),"aria-label":"Add loan",className:"act90 trt",style:{width:38,height:38,borderRadius:19,background:c.ac,border:"none",color:"#0a0a0a",fontSize:20,lineHeight:1},children:"+"})]})]}),
     nLoans>0&&o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,marginBottom:14},children:[["overview","Overview"],["loans","Loans"]].map(([k,l])=>t("button",{key:k,onClick:()=>sTab(k),className:"act95 tr",style:{flex:1,padding:"9px 0",borderRadius:9,border:"none",fontSize:13.5,fontWeight:tab===k?600:400,background:tab===k?c.sf3:"transparent",color:tab===k?c.tx:c.td},children:l}))}),
     (tab==="overview"||!nLoans)?t(LnOverview,{data,persist,onOpen:open,onAdd,onView,onTab:sTab}):t(LnList,{data,onOpen:open,onView}),
-    t("button",{onClick:()=>sAdd(true),className:"act95 tr f ia",style:{position:"fixed",right:20,bottom:96,zIndex:60,gap:8,padding:"13px 20px",borderRadius:16,border:"none",background:c.ac,color:"#0a0a0a",fontSize:14,fontWeight:600,boxShadow:"0 8px 24px rgba(0,0,0,.45)"},children:[t("span",{style:{fontSize:16},children:"🏦"}),"Add"]}),
+    lnFab(fabHidden,{onClick:()=>sAdd(true),icon:"🏦",label:"Add"}),
     add&&t(LnAddSheet,{onClose:()=>sAdd(false),onAdd:k=>{sAdd(false);onAdd(k)},onView,onIncome:()=>sInc(true)}),
     inc&&t(LnIncomeSheet,{data,persist,onClose:()=>sInc(false)}),
     v.exp&&t(Sht,{onClose:()=>sV({n:"home"}),children:o(Fragment,{children:[lnSheetTitle("Export all loans","Summary plus the full repayment schedule and payment history for each loan."),
