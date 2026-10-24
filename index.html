@@ -11618,7 +11618,7 @@ function BudgetCalculator({data,persist,cur,spendFlt,onView,mode="card",onClose}
   const legacyValues=monOff===0&&!monthsMap[pKey]&&B.values?B.values:null;
   const values=(monthsMap[pKey]&&monthsMap[pKey].values)||legacyValues||{};
   const[showLinks,sShowLinks]=useState(false);
-  const[showUnmap,sShowUnmap]=useState(false);const[unmapPick,sUnmapPick]=useState({});
+  const[showSummary,sShowSummary]=useState(false);const[showUnmap,sShowUnmap]=useState(false);const[unmapPick,sUnmapPick]=useState({});
   const[editId,sEditId]=useState(null);
   const[justRefreshed,sJustRefreshed]=useState(false);
   useEffect(()=>{if(!justRefreshed)return;const tm=setTimeout(()=>sJustRefreshed(false),1600);return()=>clearTimeout(tm)},[justRefreshed]);
@@ -11706,7 +11706,7 @@ function BudgetCalculator({data,persist,cur,spendFlt,onView,mode="card",onClose}
   const monthNav=o("div",{className:"f ia jb",style:{marginTop:12,marginBottom:10,gap:8},children:[
       t(IB,{onClick:()=>sMonOff(v=>v-1),size:32,children:t(CL,{size:16,color:c.tx})}),
       o("div",{className:"tc f1 minw0",children:[
-        t("div",{style:{fontFamily:c.hf,fontSize:15,color:c.tx},children:monthLabel}),
+        o("div",{className:"f ia jc",style:{gap:8},children:[t("span",{style:{fontFamily:c.hf,fontSize:15,color:c.tx},children:monthLabel}),t("button",{onClick:()=>sShowSummary(true),className:"act95 trt",style:{background:c.ac+"1f",border:`1px solid ${c.ac}66`,borderRadius:999,padding:"3px 10px",color:c.ac,fontSize:10.5,fontFamily:'var(--nf)',letterSpacing:.5},children:"≣ SUMMARY"})]}),
         synced&&t("div",{style:{fontFamily:'var(--nf)',fontSize:8,color:c.ac,marginTop:1,letterSpacing:.4},children:"🔒 SYNCED · FILTER SPENDING BY DATE"}),
         t("button",{onClick:()=>sJustRefreshed(true),className:"act95 trt",style:{marginTop:4,background:"transparent",border:"none",color:justRefreshed?c.mt:c.ac,fontSize:9,fontFamily:'var(--nf)',letterSpacing:.4,padding:0,display:"inline-flex",alignItems:"center",gap:4},children:justRefreshed?"✓ Updated":"🔄 Refresh AUTO values"})
       ]}),
@@ -11877,6 +11877,27 @@ function BudgetCalculator({data,persist,cur,spendFlt,onView,mode="card",onClose}
       unmapPairs.length<unmapped.length&&t("div",{style:{fontSize:10.5,color:c.tm,marginTop:6},children:(unmapped.length-unmapPairs.length)+" left as \"Don't add\" — no obvious match, pick a line if you want them counted."})
     ]})
   ]});
+  // Summary: every budget line that has a value for the viewed month, grouped by section (no zero rows).
+  const sumTag=l=>values[l.id]!=null?"Manual":((links[l.id]||[]).length?"Auto":"");
+  const sumIn=effInflows.map(l=>({l,v:effVal(l.id,"income")})).filter(x=>x.v!==0);
+  const sumSecs=effSections.map(sec=>({sec,rows:sec.lines.map(l=>({l,v:effVal(l.id,"expense")})).filter(x=>x.v!==0)})).filter(x=>x.rows.length);
+  const printSummary=()=>{const f=n=>cur+Number(Math.round(n||0)).toLocaleString("en-US");const tg=l=>{const g=sumTag(l);return g?` <small>${g}</small>`:""};
+    const rowsH=(arr)=>arr.map(x=>`<tr><td>${_htmlEsc(x.l.label)}${tg(x.l)}</td><td class="r">${f(x.v)}</td><td class="r">${income>0?(x.v/income*100).toFixed(1)+"%":""}</td></tr>`).join("");
+    const body=`<h2>💰 Monthly inflows <span>${f(inflowTotal)}</span></h2><table>${sumIn.length?rowsH(sumIn):'<tr><td colspan="3">No inflows.</td></tr>'}</table>`+sumSecs.map(x=>`<h2>${_htmlEsc(x.sec.emoji+" "+x.sec.label)} <span>${f(secTotals[x.sec.id])} · ${fp(pct(secTotals[x.sec.id]))}</span></h2><table>${rowsH(x.rows)}</table>`).join("");
+    _printHTML(`<!doctype html><html><head><meta charset="utf-8"><title>Budget summary — ${_htmlEsc(monthLabel)}</title><style>body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111;margin:24px;font-size:12px}h1{font-size:20px;margin:0 0 2px}.sub{color:#666;margin-bottom:14px}h2{font-size:13px;margin:18px 0 4px;display:flex;justify-content:space-between;border-bottom:2px solid #999;padding-bottom:4px}h2 span{font-weight:600}table{width:100%;border-collapse:collapse}td{padding:5px 8px;border-bottom:1px solid #e6e6e6}td.r{text-align:right;white-space:nowrap}small{color:#888;font-size:9px;text-transform:uppercase;margin-left:4px}.tot{margin-top:18px;border-top:2px solid #111;padding-top:8px;display:flex;justify-content:space-between;font-weight:700;font-size:14px}@media print{body{margin:12mm}tr{break-inside:avoid}}</style></head><body><h1>Monthly budget summary</h1><div class="sub">${_htmlEsc(monthLabel)} · inflow ${f(income)} · outflow ${f(outTotal)}</div>${body}<div class="tot"><span>${leftout<0?"Over by":"Left for the month"}</span><span>${f(Math.abs(leftout))} (${fp(pct(leftout))})</span></div></body></html>`)};
+  const sumRow=(x,i)=>o("div",{key:x.l.id,className:"f ia jb",style:{padding:"10px 0",borderTop:i?`1px solid ${c.brs}`:"none",gap:8},children:[
+    o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:13.5,color:c.tx},children:x.l.label}),sumTag(x.l)&&t("div",{style:{fontFamily:'var(--nf)',fontSize:9,letterSpacing:.5,color:x.l.id&&values[x.l.id]!=null?c.gd:c.mt,marginTop:2},children:sumTag(x.l).toUpperCase()})]}),
+    o("div",{className:"f ia",style:{gap:8,flexShrink:0},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:14,color:c.tx},children:fm(x.v,cur)}),t("span",{style:{fontFamily:'var(--nf)',fontSize:10.5,color:c.tm,minWidth:40,textAlign:"right"},children:income>0?fp(x.v/income):""})]})]});
+  const sumCard=(key,head,arr,empty)=>o("div",{key,style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,padding:"14px 16px",marginBottom:12},children:[head,...(arr.length?arr.map(sumRow):[t("div",{key:"e",style:{fontSize:12,color:c.tm,padding:"8px 0"},children:empty})])]});
+  const summaryEl=showSummary&&createPortal(t("div",{style:{position:"fixed",inset:0,zIndex:80,background:c.bg||"#0a0a0a",overflowY:"auto",padding:"16px 20px 60px"},children:o("div",{style:{maxWidth:640,margin:"0 auto"},children:[
+    o("div",{className:"f ia jb",style:{marginBottom:14},children:[t(BB,{onClick:()=>sShowSummary(false)}),t("div",{style:{fontFamily:c.hf,fontSize:22},children:t("em",{children:"Budget Summary"})}),t("button",{onClick:printSummary,"aria-label":"Print or save as PDF",className:"act95 trt",style:{height:38,padding:"0 12px",borderRadius:12,background:c.sf2,border:`1px solid ${c.brs}`,color:c.tx,fontSize:12},children:"PDF"})]}),
+    o("div",{className:"f ia jb",style:{marginBottom:12},children:[t("div",{style:{fontFamily:c.hf,fontSize:15,color:c.tx},children:monthLabel}),t("div",{style:{fontSize:11,color:c.tm},children:"Only lines with an amount"})]}),
+    bKpiRow,
+    sumCard("in",o("div",{className:"f ia jb",style:{marginBottom:4},children:[t("span",{style:{fontSize:14,fontWeight:600,color:c.tx},children:"💰 Monthly inflows"}),t("span",{style:{fontFamily:'var(--nf)',fontSize:14,fontWeight:600,color:c.mt},children:fm(inflowTotal,cur)})]}),sumIn,"No inflows this month."),
+    ...sumSecs.map(x=>sumCard(x.sec.id,o("div",{className:"f ia jb",style:{marginBottom:4,gap:8},children:[t("span",{className:"tru",style:{fontSize:14,fontWeight:600,color:c.tx},children:x.sec.emoji+" "+x.sec.label}),o("div",{className:"f ia",style:{gap:8,flexShrink:0},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:14,fontWeight:600,color:c.tx},children:fm(secTotals[x.sec.id],cur)}),t("span",{style:{fontFamily:'var(--nf)',fontSize:10.5,color:c.tm},children:fp(pct(secTotals[x.sec.id]))})]})]}),x.rows,"")),
+    !sumSecs.length&&t("div",{style:{fontSize:12.5,color:c.tm,textAlign:"center",padding:"16px 0"},children:"No outflow lines have an amount for "+monthLabel+"."}),
+    totalsCard
+  ]})}),document.body);
   const bodyBlk=o(Fragment,{children:[monthNav,bKpiRow,bBar,overrideBanner,inflowCard,...effSections.map(secCard),
     bLbl("WHAT THIS MEANS"),
     o("div",{style:{display:"flex",flexDirection:"column",gap:8},children:insights.map((x,i)=>o("div",{key:i,className:"f",style:{gap:10,padding:"11px 13px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,fontSize:12.5,color:c.td,lineHeight:1.45},children:[t("span",{style:{flexShrink:0},children:x[0]}),t("span",{children:x[1]})]}))}),
@@ -11884,7 +11905,7 @@ function BudgetCalculator({data,persist,cur,spendFlt,onView,mode="card",onClose}
     t("button",{onClick:()=>sShowManage(v=>!v),className:"w100 act97 trt f ia jb",style:{marginTop:16,padding:"12px 14px",background:showManage?c.sk+"14":c.sf2,border:`1px solid ${showManage?c.sk+"55":c.brs}`,borderRadius:12,color:c.tx,fontSize:13.5},children:[o("span",{children:"⚙️  Manage lines & sections"}),t("span",{style:{color:c.tm,fontSize:12,transform:showManage?"rotate(180deg)":"none"},children:"▾"})]}),
     showManage&&manageBlk,
     t("div",{style:{marginTop:14,fontSize:10,color:c.tm,lineHeight:1.5,fontStyle:"italic"},children:"Limits: essentials <40%, lifestyle <20%, EMIs <30% of income; investments should be ≥20% and the surplus >10%. Tap any line to set an amount or link categories."}),
-    lineSheetEl]});
+    lineSheetEl,summaryEl]});
   return o(Fragment,{children:[t(BudgetShell,{mode,onOpen:()=>onView&&onView("budgetCalc"),onClose,cur,monthLabel,income,outTotal,leftout,children:o(Fragment,{children:[
     bodyBlk,
   ]})}),delTarget&&t(CSht,{title:`Delete "${delTarget.label}"?`,subtitle:delTarget.kind==="section"?"This permanently deletes the section and any custom lines inside it, including their saved monthly values. This can't be undone.":"This permanently deletes the line and its saved monthly values. This can't be undone.",onClose:()=>sDelTarget(null),onConfirm:()=>{if(delTarget.kind==="section")deleteCustomSection(delTarget.id);else deleteCustomLine(delTarget.id);sDelTarget(null)},confirmLabel:"Delete forever",danger:true})]});
