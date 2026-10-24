@@ -6260,7 +6260,8 @@ function GroceryCatSht({data,persist,onClose}){
     const label=nl.trim();if(!label||dupe)return;
     const nc={id:"custom_"+uid(),label,emoji:ne||"🛒",color:"#A39B8C",subs:["Other"]};
     const ord=data.categoryOrder||{};
-    persist({customExpenseCategories:[...custom,nc],categoryOrder:{...ord,expense:[...(ord.expense||[]),nc.id]},groceryCategories:[...sel,nc.id]});
+    const grocLine=budLineGroups(data).expense.some(g=>g.lines.some(l=>l.id==="groceries"))?"groceries":null;
+    persist({customExpenseCategories:[...custom,nc],categoryOrder:{...ord,expense:[...(ord.expense||[]),nc.id]},groceryCategories:[...sel,nc.id],...budLinkPatch(data,[[grocLine,nc.id]])});
     sNl("");sNe("🛒");sShowNew(false);
   };
   const delCustom=()=>{
@@ -11496,11 +11497,59 @@ const BUD_SECTIONS=[
   ]},
 ];
 const BUD_SECTION_PALETTE=["#4F8DFD","#F59E0B","#9CA3AF","#F5B301","#2FC59B","#FF6B9D","#A78BFA","#5EB1FF"];
+// Category → budget-line mapping helpers. Shared by the budget screen, the new-category forms and the
+// "unmapped categories" tool, so they all see the same visible lines (renamed / hidden / custom ones included).
+function budLineGroups(data){
+  const B=(data.calculators||{}).budget||{},lc=B.lineConfig||{};
+  const labels=lc.labels||{},hidden=new Set(lc.hidden||[]),customLines=lc.customLines||[],order=lc.order||{};
+  const lines=(sid,def)=>{const all=[...def,...customLines.filter(l=>l.section===sid)].map(l=>({id:l.id,label:labels[l.id]||l.label})).filter(l=>!hidden.has(l.id));const ord=order[sid];if(!ord||!ord.length)return all;const ix=id=>{const i=ord.indexOf(id);return i===-1?999:i};return[...all].sort((a,b)=>ix(a.id)-ix(b.id))};
+  const secs=[...BUD_SECTIONS.map(s=>({id:s.id,label:labels[s.id]||s.label,emoji:s.emoji,def:s.lines})),...(lc.customSections||[]).map(s=>({id:s.id,label:labels[s.id]||s.label,emoji:s.emoji||"📌",def:[]}))].filter(s=>!hidden.has(s.id));
+  return{income:[{id:"inflow",label:"Monthly inflows",emoji:"💰",lines:lines("inflow",BUD_INFLOWS)}],expense:secs.map(s=>({id:s.id,label:s.label,emoji:s.emoji,lines:lines(s.id,s.def)}))};
+}
+const BUD_CAT_DEFAULT={food:"dining",groceries:"groceries",milk_curd:"groceries",eggs:"groceries",transport:"transport",bike:"transport",travel_outstation:"travel",travel_hyd:"travel",shopping:"shopping",apparel_online:"shopping",apparel_offline:"shopping",online_purchases:"shopping",household_sam:"maid",entertainment:"dining",subscriptions:"dining",gym:"medical",bills:"utilities",health:"medical",salary:"income",arrears:"income",savings_deposit:"additional",trading:"additional",interest:"additional",cashback:"additional",gift:"additional",rental:"rental",business:"additional",income_other:"additional"};
+const BUD_KW={
+  expense:[[/home\s*loan|housing\s*loan|mortgage/,"homeloan"],[/car\s*loan|vehicle\s*loan|auto\s*loan/,"carloan"],[/personal\s*loan/,"personalloan"],[/\bemi\b|loan/,"otheremi"],[/mutual|\bsip\b|\bmf\b/,"mf"],[/stock|share|equity|demat|trading/,"stocks"],[/\bfd\b|fixed deposit|\brd\b|deposit|ppf|epf/,"fd"],[/invest|gold|\bnps\b|crypto|bond/,"otherinvest"],[/property tax|house tax/,"propertytax"],[/rent|maintenance/,"rent"],[/school|tuition|college|fees|education/,"schoolfees"],[/insurance|premium|\blic\b/,"insurance"],[/doctor|medic|pharma|hospital|health|clinic|dental|therapy/,"medical"],[/electric|water|\bgas\b|internet|wifi|broadband|mobile|recharge|phone|\bdth\b|utilit|bill|cable/,"utilities"],[/grocer|milk|curd|\begg|veg|fruit|kirana|bread/,"groceries"],[/fuel|petrol|diesel|\bcab\b|taxi|uber|\bola\b|metro|\bbus\b|train|\bauto\b|bike|\bcar\b|parking|toll|transport|commute/,"transport"],[/maid|\bcook|servant|nanny|helper|domestic/,"maid"],[/travel|trip|flight|hotel|holiday|vacation|\btour/,"travel"],[/shop|cloth|apparel|fashion|amazon|flipkart|gadget|electronics|beauty|salon|saloon|personal care/,"shopping"],[/dine|restaurant|food|cafe|coffee|movie|entertain|\bfun\b|swiggy|zomato|\bbar\b|\bpub\b|netflix|subscr|party|game/,"dining"]],
+  income:[[/spouse|wife|husband|partner/,"spouse"],[/rent/,"rental"],[/salary|bonus|arrear|reimb|payroll|wage|stipend/,"income"]]
+};
+// Best-guess budget line for a category (built-in default first, then name keywords). Only returns a line that
+// is currently visible; null when there is no confident match (e.g. "Other", "Donation").
+function budSuggestLine(cat,kind,groups){
+  const id=cat&&typeof cat==="object"?cat.id:null,label=String(cat&&typeof cat==="object"?cat.label:cat||"").toLowerCase().trim();
+  const vis=new Set(groups[kind].flatMap(g=>g.lines.map(l=>l.id)));
+  const cand=[];
+  if(id&&BUD_CAT_DEFAULT[id])cand.push(BUD_CAT_DEFAULT[id]);
+  if(label)for(const[re,lid]of BUD_KW[kind]){if(re.test(label))cand.push(lid)}
+  if(kind==="income")cand.push("additional");
+  return cand.find(x=>vis.has(x))||null;
+}
+// Categories of `kind` that don't feed any visible budget line yet.
+function budUnmapped(data,kind){
+  const groups=budLineGroups(data),links=((data.calculators||{}).budget||{}).links||{};
+  const mapped=new Set();groups[kind].forEach(g=>g.lines.forEach(l=>(links[l.id]||[]).forEach(cid=>mapped.add(cid))));
+  return(kind==="income"?ciAll():ceAll()).filter(cc=>!mapped.has(cc.id));
+}
+// persist() patch that links categories to lines: pairs = [[lineId,catId],…]. Merge it into the same
+// persist call that creates the category — two back-to-back persists would clobber each other.
+function budLinkPatch(data,pairs){
+  const cals=data.calculators||{},B=cals.budget||{},links={...(B.links||{})};let changed=false;
+  for(const[lid,cid]of pairs){if(!lid||!cid)continue;const cl=links[lid]||[];if(!cl.includes(cid)){links[lid]=[...cl,cid];changed=true}}
+  return changed?{calculators:{...cals,budget:{...B,links}}}:{};
+}
+function BudLinePicker({data,kind,value,onChange}){
+  const g=budLineGroups(data)[kind];
+  return o("select",{value:value||"",onChange:e=>onChange(e.target.value||null),style:{width:"100%",boxSizing:"border-box",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px",color:c.tx,fontSize:13.5,outline:"none",fontFamily:'var(--tf)'},children:[
+    t("option",{key:"__none",value:"",children:"Don't add to the budget"}),
+    ...g.map(s=>o("optgroup",{key:s.id,label:s.emoji+" "+s.label,children:s.lines.map(l=>t("option",{key:l.id,value:l.id,children:l.label}))}))
+  ]});
+}
 function BudLineSheet({line,kind,secLabel,cur,monthLabel,value,auto,linkedIds,catAmt,onSetVal,onToggleLink,onClose}){
   const linked=linkedIds.length>0;
   const[draft,sDraft]=useState(value==null?"":String(value));
-  const[q,sQ]=useState("");const[pick,sPick]=useState(false);
+  const[q,sQ]=useState("");const[pick,sPick]=useState(false);const[showZero,sShowZero]=useState(false);
   const cats=kind==="income"?ciAll():ceAll();
+  // Only categories that actually have money this month are listed; the rest stay linked but tucked away.
+  const activeIds=linkedIds.filter(cid=>catAmt(cid)!==0),idleIds=linkedIds.filter(cid=>catAmt(cid)===0);
+  const catRow=cid=>{const cc=co(cid);return o("div",{key:cid,className:"f ia jb",style:{padding:"9px 0",borderBottom:`1px solid ${c.brs}`,gap:8},children:[t("span",{className:"tru",style:{fontSize:13.5,color:c.tx,flex:1,minWidth:0},children:(cc?cc.emoji+" "+cc.label:cid)}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:c.td,flexShrink:0},children:fm(catAmt(cid),cur)}),t("button",{onClick:()=>onToggleLink(cid),"aria-label":"Unlink",className:"act90 trt",style:{background:"transparent",border:"none",color:c.tm,fontSize:16,padding:"0 4px"},children:"×"})]})};
   const eff=value!=null?value:(auto!=null?auto:0);
   const mode=value!=null?"MANUAL":(linked?"AUTO":"NOT SET");
   const modeCol=value!=null?c.gd:(linked?c.mt:c.tm);
@@ -11515,8 +11564,11 @@ function BudLineSheet({line,kind,secLabel,cur,monthLabel,value,auto,linkedIds,ca
       (value!=null)&&lnBtn(linked?"Back to auto":"Clear",()=>{onSetVal(null);sDraft("")},false),
       lnBtn("Save amount",()=>{if(draft===""){onSetVal(null)}else if(dn>=0){onSetVal(dn)}onClose()},true)]}),
     lnLbl("LINKED CATEGORIES"),
-    t("div",{style:{fontSize:11.5,color:c.tm,lineHeight:1.5,marginBottom:8},children:linked?"This line adds up your transactions in these categories for the month, unless you type your own amount above.":"Link categories so this line fills itself from your transactions."}),
-    ...linkedIds.map(cid=>{const cc=co(cid);return o("div",{key:cid,className:"f ia jb",style:{padding:"9px 0",borderBottom:`1px solid ${c.brs}`,gap:8},children:[t("span",{className:"tru",style:{fontSize:13.5,color:c.tx,flex:1,minWidth:0},children:(cc?cc.emoji+" "+cc.label:cid)}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:c.td,flexShrink:0},children:fm(catAmt(cid),cur)}),t("button",{onClick:()=>onToggleLink(cid),"aria-label":"Unlink",className:"act90 trt",style:{background:"transparent",border:"none",color:c.tm,fontSize:16,padding:"0 4px"},children:"×"})]})}),
+    t("div",{style:{fontSize:11.5,color:c.tm,lineHeight:1.5,marginBottom:8},children:linked?"This line adds up your transactions in these categories for the month, unless you type your own amount above. Categories with nothing this month are hidden.":"Link categories so this line fills itself from your transactions."}),
+    ...activeIds.map(catRow),
+    linked&&activeIds.length===0&&t("div",{style:{fontSize:12,color:c.tm,padding:"8px 0"},children:"None of the linked categories have a transaction in "+monthLabel+"."}),
+    idleIds.length>0&&t("button",{onClick:()=>sShowZero(v=>!v),className:"act95 trt",style:{background:"transparent",border:"none",color:c.tm,fontSize:11.5,padding:"9px 0 2px",fontFamily:'var(--nf)'},children:(showZero?"Hide ":"Show ")+idleIds.length+" linked with no activity this month"}),
+    ...(showZero?idleIds.map(catRow):[]),
     t("button",{onClick:()=>sPick(v=>!v),className:"w100 act95 trt",style:{marginTop:10,padding:"11px 0",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:12,color:c.ac,fontSize:13},children:pick?"Done adding":"＋ Add categories"}),
     pick&&o("div",{style:{marginTop:10},children:[
       cats.length>9&&t("input",{value:q,onChange:e=>sQ(e.target.value),placeholder:"Search category…",style:{...lnInp(),marginBottom:8}}),
@@ -11566,6 +11618,7 @@ function BudgetCalculator({data,persist,cur,spendFlt,onView,mode="card",onClose}
   const legacyValues=monOff===0&&!monthsMap[pKey]&&B.values?B.values:null;
   const values=(monthsMap[pKey]&&monthsMap[pKey].values)||legacyValues||{};
   const[showLinks,sShowLinks]=useState(false);
+  const[showUnmap,sShowUnmap]=useState(false);const[unmapPick,sUnmapPick]=useState({});
   const[editId,sEditId]=useState(null);
   const[justRefreshed,sJustRefreshed]=useState(false);
   useEffect(()=>{if(!justRefreshed)return;const tm=setTimeout(()=>sJustRefreshed(false),1600);return()=>clearTimeout(tm)},[justRefreshed]);
@@ -11635,7 +11688,7 @@ function BudgetCalculator({data,persist,cur,spendFlt,onView,mode="card",onClose}
       o("div",{className:"f ia",style:{gap:6,flexShrink:0},children:[t(ASNum,{value:v==null?null:v,placeholder:linked?String(a):"0",prefix:cur,width:96,onSave:(n)=>setVal(l.id,n)}),overridden&&t("button",{onClick:()=>setVal(l.id,null),title:"Reset to auto",style:{background:"transparent",border:"none",color:c.tm,fontSize:14,padding:2,cursor:"pointer"},children:"↺"})]})
     ]}),
     overridden&&a!=null&&a!==v&&o("div",{style:{textAlign:"right",marginTop:2},children:t("span",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm},children:"Linked categories total "+fm(a,cur)+" — tap ↺ to use that"})}),
-    expanded&&o("div",{style:{marginTop:6,paddingLeft:2,display:"flex",flexDirection:"column",gap:6},children:cids.map(cid=>({cid,amt:autoForCat(cid,kind),subs:autoBySub(cid,kind)})).sort((x,y)=>y.amt-x.amt).map(({cid,amt,subs})=>{const cc2=co(cid);return o("div",{key:cid,style:{display:"flex",flexDirection:"column",gap:3},children:[
+    expanded&&o("div",{style:{marginTop:6,paddingLeft:2,display:"flex",flexDirection:"column",gap:6},children:cids.map(cid=>({cid,amt:autoForCat(cid,kind),subs:autoBySub(cid,kind)})).filter(x=>x.amt!==0).sort((x,y)=>y.amt-x.amt).map(({cid,amt,subs})=>{const cc2=co(cid);return o("div",{key:cid,style:{display:"flex",flexDirection:"column",gap:3},children:[
       o("div",{className:"f ia jb",style:{fontSize:11},children:[t("span",{style:{color:multi?c.td:c.tm,fontWeight:multi?600:400},children:cc2?cc2.emoji+" "+cc2.label:cid}),t("span",{style:{fontFamily:'var(--nf)',color:c.td},children:fm(amt,cur)})]}),
       subs.length>0?o("div",{style:{paddingLeft:12,display:"flex",flexDirection:"column",gap:2,borderLeft:`1px solid ${c.brs}`,marginLeft:2},children:subs.map(({sub,amt:sa})=>o("div",{key:sub,className:"f ia jb",style:{fontSize:10.5},children:[t("span",{style:{color:c.tm},children:sub}),t("span",{style:{fontFamily:'var(--nf)',color:c.tm},children:fm(sa,cur)})]}))}):t("div",{style:{paddingLeft:12,fontSize:10,color:c.tm,fontFamily:'var(--nf)'},children:"No tagged subcategories yet"}),
     ]})})})
@@ -11806,9 +11859,28 @@ function BudgetCalculator({data,persist,cur,spendFlt,onView,mode="card",onClose}
       o("div",{style:{position:"relative",height:6,borderRadius:3,background:c.sf2,margin:"9px 0 5px",overflow:"hidden"},children:[t("div",{style:{width:Math.min(100,p*100)+"%",height:"100%",background:col,borderRadius:3}}),t("div",{style:{position:"absolute",left:Math.min(100,sec.thresh*100)+"%",top:0,bottom:0,width:2,background:c.tx,opacity:.5}})]}),
       t("div",{style:{fontSize:11,color:income<=0||ok?c.tm:col,marginBottom:4},children:note})]}),sec.lines.length?sec.lines.map((l,i)=>bRow(l,"expense",i,sec.label)):[t("div",{key:"e",style:{fontSize:12,color:c.tm,padding:"8px 0"},children:"No lines in this section. Add some under Manage."})])};
   const lineSheetEl=lineSheet&&(()=>{const f=allLinesFlat.find(x=>x.l.id===lineSheet.id);if(!f)return null;const cids=links[f.l.id]||[];return t(BudLineSheet,{key:f.l.id,line:f.l,kind:f.kind,secLabel:lineSheet.secLabel,cur,monthLabel,value:values[f.l.id]==null?null:values[f.l.id],auto:cids.length?autoFor(f.l.id,f.kind):null,linkedIds:cids,catAmt:cid=>autoForCat(cid,f.kind),onSetVal:n=>setVal(f.l.id,n),onToggleLink:cid=>toggleLink(f.l.id,cid),onClose:()=>sLineSheet(null)})})();
+  // Categories that don't feed any budget line yet, each with a suggested line (editable) and a one-tap "map all".
+  const unmapGroups=budLineGroups(data);
+  const unmapped=["income","expense"].flatMap(kind=>budUnmapped(data,kind).map(cc=>({cc,kind})));
+  const unmapPickOf=u=>unmapPick[u.cc.id]!==undefined?unmapPick[u.cc.id]:budSuggestLine(u.cc,u.kind,unmapGroups);
+  const unmapPairs=unmapped.map(u=>[unmapPickOf(u),u.cc.id]).filter(pr=>pr[0]);
+  const applyUnmap=()=>{if(!unmapPairs.length)return;persist(budLinkPatch(data,unmapPairs));sUnmapPick({})};
+  const unmapBlk=unmapped.length>0&&o("div",{style:{marginTop:16,padding:"12px 14px",background:c.sf2,border:`1px solid ${showUnmap?c.ac+"55":c.brs}`,borderRadius:12},children:[
+    o("button",{onClick:()=>sShowUnmap(v=>!v),className:"w100 act97 trt f ia jb",style:{background:"transparent",border:"none",padding:0,color:c.tx,fontSize:13.5,textAlign:"left"},children:[o("span",{children:"🔗  "+unmapped.length+" categor"+(unmapped.length===1?"y isn't":"ies aren't")+" in your budget"}),t("span",{style:{color:c.tm,fontSize:12,transform:showUnmap?"rotate(180deg)":"none"},children:"▾"})]}),
+    showUnmap&&o("div",{style:{marginTop:10},children:[
+      t("div",{style:{fontSize:11.5,color:c.tm,lineHeight:1.5,marginBottom:8},children:"These categories don't feed any budget line, so their spending isn't counted. Suggested lines are pre-picked — change any, then map them all at once."}),
+      ...unmapped.map(u=>o("div",{key:u.cc.id,className:"f ia jb",style:{gap:8,padding:"7px 0",borderBottom:`1px solid ${c.brs}`},children:[
+        t("span",{className:"tru",style:{fontSize:12.5,color:c.tx,flex:"0 0 40%",minWidth:0},children:u.cc.emoji+" "+u.cc.label+(u.kind==="income"?" ↓":"")}),
+        t("div",{style:{flex:1,minWidth:0},children:t(BudLinePicker,{data,kind:u.kind,value:unmapPickOf(u),onChange:v=>sUnmapPick(m=>({...m,[u.cc.id]:v}))})})
+      ]})),
+      t("button",{onClick:applyUnmap,disabled:!unmapPairs.length,className:"w100 act95 trt",style:{marginTop:12,padding:"12px 0",background:unmapPairs.length?c.ac:c.sf,border:"none",borderRadius:12,color:unmapPairs.length?"#0a0a0a":c.tm,fontSize:13.5,fontWeight:600},children:unmapPairs.length?"Map "+unmapPairs.length+" categor"+(unmapPairs.length===1?"y":"ies")+" to the budget":"Pick a line for at least one category"}),
+      unmapPairs.length<unmapped.length&&t("div",{style:{fontSize:10.5,color:c.tm,marginTop:6},children:(unmapped.length-unmapPairs.length)+" left as \"Don't add\" — no obvious match, pick a line if you want them counted."})
+    ]})
+  ]});
   const bodyBlk=o(Fragment,{children:[monthNav,bKpiRow,bBar,overrideBanner,inflowCard,...effSections.map(secCard),
     bLbl("WHAT THIS MEANS"),
     o("div",{style:{display:"flex",flexDirection:"column",gap:8},children:insights.map((x,i)=>o("div",{key:i,className:"f",style:{gap:10,padding:"11px 13px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,fontSize:12.5,color:c.td,lineHeight:1.45},children:[t("span",{style:{flexShrink:0},children:x[0]}),t("span",{children:x[1]})]}))}),
+    unmapBlk,
     t("button",{onClick:()=>sShowManage(v=>!v),className:"w100 act97 trt f ia jb",style:{marginTop:16,padding:"12px 14px",background:showManage?c.sk+"14":c.sf2,border:`1px solid ${showManage?c.sk+"55":c.brs}`,borderRadius:12,color:c.tx,fontSize:13.5},children:[o("span",{children:"⚙️  Manage lines & sections"}),t("span",{style:{color:c.tm,fontSize:12,transform:showManage?"rotate(180deg)":"none"},children:"▾"})]}),
     showManage&&manageBlk,
     t("div",{style:{marginTop:14,fontSize:10,color:c.tm,lineHeight:1.5,fontStyle:"italic"},children:"Limits: essentials <40%, lifestyle <20%, EMIs <30% of income; investments should be ≥20% and the surplus >10%. Tap any line to set an amount or link categories."}),
@@ -13855,12 +13927,16 @@ function QuickCatSheet({data,persist,initialLabel,group,onCreated,onClose}){
   const dupe=useMemo(()=>{const l=trimmed.toLowerCase();return l?ceAll().find(x=>String(x.label||"").toLowerCase()===l):null},[trimmed,data.customExpenseCategories,data.categoryOverrides]);
   const grp=(group&&group!=="all")?group:"more";
   const gMeta=CE_GROUPS.find(g=>g.id===grp)||CE_GROUPS[CE_GROUPS.length-1];
+  // Budget line the new category feeds: pre-filled from its name until the user picks one themselves.
+  const[blPick,sBlPick]=useState(undefined);
+  const blSug=useMemo(()=>budSuggestLine(trimmed,"expense",budLineGroups(data)),[trimmed,data.calculators]);
+  const bl=blPick!==undefined?blPick:blSug;
   const create=()=>{
     if(!trimmed)return;
     if(dupe){onCreated(dupe.id);onClose();return}
     const nc={id:"custom_"+Math.random().toString(36).slice(2),label:trimmed,emoji:picked,color:"#A39B8C",subs:["Other"],grp};
     const co2=data.categoryOrder||{};
-    persist({customExpenseCategories:[...(data.customExpenseCategories||[]),nc],categoryOrder:{...co2,expense:[...(co2.expense||[]),nc.id]}});
+    persist({customExpenseCategories:[...(data.customExpenseCategories||[]),nc],categoryOrder:{...co2,expense:[...(co2.expense||[]),nc.id]},...budLinkPatch(data,[[bl,nc.id]])});
     onCreated(nc.id);onClose();
   };
   const inpSty={width:"100%",boxSizing:"border-box",background:c.sf,border:`1px solid ${c.brs}`,borderRadius:11,padding:"11px 12px",color:c.tx,fontSize:14,outline:"none",fontFamily:"var(--tf)"};
@@ -13880,6 +13956,11 @@ function QuickCatSheet({data,persist,initialLabel,group,onCreated,onClose}){
         t("span",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,letterSpacing:.5,flexShrink:0},children:"OR TYPE ONE"}),
         t("input",{value:custom,onChange:e=>{const v=[...String(e.target.value||"")].slice(0,2).join("");sCustom(v);if(v.trim())sEmoji(v.trim())},placeholder:"🙂",style:{width:64,flexShrink:0,boxSizing:"border-box",background:c.sf,border:`1px solid ${c.brs}`,borderRadius:10,padding:"7px 9px",color:c.tx,fontSize:16,outline:"none",textAlign:"center"}}),
       ]}),
+    ]}),
+    !dupe&&o("div",{style:{marginTop:16},children:[
+      t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1,marginBottom:7},children:"ADD TO WHICH BUDGET LINE?"}),
+      t(BudLinePicker,{data,kind:"expense",value:bl,onChange:v=>sBlPick(v)}),
+      t("div",{style:{fontSize:11,color:c.tm,marginTop:6,lineHeight:1.4},children:bl?"Spending in this category will count toward that line in your Monthly Budget.":"It won't appear in your Monthly Budget until you link it."})
     ]}),
     !dupe&&t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,letterSpacing:.4,marginTop:14},children:`FILES INTO ${gMeta.emoji} ${gMeta.label.toUpperCase()} · CHANGE ANY TIME IN CATEGORIES`}),
     o("div",{className:"g g2",style:{gap:8,marginTop:18},children:[
@@ -13942,6 +14023,7 @@ function CatMgr({data,persist,onClose,onQuickProfile}){
   const[catQ,sCatQ]=useState("");
   const[showForm,sShowForm]=useState(false);
   const[newLabel,sNewLabel]=useState("");
+  const[newBl,sNewBl]=useState(undefined);
   const[newEmoji,sNewEmoji]=useState("✨");
   const[showPicker,sShowPicker]=useState(false);
   const[emojiQ,sEmojiQ]=useState("");
@@ -14005,13 +14087,16 @@ function CatMgr({data,persist,onClose,onQuickProfile}){
     if(!matched.size)ALL_EMOJIS.filter(e=>e.includes(q.trim())).forEach(e=>matched.add(e));
     return matched.size?[...matched]:ALL_EMOJIS;
   };
+  const newBlSug=useMemo(()=>budSuggestLine(newLabel,tab,budLineGroups(data)),[newLabel,tab,data.calculators]);
+  const newBlEff=newBl!==undefined?newBl:newBlSug;
   const addCat=()=>{
     if(!newLabel.trim())return;
     const nc={id:"custom_"+uid2(),label:newLabel.trim(),emoji:newEmoji||"✨",color:"#A39B8C",subs:["Other"]};
     const co2=data.categoryOrder||{};const tabK=isExp?"expense":"income";const newOrd=[...(co2[tabK]||[]),nc.id];
-    if(isExp)persist({customExpenseCategories:[...custom,nc],categoryOrder:{...co2,[tabK]:newOrd}});
-    else persist({customIncomeCategories:[...custom,nc],categoryOrder:{...co2,[tabK]:newOrd}});
-    sNewLabel("");sNewEmoji("✨");sShowForm(false);sShowPicker(false);sEmojiQ("");
+    const blPatch=budLinkPatch(data,[[newBlEff,nc.id]]);
+    if(isExp)persist({customExpenseCategories:[...custom,nc],categoryOrder:{...co2,[tabK]:newOrd},...blPatch});
+    else persist({customIncomeCategories:[...custom,nc],categoryOrder:{...co2,[tabK]:newOrd},...blPatch});
+    sNewBl(undefined);sNewLabel("");sNewEmoji("✨");sShowForm(false);sShowPicker(false);sEmojiQ("");
   };
   const delCustom=(id)=>{
     const co2=data.categoryOrder||{};
@@ -14088,6 +14173,10 @@ function CatMgr({data,persist,onClose,onQuickProfile}){
         ]}),
       ]}),
       showPicker&&EGrid({onSel:em=>{sNewEmoji(em);sShowPicker(false);sEmojiQ("")},cur:newEmoji,q:emojiQ,setQ:sEmojiQ,nameHint:newLabel}),
+      o("div",{style:{marginTop:8},children:[
+        t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1,marginBottom:6},children:"ADD TO WHICH BUDGET LINE?"}),
+        t(BudLinePicker,{data,kind:tab,value:newBlEff,onChange:v=>sNewBl(v)})
+      ]}),
       o("div",{className:"g g2",style:{gap:8,marginTop:10},children:[
         t("button",{onClick:()=>{sShowForm(false);sShowPicker(false);sEmojiQ("")},className:"act95 trt",style:{padding:"10px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,fontSize:13,color:c.tx},children:"Cancel"}),
         t("button",{disabled:!newLabel.trim(),onClick:addCat,className:"act95 trt",style:{padding:"10px 0",background:newLabel.trim()?c.ac:c.sf2,color:newLabel.trim()?"#0a0a0a":c.tm,borderRadius:10,fontSize:13,fontWeight:600,border:"none"},children:"Add"}),
