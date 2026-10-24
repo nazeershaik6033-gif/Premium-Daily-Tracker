@@ -11197,7 +11197,7 @@ function RecCatalog({onPick}){
   ]});
 }
 function Recur({data,onAdd,onDelete,onEdit,onStop,onResume,onClose}){
-  const[showStopped,sShowStopped]=useState(false);const[chip,sChip]=useState("all");const[picker,sPicker]=useState(false);useNavAction(showStopped?null:"Add recurring expense",()=>sPicker(true));
+  const[showStopped,sShowStopped]=useState(false);const[chip,sChip]=useState("all");const[picker,sPicker]=useState(false);
   const[stopId,sStopId]=useState(null);const[delId,sDelId]=useState(null);
   const tIso=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
   const[stopIso,sStopIso]=useState(tIso());
