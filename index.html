@@ -132,17 +132,17 @@ body.sheet-open .nav-bar,body.kb-open .nav-bar,body.sel-open .nav-bar{display:no
   --neu-pd:rgba(0,0,0,.65);  --neu-pl:rgba(255,255,255,.06);
   --neu-ad:rgba(0,0,0,.6);   --neu-al:rgba(255,255,255,.04);
 }
-body[data-theme="snow"],body[data-theme="parchment"]{
+body[data-theme="light"],body[data-theme="parchment"]{
   --neu-d:rgba(92,80,58,.13);  --neu-l:rgba(255,255,255,.95);
   --neu-dc:rgba(92,80,58,.16); --neu-lc:rgba(255,255,255,1);
   --neu-pd:rgba(92,80,58,.17); --neu-pl:rgba(255,255,255,.92);
   --neu-ad:rgba(92,80,58,.15); --neu-al:rgba(255,255,255,.88);
 }
 /* === IPO theme: flat bordered cards, blue pill actions, orange nav === */
-body[data-theme="light"]{--neu-d:rgba(0,0,0,.55);--neu-l:rgba(255,255,255,.03);--neu-dc:rgba(0,0,0,.6);--neu-lc:rgba(255,255,255,.04);--neu-pd:rgba(0,0,0,.6);--neu-pl:rgba(255,255,255,.03);--neu-ad:rgba(0,0,0,.55);--neu-al:rgba(255,255,255,.03)}
-body[data-theme="light"] .neu,body[data-theme="light"] .neu-circ{box-shadow:0 0 0 1px #2A2A2C}
-body[data-theme="light"] .neu-flat{box-shadow:0 4px 14px rgba(58,125,254,.35)}
-body[data-theme="light"] .neu-flat,body[data-theme="light"] .nb-fab{border-radius:999px}
+body[data-theme="snow"]{--neu-d:rgba(0,0,0,.55);--neu-l:rgba(255,255,255,.03);--neu-dc:rgba(0,0,0,.6);--neu-lc:rgba(255,255,255,.04);--neu-pd:rgba(0,0,0,.6);--neu-pl:rgba(255,255,255,.03);--neu-ad:rgba(0,0,0,.55);--neu-al:rgba(255,255,255,.03)}
+body[data-theme="snow"] .neu,body[data-theme="snow"] .neu-circ{box-shadow:0 0 0 1px #2A2A2C}
+body[data-theme="snow"] .neu-flat{box-shadow:0 4px 14px rgba(58,125,254,.35)}
+body[data-theme="snow"] .neu-flat,body[data-theme="snow"] .nb-fab{border-radius:999px}
 /* === Synth-style neumorphic utilities === */
 .neu{box-shadow:6px 6px 14px var(--neu-d),-5px -5px 12px var(--neu-l)}
 .neu-circ{box-shadow:6px 6px 14px var(--neu-dc),-5px -5px 12px var(--neu-lc)}
@@ -406,11 +406,10 @@ const KU="etp-users",KAU="etp-active-user";
 // === THEME ===
 // CRED-2020 (Fabrik) — luxury dark, gradient depth, champagne gold + jewel tones, Cirka-style serif
 const darkC={bg:"#1B1B1D",bgg:"#1B1B1D",sf:"#242427",sfg:"#242427",sf2:"#2C2C30",sf3:"#34343A",br:"#3A3A40",brs:"#303036",tx:"#F4F4F6",td:"#9B9BA2",tm:"#6C6C74",ac:"#FFFFFF",gd:"#FFD66B",cr:"#FF9E7A",co:"#FF5A6E",ro:"#FF4D63",mt:"#2FC59B",sk:"#4D7BF0",lv:"#9B8CFF",cu:"#C99064",hf:"'Space Grotesk','Geist',-apple-system,system-ui,sans-serif",dk:true};
-// IPO — near-black canvas, electric blue primary, orange nav/highlight; sampled from the IPO app reference.
-const lightC={bg:"#0B0A0C",bgg:"#0B0A0C",sf:"#191919",sfg:"#191919",sf2:"#222222",sf3:"#2C2C2E",br:"#3A3A3D",brs:"#2A2A2C",tx:"#F5F5F7",td:"#B4B4BA",tm:"#85858C",ac:"#3A7DFE",gd:"#FD8B00",cr:"#FF9F43",co:"#F0392D",ro:"#F0392D",mt:"#3EA342",sk:"#1B8AF0",lv:"#9B8CFF",cu:"#FD8B00",hf:"'Inter','SF Pro Display',-apple-system,system-ui,sans-serif",dk:true};
+const lightC={bg:"#EDEAE2",bgg:"#EDEAE2",sf:"#FDFCFA",sfg:"#FDFCFA",sf2:"#F4F1EB",sf3:"#E9E5DC",br:"#DCD7CB",brs:"#E7E3D9",tx:"#1A1814",td:"#4A4640",tm:"#7A7670",ac:"#1A7A2E",gd:"#8B6A14",cr:"#7A4020",co:"#CC4400",ro:"#CC2020",mt:"#156830",sk:"#0E5FA0",lv:"#5E2EA0",cu:"#8A5A2E",hf:"'Instrument Serif','Times New Roman',serif",dk:false};
 const navyC={bg:"#0F1117",bgg:"#0F1117",sf:"#1A1E2E",sfg:"#1A1E2E",sf2:"#232840",sf3:"#2D3354",br:"#2E3555",brs:"#262B45",tx:"#F1F5F9",td:"#94A3B8",tm:"#64748B",ac:"#6366F1",gd:"#F59E0B",cr:"#FB7185",co:"#F97316",ro:"#EF4444",mt:"#10B981",sk:"#38BDF8",lv:"#A78BFA",cu:"#D8956A",hf:"'Instrument Serif','Times New Roman',serif",dk:true};
-// Cool neutral white/grey.
-const snowC={bg:"#F5F6F8",bgg:"#F5F6F8",sf:"#FFFFFF",sfg:"#FFFFFF",sf2:"#F0F1F4",sf3:"#E6E8EC",br:"#D7DAE0",brs:"#E1E3E8",tx:"#14161A",td:"#4B4F58",tm:"#868C96",ac:"#2563EB",gd:"#B58900",cr:"#C2410C",co:"#DC2626",ro:"#B91C1C",mt:"#059669",sk:"#0284C7",lv:"#7C3AED",cu:"#A16207",hf:"'Inter','SF Pro Display',-apple-system,system-ui,sans-serif",dk:false};
+// IPO — near-black canvas, electric blue primary, orange nav/highlight; sampled from the IPO app reference.
+const snowC={bg:"#0B0A0C",bgg:"#0B0A0C",sf:"#191919",sfg:"#191919",sf2:"#222222",sf3:"#2C2C2E",br:"#3A3A3D",brs:"#2A2A2C",tx:"#F5F5F7",td:"#B4B4BA",tm:"#85858C",ac:"#3A7DFE",gd:"#FD8B00",cr:"#FF9F43",co:"#F0392D",ro:"#F0392D",mt:"#3EA342",sk:"#1B8AF0",lv:"#9B8CFF",cu:"#FD8B00",hf:"'Inter','SF Pro Display',-apple-system,system-ui,sans-serif",dk:true};
 // Warm paper tone with a classic ledger serif and a brass accent.
 const parchmentC={bg:"#E8DFC8",bgg:"#E8DFC8",sf:"#F7F1E1",sfg:"#F7F1E1",sf2:"#EFE6D0",sf3:"#E4D8BC",br:"#C9B98F",brs:"#DCCEA9",tx:"#2B2113",td:"#5C4E33",tm:"#8A7A57",ac:"#8B5E1F",gd:"#A47C1B",cr:"#7A4A20",co:"#A83A1C",ro:"#8F2A1A",mt:"#3F6B3A",sk:"#3E6E8E",lv:"#6B4E8E",cu:"#8A5A2E",hf:"'Georgia','Times New Roman',serif",dk:false};
 // Cool charcoal-grey dark theme -- distinct from "dark" (near-black) and "navy" (blue-black).
@@ -1864,7 +1863,7 @@ function App(){
   const[activeUser,setActiveUser]=useState(null);
   Object.assign(c,themeC);
   const THEME_CYCLE={dark:"navy",navy:"slate",slate:"light",light:"snow",snow:"parchment",parchment:"dark"};
-  const THEME_BG={dark:"#1B1B1D",navy:"#0F1117",slate:"#1E2328",light:"#0B0A0C",snow:"#F5F6F8",parchment:"#E8DFC8"};
+  const THEME_BG={dark:"#1B1B1D",navy:"#0F1117",slate:"#1E2328",light:"#EDEAE2",snow:"#0B0A0C",parchment:"#E8DFC8"};
   const applyTheme=(next)=>{setTheme(next);const nc=THEMES[next]||darkC;Object.assign(c,nc);localStorage.setItem("etp-theme",next);document.documentElement.style.background=THEME_BG[next];document.body.style.background=THEME_BG[next];document.body.style.color=nc.tx;document.body.dataset.theme=next;paintNavVars(nc,next);document.querySelector('meta[name="theme-color"]')?.setAttribute("content",THEME_BG[next])};
   const toggleTheme=()=>applyTheme(THEME_CYCLE[theme]);
   // Covers first paint and any theme change (including restore from storage),
@@ -10978,8 +10977,8 @@ return o("div",{style:{padding:`8px ${GUT}px 104px`},className:"st",children:[
       {id:"dark",label:"Luxe",emoji:"👑",desc:"Gold & jewel"},
       {id:"navy",label:"Navy",emoji:"🌊",desc:"Indigo blue"},
       {id:"slate",label:"Slate",emoji:"🪨",desc:"Cool charcoal"},
-      {id:"light",label:"IPO",emoji:"📈",desc:"Black, blue & orange"},
-      {id:"snow",label:"Snow",emoji:"❄️",desc:"Neutral grey"},
+      {id:"light",label:"Light",emoji:"☀️",desc:"Clean white"},
+      {id:"snow",label:"IPO",emoji:"📈",desc:"Black, blue & orange"},
       {id:"parchment",label:"Parchment",emoji:"📜",desc:"Warm paper"},
     ].map(th=>o("button",{key:th.id,onClick:()=>theme!==th.id&&onSetTheme&&onSetTheme(th.id),style:{padding:"12px 8px",background:theme===th.id?c.sf3:c.sf2,border:`1px solid ${theme===th.id?c.ac:c.brs}`,borderRadius:11,display:"flex",flexDirection:"column",alignItems:"center",gap:4},children:[
       t("span",{style:{fontSize:20},children:th.emoji}),
