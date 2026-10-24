@@ -1275,7 +1275,9 @@ const SH=({title,onBack,right})=>o("div",{className:"f ia jb",style:{padding:"0 
 // screen that uses this button (localStorage) and re-clamped to the viewport
 // on load and on resize/rotation, so it can never end up stranded off-screen.
 // Save for long forms: the bottom nav's centre button turns into a ✓ Save button instead of a second floating circle.
-// `anchorSel` (optional) points at the in-page Save button; while that is on screen the nav button keeps its normal job.
+// It stays a ✓ for as long as the form is open (dimmed while the form can't be saved yet), so it never flips back and
+// forth while scrolling. `anchorSel` (optional) points at an in-page Save button; while that is on screen the nav
+// button keeps its normal job.
 const FloatingSave=({onClick,disabled,label="Save",anchorSel})=>{
   const[anchorVis,setAnchorVis]=useState(false);
   useEffect(()=>{
@@ -7872,7 +7874,7 @@ return o(Fragment,{children:[o("div",{className:"fi",style:{paddingTop:48,paddin
   // Long form, easy to be scrolled away from the bottom Save button above —
   // this floating twin stays reachable the whole time, mirroring the same
   // save action (split vs. single).
-  t(FloatingSave,{onClick:()=>{split?svSplit():sv()},disabled:!canSave,anchorSel:"[data-savebtn]"}),
+  t(FloatingSave,{onClick:()=>{split?svSplit():sv()},disabled:!canSave}),
   splitPickFor&&(()=>{const q2=splitCatQ.trim().toLowerCase();const fc=q2?cs.filter(x=>x.label.toLowerCase().includes(q2)||x.emoji.includes(splitCatQ.trim())):cs;return t(Sht,{onClose:()=>{sSplitPickFor(null);sSplitCatQ("")},children:o(Fragment,{children:[
     t("div",{style:{fontFamily:c.hf,fontSize:18,fontWeight:700,color:c.tx,marginBottom:14},children:"Pick a category"}),
     o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${splitCatQ?c.ac+"66":c.brs}`,borderRadius:10,padding:"9px 12px",marginBottom:12},children:[t(Srch,{size:14,color:splitCatQ?c.ac:c.tm}),t("input",{value:splitCatQ,onChange:e=>sSplitCatQ(e.target.value),placeholder:"Search categories…",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:13.5,fontFamily:'var(--tf)',minWidth:0}}),splitCatQ&&t("button",{onClick:()=>sSplitCatQ(""),style:{background:"transparent",border:"none",color:c.tm,display:"flex",flexShrink:0},children:t(X,{size:13})})]}),
