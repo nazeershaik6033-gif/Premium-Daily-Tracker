@@ -2590,7 +2590,7 @@ function Home({data,persist,onTx,onView,onFlt,onUseProfile,onTour,onAddExpenses}
 const periodRange=useMemo(()=>{const n=new Date(),y=n.getFullYear(),m=n.getMonth();if(pr==="quarter"){const sm=Math.floor(m/3)*3;return{start:mss(y,sm,msd),end:mss(y,sm+3,msd)}}if(pr==="half"){const sm=m<6?0:6;return{start:mss(y,sm,msd),end:mss(y,sm+6,msd)}}if(pr==="year")return{start:mss(y,0,msd),end:mss(y+1,0,msd)};return{start:ps(n,msd),end:mse(y,m,msd)}},[pr,msd]);
 const periodStart=periodRange.start,periodEnd=periodRange.end;
 const periodLabel=useMemo(()=>{const n=new Date();if(pr==="quarter"){const q=Math.floor(n.getMonth()/3)+1;return `Q${q} ${n.getFullYear()}`}if(pr==="half")return (n.getMonth()<6?"H1":"H2")+" "+n.getFullYear();if(pr==="year")return String(n.getFullYear());return n.toLocaleDateString("en-US",{month:"long",year:"numeric"})},[pr]);
-const monExp=useMemo(()=>expenses.filter(e=>e.date>=periodStart&&e.date<periodEnd&&e.type==="expense"),[expenses,periodStart,periodEnd]);const monInc=useMemo(()=>expenses.filter(e=>e.date>=periodStart&&e.date<periodEnd&&e.type==="income"),[expenses,periodStart,periodEnd]);const totExp=monExp.reduce((s,e)=>s+e.amount,0);const totInc=monInc.reduce((s,e)=>s+e.amount,0);const periodReimb=monExp.filter(e=>e.reimbursedBy).reduce((s,e)=>s+(e.reimbursedAmount??e.amount),0);const netExp=Math.max(0,totExp-periodReimb);const netCF=totInc-totExp;
+const monExp=useMemo(()=>expenses.filter(e=>e.date>=periodStart&&e.date<periodEnd&&e.type==="expense"),[expenses,periodStart,periodEnd]);const monInc=useMemo(()=>expenses.filter(e=>e.date>=periodStart&&e.date<periodEnd&&e.type==="income"),[expenses,periodStart,periodEnd]);const totExp=monExp.reduce((s,e)=>s+e.amount,0);const totInc=monInc.reduce((s,e)=>s+e.amount,0);const periodReimb=monExp.filter(e=>e.reimbursedBy).reduce((s,e)=>s+(e.reimbursedAmount??e.amount),0);const netExp=Math.max(0,totExp-periodReimb);const netCF=totInc-totExp;const pendReimbItems=pr==="month"?monExp.filter(e=>e.reimbursable&&!e.reimbursedBy):[];const pendReimbMonth=pendReimbItems.reduce((s,e)=>s+(e.amount||0),0);const netIfReimbursed=netCF+pendReimbMonth;
 // Credit card bill payments are their own transaction type (not "expense"), so they never
 // entered totExp/netCF above — this is deliberate for anyone who logs each card swipe as
 // its own expense (double-counting risk otherwise), but leaves the summary blind to card
@@ -2729,6 +2729,16 @@ const row=(lbl,val,col,sign,kind,total)=>o("div",{className:"f ia jb",children:[
           o("div",{className:"f ia",style:{gap:6},children:[t(Rpt,{size:12,color:c.mt}),t("div",{style:{fontFamily:'var(--nf)',fontSize:9,letterSpacing:1,color:c.mt,fontWeight:600},children:"REIMBURSE"})]}),
           o("div",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.tm},children:["−",fm(periodReimb,data.currency),t("span",{style:{color:c.mt,fontWeight:600},children:["  · net exp ",fm(netExp,data.currency)]})]}),
         ]}),
+        pendReimbMonth>0&&o("button",{onClick:()=>onFlt({title:"Reimbursable · pending",items:[...pendReimbItems].sort((a,b)=>b.date-a.date)}),className:"w100 act95 trt",style:{display:"block",textAlign:"left",padding:"10px 16px",background:"transparent",border:"none",borderTop:`1px solid ${c.brs}`},children:[
+          o("div",{className:"f ia jb",children:[
+            o("div",{className:"f ia",style:{gap:6},children:[t(Rpt,{size:12,color:c.gd}),t("div",{style:{fontFamily:'var(--nf)',fontSize:9,letterSpacing:1,color:c.gd,fontWeight:600},children:"REIMBURSABLE · THIS MONTH"})]}),
+            o("div",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.tm},children:["+",fm(pendReimbMonth,data.currency),"  · ",pendReimbItems.length+(pendReimbItems.length===1?" entry":" entries")]}),
+          ]}),
+          o("div",{className:"f ia jb",style:{marginTop:6},children:[
+            t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:.5},children:"NET INCL. REIMBURSABLE"}),
+            t("div",{style:{fontFamily:'var(--nf)',fontSize:12,fontWeight:600,color:netIfReimbursed>=0?c.mt:c.co},children:(netIfReimbursed>=0?"+":"")+fm(netIfReimbursed,data.currency)}),
+          ]}),
+        ]}),
         cardPayMonth>0&&o("div",{style:{padding:"10px 16px",borderTop:`1px solid ${c.brs}`},children:[
           o("div",{className:"f ia jb",children:[
             o("div",{className:"f ia",style:{gap:6},children:[t(CC,{size:12,color:c.co}),t("div",{style:{fontFamily:'var(--nf)',fontSize:9,letterSpacing:1,color:c.co,fontWeight:600},children:"CARDPAY · THIS MONTH"})]}),
@@ -2755,6 +2765,7 @@ const row=(lbl,val,col,sign,kind,total)=>o("div",{className:"f ia jb",children:[
         ]}),
         cfInfoOpen&&o("div",{style:{padding:"0 16px 12px",display:"flex",flexDirection:"column",gap:6},children:[
           t("div",{style:{fontSize:11,color:c.td,lineHeight:1.5},children:"NET = Income − Expenses. A credit card purchase you've logged as its own expense is already counted here, the moment you spend it."}),
+          pendReimbMonth>0&&t("div",{style:{fontSize:11,color:c.td,lineHeight:1.5},children:"REIMBURSABLE · THIS MONTH is money you've flagged as owed back to you (this month's expenses not yet marked reimbursed; shown in the Mo view only). NET INCL. REIMBURSABLE shows your net if all of it came back — it doesn't change Income, Expenses or Net above."}),
           t("div",{style:{fontSize:11,color:c.td,lineHeight:1.5},children:"NET INCL. CARDPAY additionally subtracts this month's credit card bill payments — real money that left an account to settle card debt. Shown separately so it isn't double-counted for anyone who also logs individual card purchases as expenses."}),
           t("div",{style:{fontSize:11,color:c.td,lineHeight:1.5},children:"NET AFTER SAVINGS further subtracts what you moved into savings pots this month (a withdrawal adds back instead, since it's money returning to what's spendable). It's your own money changing buckets, not spending — this just shows what's truly left unearmarked."}),
         ]}),
@@ -11446,6 +11457,24 @@ const AS_ITR_HEADS=[
   {id:"capgains",label:"Capital Gains",emoji:"📈",cats:["trading"],note:"Stocks, MF, F&O, crypto — verify STCG/LTCG split"},
   {id:"othersrc",label:"Other Sources",emoji:"🏦",cats:["interest","cashback","gift","income_other"],note:"Interest, cashbacks, gifts & misc"},
 ];
+// Income category → ITR head. Explicit choices live in data.advStats.headMap; anything unmapped falls back to the
+// built-in lists above, then a name guess, then Other Sources. "excluded" = not taxable income (reimbursements, refunds).
+const AS_HEAD_EXCLUDED="excluded";
+const AS_HEAD_KW=[[/reimb|refund|claim|insurance/,AS_HEAD_EXCLUDED],[/salary|bonus|arrear|payroll|wage|stipend/,"salary"],[/rent/,"house"],[/freelanc|consult|business|profession|commission|side/,"business"],[/trading|profit|stock|mutual|\bmf\b|crypto|capital|gain|f&o|ltcg|stcg/,"capgains"]];
+function asHeadSuggest(cat){
+  const id=cat&&cat.id,label=String(cat&&cat.label||"").toLowerCase();
+  if(id==="savings_deposit")return AS_HEAD_EXCLUDED;
+  const h=AS_ITR_HEADS.find(x=>x.cats.includes(id));if(h)return h.id;
+  for(const[re,hid]of AS_HEAD_KW)if(re.test(label))return hid;
+  return"othersrc";
+}
+const asHeadOf=(cat,headMap)=>(headMap&&headMap[cat.id])||asHeadSuggest(cat);
+function AsHeadPicker({value,onChange}){
+  return o("select",{value:value||"",onChange:e=>onChange(e.target.value),style:{width:"100%",boxSizing:"border-box",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"10px 12px",color:c.tx,fontSize:13.5,outline:"none",fontFamily:'var(--tf)'},children:[
+    ...AS_ITR_HEADS.map(h=>t("option",{key:h.id,value:h.id,children:h.emoji+" "+h.label})),
+    t("option",{key:AS_HEAD_EXCLUDED,value:AS_HEAD_EXCLUDED,children:"🚫 Not taxable / excluded"})
+  ]});
+}
 const AS_DED_PRESETS=[
   {section:"80C",label:"PPF / ELSS / LIC / EPF / tuition",limit:150000},
   {section:"80CCD(1B)",label:"NPS (additional)",limit:50000},
@@ -12890,7 +12919,7 @@ function AdvancedStats({data,persist,onClose,onTx,onFlt,initialBasis}){
   const saveAS=(patch)=>persist({advStats:{inflationPct,autoTags,catPlan,periods,...AS,...patch}});
   // "PLAN" is the year-preparation basis: same calendar-year window as CY, but it
   // swaps the reporting cards for the income/expenses/savings planner.
-  const[basis,sBasis]=useState(initialBasis||"FY");
+  const[basis,sBasis]=useState(initialBasis||"CY");
   const curFy=now.getMonth()>=AS_FY_START?now.getFullYear():now.getFullYear()-1;
   const[fyA,sFyA]=useState(curFy);
   const[cyY,sCyY]=useState(now.getFullYear());
@@ -12923,7 +12952,10 @@ function AdvancedStats({data,persist,onClose,onTx,onFlt,initialBasis}){
   const netSavings=grossIncome-grossExpense;
   const savingsRate=grossIncome>0?(netSavings/grossIncome)*100:0;
   const investTotal=savingsDep+miSum("savings");
-  const heads=AS_ITR_HEADS.map(h=>{const items=incomeTxns.filter(e=>h.cats.includes(e.category));const total=items.reduce((s,e)=>s+e.amount,0);return{...h,total,count:items.length,items};});
+  const headMap=AS.headMap||{};
+  const headOfTxn=e=>asHeadOf({id:e.category,label:(co(e.category)||{}).label},headMap);
+  const excludedItems=incNoSave.filter(e=>headOfTxn(e)===AS_HEAD_EXCLUDED);const excludedTotal=excludedItems.reduce((s,e)=>s+e.amount,0);
+  const heads=AS_ITR_HEADS.map(h=>{const items=incNoSave.filter(e=>headOfTxn(e)===h.id);const total=items.reduce((s,e)=>s+e.amount,0);return{...h,total,count:items.length,items};});
   const headTotal=heads.reduce((s,h)=>s+h.total,0);
   const byCat={};for(const e of spendTxns)byCat[e.category]=(byCat[e.category]||0)+netAmt(e);
   const catRows=Object.entries(byCat).map(([cid,amt])=>{const annualized=Math.round(amt/monthsElapsed*12);const projBase=Math.round(annualized*(1+inflationPct/100));const plan=catPlan[cid]!=null?catPlan[cid]:projBase;return{cid,amt,annualized,projBase,plan,...co(cid)};}).sort((a,b)=>b.amt-a.amt);
@@ -13008,9 +13040,18 @@ function AdvancedStats({data,persist,onClose,onTx,onFlt,initialBasis}){
         o("div",{className:"f ia jb",style:{gap:10},children:[o("div",{className:"f ia",style:{gap:9},children:[t("span",{style:{fontSize:16},children:h.emoji}),o("div",{children:[t("div",{style:{fontSize:13.5,fontWeight:600,color:c.tx},children:h.label}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:h.count+" "+(h.count===1?"entry":"entries")+" · tap to view"})]})]}),o("div",{className:"f ia",style:{gap:6},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:14,fontWeight:600,color:c.tx},children:fm(h.total,cur)}),t("span",{style:{color:c.tm,fontSize:13},children:"›"})]})]}),
         t("div",{style:{fontSize:10.5,color:c.tm,marginTop:6,lineHeight:1.4},children:h.note}),
       ]})),
+      excludedTotal>0&&o("button",{onClick:()=>drill("Not taxable / excluded",excludedItems),className:"act98 trt w100 f ia jb",style:{padding:"11px 0",background:"transparent",border:"none",textAlign:"left",gap:10},children:[o("div",{children:[t("div",{style:{fontSize:13,color:c.td},children:"🚫 Not taxable / excluded"}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:"Reimbursements & refunds · not in gross income · tap to view"})]}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:c.tm},children:fm(excludedTotal,cur)})]}),
       o("div",{className:"f ia jb",style:{marginTop:12,paddingTop:12,borderTop:`2px solid ${c.brs}`},children:[t("span",{style:{fontSize:13,fontWeight:700,color:c.tx},children:"Gross total income"}),t("span",{style:{fontFamily:'var(--nf)',fontSize:15,fontWeight:700,color:c.gd},children:fm(headTotal,cur)})]}),
       t("div",{style:{fontSize:10.5,color:c.tm,marginTop:10,lineHeight:1.5,fontStyle:"italic"},children:"From your logged transactions — a planning aid, not tax advice. Reconcile with Form 16 / AIS / broker statements before filing."}),
     ]}),
+  ]);
+  const mapCats=ciAll().filter(cc=>cc.id!=="savings_deposit");
+  const mapCard=ccard("hmap","TAX-HEAD MAPPING",null,mapCats.length+" categories",[
+    t("div",{style:{fontSize:11.5,color:c.tm,marginBottom:10,lineHeight:1.5},children:"Every income category feeds one tax head. Suggestions are pre-picked from the category name — change any. Reimbursements and refunds should stay on “Not taxable / excluded”."}),
+    ...mapCats.map(cc=>o("div",{key:cc.id,className:"f ia jb",style:{gap:8,padding:"7px 0",borderBottom:`1px solid ${c.brs}`},children:[
+      t("span",{className:"tru",style:{fontSize:12.5,color:c.tx,flex:"0 0 40%",minWidth:0},children:cc.emoji+" "+cc.label}),
+      t("div",{style:{flex:1,minWidth:0},children:t(AsHeadPicker,{value:asHeadOf(cc,headMap),onChange:v=>saveAS({headMap:{...headMap,[cc.id]:v}})})})
+    ]}))
   ]);
   const dedCard=ccard("ded","DEDUCTIONS TRACKER",null,fm(dedTotal,cur),[
     t("div",{style:{fontSize:11.5,color:c.tm,marginBottom:12,lineHeight:1.5},children:"Manually track deductible spends toward their limits for "+label+"."}),
@@ -13071,7 +13112,10 @@ function AdvancedStats({data,persist,onClose,onTx,onFlt,initialBasis}){
     t(SH,{title:t("em",{children:"Advanced"}),onBack:onClose,right:t("div",{style:{width:38}})}),
     o("div",{style:{marginTop:4},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:10,letterSpacing:1.5,color:c.gd},children:"HNI · PREMIUM STATISTICS"}),o("div",{style:{fontFamily:c.hf,fontWeight:700,fontSize:30,lineHeight:1.1,marginTop:2},children:["the ",t("span",{style:{color:c.gd},children:"big"})," picture"]}),t("div",{style:{fontSize:12.5,color:c.tm,marginTop:6,lineHeight:1.5},children:basis==="FY"?"Financial year — an ITR-oriented view of income, deductions & planning.":basis==="PLAN"?"Year plan — prepare the whole calendar year: income, expenses & savings in one place.":"Calendar year — a personal-finance view of cashflow, savings & spending."})]}),
     o("div",{style:{marginTop:18,background:c.sfg,borderRadius:16,border:`1px solid ${c.brs}`,padding:14},children:[
-      t("div",{className:"f",style:{gap:4,padding:4,background:c.sf2,borderRadius:12,border:`1px solid ${c.brs}`},children:[[["FY","Financial Year"],["CY","Calendar Year"],["PLAN","Year Plan"]].map(([b,lbl])=>{const on=basis===b;return t("button",{key:b,onClick:()=>sBasis(b),className:"f1 tr",style:{padding:"9px 2px",background:on?c.ac:"transparent",color:on?"#0a0a0a":c.td,borderRadius:9,fontSize:11.5,fontWeight:on?700:500,border:"none",whiteSpace:"nowrap"},children:lbl})})]}),
+      o("div",{style:{position:"relative"},children:[
+        t("select",{value:basis,onChange:e=>sBasis(e.target.value),"aria-label":"Reporting basis",style:{width:"100%",boxSizing:"border-box",appearance:"none",WebkitAppearance:"none",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 40px 12px 14px",color:c.tx,fontSize:14,fontWeight:600,outline:"none",fontFamily:'var(--tf)'},children:[["CY","Calendar Year"],["FY","Financial Year"],["PLAN","Year Plan"]].map(([b,lbl])=>t("option",{key:b,value:b,children:lbl}))}),
+        t("span",{style:{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",pointerEvents:"none",color:c.tm,fontSize:12},children:"▾"})
+      ]}),
       t("div",{style:{textAlign:"center",fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,letterSpacing:.5,marginTop:8},children:basis==="FY"?"ITR MODE · TAX HEADS & DEDUCTIONS":basis==="PLAN"?"PLANNING MODE · INCOME, SPENDING & SAVINGS":"PERSONAL FINANCE MODE · CASHFLOW & SAVINGS"}),
       o("div",{className:"f ia jb",style:{marginTop:10,gap:10},children:[
         t("button",{onClick:()=>step(-1),className:"act95 trt",style:{width:40,height:40,borderRadius:11,background:c.sf2,border:`1px solid ${c.brs}`,color:c.tx,fontSize:18,flexShrink:0},children:"‹"}),
@@ -13084,7 +13128,7 @@ function AdvancedStats({data,persist,onClose,onTx,onFlt,initialBasis}){
     basis!=="PLAN"&&asTab==="overview"&&o(Fragment,{children:[
       overviewCard,
       exportCard,
-      ...(basis==="FY"?[itrCard,dedCard]:[cashflowCard,incSrcCard,spendCatCard,nwCard]),
+      ...(basis==="FY"?[itrCard,mapCard,dedCard]:[cashflowCard,incSrcCard,spendCatCard,nwCard]),
       planCard,
       manualCard,
       tagsCard,
@@ -14046,6 +14090,7 @@ function CatMgr({data,persist,onClose,onQuickProfile}){
   const[showForm,sShowForm]=useState(false);
   const[newLabel,sNewLabel]=useState("");
   const[newBl,sNewBl]=useState(undefined);
+  const[newHead,sNewHead]=useState(undefined);
   const[newEmoji,sNewEmoji]=useState("✨");
   const[showPicker,sShowPicker]=useState(false);
   const[emojiQ,sEmojiQ]=useState("");
@@ -14111,14 +14156,15 @@ function CatMgr({data,persist,onClose,onQuickProfile}){
   };
   const newBlSug=useMemo(()=>budSuggestLine(newLabel,tab,budLineGroups(data)),[newLabel,tab,data.calculators]);
   const newBlEff=newBl!==undefined?newBl:newBlSug;
+  const newHeadEff=newHead!==undefined?newHead:asHeadSuggest({label:newLabel});
   const addCat=()=>{
     if(!newLabel.trim())return;
     const nc={id:"custom_"+uid2(),label:newLabel.trim(),emoji:newEmoji||"✨",color:"#A39B8C",subs:["Other"]};
     const co2=data.categoryOrder||{};const tabK=isExp?"expense":"income";const newOrd=[...(co2[tabK]||[]),nc.id];
-    const blPatch=budLinkPatch(data,[[newBlEff,nc.id]]);
+    const blPatch={...budLinkPatch(data,[[newBlEff,nc.id]]),...(isExp?{}:{advStats:{...(data.advStats||{}),headMap:{...((data.advStats||{}).headMap||{}),[nc.id]:newHeadEff}}})};
     if(isExp)persist({customExpenseCategories:[...custom,nc],categoryOrder:{...co2,[tabK]:newOrd},...blPatch});
     else persist({customIncomeCategories:[...custom,nc],categoryOrder:{...co2,[tabK]:newOrd},...blPatch});
-    sNewBl(undefined);sNewLabel("");sNewEmoji("✨");sShowForm(false);sShowPicker(false);sEmojiQ("");
+    sNewBl(undefined);sNewHead(undefined);sNewLabel("");sNewEmoji("✨");sShowForm(false);sShowPicker(false);sEmojiQ("");
   };
   const delCustom=(id)=>{
     const co2=data.categoryOrder||{};
@@ -14198,6 +14244,10 @@ function CatMgr({data,persist,onClose,onQuickProfile}){
       o("div",{style:{marginTop:8},children:[
         t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1,marginBottom:6},children:"ADD TO WHICH BUDGET LINE?"}),
         t(BudLinePicker,{data,kind:tab,value:newBlEff,onChange:v=>sNewBl(v)})
+      ]}),
+      !isExp&&o("div",{style:{marginTop:8},children:[
+        t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1,marginBottom:6},children:"WHICH TAX HEAD? (ADVANCED)"}),
+        t(AsHeadPicker,{value:newHeadEff,onChange:v=>sNewHead(v)})
       ]}),
       o("div",{className:"g g2",style:{gap:8,marginTop:10},children:[
         t("button",{onClick:()=>{sShowForm(false);sShowPicker(false);sEmojiQ("")},className:"act95 trt",style:{padding:"10px 0",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,fontSize:13,color:c.tx},children:"Cancel"}),
