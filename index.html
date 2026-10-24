@@ -11812,7 +11812,7 @@ function loanFlexi(L,now){
   const r=(L.rate||0)/1200,start=lnDay(L.sanction||end);
   const ev=[{id:"init",date:start,kind:"draw",amount:L.principal||0},...(L.fxTxns||[]).map(x=>({...x,date:Math.max(start,lnDay(x.date))}))]
     .sort((a,b)=>a.date-b.date||(a.kind===b.kind?0:a.kind==="draw"?-1:1));
-  let P=0,U=0,charged=0,paidAmt=0,borrowed=0,accruing=0,nextCharge=null,pi=0;const cycles=[];
+  let P=0,U=0,charged=0,paidAmt=0,borrowed=0,accruing=0,nextCharge=null,pi=0;const cycles=[],ipay=[];
   for(let k=0;k<1200;k++){
     const cs=lnAddM(start,k),ce=lnAddM(start,k+1);if(cs>end)break;
     const len=Math.max(1,Math.round((ce-cs)/864e5));
@@ -11821,17 +11821,25 @@ function loanFlexi(L,now){
     const charge=()=>{const add=lnR2(accr-done);U=lnR2(U+add);charged=lnR2(charged+add);done=lnR2(done+add)};
     while(pi<ev.length&&ev[pi].date<ce&&ev[pi].date<=end){
       const e=ev[pi++];seg(e.date);
-      if(e.kind==="draw"){P=lnR2(P+e.amount);borrowed=lnR2(borrowed+e.amount);row.draw=lnR2(row.draw+e.amount)}
+      if(e.kind==="draw"){P=lnR2(P+e.amount);borrowed=lnR2(borrowed+e.amount);if(e.id==="init")row.open=P;else row.draw=lnR2(row.draw+e.amount)}
       else{
         if(e.settle)charge();
         let a=Math.min(e.amount,lnR2(P+U));const ti=Math.min(a,U);U=lnR2(U-ti);a=lnR2(a-ti);const tp=Math.min(a,P);P=lnR2(P-tp);
-        paidAmt=lnR2(paidAmt+ti+tp);row.paid=lnR2(row.paid+ti+tp);row.toInt=lnR2(row.toInt+ti);
+        paidAmt=lnR2(paidAmt+ti+tp);row.paid=lnR2(row.paid+ti+tp);row.toInt=lnR2(row.toInt+ti);if(ti>0)ipay.push({date:e.date,amt:ti});
       }
     }
     if(ce<=end){seg(ce);charge();row.interest=lnR2(accr);row.close=P;cycles.push(row)}
     else{seg(end);accruing=Math.max(0,lnR2(accr-done));row.interest=lnR2(accr);row.close=P;row.pending=true;cycles.push(row);nextCharge=ce;break}
   }
   const settled=!!L.closedAt;
+  let qi=0,left=ipay.length?ipay[0].amt:0;
+  const take=need=>{let got=0,last=0;while(need-got>0.005&&qi<ipay.length){const x=Math.min(left,need-got);got+=x;left-=x;last=ipay[qi].date;if(left<=0.005){qi++;left=qi<ipay.length?ipay[qi].amt:0}}return{got:lnR2(got),last}};
+  cycles.forEach(cy=>{
+    if(cy.pending){cy.st=settled?"ontime":"upcoming";cy.ipaid=settled?cy.interest:0;return}
+    if(cy.interest<=0.005){cy.st="none";cy.ipaid=0;return}
+    const r=take(cy.interest);cy.ipaid=r.got;
+    cy.st=r.got>=cy.interest-0.005?(r.last<=cy.to?"ontime":"delayed"):r.got>0.005?"partial":(end>cy.to?"overdue":"upcoming");
+  });
   return{P:settled?0:P,U:settled?0:U,accruing:settled?0:accruing,totalDue:settled?0:lnR2(P+U+accruing),charged,interestTotal:lnR2(charged+accruing),paidAmt,borrowed,cycles,nextCharge,monthlyInt:lnR2(P*r)};
 }
 // Everything the UI needs about one loan at a point in time.
@@ -11942,7 +11950,7 @@ function lnMakeExpense(data,L,amount,payWith,dateTs,note){
 function LnWizard({kind,data,onSave,onCancel}){
   const K=LOAN_KINDS[kind],isOD=kind==="od",isF=kind==="friends",isFx=kind==="flexi",noE=isOD||isFx;
   const[step,sStep]=useState(0);
-  const[f,sF]=useState({lender:"",purpose:"",desc:"",dir:"borrowed",amount:"",rate:"",tenure:"",sanction:lnYMD(Date.now()),start:lnYMD(lnAddM(Date.now(),1)),emi:"",used:""});
+  const[f,sF]=useState({lender:"",purpose:"",desc:"",dir:"borrowed",amount:"",rate:"",tenure:"",sanction:lnYMD(Date.now()),start:lnYMD(lnAddM(Date.now(),1)),emi:"",used:"",markPaid:false});
   const[tried,sTried]=useState(false);
   const up=p=>sF(x=>({...x,...p}));
   const num=s=>parseFloat(String(s).replace(/,/g,""));
@@ -11952,6 +11960,7 @@ function LnWizard({kind,data,onSave,onCancel}){
   const sTs=lnFromYMD(f.sanction),eTs=lnFromYMD(f.start);
   const e2=!sTs?"Pick the sanction date":(!noE&&!eTs)?"Pick the EMI start date":(!noE&&eTs<=sTs)?"EMI start date must be after sanction date":(f.emi!==""&&!(num(f.emi)>0))?"Enter a valid EMI amount":(!noE&&f.emi!==""&&num(f.emi)<=num(f.amount)*(num(f.rate)||0)/1200+0.005)?"EMI must be more than the first month's interest ("+fm(num(f.amount)*(num(f.rate)||0)/1200,data.currency)+")":null;
   const errs=[e0,e1,e2];
+  const fxPast=isFx&&sTs&&num(f.amount)>0?loanFlexi({principal:num(f.amount),rate:num(f.rate)||0,sanction:sTs,fxTxns:[]}).cycles.filter(cy=>!cy.pending&&cy.interest>0.005):[];
   const autoEmi=!noE&&num(f.amount)>0&&num(f.tenure)>=1?lnEmi(num(f.amount),num(f.tenure),num(f.rate)||0):null;
   const next=()=>{sTried(true);if(errs[step])return;sTried(false);sStep(step+1)};
   const create=()=>{
@@ -11959,7 +11968,8 @@ function LnWizard({kind,data,onSave,onCancel}){
     const base={id:"ln_"+uid(),kind,lender:f.lender.trim(),purpose:f.purpose.trim(),desc:f.desc.trim(),direction:isF?f.dir:"borrowed",sanction:sTs,loanNo:"#"+new Date().getFullYear()+String(Math.floor(Math.random()*1e8)).padStart(8,"0"),charges:0,remindDays:2,payments:[],prepayments:[],odTxns:[],docs:[],createdAt:Date.now()};
     let L;
     if(isOD)L={...base,principal:num(f.used)||0,limit:num(f.amount),rate:num(f.rate)||0,tenure:0,emiStart:null,emi:0,emiManual:false};
-    else if(isFx)L={...base,principal:num(f.amount),rate:num(f.rate)||0,tenure:0,emiStart:null,emi:0,emiManual:false,fxTxns:[]};
+    else if(isFx){L={...base,principal:num(f.amount),rate:num(f.rate)||0,tenure:0,emiStart:null,emi:0,emiManual:false,fxTxns:[]};
+      if(f.markPaid)L.fxTxns=loanFlexi(L).cycles.filter(cy=>!cy.pending&&cy.interest>0.005).map(cy=>({id:"fx_"+uid(),date:cy.to,amount:cy.interest,kind:"repay",note:"Interest · marked paid when the loan was added"}))}
     else{L={...base,principal:num(f.amount),rate:num(f.rate)||0,tenure:num(f.tenure),emiStart:eTs,emi:f.emi!==""?num(f.emi):0,emiManual:f.emi!==""};L.payments=loanAutoPay(L)}
     onSave(L);
   };
@@ -11992,6 +12002,7 @@ function LnWizard({kind,data,onSave,onCancel}){
       fld(isOD?"START DATE":isFx?"DISBURSAL DATE":"SANCTION DATE","sanction","",{type:"date"}),
       !noE&&fld("EMI START DATE","start","",{type:"date"}),
       !noE&&fld("MONTHLY EMI AMOUNT (OPTIONAL)","emi",autoEmi!=null?"Auto: "+fm(autoEmi,cur):"Auto-calculated",{prefix:cur,num:true,inputMode:"decimal",hint:"Leave blank to calculate it from amount, rate and tenure."}),
+      isFx&&fxPast.length>0&&lnToggle(f.markPaid,()=>up({markPaid:!f.markPaid}),`Mark ${fxPast.length} month${fxPast.length===1?"":"s"} of interest as already paid`,`${fm(fxPast.reduce((a,cy)=>a+cy.interest,0),cur)} was charged since the start date. Leave off to record payments yourself in Payment History.`),
       !noE&&o("div",{style:{background:c.sk+"18",border:`1px solid ${c.sk}40`,borderRadius:10,padding:"9px 12px",fontSize:11.5,color:c.td,marginBottom:12},children:"ℹ️ EMIs till date will be marked as paid automatically."}),
       err,
       o("div",{className:"f",style:{gap:10},children:[lnBtn("Back",()=>sStep(1)),lnBtn("Create Loan",create,true)]})
@@ -12290,7 +12301,7 @@ function LnDetail({L,data,persist,onBack,initTab}){
   const doOd=(tx)=>{upd({odTxns:[tx,...(L.odTxns||[])],principal:Math.max(0,lnR2((L.principal||0)+(tx.kind==="draw"?tx.amount:-tx.amount)))});sSheet(null)};
   const delPre=(id)=>{const p=(L.prepayments||[]).find(x=>x.id===id);upd({prepayments:(L.prepayments||[]).filter(x=>x.id!==id)},p&&p.expenseId?{expenses:(data.expenses||[]).filter(e=>e.id!==p.expenseId)}:{})};
   const kv=(k,v,key)=>o("div",{key:key||k,className:"f jb",style:{padding:"9px 0",borderBottom:`1px solid ${c.brs}`,gap:12},children:[t("span",{style:{fontSize:13,color:c.td},children:k}),t("span",{style:{fontSize:13,color:c.tx,textAlign:"right"},children:v})]});
-  const tabs=[["details","Loan Details"],["reinvest","Reinvestments"],["history",isFx?"Interest Statement":"Payment History"],["docs","Documents"],["activity","Loan Activity"]].filter(([k])=>!(isOD&&k==="history")&&!(lent&&k==="reinvest"));
+  const tabs=[["details","Loan Details"],["reinvest","Reinvestments"],["history","Payment History"],["docs","Documents"],["activity","Loan Activity"]].filter(([k])=>!(isOD&&k==="history")&&!(lent&&k==="reinvest"));
   // ---- reinvestments (holdings in data.investments with loanId === L.id) ----
   const ri=riLoanSummary(data,L);
   const invs=data.investments||[];
@@ -12328,15 +12339,35 @@ function LnDetail({L,data,persist,onBack,initTab}){
     isOD&&kv("OD limit",fm(L.limit||0,cur)),isOD&&kv("Interest this month (est.)",fm(st.monthlyInt,cur)),
     kv("Reminder",noEmi||lent?"—":(L.remindDays>0?L.remindDays+" day(s) before":"Off"))
   ].filter(Boolean));
-  const histTab=isFx?lnCard([
-    t("div",{key:"t",style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx,marginBottom:4},children:"Monthly interest statement"}),
-    t("div",{key:"s",style:{fontSize:11.5,color:c.tm,marginBottom:10,lineHeight:1.45},children:"Interest = principal owed × rate ÷ 12, weighted by days in each monthly cycle. It is charged at the end of the cycle and is never added to the principal."}),
-    fx.cycles.length===0&&t("div",{key:"n",style:{fontSize:12.5,color:c.tm,padding:"8px 0"},children:"No cycles yet."}),
-    fx.cycles.length>0&&t("div",{key:"x",style:{overflowX:"auto",WebkitOverflowScrolling:"touch"},children:o("table",{style:{width:"100%",minWidth:0,borderCollapse:"collapse",fontSize:11.5},children:[
-      t("thead",{children:o("tr",{children:["Cycle ends","Principal","Interest","Paid"].map((h,i)=>t("th",{key:h,style:{textAlign:i?"right":"left",padding:"6px 6px",color:c.tm,fontWeight:500,fontFamily:'var(--nf)',fontSize:9.5,letterSpacing:.5,borderBottom:`1px solid ${c.brs}`},children:h.toUpperCase()}))})}),
-      t("tbody",{children:[...fx.cycles].reverse().map(r=>o("tr",{key:r.n,children:[o("td",{style:{padding:"7px 6px",color:r.pending?c.gd:c.td},children:[lnFmtD(r.to),r.pending&&t("div",{style:{fontSize:10,color:c.gd},children:"accruing"})]}),t("td",{style:{padding:"7px 6px",textAlign:"right",color:c.tx},children:fm(r.close,cur).replace(cur,"")}),t("td",{style:{padding:"7px 6px",textAlign:"right",color:r.pending?c.gd:c.td},children:fm(r.interest,cur).replace(cur,"")}),t("td",{style:{padding:"7px 6px",textAlign:"right",color:r.paid?c.mt:c.tm},children:r.paid?fm(r.paid,cur).replace(cur,""):"—"})]}))})
-    ]})})
-  ]):(()=>{
+  const histTab=isFx?(()=>{
+    const cyc=fx.cycles,MN=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const stc=x=>x==="partial"?c.sk:x==="none"?c.tm:LN_ST[x].c(),stl=x=>x==="partial"?"Partly paid":x==="none"?"No interest":LN_ST[x].l;
+    const months=Array.from({length:12},(_,m)=>{const r=cyc.find(q=>{const d=new Date(q.to);return d.getFullYear()===yr&&d.getMonth()===m});return r?{r,s:r.st}:null});
+    const yrRows=cyc.filter(q=>new Date(q.to).getFullYear()===yr);
+    const charged=lnR2(cyc.filter(q=>!q.pending).reduce((a,q)=>a+q.interest,0)),paidI=lnR2(cyc.filter(q=>!q.pending).reduce((a,q)=>a+q.ipaid,0));
+    const markPaid=(q)=>{const rem=lnR2(q.interest-q.ipaid);if(rem>0)doFx({id:"fx_"+uid(),date:q.to,amount:rem,kind:"repay",note:"Interest for "+MN[new Date(q.to-864e5).getMonth()]+" "+new Date(q.to-864e5).getFullYear()},null)};
+    return o(Fragment,{children:[
+      lnCard([
+        o("div",{key:"s",className:"f jb",style:{gap:8},children:[
+          o("div",{className:"tl",children:[t("div",{style:{fontSize:11,color:c.tm},children:"Interest charged"}),t("div",{style:{fontFamily:'var(--nf)',fontSize:15,color:c.tx,marginTop:2},children:fm(charged,cur)})]}),
+          o("div",{className:"tl",children:[t("div",{style:{fontSize:11,color:c.tm},children:"Interest paid"}),t("div",{style:{fontFamily:'var(--nf)',fontSize:15,color:c.mt,marginTop:2},children:fm(paidI,cur)})]}),
+          o("div",{className:"tr",style:{textAlign:"right"},children:[t("div",{style:{fontSize:11,color:c.tm},children:"Interest unpaid"}),t("div",{style:{fontFamily:'var(--nf)',fontSize:15,color:fx.U>0.005?c.ro:c.tx,marginTop:2},children:fm(fx.U,cur)})]})
+        ]})
+      ]),
+      lnCard([
+        o("div",{key:"h",className:"f ia jb",style:{marginBottom:14},children:[t("button",{onClick:()=>sYr(y=>y-1),className:"act90 trt",style:{background:"transparent",border:"none",color:c.td,fontSize:18,padding:"0 10px"},children:"‹"}),t("span",{style:{fontFamily:'var(--nf)',fontSize:14,color:c.tx},children:String(yr)}),t("button",{onClick:()=>sYr(y=>y+1),className:"act90 trt",style:{background:"transparent",border:"none",color:c.td,fontSize:18,padding:"0 10px"},children:"›"})]}),
+        t("div",{key:"g",style:{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:"14px 4px",textAlign:"center"},children:months.map((m,i)=>o("div",{key:i,children:[t("div",{style:{width:16,height:16,borderRadius:8,margin:"0 auto 4px",background:m&&(m.s==="ontime"||m.s==="delayed"||m.s==="partial")?stc(m.s):"transparent",border:m?`2px solid ${stc(m.s)}`:`2px solid ${c.brs}`,opacity:m?1:.5}}),t("div",{style:{fontSize:11,color:c.td},children:MN[i]})]}))}),
+        o("div",{key:"l",className:"f ia jc fw",style:{gap:12,marginTop:16,fontSize:11,color:c.tm},children:["ontime","delayed","partial","overdue"].map(k=>o("span",{key:k,className:"f ia",style:{gap:5},children:[t("span",{style:{width:9,height:9,borderRadius:5,background:k==="overdue"?"transparent":stc(k),border:`2px solid ${stc(k)}`}}),stl(k)]}))})
+      ]),
+      yrRows.length>0&&lnCard(yrRows.map((q,i)=>{const pend=q.pending,rem=lnR2(q.interest-q.ipaid),per=new Date(q.to-864e5);
+        return o("div",{key:q.n,className:"f ia jb",style:{padding:"9px 0",borderBottom:i===yrRows.length-1?"none":`1px solid ${c.brs}`,gap:8},children:[
+          o("div",{className:"tl",children:[t("div",{style:{fontSize:13,color:c.tx},children:`${MN[per.getMonth()]} ${per.getFullYear()} · ${pend?"charges on":"due"} ${lnFmtD(q.to)}`}),t("div",{style:{fontSize:11,color:pend?c.td:stc(q.st)},children:(pend?"Accruing":stl(q.st))+(q.st==="partial"?` · ${fm(q.ipaid,cur)} paid`:"")+(q.draw>0?` · +${fm(q.draw,cur)} drawn`:"")}),t("div",{style:{fontSize:10.5,color:c.tm},children:`Principal ${fm(q.open,cur)} → ${fm(q.close,cur)}`+(q.paid>0?` · repaid ${fm(q.paid,cur)}`:"")})]}),
+          o("div",{className:"f ia",style:{gap:8},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:pend?c.gd:c.tx},children:fm(q.interest,cur)}),
+            !pend&&!st.closed&&rem>0.005&&t("button",{onClick:()=>markPaid(q),className:"act95 trt",style:{background:c.ac+"22",border:`1px solid ${c.ac}`,borderRadius:8,color:c.tx,fontSize:11,padding:"4px 8px"},children:lent?"Received":"Mark paid"})]})]})})),
+      yrRows.length===0&&t("div",{style:{textAlign:"center",color:c.tm,fontSize:12.5,padding:"8px 0"},children:"No interest cycles fall in "+yr}),
+      t("div",{style:{fontSize:10.5,color:c.tm,textAlign:"center",marginBottom:8,lineHeight:1.45},children:"Interest = principal owed × rate ÷ 12, weighted by days, charged at the end of each monthly cycle and never added to the principal. Mark paid records an interest payment dated on the due date."})
+    ]});
+  })():(()=>{
     const months=Array.from({length:12},(_,m)=>{const r=st.rows.find(x=>{const d=new Date(x.due);return d.getFullYear()===yr&&d.getMonth()===m});return r?{r,s:lnPayStatus(L,r,pays.get(r.n))}:null});
     const yrRows=st.rows.filter(x=>new Date(x.due).getFullYear()===yr);
     return o(Fragment,{children:[
