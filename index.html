@@ -2280,7 +2280,7 @@ function App(){
     o("div",{className:"r w100",style:{maxWidth:AW,flex:1,minHeight:0,background:c.bg,overflow:"hidden",display:"flex",flexDirection:"column"},children:[
       o("div",{key:"vw-"+v,ref:scrollRef,className:vwCls,style:{paddingBottom:"calc(70px + (env(safe-area-inset-bottom) * 0.0625))",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
         v==="home"&&t(Home,{data:dv,persist:pst,onTx:sAtx,onView:sV,onSetBudget:b=>pst({budget:b}),onFlt:sFlt,onUseProfile:p=>sProfToUse(p),onTour:()=>sShowTour(true),onAddExpenses:aEMany}),
-        v==="calendar"&&t(Calend,{data:dv,onTx:sAtx,onFlt:sFlt,presetAdd:(ts,k)=>{window.__pd=ts;window.__pt=k||"expense";sV("add")},onExplore:(y,m)=>{window.__emYr=y;window.__emMo=m;navFromRef.current="calendar";sV("exploreMonth")}}),
+        v==="calendar"&&t(Calend,{data:dv,onTx:sAtx,onFlt:sFlt,onDiary:()=>{navFromRef.current="calendar";sV("diary")},presetAdd:(ts,k)=>{window.__pd=ts;window.__pt=k||"expense";sV("add")},onExplore:(y,m)=>{window.__emYr=y;window.__emMo=m;navFromRef.current="calendar";sV("exploreMonth")}}),
         v==="exploreMonth"&&t(MonthTools,{data:dv,yr:window.__emYr??new Date().getFullYear(),mo:window.__emMo??new Date().getMonth(),onTx:sAtx,onFlt:sFlt,onClose:()=>sV(navFromRef.current||"calendar")}),
         v==="stats"&&t(Stats,{data:dv,onTx:sAtx,onView:(id)=>{navFromRef.current="stats";sV(id)},onFlt:sFlt,persist:pst,onReimburse:(e)=>sReimbT(e),onUnreimburse:unReimburse}),
         v==="calculators"&&t(CalculatorsScreen,{data:dv,persist:pst,onView:(id)=>{navFromRef.current="calculators";sV(id)}}),
@@ -7164,7 +7164,7 @@ function PriceWatchLog({data,onClose}){
     ]})
   ]});
 }
-function Calend({data,onTx,onFlt,presetAdd,onExplore}){const{expenses,currency}=data;const[yr,sYr]=useState(()=>_calState.yr??new Date().getFullYear()),[mo,sMo]=useState(()=>_calState.mo??new Date().getMonth()),[sel,sSel]=useState(()=>_calState.sel||new Date().toDateString());const[cf,sCf]=useState(()=>_calState.cf||"all");const[cThr,sCThr]=useState([]);const[thrSht,sThrSht]=useState(false);const[cSub,sCSub]=useState(()=>_calState.cSub??null);const[gnOpen,sGnOpen]=useState(false);
+function Calend({data,onTx,onFlt,presetAdd,onExplore,onDiary}){const{expenses,currency}=data;const[yr,sYr]=useState(()=>_calState.yr??new Date().getFullYear()),[mo,sMo]=useState(()=>_calState.mo??new Date().getMonth()),[sel,sSel]=useState(()=>_calState.sel||new Date().toDateString());const[cf,sCf]=useState(()=>_calState.cf||"all");const[cThr,sCThr]=useState([]);const[thrSht,sThrSht]=useState(false);const[cSub,sCSub]=useState(()=>_calState.cSub??null);const[gnOpen,sGnOpen]=useState(false);
   useEffect(()=>{_calState={yr,mo,sel,cf,cSub}},[yr,mo,sel,cf,cSub]);
   const days=useMemo(()=>{const fd=new Date(yr,mo,1).getDay(),la=new Date(yr,mo+1,0).getDate(),x=[];for(let i=fd-1;i>=0;i--)x.push({date:new Date(yr,mo,-i),other:true});for(let d=1;d<=la;d++)x.push({date:new Date(yr,mo,d),other:false});while(x.length<42){const l=x[x.length-1].date,n=new Date(l);n.setDate(l.getDate()+1);x.push({date:n,other:true})}return x},[yr,mo]);
   const byD=useMemo(()=>{const pairs=txPairs(expenses);const m={};for(const e of expenses){if(e.type==="transfer-in")continue;const k=new Date(e.date).toDateString();if(!m[k])m[k]={total:0,income:0,items:[]};if(e.type==="expense"||e.type==="card-payment")m[k].total+=netAmt(e);else if(e.type==="income")m[k].income+=e.amount;m[k].items.push(enrichTx(e,pairs))}return m},[expenses]);
@@ -7176,7 +7176,7 @@ function Calend({data,onTx,onFlt,presetAdd,onExplore}){const{expenses,currency}=
   //   • Card bill pay: built-in Card Pay (card-payment) entries + expenses tagged
   //     with a "Credit card bill" category (both settle a card already counted).
   //   • Reimbursed: the reimbursed portion of any remaining expense.
-  const gn=useMemo(()=>{let gross=0,ccbill=0,reimb=0,pend=0;for(const e of expenses){const dt=new Date(e.date);if(dt.getFullYear()!==yr||dt.getMonth()!==mo)continue;if(e.type==="card-payment"){gross+=e.amount;ccbill+=e.amount;continue;}if(e.type!=="expense")continue;gross+=e.amount;if(isCcBill(e)){ccbill+=e.amount;continue;}reimb+=rbAmt(e);if(e.reimbursable&&!e.reimbursedBy)pend+=e.amount;}return{gross,ccbill,reimb,pend,net:Math.max(0,gross-ccbill-reimb)};},[expenses,yr,mo]);
+  const gn=useMemo(()=>{let gross=0,ccbill=0,reimb=0,pend=0,lent=0;for(const e of expenses){const dt=new Date(e.date);if(dt.getFullYear()!==yr||dt.getMonth()!==mo)continue;if(e.type==="card-payment"){gross+=e.amount;ccbill+=e.amount;continue;}if(e.type!=="expense")continue;gross+=e.amount;if(isCcBill(e)){ccbill+=e.amount;continue;}reimb+=rbAmt(e);lent+=lentAmt(e);if(e.reimbursable&&!e.reimbursedBy)pend+=e.amount;}return{gross,ccbill,reimb,pend,lent,net:Math.max(0,gross-ccbill-reimb-lent)};},[expenses,yr,mo]);
   const tod=new Date().toDateString(),cl=fByD[sel],its=cl?.items||[],sp=cl?.total||0,inc=cl?.income||0,mn=new Date(yr,mo).toLocaleDateString("en-US",{month:"long",year:"numeric"}),selTs=useMemo(()=>{const d=new Date(sel);d.setHours(12,0,0,0);return d.getTime()},[sel]);
   const filterLabel=cf==="all"?"All":cf==="income"?"Income":cf==="expense"?"Expense":cf==="cards"?(cSub?(((data.cards||[]).find(x=>x.id===cSub)||{}).name||"Card"):"All cards"):cf==="accounts"?(cSub?(((data.accounts||[]).find(x=>x.id===cSub)||{}).name||"Account"):"All accounts"):cf==="reimbursable"?(cSub==="pending"?"To be reimbursed":cSub==="done"?"Reimbursed":"Reimbursable"):cf==="cardpay"?"Card Payments":cf==="stmt"?"Statement imports":"All";
 return o("div",{style:{padding:`8px ${GUT}px 48px`},className:"st",children:[
@@ -7186,7 +7186,7 @@ return o("div",{style:{padding:`8px ${GUT}px 48px`},className:"st",children:[
     o("div",{className:"trg",style:{flexShrink:0},children:[mst.total>0&&t("div",{style:{fontFamily:'var(--nf)',fontSize:15,fontWeight:600,color:c.co},children:"−"+fm(mst.total,currency)}),mst.income>0&&t("div",{style:{fontFamily:'var(--nf)',fontSize:15,fontWeight:600,color:c.mt,marginTop:mst.total>0?2:0},children:"+"+fm(mst.income,currency)}),mst.total===0&&mst.income===0&&t("div",{style:{fontFamily:'var(--nf)',fontSize:15,color:c.tm},children:fm(0,currency)})]})
   ]})}),
   cf==="all"&&(gn.gross>0||gn.net>0)&&(()=>{
-    const hasBreak=gn.ccbill>0||gn.reimb>0||gn.pend>0;
+    const hasBreak=gn.ccbill>0||gn.reimb>0||gn.pend>0||gn.lent>0;
     const row=(lbl,val,col)=>o("div",{className:"f ia jb",children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:10.5,color:c.tm,letterSpacing:.4},children:lbl}),t("span",{style:{fontFamily:'var(--nf)',fontSize:12.5,fontWeight:600,color:col},children:val})]});
     return o("div",{style:{marginTop:8},children:t("button",{onClick:()=>{if(hasBreak)sGnOpen(v=>!v)},className:"w100 tl act95",style:{display:"block",background:`linear-gradient(135deg,${c.mt}14,${c.sfg})`,border:`1px solid ${c.mt}44`,borderRadius:14,padding:"12px 14px",cursor:hasBreak?"pointer":"default"},children:o("div",{children:[
       o("div",{className:"f ia jb",children:[
@@ -7198,6 +7198,7 @@ return o("div",{style:{padding:`8px ${GUT}px 48px`},className:"st",children:[
         row("Gross expense",fm(gn.gross,currency),c.tx),
         gn.ccbill>0&&row("💳 − Card bill pay","−"+fm(gn.ccbill,currency),c.co),
         gn.reimb>0&&row("↩️ − Reimbursed","−"+fm(gn.reimb,currency),c.co),
+        gn.lent>0&&(onDiary?t("span",{role:"button",tabIndex:0,onClick:e=>{e.stopPropagation();onDiary()},onKeyDown:e=>{if(e.key==="Enter"){e.stopPropagation();onDiary()}},style:{display:"block",cursor:"pointer"},title:"Open the Lending Diary",children:row("🤝 − Lent to others ›","−"+fm(gn.lent,currency),c.co)}):row("🤝 − Lent to others","−"+fm(gn.lent,currency),c.co)),
         gn.pend>0&&o("div",{children:[
           row("🕓 To be reimbursed",fm(gn.pend,currency),c.tm),
           t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,marginTop:3,letterSpacing:.3,opacity:.8},children:"Owed back — not deducted from net"}),
