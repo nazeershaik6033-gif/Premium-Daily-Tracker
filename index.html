@@ -3372,6 +3372,137 @@ function Wrapped({data,onClose}){
 }
 
 // === DEBT DESTROYER ===
+// === LAS PLEDGE RECEIPTS — parsing, merging and comparing receipts read by AI ===
+// A receipt = one photo: its date, what kind of document it is, and the scrips on it.
+//   holding: {id,name,value,isin?,qty?,price?,haircut?,collateral?,pledgedOn?,receiptId?}
+//   L.receipts: [{id,date,kind,source,rows,total,collateral,photoId|data,fileName,createdAt}]
+const LAS_KINDS={pledge:"Pledge",unpledge:"Unpledge",holdings:"Holdings"};
+const lasNum=x=>{const n=parseFloat(String(x==null?"":x).replace(/[^0-9.\-]/g,""));return isFinite(n)?n:null};
+const lasR2=x=>Math.round((Number(x)||0)*100)/100;
+// Defensive: model output is never trusted. Bad dates become null, impossible haircuts are dropped, duplicate rows merged.
+function lasParseReceipt(j){
+  j=j&&typeof j==="object"?j:{};
+  let date=null;const m=String(j.date||"").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m){const ts=new Date(+m[1],+m[2]-1,+m[3]).getTime();if(ts>new Date(2005,0,1).getTime()&&ts<=Date.now()+2*864e5)date=ts}
+  const kind=LAS_KINDS[j.kind]?j.kind:"pledge",rows=[],seen=new Set();
+  for(const it of Array.isArray(j.holdings)?j.holdings:[]){
+    if(!it)continue;const name=String(it.name||"").trim().slice(0,60);if(!name)continue;
+    const qty=lasNum(it.qty),price=lasNum(it.price);let value=lasNum(it.value),hc=lasNum(it.haircut),col=lasNum(it.collateral);
+    if(hc!=null&&(hc<0||hc>100))hc=null;
+    if(!(value>0)&&qty>0&&price>0)value=qty*price;
+    if(!(value>0)&&col>0)value=hc!=null&&hc<100?col/(1-hc/100):col;
+    if(!(value>0)&&kind!=="unpledge")continue;
+    if(!(col>0)&&hc!=null&&value>0)col=value*(1-hc/100);
+    const isin=String(it.isin||"").trim().toUpperCase(),nk=name.toLowerCase();
+    if(seen.has(nk)||(isin&&seen.has(isin)))continue;seen.add(nk);if(isin)seen.add(isin);
+    rows.push({name,isin:/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isin)?isin:null,qty:qty>0?qty:null,price:price>0?price:null,value:value>0?lasR2(value):0,haircut:hc,collateral:col>0?lasR2(col):null});
+  }
+  return{date,kind,source:String(j.source||"").trim().slice(0,40)||null,rows,total:lasNum(j.total),note:String(j.note||"").trim().slice(0,160)||null};
+}
+// Applies reviewed drafts (oldest first, so the newest photo wins) to the holdings list.
+// A scrip is matched by ISIN, else by name. "full" treats the receipts as the complete picture and drops the rest.
+function lasMerge(holdings,drafts,full){
+  let list=holdings.map(h=>({...h}));const st={added:0,updated:0,removed:0},touched=new Set();
+  const find=r=>list.findIndex(h=>(r.isin&&h.isin===r.isin)||String(h.name).toLowerCase()===r.name.toLowerCase());
+  for(const d of [...drafts].sort((a,b)=>a.date-b.date)){
+    for(const r of d.rows.filter(x=>x.on!==false)){
+      const i=find(r);
+      if(d.kind==="unpledge"){if(i>=0){list.splice(i,1);st.removed++}continue}
+      const patch={value:r.value,pledgedOn:d.date,receiptId:d.id};
+      for(const k of["isin","qty","price","haircut","collateral"])if(r[k]!=null)patch[k]=r[k];
+      if(i>=0){list[i]={...list[i],...patch};st.updated++;touched.add(list[i].id)}
+      else{const id="lash_"+uid();list.push({id,name:r.name,...patch});st.added++;touched.add(id)}
+    }
+  }
+  if(full&&drafts.some(d=>d.kind!=="unpledge")){const before=list.length;list=list.filter(h=>touched.has(h.id));st.removed+=before-list.length}
+  return{holdings:list,...st};
+}
+const lasTotals=rows=>({total:lasR2(rows.reduce((a,r)=>a+(r.value||0),0)),collateral:lasR2(rows.reduce((a,r)=>a+(r.collateral!=null?r.collateral:(r.haircut!=null?r.value*(1-r.haircut/100):0)),0))});
+// What changed since the previous pledge/holdings receipt: value moved, scrips added or dropped.
+function lasDelta(prev,cur){
+  if(!prev||!cur)return null;
+  const k=r=>(r.isin||r.name).toLowerCase(),pm=new Map(prev.rows.map(r=>[k(r),r])),cm=new Map(cur.rows.map(r=>[k(r),r]));
+  return{dv:lasR2(cur.total-prev.total),added:cur.rows.filter(r=>!pm.has(k(r))).map(r=>r.name),dropped:prev.rows.filter(r=>!cm.has(k(r))).map(r=>r.name),days:Math.round((cur.date-prev.date)/864e5)};
+}
+// Quick facts across the current holdings: collateral, average haircut, concentration, oldest pledge.
+function lasInsights(holdings){
+  const tot=holdings.reduce((a,h)=>a+(Number(h.value)||0),0);if(!(tot>0))return null;
+  const colOf=h=>h.collateral!=null?h.collateral:(h.haircut!=null?h.value*(1-h.haircut/100):null);
+  const withHc=holdings.filter(h=>colOf(h)!=null),colTot=withHc.reduce((a,h)=>a+colOf(h),0),valHc=withHc.reduce((a,h)=>a+h.value,0);
+  const top=[...holdings].sort((a,b)=>b.value-a.value).slice(0,3).map(h=>({name:h.name,pct:h.value/tot*100}));
+  const dated=holdings.filter(h=>h.pledgedOn),oldest=dated.length?dated.reduce((a,h)=>h.pledgedOn<a.pledgedOn?h:a):null;
+  return{tot,n:holdings.length,collateral:withHc.length?lasR2(colTot):null,avgHaircut:valHc>0&&withHc.length?lasR2((1-colTot/valHc)*100):null,top,topPct:top.reduce((a,x)=>a+x.pct,0),oldest};
+}
+
+// --- review what the AI read from each photo before anything is saved ---
+function LasReview({drafts:init,holdings,cur,onConfirm,onClose}){
+  const[ds,sDs]=useState(init);const[full,sFull]=useState(false);
+  const setD=(i,p)=>sDs(l=>l.map((d,j)=>j===i?{...d,...p}:d));
+  const setR=(i,k,p)=>sDs(l=>l.map((d,j)=>j===i?{...d,rows:d.rows.map((r,q)=>q===k?{...r,...p}:r)}:d));
+  const known=r=>holdings.find(h=>(r.isin&&h.isin===r.isin)||String(h.name).toLowerCase()===r.name.toLowerCase());
+  const live=ds.filter(d=>d.rows.length);
+  const m=lasMerge(holdings,live.map(d=>({...d,date:d.date||Date.now()})),full);
+  const nOn=live.reduce((a,d)=>a+d.rows.filter(r=>r.on!==false).length,0);
+  const inS={background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:9,padding:"8px 10px",color:c.tx,fontSize:12.5,outline:"none",fontFamily:'var(--nf)'};
+  const chip=(on,l,fn,col)=>t("button",{onClick:fn,className:"act95 trt",style:{padding:"5px 10px",borderRadius:999,fontSize:11.5,background:on?(col||c.ac)+"26":c.sf2,border:`1px solid ${on?(col||c.ac):c.brs}`,color:on?c.tx:c.td},children:l});
+  return t(Sht,{onClose,children:o(Fragment,{children:[
+    lnSheetTitle("Review pledge receipts",`${ds.length} photo${ds.length===1?"":"s"} read. Check the dates and scrips — nothing is saved until you confirm.`),
+    ...ds.map((d,i)=>{const tt=lasTotals(d.rows.filter(r=>r.on!==false));return o("div",{key:d.id,style:{background:c.sf2,borderRadius:14,padding:12,marginBottom:12},children:[
+      o("div",{className:"f",style:{gap:10},children:[
+        d.thumb&&t("img",{src:d.thumb,alt:"Receipt photo "+(i+1),style:{width:54,height:70,objectFit:"cover",borderRadius:8,border:`1px solid ${c.brs}`,flexShrink:0}}),
+        o("div",{className:"f1 minw0",children:[
+          o("div",{className:"f ia jb",style:{gap:8},children:[t("div",{style:{fontSize:13,color:c.tx,fontWeight:600},children:"Photo "+(i+1)+(d.source?" · "+d.source:"")}),t("span",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.td},children:fm(tt.total,cur)})]}),
+          o("div",{className:"f fw",style:{gap:5,margin:"7px 0"},children:Object.entries(LAS_KINDS).map(([k,l])=>chip(d.kind===k,l,()=>setD(i,{kind:k}),k==="unpledge"?c.ro:c.mt))}),
+          o("div",{className:"f ia",style:{gap:8},children:[t("input",{type:"date",value:d.date?lnYMD(d.date):"",onChange:e=>setD(i,{date:lnFromYMD(e.target.value),dateGuess:false}),style:{...inS,colorScheme:c.dk?"dark":"light",flex:1,minWidth:0}}),t("span",{style:{fontSize:10.5,color:d.dateGuess?c.gd:c.mt,flexShrink:0},children:d.dateGuess?"not on photo · file date":"✓ read from photo"})]})]})]}),
+      d.note&&t("div",{style:{fontSize:11,color:c.tm,marginTop:8,lineHeight:1.4},children:"ℹ️ "+d.note}),
+      !d.rows.length&&t("div",{style:{fontSize:12,color:c.co,marginTop:8},children:d.err||"No securities found in this photo."}),
+      ...d.rows.map((r,k)=>{const h=known(r),on=r.on!==false,unp=d.kind==="unpledge";return o("div",{key:k,className:"f ia",style:{gap:9,padding:"9px 0",borderTop:`1px solid ${c.brs}`,opacity:on?1:.45},children:[
+        t("button",{onClick:()=>setR(i,k,{on:!on}),"aria-label":on?"Skip":"Include",style:{width:20,height:20,borderRadius:6,border:`1.5px solid ${on?c.ac:c.td}`,background:on?c.ac:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,padding:0},children:on&&t(Check,{size:13,color:"#0a0a0a"})}),
+        o("div",{className:"f1 minw0",children:[
+          o("div",{className:"f ia",style:{gap:6},children:[t("span",{className:"tru",style:{fontSize:13,color:c.tx,fontWeight:500},children:r.name}),t("span",{style:{fontSize:9.5,flexShrink:0,color:unp?(h?c.ro:c.tm):h?c.gd:c.mt,border:`1px solid ${(unp?(h?c.ro:c.tm):h?c.gd:c.mt)}66`,borderRadius:999,padding:"1px 6px"},children:unp?(h?"removes":"not held"):h?"updates":"new"})]}),
+          t("div",{className:"tru",style:{fontSize:10.5,color:c.tm,marginTop:2},children:[r.qty!=null&&r.price!=null?`${r.qty} × ${fm(r.price,cur)}`:r.qty!=null?`${r.qty} qty`:null,r.haircut!=null?`haircut ${r.haircut}%`:null,r.isin].filter(Boolean).join(" · ")||"—"}),
+          !unp&&h&&Math.abs(h.value-r.value)>0.5&&t("div",{style:{fontSize:10.5,color:r.value>=h.value?c.mt:c.co,marginTop:1},children:`was ${fm(h.value,cur)} → ${r.value>=h.value?"+":"−"}${fm(Math.abs(r.value-h.value),cur)}`})]}),
+        !unp&&t("input",{defaultValue:r.value,onBlur:e=>{const v=parseFloat(e.target.value.replace(/[^\d.]/g,""));if(v>0)setR(i,k,{value:v});else e.target.value=r.value},inputMode:"decimal","aria-label":"Value",style:{...inS,width:92,textAlign:"right"}})]})})]})}),
+    o("div",{style:{background:c.sf2,borderRadius:12,padding:"10px 12px",marginBottom:10,fontSize:12.5,color:c.td,lineHeight:1.5},children:[t("b",{style:{color:c.tx},children:"This will: "}),[m.added&&`add ${m.added}`,m.updated&&`update ${m.updated}`,m.removed&&`remove ${m.removed}`].filter(Boolean).join(" · ")||"change nothing",` · ${nOn} scrip${nOn===1?"":"s"} ticked`]}),
+    live.some(d=>d.kind!=="unpledge")&&t("button",{onClick:()=>sFull(v=>!v),className:"w100 f ia act99 trt",style:{gap:10,padding:"9px 2px",background:"transparent",border:"none",color:"inherit",textAlign:"left"},children:[t("span",{style:{width:20,height:20,borderRadius:6,border:`1.5px solid ${full?c.ac:c.td}`,background:full?c.ac:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:full&&t(Check,{size:13,color:"#0a0a0a"})}),o("div",{className:"tl",children:[t("div",{style:{fontSize:13,color:c.tx},children:"These photos show everything pledged"}),t("div",{style:{fontSize:11,color:c.tm},children:"Scrips not on them are removed from the list."})]})]}),
+    o("div",{className:"f",style:{gap:10,marginTop:12},children:[lnBtn("Cancel",onClose),lnBtn(nOn?"Save "+nOn+" scrip"+(nOn===1?"":"s"):"Save",()=>nOn&&onConfirm(live,full),true,{opacity:nOn?1:.5})]})]})});
+}
+// --- receipt history: every photo kept with its date, scrips and what changed since the one before ---
+function LasReceipts({receipts,cur,onDelete,cardS}){
+  const[open,sOpen]=useState(null);const src=usePhotoSrc(receipts.map(r=>r.photo).filter(Boolean));
+  const sorted=[...receipts].sort((a,b)=>b.date-a.date);
+  const holdingsR=sorted.filter(r=>r.kind!=="unpledge");
+  return o("div",{style:cardS,children:[
+    o("div",{className:"f ia jb",style:{marginBottom:10},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1},children:"PLEDGE RECEIPTS · "+receipts.length}),t("div",{style:{fontSize:10.5,color:c.tm},children:"latest "+lnFmtD(sorted[0].date)})]}),
+    ...sorted.map((r,i)=>{const prev=holdingsR.find(x=>x.date<r.date&&r.kind!=="unpledge"),dl=prev?lasDelta(prev,r):null,isOpen=open===r.id,col=r.kind==="unpledge"?c.ro:c.mt,img=r.photo?src(r.photo):null;
+      return o("div",{key:r.id,style:{borderTop:i?`1px solid ${c.brs}`:"none",padding:"11px 0"},children:[
+        o("button",{onClick:()=>sOpen(isOpen?null:r.id),className:"w100 f ia act98 trt",style:{gap:11,background:"transparent",border:"none",color:"inherit",textAlign:"left",padding:0},children:[
+          img?t("img",{src:img,alt:"Receipt "+lnFmtD(r.date),style:{width:44,height:56,objectFit:"cover",borderRadius:8,border:`1px solid ${c.brs}`,flexShrink:0}}):t("span",{style:{width:44,height:56,borderRadius:8,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0},children:"🧾"}),
+          o("div",{className:"f1 minw0",children:[
+            o("div",{className:"f ia",style:{gap:7},children:[t("span",{style:{fontSize:13.5,color:c.tx,fontWeight:600},children:lnFmtD(r.date)}),t("span",{style:{fontSize:9.5,color:col,border:`1px solid ${col}66`,borderRadius:999,padding:"1px 7px"},children:LAS_KINDS[r.kind]||"Pledge"})]}),
+            t("div",{className:"tru",style:{fontSize:11,color:c.tm,marginTop:3},children:`${r.rows.length} scrip${r.rows.length===1?"":"s"}${r.source?" · "+r.source:""}`}),
+            o("div",{className:"f ia jb",style:{marginTop:4,gap:8},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:12.5,color:c.tx},children:r.kind==="unpledge"?"− "+r.rows.length+" removed":fm(r.total,cur)}),dl&&t("span",{style:{fontSize:10.5,color:dl.dv>=0?c.mt:c.co},children:(dl.dv>=0?"▲ ":"▼ ")+fm(Math.abs(dl.dv),cur)+" in "+riDur(dl.days)})]})]}),
+          t("span",{style:{color:c.tm,transform:isOpen?"rotate(90deg)":"none",transition:"transform .2s"},children:"›"})]}),
+        isOpen&&o("div",{className:"ri-in",style:{marginTop:10},children:[
+          img&&t("img",{src:img,alt:"Receipt photo, full size",style:{width:"100%",borderRadius:10,border:`1px solid ${c.brs}`,marginBottom:8}}),
+          ...r.rows.map((x,k)=>o("div",{key:k,className:"f ia jb",style:{padding:"6px 0",borderTop:`1px solid ${c.brs}`,gap:8,fontSize:12},children:[o("div",{className:"minw0",children:[t("div",{className:"tru",style:{color:c.tx},children:x.name}),t("div",{className:"tru",style:{fontSize:10.5,color:c.tm},children:[x.qty!=null&&x.price!=null?`${x.qty} × ${fm(x.price,cur)}`:null,x.haircut!=null?`haircut ${x.haircut}%`:null,x.isin].filter(Boolean).join(" · ")})]}),t("span",{style:{fontFamily:'var(--nf)',color:c.tx,flexShrink:0},children:x.value?fm(x.value,cur):"—"})]})),
+          r.kind!=="unpledge"&&r.collateral>0&&t("div",{className:"f jb",style:{fontSize:11.5,color:c.td,paddingTop:8,borderTop:`1px solid ${c.brs}`},children:[t("span",{children:"Collateral value (after haircut)"}),t("span",{style:{fontFamily:'var(--nf)'},children:fm(r.collateral,cur)})]}),
+          dl&&(dl.added.length>0||dl.dropped.length>0)&&t("div",{style:{fontSize:11,color:c.tm,marginTop:8,lineHeight:1.5},children:[dl.added.length?"＋ New since last: "+dl.added.join(", "):null,dl.dropped.length?"－ Not on this one: "+dl.dropped.join(", "):null].filter(Boolean).join("  ·  ")}),
+          o("div",{className:"f jb",style:{marginTop:10},children:[r.fileName?t("span",{style:{fontSize:10.5,color:c.tm},children:"📎 "+r.fileName}):t("span"),t("button",{onClick:()=>onDelete(r.id),className:"act95 trt",style:{background:"transparent",border:"none",color:c.ro,fontSize:12},children:"Delete receipt"})]})]})]})}),
+    t("div",{style:{fontSize:10.5,color:c.tm,marginTop:8,lineHeight:1.45},children:"Deleting a receipt removes the photo and record only — your scrips list stays as it is."})]});
+}
+function LasInsights({holdings,receipts,cur,cardS}){
+  const ins=lasInsights(holdings);if(!ins)return null;
+  const latest=[...receipts].filter(r=>r.kind!=="unpledge").sort((a,b)=>b.date-a.date)[0],age=latest?riDays(latest.date,Date.now()):null,UP=[c.mt,"#7FB8FF","#C9A6FF"];
+  return o("div",{style:cardS,children:[
+    t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1,marginBottom:10},children:"PLEDGE INSIGHTS"}),
+    o("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12},children:[["SCRIPS PLEDGED",String(ins.n),c.tx],["COLLATERAL VALUE",ins.collateral!=null?fm(ins.collateral,cur):"—",c.mt],["AVG HAIRCUT",ins.avgHaircut!=null?ins.avgHaircut.toFixed(1)+"%":"—",c.gd],["OLDEST PLEDGE",ins.oldest?lnFmtD(ins.oldest.pledgedOn):"—",c.td]].map(([k,v,col])=>o("div",{key:k,style:{background:c.sf2,borderRadius:10,padding:"9px 11px",minWidth:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:8.5,color:c.tm,letterSpacing:.8},children:k}),t("div",{className:"tru",style:{fontFamily:'var(--nf)',fontSize:14,color:col,marginTop:3},children:v})]}))}),
+    ins.n>1&&o("div",{children:[t("div",{style:{fontSize:11,color:c.td,marginBottom:6},children:`Top ${ins.top.length} scrips make up ${Math.round(ins.topPct)}% of the pledge`+(ins.top[0].pct>40?" — concentrated, so one stock's fall moves your LTV a lot.":"")}),
+      t("div",{className:"f",style:{height:8,borderRadius:4,overflow:"hidden",background:c.sf2},children:ins.top.map((x,i)=>t("div",{key:x.name,title:x.name,style:{width:x.pct+"%",background:UP[i%3]}}))}),
+      o("div",{className:"f fw",style:{gap:10,marginTop:6},children:ins.top.map((x,i)=>t("span",{key:x.name,style:{fontSize:10.5,color:c.td},children:[t("span",{style:{color:UP[i%3]},children:"● "}),x.name+" "+Math.round(x.pct)+"%"]}))})]}),
+    age!=null&&age>=7&&t("div",{style:{fontSize:11.5,color:c.gd,marginTop:10,lineHeight:1.45},children:`⏱ Values are from ${age} days ago — snap a fresh photo so LTV reflects today's prices.`})]});
+}
+
 function LASView({data,persist,onClose}){
   const currency=data.currency||"₹";
   const base={loan:0,rate:10.5,ltv:45,fee:32,holdings:[],txns:[]};
@@ -3412,33 +3543,46 @@ function LASView({data,persist,onClose}){
   const setHVal2=(id,v2)=>{const n2=parseFloat(v2);up({holdings:holdings.map(h=>h.id===id?{...h,value:n2>0?n2:0}:h)})};
   const delH=(id)=>up({holdings:holdings.filter(h=>h.id!==id)});
   const[scanBusy,sScanBusy]=useState(false);const[scanErr,sScanErr]=useState(null);const[scanMsg,sScanMsg]=useState(null);const scanRef=useRef(null);
+  const[drafts,sDrafts]=useState(null);
+  const LAS_PROMPT='Read this pledge receipt / statement photo (e.g. Zerodha Console collateral list, CDSL/NSDL pledge or unpledge confirmation, broker holdings screen). Return JSON only: {"date":"YYYY-MM-DD or null","source":"broker or depository name or null","kind":"pledge | unpledge | holdings","holdings":[{"name":"RELIANCE","isin":"INE002A01018 or null","qty":10,"price":2900,"value":29000,"haircut":20,"collateral":23200}],"total":number or null,"note":"one short remark or null"}. "date" is the date PRINTED on the document (pledge, request or statement date) — null if none is visible, never guess. Use kind "unpledge" only if the document confirms securities being released. value = current market value in rupees; if only a collateral value is shown put it in collateral and leave value null. haircut is a percent. Use plain numbers with no symbols or commas, and null for anything not shown. Include every row visible.';
   const scanHoldings=async(files)=>{
     const arr=Array.from(files||[]).filter(Boolean);if(!arr.length)return;
     sScanErr(null);sScanMsg(null);
     if(!gAK()){sScanErr("Add an AI API key in Settings first.");return}
     const pv=AI_PROVIDERS[gProv()]||AI_PROVIDERS.anthropic;
     if(!pv.vision){sScanErr(`${pv.name} can't read photos — switch to Anthropic, DeepSeek, OpenAI, or Gemini in Settings.`);return}
-    const tooBig=arr.find(f=>f.size>4.5e6);if(tooBig){sScanErr(`Each image must be under 4.5MB — "${tooBig.name||"one photo"}" is too large.`);return}
+    const tooBig=arr.find(f=>f.size>15e6);if(tooBig){sScanErr(`Each image must be under 15MB — "${tooBig.name||"one photo"}" is too large.`);return}
     sScanBusy(true);
-    const sys="You read a stock or mutual-fund pledge / holdings screenshot (for example the Zerodha Console pledged-collateral list) and extract each pledged security with its value. Be accurate and thorough.";
-    const found=[];let firstErr=null;
-    for(const f of arr){
+    const sys="You read photos of pledged-securities receipts and statements and extract the date and every pledged security exactly as printed. Be accurate; never invent values or dates.";
+    const out=[];let firstErr=null;
+    for(let i=0;i<arr.length;i++){
+      const f=arr[i];sScanMsg(`Reading photo ${i+1} of ${arr.length}…`);
       try{
-        const b64=await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(f)});
-        const u=[{type:"image",source:{type:"base64",media_type:f.type||"image/jpeg",data:b64.split(",")[1]}},{type:"text",text:'Extract every pledged security / holding row visible. For each give the instrument name and its current market value in rupees. If only a collateral or pledged value is shown, use that value. Return JSON only: {"holdings":[{"name":"RELIANCE","value":125000}]}. Values must be plain positive numbers with no commas or currency symbols. If nothing readable: {"holdings":[]}.'}];
-        const r=await cAPI({max_tokens:2000,system:sys,messages:[{role:"user",content:u}]});
-        const txt=r.content?.map(x=>x.text||"").join("")||"";
-        const pj=extractJSON(txt);const list=(pj&&pj.holdings)||[];
-        for(const it of list){const name=String(it.name||"").trim().slice(0,60);const val=parseFloat(String(it.value).replace(/[^0-9.]/g,""));if(!name||!val||isNaN(val)||val<=0)continue;found.push({name,value:val})}
+        const img=await resizeImg(f,1600,0.8);
+        const u=[{type:"image",source:{type:"base64",media_type:"image/jpeg",data:img.split(",")[1]}},{type:"text",text:LAS_PROMPT}];
+        const r=await cAPI({max_tokens:3000,system:sys,messages:[{role:"user",content:u}]});
+        const p2=lasParseReceipt(extractJSON(r.content?.map(x=>x.text||"").join("")||""));
+        out.push({id:"lasr_"+uid(),thumb:img,fileName:f.name||null,date:p2.date||lnDay(f.lastModified||Date.now()),dateGuess:!p2.date,kind:p2.kind,source:p2.source,note:p2.note,rows:p2.rows.map(x=>({...x,on:true})),err:null});
       }catch(e2){if(!firstErr)firstErr=friendlyAPIError(e2)}
     }
-    if(!found.length){sScanErr(firstErr?("Scan failed: "+firstErr):"No pledged securities were found in the photo. Try a clearer image.");sScanBusy(false);return}
-    const idx={};holdings.forEach((h,i)=>{idx[h.name.toLowerCase()]=i});
-    const merged=holdings.map(h=>({...h}));let added=0,updated=0;
-    for(const f of found){const key=f.name.toLowerCase();if(key in idx){merged[idx[key]].value=f.value;updated++}else{merged.push({id:"lash_"+uid(),name:f.name,value:f.value});idx[key]=merged.length-1;added++}}
-    up({holdings:merged});sScanBusy(false);
-    sScanMsg(`${added?`Added ${added} scrip${added===1?"":"s"}`:""}${added&&updated?" · ":""}${updated?`updated ${updated}`:""} from the photo. Review the values below.`);
+    sScanBusy(false);sScanMsg(null);
+    if(!out.length){sScanErr(firstErr?("Scan failed: "+firstErr):"Couldn't read any photo.");return}
+    if(!out.some(x=>x.rows.length)){sScanErr("No pledged securities were found. Try a clearer, straight-on photo.");return}
+    if(out.length<arr.length)sScanErr(`${arr.length-out.length} of ${arr.length} photos couldn't be read${firstErr?" ("+firstErr+")":""}.`);
+    sDrafts(out);
   };
+  const confirmScan=async(live,full)=>{
+    const m=lasMerge(holdings,live,full),recs=[];
+    for(const d2 of live){
+      const on=d2.rows.filter(r=>r.on!==false),tt=lasTotals(on);let photo=null;
+      if(d2.thumb){try{await idbPutFile(d2.id,_dataUrlToBlob(d2.thumb));photo={id:d2.id}}catch(e){photo={id:d2.id,data:d2.thumb}}}
+      recs.push({id:d2.id,date:d2.date,kind:d2.kind,source:d2.source,note:d2.note,rows:on.map(({on:_o,...r})=>r),total:tt.total,collateral:tt.collateral,photo,fileName:d2.fileName,createdAt:Date.now()});
+    }
+    up({holdings:m.holdings,receipts:[...recs,...(L.receipts||[])]});
+    sDrafts(null);sScanErr(null);
+    sScanMsg(`Saved ${recs.length} receipt${recs.length===1?"":"s"}: ${[m.added&&m.added+" added",m.updated&&m.updated+" updated",m.removed&&m.removed+" removed"].filter(Boolean).join(" · ")||"no changes to the list"}.`);
+  };
+  const delReceipt=(id)=>{try{idbDelFile(String(id))}catch(e){}up({receipts:(L.receipts||[]).filter(x=>x.id!==id)})};
   const[txType,sTxType]=useState("repay");const[txAmt,sTxAmt]=useState("");const[txNote,sTxNote]=useState("");
   const logTx=(type,amt,note)=>{const a=parseFloat(amt);if(!(a>0))return;const nl=type==="repay"?Math.max(0,loan-a):type==="draw"?loan+a:loan;up({loan:nl,txns:[{id:"lastx_"+uid(),type,amount:a,date:Date.now(),note:note||null},...txns]})};
   const delTx=(x)=>{const nl=x.type==="repay"?loan+x.amount:x.type==="draw"?Math.max(0,loan-x.amount):loan;up({loan:nl,txns:txns.filter(y=>y.id!==x.id)})};
@@ -3482,6 +3626,7 @@ function LASView({data,persist,onClose}){
   const delDoc=(id)=>{try{idbDelFile(String(id))}catch(e){}up({docs:docs.filter(x=>x.id!==id)})};
   const uPal=(i)=>UPAL[i%UPAL.length];
   return o("div",{style:{padding:`8px ${GUT}px 40px`},className:"st",children:[
+    drafts&&t(LasReview,{drafts,holdings,cur:currency,onClose:()=>sDrafts(null),onConfirm:confirmScan}),
     t(SH,{title:t("em",{children:"LAS Tracker"}),onBack:onClose,right:t("button",{onClick:()=>sShowSet(s=>!s),className:"act90 tr",style:{width:38,height:38,borderRadius:12,background:showSet?c.sf3:c.sf,border:`1px solid ${showSet?c.ac:c.brs}`,fontSize:16},children:"⚙️"})}),
     t("div",{style:{fontSize:13,color:c.td,marginBottom:16,lineHeight:1.5},children:"Track your Zerodha Capital loan against securities — LTV zones, interest, and a planner that tells you how much to repay before unpledging."}),
     showSet&&o("div",{style:cardS,children:[
@@ -3568,18 +3713,18 @@ function LASView({data,persist,onClose}){
       ]}),
       holdings.length===0&&t("div",{style:{padding:"4px 14px 14px",fontSize:12,color:c.tm,lineHeight:1.5},children:"Add each pledged scrip with its current market value. Update values anytime — LTV recalculates instantly."}),
       holdings.map((h,i)=>o("div",{key:h.id,className:"f ia jb",style:{padding:"10px 14px",borderTop:`1px solid ${c.brs}`},children:[
-        t("div",{className:"tru",style:{fontSize:13,color:c.tx,fontWeight:500,flex:1,minWidth:0,marginRight:10},children:h.name}),
+        o("div",{className:"f1 minw0",style:{marginRight:10},children:[t("div",{className:"tru",style:{fontSize:13,color:c.tx,fontWeight:500},children:h.name}),(h.qty!=null||h.pledgedOn||h.haircut!=null)&&t("div",{className:"tru",style:{fontSize:10.5,color:c.tm,marginTop:2},children:[h.qty!=null&&h.price!=null?`${h.qty} × ${fm(h.price,currency)}`:h.qty!=null?h.qty+" qty":null,h.haircut!=null?h.haircut+"% haircut":null,h.pledgedOn?"pledged "+lnFmtD(h.pledgedOn):null].filter(Boolean).join(" · ")})]}),
         o("div",{className:"f ia",style:{gap:8,flexShrink:0},children:[
           t("input",{key:h.id+"_v",defaultValue:h.value,onBlur:e=>{const v2=e.target.value.replace(/[^\d.]/g,"");if(v2!==""&&parseFloat(v2)!==h.value)setHVal2(h.id,v2);else e.target.value=h.value},inputMode:"decimal",style:{...inS,width:96,textAlign:"right",padding:"6px 9px",fontSize:12.5}}),
           t("button",{onClick:()=>delH(h.id),style:{background:"transparent",border:"none",color:c.tm,padding:0,display:"flex"},children:t(X,{size:14})}),
         ]}),
       ]})),
       o("div",{style:{padding:"12px 14px 14px",borderTop:`1px solid ${c.brs}`},children:[
-        t("button",{onClick:()=>{if(!scanBusy)scanRef.current?.click()},disabled:scanBusy,className:"w100 act95 tr f ia jc",style:{gap:8,padding:"10px 0",marginBottom:8,background:scanBusy?c.sf2:c.ac,color:scanBusy?c.tm:"#0a0a0a",border:"none",borderRadius:10,fontSize:12.5,fontWeight:600},children:scanBusy?"Reading the photo…":"📷 Scan holdings photo"}),
+        t("button",{onClick:()=>{if(!scanBusy)scanRef.current?.click()},disabled:scanBusy,className:"w100 act95 tr f ia jc",style:{gap:8,padding:"10px 0",marginBottom:8,background:scanBusy?c.sf2:c.ac,color:scanBusy?c.tm:"#0a0a0a",border:"none",borderRadius:10,fontSize:12.5,fontWeight:600},children:scanBusy?"Reading photos…":"📷 Scan pledge receipts"}),
         t("input",{ref:scanRef,type:"file",accept:"image/*",multiple:true,style:{display:"none"},onChange:e=>{scanHoldings(e.target.files);e.target.value=""}}),
         scanErr&&t("div",{style:{background:c.co+"20",border:`1px solid ${c.co}40`,borderRadius:10,padding:"8px 12px",marginBottom:8,fontSize:12,color:c.co,lineHeight:1.5},children:scanErr}),
         scanMsg&&t("div",{style:{background:c.mt+"18",border:`1px solid ${c.mt}45`,borderRadius:10,padding:"8px 12px",marginBottom:8,fontSize:12,color:c.mt,lineHeight:1.5},children:scanMsg}),
-        t("div",{style:{fontSize:10.5,color:c.tm,textAlign:"center",marginBottom:10,lineHeight:1.4},children:"Snap your broker's pledged-holdings screen to add scrips automatically — or enter one manually below."}),
+        t("div",{style:{fontSize:10.5,color:c.tm,textAlign:"center",marginBottom:10,lineHeight:1.4},children:"Pick one or many photos of your pledge receipts or holdings screens. AI reads the date and every scrip, you review, then it's saved with the photo — or add one manually below."}),
         o("div",{className:"g",style:{gridTemplateColumns:"1fr 96px",gap:8,marginBottom:8},children:[
           t("input",{value:hName,onChange:e=>sHName(e.target.value),placeholder:"Scrip name",style:{...inS,fontFamily:"inherit"}}),
           t("input",{value:hVal,onChange:e=>sHVal(e.target.value.replace(/[^\d.]/g,"")),placeholder:"Value",inputMode:"decimal",style:inS}),
@@ -3587,6 +3732,8 @@ function LASView({data,persist,onClose}){
         t("button",{onClick:addH,className:"w100 act95 tr",style:{padding:"9px 0",background:c.sf3,color:c.tx,border:`1px solid ${c.brs}`,borderRadius:10,fontSize:12.5,fontWeight:600},children:"+ Add pledged scrip"}),
       ]}),
     ]}),
+    holdings.length>0&&t(LasInsights,{holdings,receipts:L.receipts||[],cur:currency,cardS}),
+    (L.receipts||[]).length>0&&o(Fragment,{children:[t("style",{children:RI_CSS}),t(LasReceipts,{receipts:L.receipts,cur:currency,onDelete:delReceipt,cardS})]}),
     o("div",{style:cardS,children:[
       t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1,marginBottom:10},children:"RECORD ACTIVITY"}),
       t("div",{className:"f",style:{gap:6,marginBottom:8},children:[["repay","Repayment"],["draw","Drawdown"],["interest","Interest"]].map(([id,l2])=>t("button",{key:id,onClick:()=>sTxType(id),className:"act95 tr f1",style:{padding:"8px 0",borderRadius:9,fontSize:12,fontWeight:600,background:txType===id?c.sf3:c.sf2,border:`1px solid ${txType===id?c.ac:c.brs}`,color:txType===id?c.tx:c.td},children:l2}))}),
