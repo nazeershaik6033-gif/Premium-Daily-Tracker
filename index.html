@@ -1547,11 +1547,11 @@ function Sidebar({data,onClose,onView,activeUser,onUpdateUser,focusSection}){
     const totalCount=tEntries.length+tNotes.length;
     const preview=latestTs==null?"No entries yet":(useNote?latestNote.text:(latestExp.note||latestExp.merchant||latestExp.payee||co(latestExp.category).label));
     const meta=totalCount>0?`${totalCount} entr${totalCount===1?"y":"ies"} · ${agoStr(latestTs)}`:"No entries yet";
-    const tSpend=tEntries.filter(e=>e.type==="expense").reduce((a,e)=>a+netAmt(e),0);
+    const tS=thrStats(tEntries),tAmt=tS.kind==="income"?tS.earned:tS.kind==="mixed"?tS.net:tS.spent;
     return t("button",{key:"th_"+th.id,onClick:()=>go("thread:"+th.id),className:"w100 f ia trc",style:{gap:12,padding:"11px 16px",background:"transparent",border:"none",cursor:"pointer",textAlign:"left"},children:[
       t("div",{style:{width:36,height:36,borderRadius:10,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0},children:th.emoji||"🧵"}),
       o("div",{className:"f1 tl minw0",children:[t("div",{className:"tru",style:{fontSize:14,color:c.tx,fontWeight:400},children:th.name}),t("div",{className:"tru",style:{fontSize:11,color:c.tm,marginTop:1},children:preview}),t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.td,marginTop:2},children:meta})]}),
-      tSpend>0&&t("span",{style:{fontFamily:'var(--nf)',fontSize:12.5,color:c.tx,flexShrink:0},children:fm(tSpend,data.currency)}),
+      (tS.kind==="mixed"?tAmt!==0:tAmt>0)&&t("span",{style:{fontFamily:'var(--nf)',fontSize:12.5,color:tS.kind==="income"||(tS.kind==="mixed"&&tAmt>0)?c.mt:tS.kind==="mixed"?c.ro:c.tx,flexShrink:0},children:tS.kind==="mixed"?thrSigned(tAmt,data.currency):(tS.kind==="income"?"+":"")+fm(tAmt,data.currency)}),
       t(CR,{size:14,color:c.tm})
     ]})
   }),
@@ -7803,7 +7803,7 @@ return o(Fragment,{children:[o("div",{className:"fi",style:{paddingTop:48,paddin
   !isCardBill&&o("div",{style:{padding:"0 24px",marginBottom:20,position:"relative",zIndex:threadPickOpen?45:1},children:[
     threadPickOpen&&t("div",{onClick:()=>sThreadPickOpen(false),style:{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:0}}),
     t("button",{onClick:()=>sThreadPickOpen(v=>!v),className:"w100 f ia jb act99 trt",style:{position:"relative",zIndex:1,background:c.sfg,border:`1px solid ${expThread||threadPickOpen?c.ac:c.brs}`,borderRadius:12,padding:"12px 16px"},children:[
-      o("div",{className:"f ia",style:{gap:12},children:[t("span",{style:{fontSize:16},children:"🧵"}),o("div",{className:"tl",children:[t("div",{style:{fontSize:14,color:c.tx},children:"Add to thread"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:(()=>{const th2=(data.threads||[]).find(x=>x.id===expThread);return th2?`${th2.emoji||"🧵"} ${th2.name}`:"Group with related expenses"})()})]})]}),
+      o("div",{className:"f ia",style:{gap:12},children:[t("span",{style:{fontSize:16},children:"🧵"}),o("div",{className:"tl",children:[t("div",{style:{fontSize:14,color:c.tx},children:"Add to thread"}),t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:(()=>{const th2=(data.threads||[]).find(x=>x.id===expThread);return th2?`${th2.emoji||"🧵"} ${th2.name}`:"Group with related entries"})()})]})]}),
       t("span",{style:{color:c.tm,fontSize:12,fontFamily:'var(--nf)',display:"inline-block",transform:threadPickOpen?"rotate(180deg)":"none",transition:"transform .2s"},children:"▾"})
     ]}),
     threadPickOpen&&o("div",{style:{position:"relative",zIndex:1,marginTop:8,background:c.sfg,borderRadius:14,border:`1px solid ${c.ac}55`,overflow:"hidden",boxShadow:"0 16px 48px rgba(0,0,0,.5)"},children:[
@@ -9436,6 +9436,18 @@ function ThnSnapCard({snap:s}){
 
 // === THREAD SUMMARY (total + category donut/chips + filters) ===
 const THREAD_F0={cats:[],range:"all",from:"",to:"",acct:"",q:"",amin:"",amax:"",tFrom:"",tTo:""};
+// A thread's character follows what is in it, so there is nothing to configure:
+//   expenses only → spending (total spent, budget is a spending cap)
+//   income only   → earnings (total received, budget becomes a target to reach)
+//   both          → net = income − expenses, with the two sides shown separately (budget still caps spending)
+// Only "income" and "expense" entries count; transfers, card payments and reimbursements never do.
+function thrStats(entries){
+  const exp=[],inc=[];
+  for(const e of entries||[]){if(e.type==="expense")exp.push(e);else if(e.type==="income")inc.push(e)}
+  const spent=exp.reduce((a,e)=>a+netAmt(e),0),earned=inc.reduce((a,e)=>a+e.amount,0);
+  return{exp,inc,spent,earned,net:earned-spent,kind:exp.length&&inc.length?"mixed":inc.length?"income":"expense"};
+}
+const thrSigned=(v,cur)=>(v<0?"−":"+")+fm(Math.abs(v),cur);
 const thrActive=f=>(f.cats.length?1:0)+(f.range!=="all"?1:0)+(f.acct?1:0)+(f.q.trim()?1:0)+((f.amin!==""||f.amax!=="")?1:0)+((f.tFrom||f.tTo)?1:0);
 // skipCat: ignore the category filter so the breakdown keeps showing every category while one is selected.
 function thrMatch(e,f,skipCat,data){
@@ -9457,14 +9469,17 @@ function thrMatch(e,f,skipCat,data){
   return true;
 }
 function ThreadSummary({entries,f,setF,data}){
-  const[open,sOpen]=useState(false);
+  const[open,sOpen]=useState(false);const[side,sSide]=useState("exp");
   const cur=data.currency;
   const PAL=[c.mt,"#7FB8FF","#C9A6FF",c.gd,"#FF9F6B","#5EC8C8",c.co,"#F49BD0"];
-  const exp=entries.filter(e=>e.type==="expense");
+  // `exp` is the side the donut and chips describe: the only side present, or the one picked in a mixed thread.
+  const st=thrStats(entries),mixed=st.kind==="mixed",isInc=mixed?side==="inc":st.kind==="income";
+  const exp=isInc?st.inc:st.exp;
   const base=exp.filter(e=>thrMatch(e,f,true,data));
   const shownExp=exp.filter(e=>thrMatch(e,f,false,data));
   const sum=l=>l.reduce((a,e)=>a+netAmt(e),0);
   const total=sum(shownExp),allTotal=sum(exp),act=thrActive(f);
+  const incT=mixed?sum(st.inc.filter(e=>thrMatch(e,f,false,data))):0,expT=mixed?sum(st.exp.filter(e=>thrMatch(e,f,false,data))):0,net=incT-expT;
   const m={};for(const e of base){const k=e.category;(m[k]=m[k]||{id:k,v:0,n:0}).v+=netAmt(e);m[k].n++}
   const cats=Object.values(m).filter(x=>x.v>0).sort((a,b)=>b.v-a.v).map((x,i)=>({...x,...co(x.id),color:PAL[i%PAL.length]}));
   const baseTotal=cats.reduce((a,x)=>a+x.v,0);
@@ -9478,7 +9493,7 @@ function ThreadSummary({entries,f,setF,data}){
   const inp={width:"100%",boxSizing:"border-box",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,padding:"9px 11px",color:c.tx,fontSize:13.5,outline:"none",fontFamily:'var(--tf)',colorScheme:"dark"};
   const lbl=x=>t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1,margin:"12px 0 6px"},children:x});
   const accOpts=[...(data.accounts||[]).map(a=>["acc:"+a.id,(a.emoji||"")+" "+a.name]),...(data.cards||[]).map(cd=>["card:"+cd.id,"💳 "+cd.name])];
-  if(!exp.length)return null;
+  if(!st.exp.length&&!st.inc.length)return null;
   return o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:16,marginBottom:20},children:[
     o("div",{className:"f ia jb",style:{marginBottom:12},children:[
       t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5},children:"SUMMARY"}),
@@ -9487,19 +9502,21 @@ function ThreadSummary({entries,f,setF,data}){
         t("button",{onClick:()=>sOpen(v=>!v),className:"act95 trt",style:{background:open?c.ac+"26":c.sf2,border:`1px solid ${open?c.ac:c.brs}`,borderRadius:999,padding:"5px 12px",color:c.tx,fontSize:12},children:"⚙ Filters"+(act>0?` · ${act}`:"")})
       ]})
     ]}),
+    mixed&&o("div",{className:"f",style:{gap:6,marginBottom:12},children:[["exp","Spending"],["inc","Income"]].map(([k,l])=>chip(isInc===(k==="inc"),l+" · "+(k==="inc"?st.inc.length:st.exp.length),()=>{sSide(k);setF(p=>({...p,cats:[]}))},"side_"+k))}),
     o("div",{className:"f ia",style:{gap:14},children:[
       t("div",{style:{width:112,flexShrink:0},children:t(SvgDonut,{data:donut,size:112,innerR:32,outerR:52,activeIdx:f.cats.length===1?cats.findIndex(x=>x.id===f.cats[0]):undefined,onSegmentClick:(i,d)=>toggle(d.id)})}),
       o("button",{onClick:()=>setF(THREAD_F0),className:"f1 minw0 tl act98 trt",style:{background:"transparent",border:"none",padding:0,color:"inherit"},children:[
-        t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1},children:act>0?"FILTERED TOTAL":"TOTAL SPENT"}),
-        t("div",{style:{fontFamily:'var(--nf)',fontSize:26,fontWeight:300,color:c.tx,letterSpacing:-1,marginTop:2},children:fm(total,cur)}),
-        t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:act>0?`${shownExp.length} of ${exp.length} expenses · of ${fm(allTotal,cur)}`:`${exp.length} expense${exp.length!==1?"s":""} · ${cats.length} categor${cats.length===1?"y":"ies"}`}),
+        t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1},children:(act>0?"FILTERED ":"")+(isInc?"RECEIVED":"SPENT")}),
+        t("div",{style:{fontFamily:'var(--nf)',fontSize:26,fontWeight:300,color:isInc?c.mt:c.tx,letterSpacing:-1,marginTop:2},children:fm(total,cur)}),
+        mixed&&t("div",{style:{fontSize:11,color:net<0?c.ro:c.mt,marginTop:2},children:`Net ${thrSigned(net,cur)} · ${fm(incT,cur)} in · ${fm(expT,cur)} out`}),
+        t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:act>0?`${shownExp.length} of ${exp.length} ${isInc?(exp.length===1?"income entry":"income entries"):(exp.length===1?"expense":"expenses")} · of ${fm(allTotal,cur)}`:`${exp.length} ${isInc?(exp.length===1?"income entry":"income entries"):(exp.length===1?"expense":"expenses")} · ${cats.length} categor${cats.length===1?"y":"ies"}`}),
         act>0&&t("div",{style:{fontSize:10.5,color:c.ac,marginTop:3},children:"Tap to show all"})
       ]})
     ]}),
     o("div",{className:"f fw",style:{gap:6,marginTop:12},children:cats.map(x=>chip(f.cats.includes(x.id),o("span",{children:[t("span",{style:{display:"inline-block",width:8,height:8,borderRadius:4,background:x.color,marginRight:6}}),(x.emoji||"")+" "+x.label+" ",t("span",{style:{fontFamily:'var(--nf)',fontSize:11,opacity:.8},children:fm(x.v,cur)+(baseTotal>0?` · ${Math.round(x.v/baseTotal*100)}%`:"")})]}),()=>toggle(x.id),x.id))}),
     shownExp.length>0&&o("div",{className:"g g3",style:{gap:8,marginTop:14},children:[
-      [ "TOP MERCHANT",topMer?topMer[0]:"—",topMer?fm(topMer[1],cur):""],
-      [ "DAILY AVG",fm(days?total/days:0,cur),days+" active day"+(days!==1?"s":"")],
+      [ isInc?"TOP SOURCE":"TOP MERCHANT",topMer?topMer[0]:"—",topMer?fm(topMer[1],cur):""],
+      [ isInc?"AVG / ENTRY":"DAILY AVG",isInc?fm(shownExp.length?total/shownExp.length:0,cur):fm(days?total/days:0,cur),isInc?shownExp.length+" entr"+(shownExp.length!==1?"ies":"y"):days+" active day"+(days!==1?"s":"")],
       [ "BIGGEST",big?fm(netAmt(big),cur):"—",big?(big.merchant||big.payee||co(big.category).label):""]
     ].map(([k,v,sub])=>o("div",{key:k,style:{background:c.sf2,borderRadius:10,padding:"8px 10px",minWidth:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:8.5,color:c.tm,letterSpacing:.8},children:k}),t("div",{className:"tru",style:{fontSize:12.5,color:c.tx,fontWeight:600,marginTop:3},children:v}),t("div",{className:"tru",style:{fontSize:10,color:c.tm,marginTop:1},children:sub})]}))}),
     open&&o("div",{style:{marginTop:6,borderTop:`1px solid ${c.brs}`,paddingTop:2},children:[
@@ -9541,10 +9558,15 @@ function ThreadDetail({data,threadId,onClose,onEdit,onDelete,onSelectExpense,onA
   const shownEntries=entries.filter(e=>thrMatch(e,tf,false,data));
   const notes=th.notes||[];
   const isSnapThread=th.system===MSNAP_SYS;
-  const total=entries.filter(e=>e.type==="expense").reduce((s,e)=>s+netAmt(e),0);
-  const pct=th.budget?Math.max(0,Math.min(100,(total/th.budget)*100)):null;
-  const over=th.budget&&total>th.budget;
-  const barCol=over?c.ro:c.ac;
+  const ts=thrStats(entries),kind=ts.kind;
+  // Headline: spent / received / net. The budget measures spending, except in an income-only thread where it is a target.
+  const total=kind==="income"?ts.earned:kind==="mixed"?ts.net:ts.spent;
+  const gauge=kind==="income"?ts.earned:ts.spent;
+  const pct=th.budget?Math.max(0,Math.min(100,(gauge/th.budget)*100)):null;
+  const over=th.budget&&kind!=="income"&&gauge>th.budget;
+  const hit=th.budget&&kind==="income"&&gauge>=th.budget;
+  const barCol=over?c.ro:hit?c.mt:c.ac;
+  const headCol=kind==="income"?c.mt:kind==="mixed"?(ts.net<0?c.ro:c.mt):barCol;
   const totalCount=entries.length+notes.length;
   const rows=thnFlat(notes);
   const openPhoto=(photos,idx)=>sGallery({photos,idx});
@@ -9592,7 +9614,9 @@ function ThreadDetail({data,threadId,onClose,onEdit,onDelete,onSelectExpense,onA
       ]}),
     ]})};
   const selMode=sel.size>0;
-  const dayGroups=(()=>{const m=new Map();shownEntries.forEach(e=>{const d=new Date(e.date),k=d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate();if(!m.has(k))m.set(k,{key:k,label:rd(e.date),items:[],total:0});const g=m.get(k);g.items.push(e);if(e.type==="expense")g.total+=netAmt(e)});return[...m.values()]})();
+  const dayGroups=(()=>{const m=new Map();shownEntries.forEach(e=>{const d=new Date(e.date),k=d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate();if(!m.has(k))m.set(k,{key:k,label:rd(e.date),items:[],total:0});const g=m.get(k);g.items.push(e);if(e.type==="expense")g.total-=netAmt(e);else if(e.type==="income")g.total+=e.amount});return[...m.values()]})();
+  // Day totals are signed (income − expenses); an expense-only thread shows them as plain positive spending.
+  const dayTot=g=>kind==="expense"?fm(-g.total,currency):kind==="income"?fm(g.total,currency):thrSigned(g.total,currency);
   const toggleMany=(ids,on)=>sSel(prev=>{const n=new Set(prev);ids.forEach(id=>on?n.add(id):n.delete(id));return n});
   const rowDown=e=>{lpRef.current.fired=false;clearTimeout(lpRef.current.timer);if(selMode)return;lpRef.current.timer=setTimeout(()=>{lpRef.current.fired=true;try{navigator.vibrate&&navigator.vibrate(12)}catch{}toggleMany([e.id],true)},450)};
   const rowCancel=()=>clearTimeout(lpRef.current.timer);
@@ -9602,9 +9626,11 @@ function ThreadDetail({data,threadId,onClose,onEdit,onDelete,onSelectExpense,onA
     o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:20},children:[
       o("div",{className:"f ia",style:{gap:12,marginBottom:14},children:[t("div",{style:{width:42,height:42,borderRadius:11,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,flexShrink:0},children:th.emoji||"🧵"}),o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:16,fontWeight:600,color:c.tx},children:th.name}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:`${totalCount} entr${totalCount===1?"y":"ies"}`})]}),
         notes.length===0&&!notesOpen&&t("button",{onClick:()=>sNotesOpen(true),"aria-label":"Add notes",className:"act95 trt",style:{marginLeft:"auto",flexShrink:0,display:"flex",alignItems:"center",gap:6,padding:"6px 11px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:999,color:c.td,fontSize:12,cursor:"pointer"},children:[t("span",{style:{fontSize:13},children:"📝"}),"Notes"]})]}),
-      !(isSnapThread&&!entries.length)&&o("div",{className:"f ib jb",style:{marginBottom:th.budget?6:0},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:28,fontWeight:300,color:barCol,letterSpacing:-1},children:fm(total,currency)}),th.budget&&t("span",{style:{fontFamily:'var(--nf)',fontSize:14,fontWeight:600,color:barCol},children:pct.toFixed(0)+"%"})]}),
+      !(isSnapThread&&!entries.length)&&kind!=="expense"&&t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1,marginBottom:2},children:kind==="income"?"TOTAL RECEIVED":"NET · INCOME − EXPENSES"}),
+      !(isSnapThread&&!entries.length)&&o("div",{className:"f ib jb",style:{marginBottom:th.budget?6:0},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:28,fontWeight:300,color:headCol,letterSpacing:-1},children:kind==="mixed"?thrSigned(total,currency):fm(total,currency)}),th.budget&&t("span",{style:{fontFamily:'var(--nf)',fontSize:14,fontWeight:600,color:barCol},children:pct.toFixed(0)+"%"})]}),
+      kind==="mixed"&&o("div",{className:"f",style:{gap:16,marginBottom:th.budget?10:0,fontSize:12},children:[o("span",{style:{color:c.mt},children:["Income ",t("b",{style:{fontFamily:'var(--nf)',fontWeight:600},children:fm(ts.earned,currency)})]}),o("span",{style:{color:c.td},children:["Spent ",t("b",{style:{fontFamily:'var(--nf)',fontWeight:600},children:fm(ts.spent,currency)})]})]}),
       th.budget&&t("div",{style:{height:8,background:c.sf2,borderRadius:999,overflow:"hidden",marginBottom:8},children:t("div",{style:{width:pct+"%",height:"100%",background:`linear-gradient(90deg,${barCol} 0%,${barCol}cc 100%)`,transition:"width 600ms cubic-bezier(0.2,0.9,0.2,1)"}})}),
-      th.budget&&t("div",{style:{fontSize:11,color:c.tm,fontFamily:'var(--nf)',letterSpacing:.3},children:over?`${fm(total-th.budget,currency)} OVER BUDGET`:`${fm(th.budget-total,currency)} LEFT OF ${fm(th.budget,currency)}`}),
+      th.budget&&t("div",{style:{fontSize:11,color:c.tm,fontFamily:'var(--nf)',letterSpacing:.3},children:kind==="income"?(gauge>th.budget?`${fm(gauge-th.budget,currency)} ABOVE TARGET OF ${fm(th.budget,currency)}`:hit?`TARGET OF ${fm(th.budget,currency)} REACHED`:`${fm(th.budget-gauge,currency)} TO GO OF ${fm(th.budget,currency)} TARGET`):over?`${fm(gauge-th.budget,currency)} OVER BUDGET`:`${fm(th.budget-gauge,currency)} LEFT OF ${fm(th.budget,currency)}`+(kind==="mixed"?" · SPENDING":"")}),
     ]}),
     (notes.length>0||notesOpen)&&o(Fragment,{children:[
     o("div",{className:"f ia jb",style:{marginBottom:10,gap:8},children:[
@@ -9645,14 +9671,14 @@ function ThreadDetail({data,threadId,onClose,onEdit,onDelete,onSelectExpense,onA
         ]}),
     ]}),
     t(ThreadSummary,{entries,f:tf,setF:sTf,data}),
-    t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:"EXPENSES"+(thrActive(tf)?` · ${shownEntries.length} of ${entries.length}`:"")}),
-    entries.length===0?t(ES,{title:t("em",{children:"No entries yet"}),subtitle:"Tag an expense to this thread from its detail view, or use Add entries."}):shownEntries.length===0?t("div",{style:{padding:"24px 0",textAlign:"center",color:c.tm,fontSize:13},children:"No entries match these filters"}):o("div",{style:{display:"flex",flexDirection:"column",gap:12},children:dayGroups.map(g=>{const ids=g.items.map(e=>e.id),allOn=ids.every(id=>sel.has(id));return o("div",{key:g.key,style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden"},children:[
+    t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:(kind==="income"?"INCOME":kind==="mixed"?"ENTRIES":"EXPENSES")+(thrActive(tf)?` · ${shownEntries.length} of ${entries.length}`:"")}),
+    entries.length===0?t(ES,{title:t("em",{children:"No entries yet"}),subtitle:"Tag an expense or an income entry to this thread from its detail view, or use Add entries."}):shownEntries.length===0?t("div",{style:{padding:"24px 0",textAlign:"center",color:c.tm,fontSize:13},children:"No entries match these filters"}):o("div",{style:{display:"flex",flexDirection:"column",gap:12},children:dayGroups.map(g=>{const ids=g.items.map(e=>e.id),allOn=ids.every(id=>sel.has(id));return o("div",{key:g.key,style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,overflow:"hidden"},children:[
       o("div",{className:"f ia jb",style:{padding:"9px 14px",borderBottom:`1px solid ${c.brs}`,background:c.sf2},children:[
         o("button",{onClick:()=>toggleMany(ids,!allOn),className:"f ia act95 trt",style:{gap:8,background:"transparent",border:"none",color:"inherit",padding:0,cursor:"pointer"},children:[t("span",{style:{width:16,height:16,borderRadius:5,border:`1.5px solid ${allOn?c.ac:c.td}`,background:allOn?c.ac:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:allOn&&t(Check,{size:11,color:"#0a0a0a"})}),t("span",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.td,letterSpacing:.5},children:g.label})]}),
-        t("span",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.tm},children:fm(g.total,currency)})]}),
+        t("span",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.tm},children:dayTot(g)})]}),
       ...g.items.map((e,i)=>{const cat=co(e.category),on=sel.has(e.id);return o("button",{key:e.id,onClick:()=>rowClick(e),onPointerDown:()=>rowDown(e),onPointerUp:rowCancel,onPointerLeave:rowCancel,onPointerCancel:rowCancel,onContextMenu:ev=>ev.preventDefault(),className:"w100 f ia act99 trt",style:{padding:"12px 14px",borderBottom:i===g.items.length-1?"none":`1px solid ${c.brs}`,background:on?c.ac+"1a":"transparent",border:"none",color:"inherit",gap:12,textAlign:"left",WebkitUserSelect:"none",userSelect:"none",WebkitTouchCallout:"none"},children:[
         selMode?t("span",{style:{width:20,height:20,borderRadius:6,border:`1.5px solid ${on?c.ac:c.td}`,background:on?c.ac:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:on&&t(Check,{size:13,color:"#0a0a0a"})}):t("span",{style:{fontSize:18,flexShrink:0},children:cat.emoji}),
-        o("div",{className:"f1 minw0",children:[t("div",{className:"tru",style:{fontSize:13,fontWeight:500,color:c.tx},children:e.merchant||e.payee||e.note||cat.label}),t("div",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.tm},children:rdt(e)})]}),t("div",{style:{fontFamily:'var(--nf)',fontSize:14,fontWeight:600,flexShrink:0},children:fm(e.amount,e.currency||currency)})]})})]})})}),
+        o("div",{className:"f1 minw0",children:[t("div",{className:"tru",style:{fontSize:13,fontWeight:500,color:c.tx},children:e.merchant||e.payee||e.note||cat.label}),t("div",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.tm},children:rdt(e)})]}),t("div",{style:{fontFamily:'var(--nf)',fontSize:14,fontWeight:600,flexShrink:0,color:e.type==="income"?c.mt:c.tx},children:(e.type==="income"?"+":kind==="mixed"&&e.type==="expense"?"−":"")+fm(e.amount,e.currency||currency)})]})})]})})}),
     t("button",{onClick:()=>sBulk({k:"add"}),className:"w100 act95 trt",style:{marginTop:14,padding:"12px 0",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:12,color:c.tx,fontSize:13},children:"+ Add entries to this thread"}),
     selMode&&t("div",{style:{height:84}}),
     selMode&&createPortal(t("div",{style:{position:"fixed",left:0,right:0,bottom:0,zIndex:45,display:"flex",justifyContent:"center",zoom:"var(--fz)"},children:o("div",{style:{width:"100%",maxWidth:AW,background:c.sfg,borderTop:`1px solid ${c.br}`,boxShadow:"0 -8px 30px rgba(0,0,0,.45)",padding:"10px 12px calc(env(safe-area-inset-bottom,0px) + 10px)"},children:[
@@ -9724,7 +9750,7 @@ function ThreadBulkSheet({kind,data,threadId,ids,onClose,onApply}){
     row("expense","🔴","Expense",()=>onApply(ids,{__type:"expense"}),false),row("income","💚","Income",()=>onApply(ids,{__type:"income"}),false)]})});
   if(kind==="currency")return t(Sht,{onClose,children:o(Fragment,{children:[ttl("Currency","Applies to "+cnt+" (label only, no conversion)"),
     ...["INR","USD","EUR","GBP","AED","SGD","AUD","CAD"].map(cu=>row(cu,"💱",cu,()=>onApply(ids,{currency:cu}),false))]})});
-  const cand=(data.expenses||[]).filter(e=>e.threadId!==threadId).sort((a,b)=>b.date-a.date).filter(e=>{const s=q.trim().toLowerCase();return !s||((e.merchant||"")+" "+(e.note||"")+" "+co(e.category).label).toLowerCase().includes(s)}).slice(0,200);
+  const cand=(data.expenses||[]).filter(e=>e.threadId!==threadId&&(e.type==="expense"||e.type==="income")).sort((a,b)=>b.date-a.date).filter(e=>{const s=q.trim().toLowerCase();return !s||((e.merchant||"")+" "+(e.note||"")+" "+co(e.category).label).toLowerCase().includes(s)}).slice(0,200);
   const groups=[];cand.forEach(e=>{const l=rd(e.date),g=groups[groups.length-1];if(g&&g.label===l)g.items.push(e);else groups.push({label:l,items:[e]})});
   const tog=ids2=>sPick(p=>{const m=new Set(p),all=ids2.every(i=>m.has(i));ids2.forEach(i=>all?m.delete(i):m.add(i));return m});
   return t(Sht,{onClose,children:o(Fragment,{children:[ttl("Add entries to thread","Tick any entries, or a whole day, then add them at once"),
@@ -9741,9 +9767,9 @@ return o("div",{style:{padding:"8px 0 32px"},className:"st",children:[
   o("div",{style:{padding:"0 24px"},children:[
     o("div",{className:"f",style:{gap:12,marginBottom:16},children:[
       o("div",{style:{flexShrink:0},children:[t("label",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"ICON"}),t("input",{value:em,onChange:e=>sEm(e.target.value.slice(0,2)),style:{width:56,height:56,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:0,color:c.tx,fontSize:26,outline:"none",fontFamily:'var(--tf)',textAlign:"center"}})]}),
-      o("div",{style:{flex:1},children:[t(FI,{label:"Thread name",value:n,onChange:sN,placeholder:"e.g., Pregnancy, Car loan EMI"})]}),
+      o("div",{style:{flex:1},children:[t(FI,{label:"Thread name",value:n,onChange:sN,placeholder:"e.g., Pregnancy, Car loan EMI, Freelance"})]}),
     ]}),
-    o("div",{children:[t("label",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"BUDGET (OPTIONAL)"}),o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px"},children:[t("span",{style:{color:c.td,fontFamily:'var(--nf)',fontSize:18},children:data?.currency||"₹"}),t("input",{type:"text",inputMode:"decimal",value:bg,onChange:e=>sBg(e.target.value.replace(/[^\d.]/g,"")),placeholder:"No limit — just track",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:18,fontFamily:'var(--nf)',fontWeight:500}})]}),t("div",{style:{fontSize:11,color:c.tm,marginTop:6},children:"Set a target to see a progress bar. Leave blank to just track spending."})]}),
+    o("div",{children:[t("label",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"BUDGET / TARGET (OPTIONAL)"}),o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px"},children:[t("span",{style:{color:c.td,fontFamily:'var(--nf)',fontSize:18},children:data?.currency||"₹"}),t("input",{type:"text",inputMode:"decimal",value:bg,onChange:e=>sBg(e.target.value.replace(/[^\d.]/g,"")),placeholder:"No limit — just track",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:18,fontFamily:'var(--nf)',fontWeight:500}})]}),t("div",{style:{fontSize:11,color:c.tm,marginTop:6},children:"Caps spending for a spending thread. For an income-only thread it becomes a target to reach. Leave blank to just track."})]}),
     t("button",{disabled:!va,onClick:()=>onSave({name:n.trim(),emoji:em||"🧵",budget:bg?parseFloat(bg):null}),className:"w100 act98 tr",style:{marginTop:24,padding:"16px 0",background:va?c.ac:c.sf2,color:va?"#0a0a0a":c.tm,borderRadius:14,fontWeight:600,fontSize:15,letterSpacing:.3,border:"none"},children:va?(iE?"Save changes":"Create thread"):"Give it a name"}),
   ]}),
 ]})}
@@ -11968,6 +11994,11 @@ const lnDay=ts=>{const d=new Date(ts);return new Date(d.getFullYear(),d.getMonth
 const lnAddM=(ts,k)=>{const d=new Date(ts),day=d.getDate(),x=new Date(d.getFullYear(),d.getMonth()+k,1),dim=new Date(x.getFullYear(),x.getMonth()+1,0).getDate();x.setDate(Math.min(day,dim));return x.getTime()};
 const lnR2=x=>Math.round((Number(x)||0)*100)/100;
 const lnEmi=(P,n,rate)=>{const r=(rate||0)/1200;if(!(n>0))return lnR2(P);if(!r)return lnR2(P/n);const f=Math.pow(1+r,n);return lnR2(P*r*f/(f-1))};
+// Floating rates: L.rate is the opening rate; L.rateChanges=[{id,date,rate,mode:"tenure"|"emi",note}] are resets
+// that apply from their date onward. mode: "tenure" keeps the EMI (loan ends sooner/later), "emi" keeps the end date.
+const lnRateList=L=>[...((L&&L.rateChanges)||[])].filter(x=>x&&x.date&&Number(x.rate)>=0).sort((a,b)=>a.date-b.date);
+const lnRateAt=(L,ts)=>{let r=(L&&L.rate)||0;const d=lnDay(ts||Date.now());for(const x of lnRateList(L)){if(lnDay(x.date)<=d)r=Number(x.rate);else break}return r};
+const lnCurRate=L=>lnRateAt(L,Date.now());
 const lnFmtD=ts=>new Date(ts).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
 const lnYMD=ts=>tsToYMD(ts);
 const lnFromYMD=s=>{const m=String(s||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?new Date(+m[1],+m[2]-1,+m[3]).getTime():null};
@@ -11975,21 +12006,30 @@ const lnFromYMD=s=>{const m=String(s||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);ret
 // month's interest: mode "tenure" keeps the EMI (loan ends sooner), mode "emi" keeps the end date (EMI drops).
 function loanSchedule(L){
   if(!L||L.kind==="od"||!(L.principal>0)||!L.emiStart)return[];
-  const r=(L.rate||0)/1200;let bal=L.principal;const rows=[];
-  let emi=L.emi>0?L.emi:lnEmi(L.principal,L.tenure,L.rate);
-  const pre=[...(L.prepayments||[])].sort((a,b)=>a.date-b.date);let pi=0;
+  let rate=L.rate||0;let bal=L.principal;const rows=[];
+  let emi=L.emi>0?L.emi:lnEmi(L.principal,L.tenure,rate);
+  // Part payments and rate resets share one timeline; a reset on the same day applies first.
+  const rc=lnRateList(L),pre=[...(L.prepayments||[])];
+  const ev=[...pre.map(p=>({k:"pre",date:p.date,p})),...rc.map(x=>({k:"rate",date:x.date,x}))].sort((a,b)=>a.date-b.date||(a.k===b.k?0:a.k==="rate"?-1:1));
+  // Once the EMI and the interest no longer line up with the original tenure, the last row must not sweep the balance.
+  const free=pre.length>0||rc.some(x=>x.mode!=="emi");let pi=0;
   for(let k=0;bal>0.005&&k<1200;k++){
     const due=lnAddM(L.emiStart,k);let prepaid=0;
-    while(pi<pre.length&&lnDay(pre[pi].date)<=due){
-      const p=pre[pi++],amt=Math.min(p.amount,bal);bal-=amt;prepaid+=amt;
-      if(p.mode==="emi"&&bal>0.005)emi=lnEmi(bal,Math.max(1,L.tenure-k),L.rate);
+    while(pi<ev.length&&lnDay(ev[pi].date)<=due){
+      const e=ev[pi++];
+      if(e.k==="rate"){rate=Number(e.x.rate);if(e.x.mode==="emi"&&bal>0.005)emi=lnEmi(bal,Math.max(1,L.tenure-k),rate);continue}
+      const p=e.p,amt=Math.min(p.amount,bal);bal-=amt;prepaid+=amt;
+      if(p.mode==="emi"&&bal>0.005)emi=lnEmi(bal,Math.max(1,L.tenure-k),rate);
     }
     if(bal<=0.005)break;
-    const interest=lnR2(bal*r);let pay=Math.min(emi,lnR2(bal+interest));let principal=lnR2(pay-interest);
+    const interest=lnR2(bal*rate/1200);
+    // A higher rate can push the interest past a fixed EMI; re-base the EMI so the loan still amortises.
+    if(!(emi>interest+0.005))emi=lnEmi(bal,Math.max(1,L.tenure-k),rate);
+    let pay=Math.min(emi,lnR2(bal+interest));let principal=lnR2(pay-interest);
     if(principal<=0){principal=0.01;pay=lnR2(interest+0.01)}
-    if(pay>=lnR2(bal+interest)-0.005||(!L.emiManual&&k>=L.tenure-1&&!pre.length)){pay=lnR2(bal+interest);principal=lnR2(bal)}
+    if(pay>=lnR2(bal+interest)-0.005||(!L.emiManual&&k>=L.tenure-1&&!free)){pay=lnR2(bal+interest);principal=lnR2(bal)}
     bal=lnR2(bal-principal);
-    rows.push({n:k+1,due,emi:pay,interest,principal,balance:Math.max(0,bal),prepaid});
+    rows.push({n:k+1,due,emi:pay,interest,principal,balance:Math.max(0,bal),prepaid,rate});
   }
   return rows;
 }
@@ -11998,9 +12038,11 @@ function loanSchedule(L){
 // first, then principal; a drawdown adds principal. `settle` pays the interest accrued so far in the open cycle too.
 function loanFlexi(L,now){
   const end=L.closedAt?Math.min(lnDay(now||Date.now()),lnDay(L.closedAt)):lnDay(now||Date.now());
-  const r=(L.rate||0)/1200,start=lnDay(L.sanction||end);
-  const ev=[{id:"init",date:start,kind:"draw",amount:L.principal||0},...(L.fxTxns||[]).map(x=>({...x,date:Math.max(start,lnDay(x.date))}))]
-    .sort((a,b)=>a.date-b.date||(a.kind===b.kind?0:a.kind==="draw"?-1:1));
+  const start=lnDay(L.sanction||end);let r=(L.rate||0)/1200;
+  // Rate resets are events on the same timeline: interest accrues at the rate in force on each day.
+  const rk={draw:0,rate:1,repay:2};
+  const ev=[{id:"init",date:start,kind:"draw",amount:L.principal||0},...(L.fxTxns||[]).map(x=>({...x,date:Math.max(start,lnDay(x.date))})),...lnRateList(L).map(x=>({id:x.id,kind:"rate",rate:Number(x.rate),date:Math.max(start,lnDay(x.date))}))]
+    .sort((a,b)=>a.date-b.date||(rk[a.kind]||0)-(rk[b.kind]||0));
   let P=0,U=0,charged=0,paidAmt=0,borrowed=0,accruing=0,nextCharge=null,pi=0;const cycles=[],ipay=[];
   for(let k=0;k<1200;k++){
     const cs=lnAddM(start,k),ce=lnAddM(start,k+1);if(cs>end)break;
@@ -12010,6 +12052,7 @@ function loanFlexi(L,now){
     const charge=()=>{const add=lnR2(accr-done);U=lnR2(U+add);charged=lnR2(charged+add);done=lnR2(done+add)};
     while(pi<ev.length&&ev[pi].date<ce&&ev[pi].date<=end){
       const e=ev[pi++];seg(e.date);
+      if(e.kind==="rate"){r=e.rate/1200;continue}
       if(e.kind==="draw"){P=lnR2(P+e.amount);borrowed=lnR2(borrowed+e.amount);if(e.id==="init")row.open=P;else row.draw=lnR2(row.draw+e.amount)}
       else{
         if(e.settle)charge();
@@ -12053,7 +12096,7 @@ function loanState(L,now){
   }
   if(L.kind==="od"){
     const used=Math.max(0,L.principal||0);
-    return{od:true,rows:[],unpaid:[],outstanding:used,remaining:used,paidAmt:0,next:null,overdue:[],closed:!!L.closedAt||used<=0.005,remainingN:0,monthlyInt:lnR2(used*(L.rate||0)/1200),progress:0,totalPayable:used,interestTotal:0,interestLeft:0,lastRow:null};
+    return{od:true,rows:[],unpaid:[],outstanding:used,remaining:used,paidAmt:0,next:null,overdue:[],closed:!!L.closedAt||used<=0.005,remainingN:0,monthlyInt:lnR2(used*lnRateAt(L,now)/1200),progress:0,totalPayable:used,interestTotal:0,interestLeft:0,lastRow:null};
   }
   const rows=loanSchedule(L),pays=new Map((L.payments||[]).map(p=>[p.n,p]));
   const unpaid=rows.filter(r=>!pays.has(r.n)),paidRows=rows.filter(r=>pays.has(r.n));
@@ -12087,6 +12130,19 @@ function loanWhatIf(L,amount,mode){
   const lastBase=base.unpaid[base.unpaid.length-1],lastNew=s2.unpaid[s2.unpaid.length-1];
   return{amt,saved:lnR2(base.interestLeft-s2.interestLeft),newN:s2.remainingN,oldN:base.remainingN,newEmi:s2.next?s2.next.emi:0,oldEmi:base.next?base.next.emi:0,closeOld:lastBase?lastBase.due:null,closeNew:lastNew?lastNew.due:null,closed:s2.closed};
 }
+// Rate-reset what-if: what a new floating rate does to the EMI, the remaining EMIs and the interest still to pay.
+function loanRateWhatIf(L,rate,dateTs,mode){
+  const base=loanState(L);if(base.closed)return null;
+  const L2={...L,rateChanges:[...(L.rateChanges||[]).filter(x=>lnDay(x.date)!==lnDay(dateTs)),{id:"x",date:dateTs,rate,mode}]};
+  const s2=loanState(L2);
+  if(L.kind==="flexi"||L.kind==="od"){
+    const P=base.principalDue!=null?base.principalDue:base.outstanding;
+    return{flat:true,oldInt:lnR2(P*lnCurRate(L)/1200),newInt:lnR2(P*rate/1200)};
+  }
+  const day=lnDay(dateTs),pick=st=>st.unpaid.find(r=>lnDay(r.due)>=day)||st.next||{emi:0};
+  const lastB=base.unpaid[base.unpaid.length-1],lastN=s2.unpaid[s2.unpaid.length-1];
+  return{flat:false,oldEmi:pick(base).emi,newEmi:pick(s2).emi,oldN:base.remainingN,newN:s2.remainingN,extra:lnR2(s2.interestLeft-base.interestLeft),closeOld:lastB?lastB.due:null,closeNew:lastN?lastN.due:null};
+}
 // EMI reminders: fire a notification when an installment is due within `remindDays` (or overdue), once a day.
 function checkLoanReminders(d){
   if(typeof Notification==="undefined"||Notification.permission!=="granted")return;
@@ -12106,16 +12162,16 @@ function checkLoanReminders(d){
 // Exports: one loan (summary + schedule + payments) or all loans.
 function loanExportRows(L,cur){
   const st=loanState(L),pays=new Map((L.payments||[]).map(p=>[p.n,p]));
-  const summary=[["Lender / Person",L.lender||""],["Type",(LOAN_KINDS[L.kind]||{}).l||""],["Purpose",L.purpose||""],["Loan amount",L.principal],["Interest rate % (yearly)",L.rate],["Tenure (months)",L.tenure],["Sanction date",lnFmtD(L.sanction)],["First EMI date",L.emiStart?lnFmtD(L.emiStart):""],["Monthly EMI",st.next?st.next.emi:(st.rows[0]?st.rows[0].emi:"")],["Paid till date",st.paidAmt],["Principal outstanding",st.outstanding],["Remaining amount",st.remaining],["Total interest",st.interestTotal],["Currency",cur]];
+  const summary=[["Lender / Person",L.lender||""],["Type",(LOAN_KINDS[L.kind]||{}).l||""],["Purpose",L.purpose||""],["Loan amount",L.principal],["Interest rate % (yearly)",lnCurRate(L)],["Tenure (months)",L.tenure],["Sanction date",lnFmtD(L.sanction)],["First EMI date",L.emiStart?lnFmtD(L.emiStart):""],["Monthly EMI",st.next?st.next.emi:(st.rows[0]?st.rows[0].emi:"")],["Paid till date",st.paidAmt],["Principal outstanding",st.outstanding],["Remaining amount",st.remaining],["Total interest",st.interestTotal],["Currency",cur]];
   const sched=[["#","Due date","EMI","Principal","Interest","Balance","Status","Paid on"],...st.rows.map(r=>{const p=pays.get(r.n);return[r.n,lnFmtD(r.due),r.emi,r.principal,r.interest,r.balance,LN_ST[lnPayStatus(L,r,p)].l,p?lnFmtD(p.date):""]})];
-  const events=[["Date","Type","Amount","Note"],...(L.payments||[]).map(p=>[lnFmtD(p.date),"EMI #"+p.n,p.amount,p.auto?"Auto-marked paid":""]),...(L.prepayments||[]).map(p=>[lnFmtD(p.date),"Part payment",p.amount,p.mode==="emi"?"Reduce EMI":"Reduce tenure"]),...(L.fxTxns||[]).map(p=>[lnFmtD(p.date),p.settle?"Settlement":p.kind==="draw"?"Drawdown":"Repayment",p.amount,p.note||""]),...(L.odTxns||[]).map(p=>[lnFmtD(p.date),p.kind==="draw"?"Withdrawal":"Repayment",p.amount,p.note||""])];
+  const events=[["Date","Type","Amount","Note"],...(L.payments||[]).map(p=>[lnFmtD(p.date),"EMI #"+p.n,p.amount,p.auto?"Auto-marked paid":""]),...(L.prepayments||[]).map(p=>[lnFmtD(p.date),"Part payment",p.amount,p.mode==="emi"?"Reduce EMI":"Reduce tenure"]),...(L.fxTxns||[]).map(p=>[lnFmtD(p.date),p.settle?"Settlement":p.kind==="draw"?"Drawdown":"Repayment",p.amount,p.note||""]),...(L.odTxns||[]).map(p=>[lnFmtD(p.date),p.kind==="draw"?"Withdrawal":"Repayment",p.amount,p.note||""]),...lnRateList(L).map(x=>[lnFmtD(x.date),"Rate change",x.rate,(L.kind==="flexi"||L.kind==="od"?"":(x.mode==="emi"?"Keep tenure, EMI changes":"Keep EMI, tenure changes"))])];
   return{summary,sched,events};
 }
 function exportLoanXlsx(loans,cur,title){
   const X=window.XLSX;if(!X){alert("Excel library isn't loaded — check your connection and reload.");return}
   const wb=X.utils.book_new();
   if(loans.length>1){
-    const rows=[["Lender / Person","Type","Loan amount","Rate %","Tenure","Next EMI","Next due","Paid till date","Outstanding","Remaining"],...loans.map(L=>{const st=loanState(L);return[L.lender||"",(LOAN_KINDS[L.kind]||{}).l||"",L.principal,L.rate,L.tenure,st.next?st.next.emi:"",st.next?lnFmtD(st.next.due):"",st.paidAmt,st.outstanding,st.remaining]})];
+    const rows=[["Lender / Person","Type","Loan amount","Rate %","Tenure","Next EMI","Next due","Paid till date","Outstanding","Remaining"],...loans.map(L=>{const st=loanState(L);return[L.lender||"",(LOAN_KINDS[L.kind]||{}).l||"",L.principal,lnCurRate(L),L.tenure,st.next?st.next.emi:"",st.next?lnFmtD(st.next.due):"",st.paidAmt,st.outstanding,st.remaining]})];
     X.utils.book_append_sheet(wb,X.utils.aoa_to_sheet(rows),"All loans");
   }
   loans.forEach((L,i)=>{const{summary,sched,events}=loanExportRows(L,cur);const nm=(i+1)+". "+(String(L.lender||"Loan").replace(/[\\/?*\[\]:]/g,"").slice(0,12)||"Loan");
@@ -12128,7 +12184,7 @@ function exportLoanPdf(loans,cur,title){
   const f=n=>(cur||"")+Number(n||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
   const sec=L=>{const st=loanState(L),pays=new Map((L.payments||[]).map(p=>[p.n,p]));
     const rows=st.rows.map(r=>{const p=pays.get(r.n);const s=lnPayStatus(L,r,p);return`<tr><td>${r.n}</td><td>${_htmlEsc(lnFmtD(r.due))}</td><td class="r">${f(r.emi)}</td><td class="r">${f(r.principal)}</td><td class="r">${f(r.interest)}</td><td class="r">${f(r.balance)}</td><td>${LN_ST[s].l}${p?" · "+_htmlEsc(lnFmtD(p.date)):""}</td></tr>`}).join("");
-    return`<h2>${_htmlEsc((LOAN_KINDS[L.kind]||{}).e+" "+(L.lender||"Loan"))} <small>${_htmlEsc(L.purpose||"")}</small></h2><div class="kv"><span>Loan <b>${f(L.principal)}</b></span><span>Rate <b>${L.rate}% yearly</b></span><span>Tenure <b>${L.tenure} mo</b></span><span>Paid <b>${f(st.paidAmt)}</b></span><span>Outstanding <b>${f(st.outstanding)}</b></span><span>Remaining <b>${f(st.remaining)}</b></span></div>${rows?`<table><thead><tr><th>#</th><th>Due</th><th>EMI</th><th>Principal</th><th>Interest</th><th>Balance</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`:""}`};
+    return`<h2>${_htmlEsc((LOAN_KINDS[L.kind]||{}).e+" "+(L.lender||"Loan"))} <small>${_htmlEsc(L.purpose||"")}</small></h2><div class="kv"><span>Loan <b>${f(L.principal)}</b></span><span>Rate <b>${lnCurRate(L)}% yearly</b></span><span>Tenure <b>${L.tenure} mo</b></span><span>Paid <b>${f(st.paidAmt)}</b></span><span>Outstanding <b>${f(st.outstanding)}</b></span><span>Remaining <b>${f(st.remaining)}</b></span></div>${rows?`<table><thead><tr><th>#</th><th>Due</th><th>EMI</th><th>Principal</th><th>Interest</th><th>Balance</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`:""}`};
   const html=`<!doctype html><html><head><meta charset="utf-8"><title>${_htmlEsc(title||"Loans")}</title><style>*{box-sizing:border-box}body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111;margin:24px;font-size:12px}h1{font-size:18px;margin:0 0 2px}h2{font-size:15px;margin:22px 0 6px}h2 small{color:#666;font-weight:400}.sub{color:#666;font-size:11px;margin-bottom:10px}.kv{display:flex;flex-wrap:wrap;gap:6px 22px;margin-bottom:10px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:5px 7px;border-bottom:1px solid #e6e6e6}th{font-size:10px;text-transform:uppercase;color:#555;border-bottom:2px solid #999}td.r{text-align:right;white-space:nowrap}@media print{body{margin:12mm}tr{break-inside:avoid}h2{break-before:page}h2:first-of-type{break-before:auto}}</style></head><body><h1>${_htmlEsc(title||"Loan report")}</h1><div class="sub">Generated ${_htmlEsc(new Date().toLocaleString("en-US"))}</div>${loans.map(sec).join("")}</body></html>`;
   _printHTML(html);
 }
@@ -12259,6 +12315,36 @@ function LnPrepaySheet({L,data,onClose,onSave}){
     o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn("Record",()=>{if(a>0&&!over&&lnFromYMD(date))onSave({id:"pp_"+uid(),date:lnFromYMD(date),amount:a,mode},log&&L.direction!=="lent"?pw:null)},a>0&&!over,{opacity:a>0&&!over?1:.5})]})
   ]})});
 }
+// Floating-rate reset: the new rate applies from the chosen date to the end of the loan (or the next reset).
+function LnRateSheet({L,data,onClose,onSave}){
+  const cur=data.currency,flat=L.kind==="flexi"||L.kind==="od",now=lnCurRate(L);
+  const[rate,sRate]=useState("");const[date,sDate]=useState(lnYMD(Date.now()));const[mode,sMode]=useState("tenure");const[note,sNote]=useState("");
+  const rn=parseFloat(rate),dTs=lnFromYMD(date);
+  const beforeStart=!!dTs&&dTs<lnDay(L.sanction||dTs),same=!!dTs&&rate!==""&&Math.abs(rn-lnRateAt(L,dTs))<0.00005;
+  const ok=rate!==""&&rn>=0&&rn<=100&&!!dTs&&!beforeStart&&!same;
+  const w=ok?loanRateWhatIf(L,rn,dTs,mode):null;
+  const chip=(k,l)=>t("button",{key:k,onClick:()=>sMode(k),className:"act95 trt",style:{flex:1,padding:"10px 6px",borderRadius:10,fontSize:12.5,background:mode===k?c.ac+"26":c.sf2,border:`1px solid ${mode===k?c.ac:c.brs}`,color:mode===k?c.tx:c.td},children:l});
+  const rowOf=(k,l,v)=>o("div",{key:k,className:"f ia jb",style:{marginTop:k==="s"?0:6},children:[t("span",{style:{fontSize:12,color:c.tm},children:l}),t("span",{style:{fontSize:12.5,color:c.tx},children:v})]});
+  return t(Sht,{onClose,children:o(Fragment,{children:[
+    lnSheetTitle("Change interest rate",`Currently ${now.toFixed(2)}% a year. Enter the new rate and the date it starts — the loan is recalculated from that date.`),
+    lnLbl("NEW RATE % (YEARLY)"),t("input",{value:rate,inputMode:"decimal",placeholder:now.toFixed(2),autoFocus:true,onChange:e=>sRate(e.target.value.replace(/[^\d.]/g,"")),style:lnInp()}),
+    lnLbl("EFFECTIVE FROM"),t("input",{type:"date",value:date,onChange:e=>sDate(e.target.value),style:lnInp()}),
+    beforeStart&&t("div",{style:{fontSize:11.5,color:c.ro,marginTop:6},children:"That's before the loan started ("+lnFmtD(L.sanction)+")."}),
+    same&&!beforeStart&&t("div",{style:{fontSize:11.5,color:c.ro,marginTop:6},children:"The rate on that date is already "+lnRateAt(L,dTs).toFixed(2)+"%."}),
+    !flat&&o("div",{children:[lnLbl("AFTER THE CHANGE"),o("div",{className:"f",style:{gap:8},children:[chip("tenure","Keep EMI · tenure changes"),chip("emi","Keep tenure · EMI changes")]})]}),
+    w&&lnCard(w.flat?[
+      rowOf("s","Interest a month (today's balance)",`${fm(w.oldInt,cur)} → ${fm(w.newInt,cur)}`)
+    ]:[
+      o("div",{key:"s",className:"f ia jb",children:[t("span",{style:{fontSize:12.5,color:c.td},children:w.extra>0?"Extra interest":"Interest saved"}),t("span",{style:{fontFamily:'var(--nf)',fontSize:17,color:w.extra>0?c.ro:c.mt,fontWeight:600},children:fm(Math.abs(w.extra),cur)})]}),
+      rowOf("t","Remaining EMIs",`${w.oldN} → ${w.newN}`),
+      rowOf("e","Monthly EMI",`${fm(w.oldEmi,cur)} → ${fm(w.newEmi,cur)}`),
+      w.closeNew&&rowOf("c","Last installment",`${lnFmtD(w.closeOld)} → ${lnFmtD(w.closeNew)}`)
+    ],{marginTop:12,marginBottom:0,background:c.sf2}),
+    lnLbl("NOTE (OPTIONAL)"),t("input",{value:note,placeholder:"e.g., repo rate cut, bank reset",onChange:e=>sNote(e.target.value),style:lnInp()}),
+    t("div",{style:{fontSize:11,color:c.tm,marginTop:10,lineHeight:1.45},children:flat?"Interest is charged at the old rate up to this date and the new rate after it.":"The new rate applies from the first EMI due on or after this date. Installments already marked paid keep their recorded amounts. You can add more resets later or remove one from Loan Activity."}),
+    o("div",{className:"f",style:{gap:10,marginTop:16},children:[lnBtn("Cancel",onClose),lnBtn("Apply",()=>{if(ok)onSave({id:"rc_"+uid(),date:dTs,rate:rn,mode:flat?"tenure":mode,note:note.trim()||undefined})},ok,{opacity:ok?1:.5})]})
+  ]})});
+}
 function LnForeSheet({L,data,onClose,onSave}){
   const st=loanState(L),cur=data.currency;
   const[pct,sPct]=useState("0");const[date,sDate]=useState(lnYMD(Date.now()));
@@ -12295,7 +12381,7 @@ function LnEditSheet({L,data,onClose,onSave}){
   const field=(lab,k,opts={})=>o("div",{children:[lnLbl(lab),t("input",{value:f[k],type:opts.type||"text",inputMode:opts.num?"decimal":undefined,onChange:e=>up({[k]:opts.num?e.target.value.replace(/[^\d.]/g,""):e.target.value}),placeholder:opts.ph,style:lnInp()})]});
   return t(Sht,{onClose,children:o(Fragment,{children:[
     lnSheetTitle("Edit loan details"),
-    field(L.kind==="friends"?"PERSON":"LENDER","lender"),field("PURPOSE","purpose"),field("DESCRIPTION","desc"),field(isOD?"OD LIMIT ("+data.currency+")":"LOAN AMOUNT ("+data.currency+")","amount",{num:true,ph:"0"}),field("INTEREST RATE % (YEARLY)","rate",{num:true,ph:"0"}),
+    field(L.kind==="friends"?"PERSON":"LENDER","lender"),field("PURPOSE","purpose"),field("DESCRIPTION","desc"),field(isOD?"OD LIMIT ("+data.currency+")":"LOAN AMOUNT ("+data.currency+")","amount",{num:true,ph:"0"}),field((L.rateChanges||[]).length?"OPENING INTEREST RATE % (YEARLY)":"INTEREST RATE % (YEARLY)","rate",{num:true,ph:"0"}),
     !noE&&field("TENURE (MONTHS)","tenure",{num:true,ph:"e.g., 12"}),
     field(isOD?"START DATE":"SANCTION DATE","sanction",{type:"date"}),
     !noE&&field("FIRST EMI DATE","start",{type:"date"}),
@@ -12422,12 +12508,12 @@ function riLoanCost(L,now){
   return lnR2(loanSchedule(L).filter(r=>lnDay(r.due)<=today).reduce((a,r)=>a+r.interest,0)+(L.charges||0));
 }
 function riLoanSummary(data,L){
-  const items=riOf(data,L.id).map(inv=>({inv,s:riStats(inv,L.rate)}));
+  const items=riOf(data,L.id).map(inv=>({inv,s:riStats(inv,lnCurRate(L))}));
   const sum=f=>lnR2(items.reduce((a,x)=>a+f(x.s),0));
   const P=sum(s=>s.P),ret=sum(s=>s.ret),cost=riLoanCost(L),moneyYrs=items.reduce((a,x)=>a+x.s.P*x.s.yrs,0);
   const base=L.kind==="od"?(L.limit||L.principal||0):L.kind==="flexi"?loanFlexi(L).borrowed:(L.principal||0);
   return{items,P,value:sum(s=>s.value),payouts:sum(s=>s.payouts),ret,cost,net:lnR2(ret-cost),hurdleNet:sum(s=>s.net),
-    annual:items.some(x=>x.s.annual!=null)&&moneyYrs>0?ret/moneyYrs*100:null,rate:L.rate||0,base,deployed:base>0?Math.min(100,P/base*100):0};
+    annual:items.some(x=>x.s.annual!=null)&&moneyYrs>0?ret/moneyYrs*100:null,rate:lnCurRate(L),base,deployed:base>0?Math.min(100,P/base*100):0};
 }
 // Earning vs paying, as two bars.
 function riRateBars(annual,rate){
@@ -12457,7 +12543,7 @@ function RiFormSheet({L,data,inv,onClose,onSave}){
     lnLbl("NAME (E.G., SGB 2026 SERIES I, BANK FD)"),t("input",{value:f.name,autoFocus:!iE,onChange:e=>set("name",e.target.value),style:lnInp()}),
     lnLbl("AMOUNT INVESTED ("+data.currency+")"),num("invested","0"),
     lnLbl(mkt?"BUY DATE":"DATE INVESTED"),t("input",{type:"date",value:f.date,onChange:e=>set("date",e.target.value),style:riDateInp()}),
-    !mkt&&lnLbl("EXPECTED RETURN % YEARLY (OPTIONAL)"),!mkt&&num("rate",(L.rate||0)+" is what the loan charges"),
+    !mkt&&lnLbl("EXPECTED RETURN % YEARLY (OPTIONAL)"),!mkt&&num("rate",lnCurRate(L)+" is what the loan charges"),
     !hasExit&&lnLbl(mkt?"CURRENT MARKET VALUE (OPTIONAL)":"CURRENT VALUE (OPTIONAL)"),!hasExit&&num("current",f.type==="fd"?"Leave empty to grow at the expected rate":"Leave empty if unchanged"),
     !mkt&&lnLbl("MATURITY DATE (OPTIONAL)"),!mkt&&t("input",{type:"date",value:f.maturity,onChange:e=>set("maturity",e.target.value),style:riDateInp()}),
     lnLbl(mkt?"SOLD FOR / EXIT VALUE (OPTIONAL)":"EXIT / REDEEMED VALUE (OPTIONAL)"),num("exit","Fill in once you sell to lock in the P&L"),
@@ -12481,7 +12567,7 @@ function RiEntrySheet({data,inv,kind,entry,onClose,onSave,onDelete}){
 }
 // Details of one reinvestment: numbers vs the loan, full history, and every action.
 function RiDetailSheet({L,data,inv,onClose,onAct}){
-  const cur=data.currency,s=riStats(inv,L.rate),tp=invType(inv.type),good=s.net>=0,mkt=riMarket(inv.type),pl=s.closed?"Realised P&L":mkt?"Unrealised P&L":"Total return";
+  const cur=data.currency,s=riStats(inv,lnCurRate(L)),tp=invType(inv.type),good=s.net>=0,mkt=riMarket(inv.type),pl=s.closed?"Realised P&L":mkt?"Unrealised P&L":"Total return";
   const hist=[{k:"start",date:inv.startDate||inv.createdAt,l:mkt?"Bought":"Invested",v:"−"+fm(s.P,cur),col:c.tx},
     ...(s.closed?[{k:"exit",date:s.end,l:mkt?"Sold":"Exited",v:"+"+fm(s.value,cur),col:c.mt}]:[]),
     ...(inv.payouts||[]).map(p=>({k:"pay",e:p,date:p.date,l:(mkt?"Dividend":"Payout")+(p.note?" · "+p.note:""),v:"+"+fm(p.amount,cur),col:c.mt})),
@@ -12494,7 +12580,7 @@ function RiDetailSheet({L,data,inv,onClose,onAct}){
       t("div",{style:{fontSize:12,color:c.td},children:good?"Ahead of the loan by":"Behind the loan by"}),
       t("div",{style:{fontFamily:'var(--nf)',fontSize:24,color:good?c.mt:c.co,marginTop:2},children:fm(Math.abs(s.net),cur)}),
       t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:`${pl} ${riSigned(s.ret,cur)}${s.pnlPct!=null?" ("+(s.pnlPct>=0?"+":"−")+Math.abs(s.pnlPct).toFixed(1)+"%)":""} minus ${fm(s.cost,cur)} the loan charges for ${fm(s.P,cur)} over ${s.yrs<1?Math.max(0,Math.round(s.yrs*12))+" mo":s.yrs.toFixed(1)+" yrs"}`})]}),
-    riRateBars(s.annual,L.rate||0),
+    riRateBars(s.annual,lnCurRate(L)),
     !mkt&&inv.rate!=null&&t("div",{style:{fontSize:11.5,color:c.tm,margin:"-2px 0 8px"},children:`Expected ${riPct(inv.rate)} / yr`+(s.annual!=null?` · actual ${riPct(s.annual)}`:"")}),
     kv(mkt?"Buy value":"Invested",fm(s.P,cur)),kv(s.closed?(mkt?"Exit (sell) value":"Exit value"):"Current value",fm(s.value,cur)),kv(mkt?"Dividends received":"Payouts received",fm(s.payouts,cur),c.mt),kv(pl,riSigned(s.ret,cur)+(s.pnlPct!=null?" · "+(s.pnlPct>=0?"+":"−")+Math.abs(s.pnlPct).toFixed(1)+"%":""),s.ret>=0?c.mt:c.co),kv("Loan cost for this money",fm(s.cost,cur),c.gd),
     o("div",{className:"f",style:{gap:8,marginTop:14},children:[act(mkt?"+ Dividend":"+ Payout",()=>onAct("pay"),true),!s.closed&&act("Update value",()=>onAct("val"))]}),
@@ -12545,6 +12631,8 @@ function LnDetail({L,data,persist,onBack,initTab}){
   const doFx=(tx,pw)=>{const exp=tx.kind==="repay"&&!lent?lnMakeExpense(data,L,tx.amount,pw,tx.date,(tx.settle?"Loan settled · ":"Repayment · ")+(L.purpose||K.l)):null;upd({fxTxns:[...(L.fxTxns||[]),{...tx,expenseId:exp?exp.id:null}],...(tx.settle?{closedAt:tx.date}:{})},addExp(exp));sSheet(null)};
   const delFx=(id)=>{const x=(L.fxTxns||[]).find(q=>q.id===id);if(!x)return;upd({fxTxns:(L.fxTxns||[]).filter(q=>q.id!==id),...(x.settle?{closedAt:null}:{})},x.expenseId?{expenses:(data.expenses||[]).filter(e=>e.id!==x.expenseId)}:{})};
   const doOd=(tx)=>{upd({odTxns:[tx,...(L.odTxns||[])],principal:Math.max(0,lnR2((L.principal||0)+(tx.kind==="draw"?tx.amount:-(tx.prin!=null?tx.prin:tx.amount))))});sSheet(null)};
+  const doRate=(ch)=>{upd({rateChanges:[...(L.rateChanges||[]).filter(x=>lnDay(x.date)!==lnDay(ch.date)),ch]});sSheet(null)};
+  const delRate=(id)=>upd({rateChanges:(L.rateChanges||[]).filter(x=>x.id!==id)});
   const delPre=(id)=>{const p=(L.prepayments||[]).find(x=>x.id===id);upd({prepayments:(L.prepayments||[]).filter(x=>x.id!==id)},p&&p.expenseId?{expenses:(data.expenses||[]).filter(e=>e.id!==p.expenseId)}:{})};
   const kv=(k,v,key)=>o("div",{key:key||k,className:"f jb",style:{padding:"9px 0",borderBottom:`1px solid ${c.brs}`,gap:12},children:[t("span",{style:{fontSize:13,color:c.td},children:k}),t("span",{style:{fontSize:13,color:c.tx,textAlign:"right"},children:v})]});
   const tabs=[["details","Loan Details"],["reinvest","Reinvestments"],["history","Payment History"],["docs","Documents"],["activity","Loan Activity"]].filter(([k])=>!(isOD&&k==="history")&&!(lent&&k==="reinvest"));
@@ -12560,12 +12648,12 @@ function LnDetail({L,data,persist,onBack,initTab}){
   const riRow=({inv,s},i)=>{const tp=invType(inv.type),good=s.net>=0;return t("button",{key:inv.id,onClick:()=>sSheet({k:"ri",id:inv.id}),className:"w100 act98 trt",style:{display:"block",padding:"12px 0",background:"transparent",border:"none",borderTop:i?`1px solid ${c.brs}`:"none",color:"inherit",textAlign:"left"},children:[
     o("div",{className:"f ia jb",style:{gap:10},children:[o("div",{className:"f ia minw0",style:{gap:10},children:[t("span",{style:{width:36,height:36,borderRadius:10,background:tp.color+"26",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0},children:inv.emoji||tp.emoji}),o("div",{className:"tl minw0",children:[t("div",{className:"tru",style:{fontSize:14,color:c.tx,fontWeight:500},children:inv.name}),t("div",{className:"tru",style:{fontSize:11,color:c.tm,marginTop:1},children:`${tp.label} · ${fs(s.P,cur)} on ${lnFmtD(inv.startDate||inv.createdAt)}`})]})]}),
       o("div",{className:"tr",style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:14,color:c.tx},children:fm(s.value,cur)}),t("div",{style:{fontSize:10.5,color:c.tm},children:s.payouts>0?"+ "+fm(s.payouts,cur)+" paid out":s.closed?"exit value":"value"})]})]}),
-    o("div",{className:"f ia fw",style:{gap:6,marginTop:8},children:[riMarket(inv.type)?t(LnPill,{col:s.ret>=0?c.mt:c.co,children:`${s.closed?"Realised":"Unrealised"} ${riSigned(s.ret,cur)}${s.pnlPct!=null?" · "+(s.pnlPct>=0?"+":"−")+Math.abs(s.pnlPct).toFixed(1)+"%":""}`}):t(LnPill,{col:s.annual==null?c.tm:s.annual>=(L.rate||0)?c.mt:c.co,children:s.annual==null?"Too early for a yearly %":`${riPct(s.annual)} vs ${riPct(L.rate||0)} / yr`}),t(LnPill,{col:good?c.mt:c.co,children:(good?"Ahead ":"Behind ")+fm(Math.abs(s.net),cur)})]})]})};
+    o("div",{className:"f ia fw",style:{gap:6,marginTop:8},children:[riMarket(inv.type)?t(LnPill,{col:s.ret>=0?c.mt:c.co,children:`${s.closed?"Realised":"Unrealised"} ${riSigned(s.ret,cur)}${s.pnlPct!=null?" · "+(s.pnlPct>=0?"+":"−")+Math.abs(s.pnlPct).toFixed(1)+"%":""}`}):t(LnPill,{col:s.annual==null?c.tm:s.annual>=lnCurRate(L)?c.mt:c.co,children:s.annual==null?"Too early for a yearly %":`${riPct(s.annual)} vs ${riPct(L.rate||0)} / yr`}),t(LnPill,{col:good?c.mt:c.co,children:(good?"Ahead ":"Behind ")+fm(Math.abs(s.net),cur)})]})]})};
   const riTab=o(Fragment,{children:[
     ri.items.length>0&&riSummaryCard(ri,cur),
     lnCard([
       o("div",{key:"h",className:"f ia jb",style:{marginBottom:6},children:[t("span",{style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx},children:"Reinvestments"}),t("button",{onClick:()=>sSheet({k:"riAdd"}),"aria-label":"Add reinvestment",className:"act90 trt",style:{width:30,height:30,borderRadius:15,border:"none",background:c.ac,color:"#0a0a0a",fontSize:18,lineHeight:1},children:"+"})]}),
-      ri.items.length===0&&o("div",{key:"e",style:{textAlign:"center",color:c.td,fontSize:12.5,lineHeight:1.5,padding:"6px 0 10px"},children:[t("div",{style:{color:c.tx,fontWeight:600,marginBottom:4},children:"Reinvested this loan?"}),"Add where the money went (bonds, SGB, FD, funds, stocks…). Log payouts and value updates over time and see if it earns more than the "+riPct(L.rate||0)+" this loan charges."]}),
+      ri.items.length===0&&o("div",{key:"e",style:{textAlign:"center",color:c.td,fontSize:12.5,lineHeight:1.5,padding:"6px 0 10px"},children:[t("div",{style:{color:c.tx,fontWeight:600,marginBottom:4},children:"Reinvested this loan?"}),"Add where the money went (bonds, SGB, FD, funds, stocks…). Log payouts and value updates over time and see if it earns more than the "+riPct(lnCurRate(L))+" this loan charges."]}),
       ...ri.items.map(riRow),
       o("div",{key:"b",className:"f",style:{gap:8,marginTop:12},children:[lnBtn("+ Add reinvestment",()=>sSheet({k:"riAdd"}),ri.items.length===0,{fontSize:13,padding:"11px 0"}),invs.some(i=>!i.loanId)&&lnBtn("🔗 Link existing",()=>sSheet({k:"riLink"}),false,{fontSize:13,padding:"11px 0"})]}),
       t("div",{key:"s",style:{fontSize:10.5,color:c.tm,textAlign:"center",marginTop:8},children:"These also appear in My Investments. Edits on either screen stay in sync."})
@@ -12645,6 +12733,12 @@ function LnDetail({L,data,persist,onBack,initTab}){
       isOD&&!(L.odTxns||[]).length&&t("div",{key:"n",style:{fontSize:12,color:c.tm,padding:"6px 0"},children:"No activity yet."}),
       !isOD&&o("div",{key:"tt",className:"f ia jb",style:{paddingTop:8,borderTop:`1px solid ${c.brs}`},children:[t("span",{style:{fontSize:13,color:c.td},children:"Total Disbursed"}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:c.tx},children:fm(isFx?fx.borrowed:L.principal,cur)})]})
     ]),
+    lnCard([
+      o("div",{key:"h",className:"f ia jb",style:{marginBottom:8},children:[t("span",{style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx},children:"Interest Rate"}),!st.closed&&t("button",{onClick:()=>sSheet({k:"rate"}),"aria-label":"Change interest rate",className:"act90 trt",style:{width:30,height:30,borderRadius:15,border:"none",background:c.ac,color:"#0a0a0a",fontSize:18,lineHeight:1},children:"+"})]}),
+      o("div",{key:"o",className:"f ia jb",style:{padding:"8px 0"},children:[o("div",{className:"tl",children:[t("div",{style:{fontSize:13,color:c.tx},children:lnFmtD(L.sanction)}),t("div",{style:{fontSize:11,color:c.tm},children:"Opening rate"})]}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:c.tx},children:(L.rate||0).toFixed(2)+"%"})]}),
+      ...(()=>{let prev=L.rate||0;return lnRateList(L).map(x=>{const up=x.rate>prev,dn=x.rate<prev;prev=x.rate;return o("div",{key:x.id,className:"f ia jb",style:{padding:"8px 0",borderTop:`1px solid ${c.brs}`,gap:8},children:[o("div",{className:"tl minw0",children:[t("div",{style:{fontSize:13,color:c.tx},children:lnFmtD(x.date)+(lnDay(x.date)>lnDay(Date.now())?" · upcoming":"")}),t("div",{className:"tru",style:{fontSize:11,color:c.tm},children:(noEmi?"Rate change":x.mode==="emi"?"Kept tenure, EMI changed":"Kept EMI, tenure changed")+(x.note?" · "+x.note:"")})]}),o("div",{className:"f ia",style:{gap:8},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:up?c.ro:dn?c.mt:c.tx},children:(up?"▲ ":dn?"▼ ":"")+Number(x.rate).toFixed(2)+"%"}),t("button",{onClick:()=>delRate(x.id),"aria-label":"Remove rate change",className:"act90 trt",style:{background:"transparent",border:"none",color:c.tm,fontSize:16},children:"×"})]})]})})})(),
+      !(L.rateChanges||[]).length&&t("div",{key:"n",style:{textAlign:"center",color:c.tm,fontSize:12,lineHeight:1.45,padding:"8px 0"},children:"Floating rate? Tap + whenever your lender resets it and the loan is recalculated from that date."})
+    ]),
     !noEmi&&lnCard([
       o("div",{key:"h",className:"f ia jb",style:{marginBottom:8},children:[t("span",{style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx},children:"Part Payments"}),!st.closed&&t("button",{onClick:()=>sSheet({k:"pre"}),"aria-label":"Add part payment",className:"act90 trt",style:{width:30,height:30,borderRadius:15,border:"none",background:c.ac,color:"#0a0a0a",fontSize:18,lineHeight:1},children:"+"})]}),
       ...(L.prepayments||[]).map(p=>o("div",{key:p.id,className:"f ia jb",style:{padding:"8px 0",borderTop:`1px solid ${c.brs}`,gap:8},children:[o("div",{className:"tl",children:[t("div",{style:{fontSize:13,color:c.tx},children:(p.foreclosure?"Foreclosure · ":"")+lnFmtD(p.date)}),t("div",{style:{fontSize:11,color:c.tm},children:p.foreclosure?"Loan closed":(p.mode==="emi"?"Reduced EMI":"Reduced tenure")})]}),o("div",{className:"f ia",style:{gap:8},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:c.mt},children:fm(p.amount,cur)}),t("button",{onClick:()=>delPre(p.id),"aria-label":"Remove",className:"act90 trt",style:{background:"transparent",border:"none",color:c.tm,fontSize:16},children:"×"})]})]})),
@@ -12670,6 +12764,7 @@ function LnDetail({L,data,persist,onBack,initTab}){
   // ---- manage actions ----
   const actions=[
     !noEmi&&!st.closed&&{e:"✅",l:lent?"Record payment received":"Record EMI payment",s:"Mark an installment as paid",f:()=>sSheet({k:"pay"})},
+    !st.closed&&{e:"📈",l:"Change interest rate",s:"Floating rate reset — recalculates from a date you pick",f:()=>sSheet({k:"rate"})},
     !noEmi&&!st.closed&&{e:"💰",l:"Part payment",s:"See interest saved before you commit",f:()=>sSheet({k:"pre"})},
     !noEmi&&!st.closed&&{e:"🏁",l:"Foreclose loan",s:"Close it today with one payment",f:()=>sSheet({k:"fore"})},
     isFx&&!st.closed&&{e:"⬆️",l:lent?"Record payment received":"Add repayment",s:"Edit the amount and split it between interest and principal",f:()=>sSheet({k:"fx",kind:"repay"})},
@@ -12709,8 +12804,8 @@ function LnDetail({L,data,persist,onBack,initTab}){
       ]})
     ]),
     lnCard([
-      o("div",{key:"t",className:"f ia jb",style:{marginBottom:4},children:[t("span",{style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx},children:"Loan Health"}),t("button",{onClick:()=>sSheet({k:"edit"}),className:"act95 trt",style:{background:"transparent",border:`1px solid ${c.brs}`,borderRadius:8,color:c.ac,fontSize:12,padding:"4px 10px"},children:"✏️ Edit"})]}),
-      kv(isOD?"Amount Used":"Principal Outstanding",fm(isFx?fx.P:st.outstanding,cur)),kv("Interest Rate",(L.rate||0).toFixed(2)+"% Yearly"),!noEmi&&kv("Remaining Tenure",st.remainingN+" month"+(st.remainingN===1?"":"s"))
+      o("div",{key:"t",className:"f ia jb",style:{marginBottom:4},children:[t("span",{style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx},children:"Loan Health"}),o("div",{className:"f ia",style:{gap:6},children:[!st.closed&&t("button",{onClick:()=>sSheet({k:"rate"}),className:"act95 trt",style:{background:"transparent",border:`1px solid ${c.brs}`,borderRadius:8,color:c.ac,fontSize:12,padding:"4px 10px"},children:"📈 Change rate"}),t("button",{onClick:()=>sSheet({k:"edit"}),className:"act95 trt",style:{background:"transparent",border:`1px solid ${c.brs}`,borderRadius:8,color:c.ac,fontSize:12,padding:"4px 10px"},children:"✏️ Edit"})]})]}),
+      kv(isOD?"Amount Used":"Principal Outstanding",fm(isFx?fx.P:st.outstanding,cur)),kv("Interest Rate",lnCurRate(L).toFixed(2)+"% Yearly"),(L.rateChanges||[]).length>0&&kv("Opening Rate",(L.rate||0).toFixed(2)+"% Yearly"),!noEmi&&kv("Remaining Tenure",st.remainingN+" month"+(st.remainingN===1?"":"s"))
     ].filter(Boolean)),
     breakdown,
     !lent&&ri.items.length>0&&tab!=="reinvest"&&t("button",{onClick:()=>sTab("reinvest"),className:"w100 f ia jb act98 trt",style:{padding:"12px 16px",marginBottom:12,background:c.sfg,border:`1px solid ${(ri.net>=0?c.mt:c.co)}55`,borderRadius:16,color:"inherit",textAlign:"left",gap:10},children:[o("div",{className:"tl minw0",children:[t("div",{style:{fontSize:13,color:c.tx},children:`📈 ${fm(ri.P,cur)} reinvested`}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:2},children:`Earning ${riPct(ri.annual)} vs paying ${riPct(ri.rate)} / yr`})]}),o("div",{className:"tr",style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:15,color:ri.net>=0?c.mt:c.co},children:riSigned(ri.net,cur)}),t("div",{style:{fontSize:10.5,color:c.tm},children:ri.net>=0?"ahead ›":"behind ›"})]})]}),
@@ -12719,6 +12814,7 @@ function LnDetail({L,data,persist,onBack,initTab}){
     open&&t(Sht,{onClose:()=>sOpen(false),children:o(Fragment,{children:[lnSheetTitle("Manage Loan"),...actions.map(a=>t("button",{key:a.l,onClick:()=>{sOpen(false);a.f()},className:"w100 f ia act99 trt",style:{padding:"12px 4px",gap:12,background:"transparent",border:"none",borderBottom:`1px solid ${c.brs}`,color:"inherit",textAlign:"left"},children:[t("span",{style:{fontSize:20,width:28,textAlign:"center"},children:a.e}),o("div",{className:"tl",children:[t("div",{style:{fontSize:14,color:a.danger?c.ro:c.tx},children:a.l}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:1},children:a.s})]})]}))]})}),
     sheet&&sheet.k==="pay"&&t(LnPaySheet,{L,data,row:sheet.row,onClose:()=>sSheet(null),onSave:doPay}),
     sheet&&sheet.k==="pre"&&t(LnPrepaySheet,{L,data,onClose:()=>sSheet(null),onSave:doPre}),
+    sheet&&sheet.k==="rate"&&t(LnRateSheet,{L,data,onClose:()=>sSheet(null),onSave:doRate}),
     sheet&&sheet.k==="fore"&&t(LnForeSheet,{L,data,onClose:()=>sSheet(null),onSave:doFore}),
     sheet&&sheet.k==="remind"&&t(LnRemindSheet,{L,onClose:()=>sSheet(null),onSave:d=>{upd({remindDays:d});sSheet(null)}}),
     sheet&&sheet.k==="edit"&&t(LnEditSheet,{L,data,onClose:()=>sSheet(null),onSave:p=>{upd(p);sSheet(null)}}),
