@@ -13049,64 +13049,400 @@ function riTimeline(items){
   }
   return pts;
 }
+// === REINVESTMENT HUB — data helpers (categories, filters, AI operations) ===
+// Category definitions live in data.calculators.riCats=[{id,name,emoji,color}]; a holding carries inv.cats=[ids].
+const RI_CAT_COLORS=["#6BD9B5","#7FB8FF","#C9A6FF","#FFC857","#FF9F6B","#5EC8C8","#F49BD0","#A8E6CF"];
+const riCatList=data=>((data.calculators||{}).riCats)||[];
+const riDays=(a,b)=>Math.round((lnDay(b)-lnDay(a))/864e5);
+const riDur=d=>{d=Math.abs(Math.round(d));if(d<31)return d+" day"+(d===1?"":"s");const m=Math.round(d/30.44);if(m<12)return m+" mo";const y=Math.floor(m/12),r=m%12;return y+"y"+(r?" "+r+"m":"")};
+const riStatus=(inv,now)=>riExited(inv)?"exited":(inv.maturityDate&&lnDay(inv.maturityDate)<=lnDay(now||Date.now())?"matured":"active");
+// Every reinvestment of every borrowed loan, with its stats, categories and dates worked out once.
+function riRows(data,now){
+  const cats=riCatList(data),today=now||Date.now();
+  return (data.loanTracker||[]).filter(L=>L.direction!=="lent").flatMap(L=>riOf(data,L.id).map(inv=>{
+    const s=riStats(inv,lnCurRate(L),today),start=inv.startDate||inv.createdAt||today,mat=!riMarket(inv.type)&&inv.maturityDate?inv.maturityDate:null;
+    const last=(inv.payouts||[]).reduce((m,p)=>Math.max(m,p.date||0),0)||null;
+    const next=!s.closed&&!riMarket(inv.type)&&inv.payFreq>0?lnAddM(last||start,inv.payFreq):null;
+    return{inv,L,s,tp:invType(inv.type),start,mat,last,next,status:riStatus(inv,today),
+      cats:(inv.cats||[]).map(id=>cats.find(k=>k.id===id)).filter(Boolean),
+      held:riDays(start,s.closed?s.end:today),
+      toMat:mat&&!s.closed?riDays(today,mat):null,
+      prog:mat&&!s.closed&&mat>start?Math.max(0,Math.min(100,(today-start)/(mat-start)*100)):null};
+  }));
+}
+const RI_F0={q:"",loans:[],types:[],cats:[],status:"all",perf:"all",from:"",to:"",mFrom:"",mTo:"",amin:"",amax:"",sort:"value",group:"none"};
+const riFActive=f=>(f.q.trim()?1:0)+(f.loans.length?1:0)+(f.types.length?1:0)+(f.cats.length?1:0)+(f.status!=="all"?1:0)+(f.perf!=="all"?1:0)+((f.from||f.to)?1:0)+((f.mFrom||f.mTo)?1:0)+((f.amin!==""||f.amax!=="")?1:0);
+function riMatch(r,f){
+  if(f.loans.length&&!f.loans.includes(r.L.id))return false;
+  if(f.types.length&&!f.types.includes(r.inv.type))return false;
+  if(f.cats.length){const ids=r.cats.map(k=>k.id);if(!f.cats.some(k=>k==="none"?!ids.length:ids.includes(k)))return false}
+  if(f.status!=="all"&&r.status!==f.status)return false;
+  if(f.perf==="ahead"&&r.s.net<0)return false;
+  if(f.perf==="behind"&&r.s.net>=0)return false;
+  const d0=x=>{const v=lnFromYMD(x);return v},a=d0(f.from),b=f.to?d0(f.to)+864e5:null,ma=d0(f.mFrom),mb=f.mTo?d0(f.mTo)+864e5:null;
+  if(a&&r.start<a)return false;if(b&&r.start>=b)return false;
+  if(ma||mb){if(!r.mat)return false;if(ma&&r.mat<ma)return false;if(mb&&r.mat>=mb)return false}
+  if(f.amin!==""&&r.s.P<parseFloat(f.amin))return false;if(f.amax!==""&&r.s.P>parseFloat(f.amax))return false;
+  const q=f.q.trim().toLowerCase();
+  if(q&&!((r.inv.name||"")+" "+(r.inv.note||"")+" "+(r.L.lender||"")+" "+r.tp.label+" "+r.cats.map(k=>k.name).join(" ")).toLowerCase().includes(q))return false;
+  return true;
+}
+const RI_SORTS={value:["Value",(a,b)=>b.s.value-a.s.value],ret:["Return ₹",(a,b)=>b.s.ret-a.s.ret],pct:["Return %",(a,b)=>(b.s.pnlPct==null?-1e9:b.s.pnlPct)-(a.s.pnlPct==null?-1e9:a.s.pnlPct)],net:["Vs loan",(a,b)=>b.s.net-a.s.net],date:["Newest",(a,b)=>b.start-a.start],old:["Oldest",(a,b)=>a.start-b.start],mat:["Maturity",(a,b)=>(a.mat||9e15)-(b.mat||9e15)],name:["Name",(a,b)=>String(a.inv.name).localeCompare(String(b.inv.name))]};
+// Groups for the list and the allocation donut: by category (a holding in two categories counts in both), type or loan.
+function riGroups(rows,by,cur){
+  const m=new Map(),add=(key,label,emoji,color,r)=>{let g=m.get(key);if(!g){g={key,label,emoji,color,rows:[],P:0,value:0,ret:0};m.set(key,g)}g.rows.push(r);g.P+=r.s.P;g.value+=r.s.value;g.ret+=r.s.ret};
+  rows.forEach(r=>{
+    if(by==="cat"){if(r.cats.length)r.cats.forEach(k=>add(k.id,k.name,k.emoji,k.color,r));else add("none","Uncategorised","🗂️","#8a8a8a",r)}
+    else if(by==="type")add(r.inv.type,r.tp.label,r.tp.emoji,r.tp.color,r);
+    else if(by==="loan")add(r.L.id,r.L.lender||"Loan",(LOAN_KINDS[r.L.kind]||{}).e||"🏦",RI_CAT_COLORS[0],r);
+    else add("all","","","",r)});
+  const gs=[...m.values()].sort((a,b)=>b.value-a.value);
+  if(by==="loan")gs.forEach((g,i)=>{g.color=RI_CAT_COLORS[i%RI_CAT_COLORS.length]});
+  return gs;
+}
+// --- AI / bulk operations ---------------------------------------------------------------
+const RI_OPS={addCategory:"Add to category",setCategory:"Set category",removeCategory:"Remove from category",moveLoan:"Move to loan",markExited:"Mark exited",logPayout:"Log payout",unlink:"Unlink from loan",delete:"Delete"};
+// Applies operations to the investments list; unknown categories named by an op are created. Pure: returns the new data.
+function riApplyOps(data,ops){
+  let invs=(data.investments||[]).map(x=>({...x}));const cats=[...riCatList(data)],idx=new Map(invs.map((x,i)=>[x.id,i])),drop=new Set();
+  const catId=name=>{const n=String(name||"").trim();if(!n)return null;let k=cats.find(x=>x.name.toLowerCase()===n.toLowerCase());if(!k){k={id:"rc_"+uid(),name:n,emoji:"🏷️",color:RI_CAT_COLORS[cats.length%RI_CAT_COLORS.length]};cats.push(k)}return k.id};
+  for(const op of ops)for(const id of op.ids||[]){
+    const i=idx.get(id);if(i==null)continue;const h=invs[i];
+    if(op.op==="addCategory"||op.op==="setCategory"){const k=catId(op.category);if(!k)continue;h.cats=op.op==="setCategory"?[k]:((h.cats||[]).includes(k)?h.cats:[...(h.cats||[]),k])}
+    else if(op.op==="removeCategory"){const n=String(op.category||"").trim().toLowerCase(),k=cats.find(x=>x.name.toLowerCase()===n);if(k)h.cats=(h.cats||[]).filter(q=>q!==k.id)}
+    else if(op.op==="moveLoan"){if(op.loanId)h.loanId=op.loanId}
+    else if(op.op==="markExited"){const v=op.value!=null&&op.value!==""&&isFinite(Number(op.value))?Number(op.value):invCurrent(h);h.exitValue=v;h.current=v;h.exitDate=(op.date&&lnFromYMD(op.date))||Date.now()}
+    else if(op.op==="logPayout"){const a=Number(op.amount);if(a>0)h.payouts=[...(h.payouts||[]),{id:"rp_"+uid(),date:(op.date&&lnFromYMD(op.date))||Date.now(),amount:a,note:op.note||""}]}
+    else if(op.op==="unlink")h.loanId=null;
+    else if(op.op==="delete")drop.add(id);
+  }
+  invs=invs.filter(x=>!drop.has(x.id));
+  return{investments:invs,calculators:{...(data.calculators||{}),riCats:cats}};
+}
+// Never trust model output: keep only known operations, on ids inside the scope, with valid arguments.
+function riSanitizeOps(raw,scopeIds,loanIds){
+  const scope=new Set(scopeIds),out=[];
+  for(const o0 of Array.isArray(raw)?raw:[]){
+    if(!o0||!RI_OPS[o0.op])continue;
+    const ids=[...new Set((Array.isArray(o0.ids)?o0.ids:[]).map(String).filter(x=>scope.has(x)))];if(!ids.length)continue;
+    const op={op:o0.op,ids,why:String(o0.why||"").slice(0,160)};
+    if(/Category$/.test(o0.op)){op.category=String(o0.category||"").trim().slice(0,40);if(!op.category)continue}
+    if(o0.op==="moveLoan"){if(!loanIds.includes(o0.loanId))continue;op.loanId=o0.loanId}
+    if(o0.op==="markExited"){if(o0.date&&!lnFromYMD(o0.date))continue;op.date=o0.date||lnYMD(Date.now());if(o0.value!=null&&o0.value!==""){if(!isFinite(Number(o0.value))||Number(o0.value)<0)continue;op.value=Number(o0.value)}}
+    if(o0.op==="logPayout"){if(!(Number(o0.amount)>0))continue;op.amount=Number(o0.amount);if(o0.date&&!lnFromYMD(o0.date))continue;op.date=o0.date||lnYMD(Date.now());op.note=String(o0.note||"").slice(0,80)}
+    out.push(op);
+  }
+  return out;
+}
+function riParseAi(txt){
+  let s=String(txt||"").replace(/<think>[\s\S]*?<\/think>/gi,"").replace(/<thinking>[\s\S]*?<\/thinking>/gi,"");
+  const fence=s.match(/```(?:json)?\s*([\s\S]*?)```/i);if(fence)s=fence[1];
+  const m=s.match(/\{[\s\S]*\}/);
+  try{const j=JSON.parse(m?m[0]:s);return{answer:String(j.answer||""),ops:Array.isArray(j.ops)?j.ops:[]}}catch{return null}
+}
+
+// === REINVESTMENT HUB — UI ===
+const RI_CSS=`@keyframes riIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes riDraw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+@keyframes riPop{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+@keyframes riPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,120,120,.35)}50%{box-shadow:0 0 0 6px rgba(255,120,120,0)}}
+.ri-in{animation:riIn .45s cubic-bezier(.2,.8,.2,1) both}
+.ri-draw{stroke-dasharray:1;stroke-dashoffset:1;animation:riDraw 1.1s ease-out .15s forwards}
+.ri-pop{animation:riPop .5s cubic-bezier(.2,.9,.3,1.3) both}
+.ri-late{animation:riPulse 2s ease-in-out infinite}
+.ri-bar>div{transition:width .9s cubic-bezier(.2,.8,.2,1)}
+.ri-seg{transition:stroke-dasharray .9s cubic-bezier(.2,.8,.2,1),stroke-dashoffset .9s cubic-bezier(.2,.8,.2,1),opacity .2s}`;
+const RI_ANIM="riIn .5s cubic-bezier(.2,.8,.2,1) both";
+const riChip=(on,label,onClick,key,col)=>t("button",{key,onClick,className:"act95 trt",style:{flexShrink:0,padding:"6px 12px",borderRadius:999,fontSize:12,whiteSpace:"nowrap",background:on?(col||c.ac)+"26":c.sf2,border:`1px solid ${on?(col||c.ac):c.brs}`,color:on?c.tx:c.td,fontWeight:on?600:400},children:label});
+const riBar=(pct,col)=>t("div",{className:"ri-bar",style:{height:6,borderRadius:3,background:c.sf2,overflow:"hidden"},children:t("div",{style:{width:Math.max(0,Math.min(100,pct))+"%",height:"100%",background:col,borderRadius:3}})});
+function RiMounted(){const[m,sM]=useState(false);useEffect(()=>{const r=requestAnimationFrame(()=>sM(true));return()=>cancelAnimationFrame(r)},[]);return m}
+// Allocation ring. Segments grow from zero on mount; the middle shows a count-up total.
+function RiDonut({segs,size,total,cur,active,onSeg}){
+  const m=RiMounted(),sum=segs.reduce((a,x)=>a+x.v,0)||1,R=15.9155;let acc=0;
+  return o("div",{style:{position:"relative",width:size,height:size,flexShrink:0},children:[
+    o("svg",{viewBox:"0 0 42 42",width:size,height:size,style:{transform:"rotate(-90deg)"},children:[
+      t("circle",{cx:21,cy:21,r:R,fill:"none",stroke:c.sf2,strokeWidth:5}),
+      ...segs.map((x,i)=>{const p=x.v/sum*100,off=acc;acc+=p;return t("circle",{key:x.key,className:"ri-seg",cx:21,cy:21,r:R,fill:"none",stroke:x.color,strokeWidth:active===x.key?6.5:5,strokeDasharray:m?`${Math.max(0,p-.6)} ${100-Math.max(0,p-.6)}`:"0 100",strokeDashoffset:-off,opacity:active&&active!==x.key?.35:1,style:{cursor:"pointer"},onClick:()=>onSeg&&onSeg(x.key)})})]}),
+    o("div",{style:{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",pointerEvents:"none"},children:[
+      t("div",{style:{fontFamily:'var(--nf)',fontSize:8.5,color:c.tm,letterSpacing:1},children:"VALUE"}),
+      t(CountUp,{v:total,fmt:v=>fs(v,cur),style:{fontFamily:'var(--nf)',fontSize:15,color:c.tx,marginTop:2}})]})]});
+}
+// Invested vs worth over time; the worth line draws itself in.
 function RiChart({pts,cur}){
   if(pts.length<2)return null;
-  const W=320,H=120,pl=4,pr=4,pt=8,pb=8;
-  const all=pts.flatMap(q=>[q.inv,q.worth]),lo=Math.min(...all),hi=Math.max(...all),rng=hi-lo||1;
+  const W=320,H=130,pl=4,pr=4,pt=10,pb=8,all=pts.flatMap(q=>[q.inv,q.worth]),lo=Math.min(...all),hi=Math.max(...all),rng=hi-lo||1;
   const X=i=>pl+(W-pl-pr)*i/(pts.length-1),Y=v=>pt+(H-pt-pb)*(1-(v-lo)/rng);
   const line=k=>pts.map((q,i)=>(i?"L":"M")+X(i).toFixed(1)+" "+Y(q[k]).toFixed(1)).join(" ");
-  const last=pts[pts.length-1],good=last.worth>=last.inv;
+  const last=pts[pts.length-1],good=last.worth>=last.inv,col=good?c.mt:c.co;
+  const area=line("worth")+` L${X(pts.length-1).toFixed(1)} ${H-pb} L${X(0).toFixed(1)} ${H-pb} Z`;
   return o("div",{children:[
     o("svg",{viewBox:`0 0 ${W} ${H}`,style:{width:"100%",height:"auto",display:"block"},role:"img","aria-label":"Reinvested amount versus current worth over time",children:[
-      t("path",{d:line("inv"),fill:"none",stroke:c.tm,strokeWidth:1.5,strokeDasharray:"4 3"}),
-      t("path",{d:line("worth"),fill:"none",stroke:good?c.mt:c.co,strokeWidth:2.2,strokeLinejoin:"round"}),
-      t("circle",{cx:X(pts.length-1),cy:Y(last.worth),r:3.5,fill:good?c.mt:c.co})]}),
+      t("defs",{children:o("linearGradient",{id:"riGrad",x1:0,y1:0,x2:0,y2:1,children:[t("stop",{offset:"0%",stopColor:col,stopOpacity:.35}),t("stop",{offset:"100%",stopColor:col,stopOpacity:0})]})}),
+      t("path",{d:area,fill:"url(#riGrad)",className:"ri-in",style:{animationDelay:".7s"}}),
+      t("path",{d:line("inv"),fill:"none",stroke:c.tm,strokeWidth:1.4,strokeDasharray:"4 3"}),
+      t("path",{d:line("worth"),fill:"none",stroke:col,strokeWidth:2.4,strokeLinejoin:"round",strokeLinecap:"round",pathLength:1,className:"ri-draw"}),
+      t("circle",{cx:X(pts.length-1),cy:Y(last.worth),r:4,fill:col,className:"ri-pop",style:{animationDelay:"1.1s",transformOrigin:`${X(pts.length-1)}px ${Y(last.worth)}px`}})]}),
     o("div",{className:"f jb",style:{fontSize:10.5,color:c.tm,marginTop:4,fontFamily:'var(--nf)'},children:[t("span",{children:lnFmtD(pts[0].d)}),t("span",{children:lnFmtD(last.d)})]}),
-    o("div",{className:"f",style:{gap:16,marginTop:8,fontSize:11.5},children:[o("span",{style:{color:c.td},children:["┄ Invested ",t("b",{style:{fontFamily:'var(--nf)',color:c.tx},children:fs(last.inv,cur)})]}),o("span",{style:{color:good?c.mt:c.co},children:["━ Worth ",t("b",{style:{fontFamily:'var(--nf)'},children:fs(last.worth,cur)})]})]})]});
+    o("div",{className:"f",style:{gap:16,marginTop:8,fontSize:11.5},children:[o("span",{style:{color:c.td},children:["┄ Invested ",t("b",{style:{fontFamily:'var(--nf)',color:c.tx},children:fs(last.inv,cur)})]}),o("span",{style:{color:col},children:["━ Worth ",t("b",{style:{fontFamily:'var(--nf)'},children:fs(last.worth,cur)})]})]})]});
 }
+// One holding: dates, countdown, progress, return, loan rate comparison, categories. Tap to expand, long-press to select.
+function RiCard({r,cur,i,sel,selMode,open,onTap,onDown,onCancel,onAct}){
+  const{inv,L,s,tp,start,mat,last,next,status,toMat,prog,held}=r,good=s.net>=0,mkt=riMarket(inv.type);
+  const stCol=status==="exited"?c.td:status==="matured"?c.gd:c.mt,stLbl=status==="exited"?(mkt?"Sold":"Exited"):status==="matured"?"Matured":"Active";
+  const late=status==="matured";
+  const row=(k,v,col)=>o("div",{key:k,className:"f jb",style:{padding:"6px 0",borderBottom:`1px solid ${c.brs}`,gap:10,fontSize:12.5},children:[t("span",{style:{color:c.td},children:k}),t("span",{style:{color:col||c.tx,fontFamily:'var(--nf)',textAlign:"right"},children:v})]});
+  return o("div",{className:"ri-in",style:{animationDelay:Math.min(i,8)*45+"ms",background:sel?c.ac+"14":c.sfg,border:`1px solid ${sel?c.ac:c.brs}`,borderRadius:16,marginBottom:10,overflow:"hidden",borderLeft:`3px solid ${tp.color}`},children:[
+    o("button",{onClick:onTap,onPointerDown:onDown,onPointerUp:onCancel,onPointerLeave:onCancel,onPointerCancel:onCancel,onContextMenu:e=>e.preventDefault(),className:"w100 act99 trt",style:{display:"block",textAlign:"left",padding:"13px 14px",background:"transparent",border:"none",color:"inherit",WebkitUserSelect:"none",userSelect:"none",WebkitTouchCallout:"none"},children:[
+      o("div",{className:"f ia jb",style:{gap:10},children:[
+        o("div",{className:"f ia minw0",style:{gap:10},children:[
+          selMode?t("span",{style:{width:22,height:22,borderRadius:7,border:`1.5px solid ${sel?c.ac:c.td}`,background:sel?c.ac:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:sel&&t(Check,{size:14,color:"#0a0a0a"})}):t("span",{style:{width:38,height:38,borderRadius:11,background:tp.color+"26",display:"flex",alignItems:"center",justifyContent:"center",fontSize:19,flexShrink:0},children:inv.emoji||tp.emoji}),
+          o("div",{className:"tl minw0",children:[t("div",{className:"tru",style:{fontSize:14.5,color:c.tx,fontWeight:600},children:inv.name}),
+            o("div",{className:"f ia",style:{gap:6,marginTop:2,flexWrap:"wrap"},children:[t("span",{style:{fontSize:10.5,color:stCol,border:`1px solid ${stCol}55`,borderRadius:999,padding:"1px 7px"},children:stLbl}),t("span",{className:"tru",style:{fontSize:11,color:c.tm},children:`${tp.label} · ${L.lender||"Loan"}`})]})]})]}),
+        o("div",{className:"tr",style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:15,color:c.tx},children:fm(s.value,cur)}),t("div",{style:{fontFamily:'var(--nf)',fontSize:11.5,color:s.ret>=0?c.mt:c.co},children:s.pnlPct!=null?(s.pnlPct>=0?"▲ ":"▼ ")+Math.abs(s.pnlPct).toFixed(1)+"%":riSigned(s.ret,cur)})]})]}),
+      r.cats.length>0&&o("div",{className:"f fw",style:{gap:5,marginTop:8},children:r.cats.map(k=>t("span",{key:k.id,style:{fontSize:10.5,color:c.tx,background:k.color+"28",border:`1px solid ${k.color}66`,borderRadius:999,padding:"2px 8px"},children:k.emoji+" "+k.name}))}),
+      o("div",{className:"f jb",style:{marginTop:10,fontSize:11,color:c.tm,gap:8,flexWrap:"wrap"},children:[
+        o("span",{children:["📅 ",lnFmtD(start)," · ",riDur(held)+(s.closed?" held":"")]}),
+        s.closed?o("span",{children:[(mkt?"Sold ":"Exited ")+lnFmtD(s.end)]}):mat?o("span",{className:late?"ri-late":"",style:{color:late?c.gd:toMat<=30?c.gd:c.tm,borderRadius:6},children:[late?"Matured "+riDur(toMat)+" ago":"🏁 "+lnFmtD(mat)+" · "+(toMat===0?"today":"in "+riDur(toMat))]}):next?o("span",{children:["💸 next "+lnFmtD(next)]}):null]}),
+      prog!=null&&o("div",{style:{marginTop:7},children:riBar(prog,late?c.gd:tp.color)}),
+      o("div",{className:"f jb",style:{marginTop:9,fontSize:11,gap:8},children:[
+        t("span",{style:{color:c.td},children:`${fs(s.P,cur)} in`+(s.payouts>0?` · ${fs(s.payouts,cur)} paid out`:"")}),
+        t("span",{style:{color:good?c.mt:c.co},children:s.annual==null?"too early for %":`${riPct(s.annual)} vs loan ${lnCurRate(L).toFixed(2)}%`})]})]}),
+    open&&o("div",{className:"ri-in",style:{padding:"2px 14px 14px",borderTop:`1px solid ${c.brs}`},children:[
+      o("div",{style:{background:(good?c.mt:c.co)+"18",borderRadius:10,padding:"9px 12px",margin:"10px 0 6px",fontSize:12,color:c.td},children:[good?"Ahead of the loan by ":"Behind the loan by ",t("b",{style:{fontFamily:'var(--nf)',color:good?c.mt:c.co},children:fm(Math.abs(s.net),cur)}),` (loan charges ${fm(s.cost,cur)} on this money)`]}),
+      row(mkt?"Bought":"Invested",lnFmtD(start)),row("Amount",fm(s.P,cur)),row(s.closed?"Exit value":"Current value",fm(s.value,cur)),row("Payouts",fm(s.payouts,cur),c.mt),row("Total return",riSigned(s.ret,cur),s.ret>=0?c.mt:c.co),
+      !mkt&&inv.rate!=null&&row("Expected rate",riPct(inv.rate)+" / yr"),mat&&row("Matures",lnFmtD(mat)),last&&row("Last payout",lnFmtD(last)),next&&row("Next payout",lnFmtD(next)),inv.note&&row("Note",inv.note),
+      o("div",{className:"f",style:{gap:8,marginTop:12},children:[lnBtn("+ Payout",()=>onAct("pay"),true,{fontSize:12.5,padding:"10px 0"}),!s.closed&&lnBtn("Update value",()=>onAct("val"),false,{fontSize:12.5,padding:"10px 0"}),lnBtn("Details",()=>onAct("det"),false,{fontSize:12.5,padding:"10px 0"})]}),
+      o("div",{className:"f",style:{gap:8,marginTop:8},children:[lnBtn("🏷️ Categories",()=>onAct("cat"),false,{fontSize:12.5,padding:"10px 0"}),lnBtn("Open loan ›",()=>onAct("loan"),false,{fontSize:12.5,padding:"10px 0"})]})]})]});
+}
+// --- category manager: create, rename, recolour, delete tags that group holdings across loans ---
+function RiCatManager({cats,rows,onSave,onClose}){
+  const[list,sList]=useState(cats.map(k=>({...k})));const[nn,sNn]=useState("");
+  const upd=(id,p)=>sList(l=>l.map(k=>k.id===id?{...k,...p}:k));
+  const add=()=>{const n=nn.trim();if(!n||list.some(k=>k.name.toLowerCase()===n.toLowerCase()))return;sList(l=>[...l,{id:"rc_"+uid(),name:n,emoji:"🏷️",color:RI_CAT_COLORS[l.length%RI_CAT_COLORS.length]}]);sNn("")};
+  return t(Sht,{onClose,children:o(Fragment,{children:[lnSheetTitle("Categories","Group reinvestments from any loan. A holding can sit in more than one category."),
+    ...list.map(k=>o("div",{key:k.id,style:{padding:"10px 0",borderBottom:`1px solid ${c.brs}`},children:[
+      o("div",{className:"f ia",style:{gap:8},children:[
+        t("input",{value:k.emoji,onChange:e=>upd(k.id,{emoji:e.target.value.slice(0,2)}),style:{...lnInp(),width:52,padding:"10px 0",textAlign:"center",fontSize:20}}),
+        t("input",{value:k.name,onChange:e=>upd(k.id,{name:e.target.value.slice(0,30)}),style:{...lnInp(),flex:1}}),
+        t("button",{onClick:()=>sList(l=>l.filter(x=>x.id!==k.id)),"aria-label":"Delete category",className:"act90 trt",style:{background:"transparent",border:"none",color:c.ro,fontSize:18},children:"🗑"})]}),
+      o("div",{className:"f ia",style:{gap:7,marginTop:8},children:[...RI_CAT_COLORS.map(col=>t("button",{key:col,onClick:()=>upd(k.id,{color:col}),"aria-label":"Colour",style:{width:22,height:22,borderRadius:11,background:col,border:k.color===col?`2px solid ${c.tx}`:"2px solid transparent",padding:0}})),t("span",{style:{fontSize:11,color:c.tm,marginLeft:"auto"},children:rows.filter(r=>(r.inv.cats||[]).includes(k.id)).length+" holdings"})]})]})),
+    !list.length&&t("div",{style:{fontSize:12.5,color:c.tm,padding:"10px 0"},children:"No categories yet — e.g. Retirement, Emergency, Short-term."}),
+    lnLbl("NEW CATEGORY"),o("div",{className:"f",style:{gap:8},children:[t("input",{value:nn,placeholder:"e.g., Retirement",onChange:e=>sNn(e.target.value),onKeyDown:e=>{if(e.key==="Enter")add()},style:{...lnInp(),flex:1}}),lnBtn("Add",add,true,{flex:"none",padding:"0 18px"})]}),
+    o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn("Save",()=>onSave(list),true)]})]})});
+}
+function RiAssignSheet({cats,count,onApply,onManage,onClose}){
+  const[pick,sPick]=useState([]);const[mode,sMode]=useState("add");
+  const tog=id=>sPick(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
+  return t(Sht,{onClose,children:o(Fragment,{children:[lnSheetTitle("Categories",`For ${count} holding${count===1?"":"s"}`),
+    o("div",{className:"f",style:{gap:8,marginBottom:6},children:[["add","Add"],["set","Replace"],["remove","Remove"]].map(([k,l])=>riChip(mode===k,l,()=>sMode(k),k))}),
+    o("div",{className:"f fw",style:{gap:8,margin:"10px 0"},children:[...cats.map(k=>riChip(pick.includes(k.id),k.emoji+" "+k.name,()=>tog(k.id),k.id,k.color)),riChip(false,"+ Manage",onManage,"mg")]}),
+    !cats.length&&t("div",{style:{fontSize:12.5,color:c.tm},children:"Create a category first with Manage."}),
+    o("div",{className:"f",style:{gap:10,marginTop:14},children:[lnBtn("Cancel",onClose),lnBtn("Apply",()=>(pick.length||mode==="set")&&onApply(mode,pick),true,{opacity:pick.length||mode==="set"?1:.5})]})]})});
+}
+function RiMoveSheet({loans,cur,count,onPick,onClose}){
+  return t(Sht,{onClose,children:o(Fragment,{children:[lnSheetTitle("Move to another loan",`${count} holding${count===1?"":"s"} will be compared against the loan you pick.`),
+    ...loans.map(L=>t("button",{key:L.id,onClick:()=>onPick(L.id),className:"w100 f ia act99 trt",style:{padding:"12px 4px",gap:12,background:"transparent",border:"none",borderBottom:`1px solid ${c.brs}`,color:"inherit",textAlign:"left"},children:[t("span",{style:{fontSize:20,width:28,textAlign:"center"},children:(LOAN_KINDS[L.kind]||{}).e}),o("div",{className:"tl",children:[t("div",{style:{fontSize:14,color:c.tx},children:L.lender||"Loan"}),t("div",{style:{fontSize:11.5,color:c.tm},children:`${fs(L.principal||0,cur)} · ${lnCurRate(L).toFixed(2)}%`})]})]}))]})});
+}
+function RiExitSheet({count,cur,onApply,onClose}){
+  const[mode,sMode]=useState("exit");const[date,sDate]=useState(lnYMD(Date.now()));const[amt,sAmt]=useState("");const[note,sNote]=useState("");
+  const ok=lnFromYMD(date)&&(mode==="exit"||parseFloat(amt)>0);
+  return t(Sht,{onClose,children:o(Fragment,{children:[lnSheetTitle("Exit or payout",`Applies to ${count} holding${count===1?"":"s"}.`),
+    o("div",{className:"f",style:{gap:8},children:[["exit","Mark exited"],["pay","Log payout"]].map(([k,l])=>riChip(mode===k,l,()=>sMode(k),k))}),
+    lnLbl("DATE"),t("input",{type:"date",value:date,onChange:e=>sDate(e.target.value),style:riDateInp()}),
+    mode==="exit"?t("div",{style:{fontSize:12,color:c.tm,marginTop:10,lineHeight:1.5},children:"Each holding is closed at its own current value on this date, locking in the P&L. Edit a single holding afterwards to enter a different exit value."}):o(Fragment,{children:[lnLbl("AMOUNT FOR EACH HOLDING ("+cur+")"),t("input",{value:amt,inputMode:"decimal",onChange:e=>sAmt(e.target.value.replace(/[^\d.]/g,"")),style:lnInp()}),lnLbl("NOTE (OPTIONAL)"),t("input",{value:note,onChange:e=>sNote(e.target.value),style:lnInp()})]}),
+    o("div",{className:"f",style:{gap:10,marginTop:16},children:[lnBtn("Cancel",onClose),lnBtn("Apply",()=>ok&&onApply(mode==="exit"?{op:"markExited",date}:{op:"logPayout",date,amount:parseFloat(amt),note:note.trim()}),true,{opacity:ok?1:.5})]})]})});
+}
+// --- the filter sheet: loan, type, status, performance, dates, amounts, sort, grouping ---
+function RiFilterSheet({f,setF,loans,cats,onClose}){
+  const tog=(k,v)=>setF(p=>({...p,[k]:p[k].includes(v)?p[k].filter(x=>x!==v):[...p[k],v]}));
+  const inp={...lnInp(),padding:"10px 12px",fontSize:13.5},d=riDateInp();
+  const sec=(l,ch)=>o("div",{children:[lnLbl(l),ch]});
+  return t(Sht,{onClose,children:o(Fragment,{children:[lnSheetTitle("Filters & sort"),
+    sec("LOAN",o("div",{className:"f fw",style:{gap:6},children:loans.map(L=>riChip(f.loans.includes(L.id),(L.lender||"Loan"),()=>tog("loans",L.id),L.id))})),
+    sec("TYPE",o("div",{className:"f fw",style:{gap:6},children:INV_TYPES.map(x=>riChip(f.types.includes(x.id),x.emoji+" "+x.label,()=>tog("types",x.id),x.id,x.color))})),
+    sec("CATEGORY",o("div",{className:"f fw",style:{gap:6},children:[...cats.map(k=>riChip(f.cats.includes(k.id),k.emoji+" "+k.name,()=>tog("cats",k.id),k.id,k.color)),riChip(f.cats.includes("none"),"🗂️ Uncategorised",()=>tog("cats","none"),"none")]})),
+    sec("STATUS",o("div",{className:"f fw",style:{gap:6},children:[["all","All"],["active","Active"],["matured","Matured"],["exited","Exited / sold"]].map(([k,l])=>riChip(f.status===k,l,()=>setF(p=>({...p,status:k})),k))})),
+    sec("PERFORMANCE VS LOAN",o("div",{className:"f fw",style:{gap:6},children:[["all","All"],["ahead","Ahead"],["behind","Behind"]].map(([k,l])=>riChip(f.perf===k,l,()=>setF(p=>({...p,perf:k})),k))})),
+    sec("INVESTED BETWEEN",o("div",{className:"f ia",style:{gap:8},children:[t("input",{type:"date",value:f.from,onChange:e=>setF(p=>({...p,from:e.target.value})),style:d}),t("input",{type:"date",value:f.to,onChange:e=>setF(p=>({...p,to:e.target.value})),style:d})]})),
+    sec("MATURING BETWEEN",o("div",{className:"f ia",style:{gap:8},children:[t("input",{type:"date",value:f.mFrom,onChange:e=>setF(p=>({...p,mFrom:e.target.value})),style:d}),t("input",{type:"date",value:f.mTo,onChange:e=>setF(p=>({...p,mTo:e.target.value})),style:d})]})),
+    sec("AMOUNT INVESTED",o("div",{className:"f ia",style:{gap:8},children:[t("input",{value:f.amin,inputMode:"decimal",placeholder:"Min",onChange:e=>setF(p=>({...p,amin:e.target.value.replace(/[^\d.]/g,"")})),style:inp}),t("input",{value:f.amax,inputMode:"decimal",placeholder:"Max",onChange:e=>setF(p=>({...p,amax:e.target.value.replace(/[^\d.]/g,"")})),style:inp})]})),
+    sec("SORT BY",o("div",{className:"f fw",style:{gap:6},children:Object.entries(RI_SORTS).map(([k,v])=>riChip(f.sort===k,v[0],()=>setF(p=>({...p,sort:k})),k))})),
+    sec("GROUP BY",o("div",{className:"f fw",style:{gap:6},children:[["none","None"],["cat","Category"],["type","Type"],["loan","Loan"]].map(([k,l])=>riChip(f.group===k,l,()=>setF(p=>({...p,group:k})),k))})),
+    o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Reset",()=>setF(p=>({...RI_F0,group:p.group,sort:p.sort}))),lnBtn("Done",onClose,true)]})]})});
+}
+// --- AI: describe what you want; it proposes operations, you review and confirm ---
+const RI_AI_HINTS=["Tag all FDs maturing this year as Safe","Which holdings are behind their loan cost?","Mark everything past maturity as exited","Move my mutual funds to my home loan","Log a ₹500 payout on each FD"];
+function RiAiSheet({data,rows,scope,scopeLabel,onApply,onClose}){
+  const[q,sQ]=useState("");const[busy,sBusy]=useState(false);const[err,sErr]=useState("");const[res,sRes]=useState(null);const[chk,sChk]=useState({});
+  const cur=data.currency,loans=rows.map(r=>r.L).filter((L,i,a)=>a.findIndex(x=>x.id===L.id)===i),allLoans=(data.loanTracker||[]).filter(L=>L.direction!=="lent");
+  const run=async()=>{
+    if(!q.trim()||busy)return;sBusy(true);sErr("");sRes(null);
+    const ctx={today:lnYMD(Date.now()),currency:cur,categories:riCatList(data).map(k=>k.name),loans:allLoans.map(L=>({id:L.id,lender:L.lender,rate:lnCurRate(L)})),
+      holdings:scope.map(r=>({id:r.inv.id,name:r.inv.name,type:r.inv.type,loanId:r.L.id,loan:r.L.lender,invested:r.s.P,value:Math.round(r.s.value),payouts:r.s.payouts,returnPct:r.s.pnlPct==null?null:+r.s.pnlPct.toFixed(1),vsLoanCost:Math.round(r.s.net),invested_on:lnYMD(r.start),maturity:r.mat?lnYMD(r.mat):null,exited_on:r.s.closed?lnYMD(r.s.end):null,status:r.status,categories:r.cats.map(k=>k.name)}))};
+    const sys=`You operate on a user's loan-funded reinvestments. Reply with ONLY a JSON object: {"answer":"short plain-text reply or summary","ops":[...]}. Each op: {"op":one of ${Object.keys(RI_OPS).join("|")},"ids":[holding ids from the data],"why":"short reason"} plus: category (name) for addCategory/setCategory/removeCategory; loanId for moveLoan; date (YYYY-MM-DD) and optional value for markExited; amount, date, optional note for logPayout. Use ONLY ids that appear in the data. If the user only asks a question, return ops:[]. Never invent holdings. Do not use delete unless the user explicitly asks to delete.`;
+    try{
+      const r=await cAPI({system:sys,max_tokens:2000,messages:[{role:"user",content:`DATA:\n${JSON.stringify(ctx)}\n\nREQUEST: ${q.trim()}`}]});
+      const txt=(r.content&&r.content[0]&&r.content[0].text)||"",p=riParseAi(txt);
+      if(!p)throw new Error("The AI reply wasn't in a usable format — try rephrasing.");
+      const ops=riSanitizeOps(p.ops,scope.map(x=>x.inv.id),allLoans.map(L=>L.id));
+      sRes({answer:p.answer,ops,dropped:(p.ops||[]).length-ops.length});sChk(Object.fromEntries(ops.map((o2,i)=>[i,o2.op!=="delete"])));
+    }catch(e){sErr(e.code==="NO_API_KEY"?"Add an AI API key in Settings to use this.":(e.message||"Something went wrong."))}
+    sBusy(false);
+  };
+  const name=id=>(rows.find(r=>r.inv.id===id)||{inv:{name:"?"}}).inv.name;
+  const desc=o2=>{const n=o2.ids.length,who=n<=2?o2.ids.map(name).join(", "):n+" holdings";
+    const what=o2.op==="moveLoan"?"→ "+((allLoans.find(L=>L.id===o2.loanId)||{}).lender||"loan"):/Category$/.test(o2.op)?"“"+o2.category+"”":o2.op==="markExited"?"on "+lnFmtD(lnFromYMD(o2.date))+(o2.value!=null?" at "+fm(o2.value,cur):""):o2.op==="logPayout"?fm(o2.amount,cur)+" on "+lnFmtD(lnFromYMD(o2.date)):"";
+    return{title:RI_OPS[o2.op]+" "+what,sub:who+(o2.why?" · "+o2.why:"")}};
+  const picked=res?res.ops.filter((_,i)=>chk[i]):[];
+  return t(Sht,{onClose,children:o(Fragment,{children:[lnSheetTitle("✨ Ask AI",`Works on ${scopeLabel}. It proposes changes — nothing is applied until you confirm.`),
+    t("textarea",{value:q,onChange:e=>sQ(e.target.value),placeholder:"e.g., Tag all FDs maturing this year as Safe",rows:3,autoFocus:true,style:{...lnInp(),resize:"none",fontFamily:"inherit",lineHeight:1.4}}),
+    !res&&!busy&&o("div",{className:"f fw",style:{gap:6,marginTop:10},children:RI_AI_HINTS.map(h=>riChip(false,h,()=>sQ(h),h))}),
+    err&&t("div",{style:{fontSize:12.5,color:c.ro,marginTop:10,lineHeight:1.45},children:err}),
+    busy&&t("div",{className:"ri-in",style:{fontSize:13,color:c.td,marginTop:14,textAlign:"center"},children:"Thinking…"}),
+    res&&o("div",{className:"ri-in",style:{marginTop:14},children:[
+      res.answer&&t("div",{style:{background:c.sf2,borderRadius:12,padding:"11px 13px",fontSize:13,color:c.tx,lineHeight:1.5,marginBottom:10},children:res.answer}),
+      res.ops.length>0&&t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,letterSpacing:1,marginBottom:4},children:"PROPOSED CHANGES · UNTICK TO SKIP"}),
+      ...res.ops.map((o2,i)=>{const d=desc(o2),on=!!chk[i];return o("button",{key:i,onClick:()=>sChk(p=>({...p,[i]:!p[i]})),className:"w100 f ia act99 trt",style:{gap:10,padding:"10px 0",background:"transparent",border:"none",borderBottom:`1px solid ${c.brs}`,color:"inherit",textAlign:"left"},children:[
+        t("span",{style:{width:20,height:20,borderRadius:6,border:`1.5px solid ${on?c.ac:c.td}`,background:on?c.ac:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:on&&t(Check,{size:13,color:"#0a0a0a"})}),
+        o("div",{className:"tl minw0",children:[t("div",{style:{fontSize:13.5,color:o2.op==="delete"?c.ro:c.tx},children:d.title}),t("div",{className:"tru",style:{fontSize:11,color:c.tm,marginTop:1},children:d.sub})]})]})}),
+      res.dropped>0&&t("div",{style:{fontSize:11,color:c.tm,marginTop:8},children:res.dropped+" suggestion"+(res.dropped===1?" was":"s were")+" skipped because they didn't match your holdings."}),
+      !res.ops.length&&!res.answer&&t("div",{style:{fontSize:12.5,color:c.tm},children:"No changes proposed."})]}),
+    o("div",{className:"f",style:{gap:10,marginTop:16},children:[lnBtn(res?"Close":"Cancel",onClose),res&&res.ops.length>0?lnBtn("Apply "+picked.length,()=>picked.length&&onApply(picked),true,{opacity:picked.length?1:.5}):lnBtn("Ask",run,true,{opacity:q.trim()&&!busy?1:.5})]})]})});
+}
+// --- timeline of dated events: invested, payouts, value updates, maturities, exits ---
+function RiTimeline({rows,cur,onOpen}){
+  const today=lnDay(Date.now()),ev=[];
+  rows.forEach(r=>{const{inv,s}=r,mkt=riMarket(inv.type),base={r,name:inv.name,col:r.tp.color};
+    ev.push({...base,k:"in",date:r.start,ic:"⬇️",l:(mkt?"Bought ":"Invested in ")+inv.name,v:"−"+fm(s.P,cur)});
+    (inv.payouts||[]).forEach(p=>ev.push({...base,k:"pay",date:p.date,ic:"💸",l:(mkt?"Dividend · ":"Payout · ")+inv.name+(p.note?" · "+p.note:""),v:"+"+fm(p.amount,cur),vc:c.mt}));
+    (inv.valueLog||[]).forEach(v=>ev.push({...base,k:"val",date:v.date,ic:"📊",l:"Value update · "+inv.name,v:fm(v.value,cur),vc:c.td}));
+    if(s.closed)ev.push({...base,k:"out",date:s.end,ic:"✅",l:(mkt?"Sold ":"Exited ")+inv.name,v:"+"+fm(s.value,cur),vc:c.mt});
+    else{if(r.mat)ev.push({...base,k:"mat",date:r.mat,ic:"🏁",l:(lnDay(r.mat)<=today?"Matured · ":"Matures · ")+inv.name,v:fm(s.value,cur),vc:c.td});if(r.next)ev.push({...base,k:"next",date:r.next,ic:"🔔",l:(lnDay(r.next)<today?"Payout overdue · ":"Next payout due · ")+inv.name,v:"",vc:c.td})}});
+  const fut=ev.filter(e=>lnDay(e.date)>today||(e.k==="next"&&lnDay(e.date)>=today)).sort((a,b)=>a.date-b.date),past=ev.filter(e=>!fut.includes(e)).sort((a,b)=>b.date-a.date);
+  const months=[];past.forEach(e=>{const k=new Date(e.date).toLocaleDateString("en-GB",{month:"long",year:"numeric"});let g=months[months.length-1];if(!g||g.k!==k){g={k,items:[]};months.push(g)}g.items.push(e)});
+  const row=(e,i,dim)=>o("button",{key:e.k+e.name+e.date+i,onClick:()=>onOpen(e.r),className:"ri-in w100 f act98 trt",style:{animationDelay:Math.min(i,10)*35+"ms",gap:12,padding:"0 0 14px",background:"transparent",border:"none",color:"inherit",textAlign:"left",opacity:dim?.85:1},children:[
+    o("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",flexShrink:0,width:26},children:[t("span",{style:{width:26,height:26,borderRadius:13,background:e.col+"30",border:`1.5px ${dim?"dashed":"solid"} ${e.col}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12},children:e.ic}),t("span",{style:{flex:1,width:1,background:c.brs,marginTop:3}})]}),
+    o("div",{className:"f1 minw0 f jb",style:{gap:8},children:[o("div",{className:"tl minw0",children:[t("div",{className:"tru",style:{fontSize:13,color:c.tx},children:e.l}),t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:lnFmtD(e.date)+(dim?" · in "+riDur(riDays(today,e.date)):"")+" · "+(e.r.L.lender||"Loan")})]}),e.v&&t("span",{style:{fontFamily:'var(--nf)',fontSize:12.5,color:e.vc||c.tx,flexShrink:0},children:e.v})]})]});
+  if(!ev.length)return t("div",{style:{textAlign:"center",color:c.tm,fontSize:13,padding:"30px 0"},children:"Nothing to show for these filters."});
+  return o("div",{children:[
+    fut.length>0&&o("div",{children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,letterSpacing:1.5,margin:"4px 0 12px"},children:"UPCOMING"}),...fut.map((e,i)=>row(e,i,true))]}),
+    ...months.map(g=>o("div",{key:g.k,children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,letterSpacing:1.5,margin:"6px 0 12px"},children:g.k.toUpperCase()}),...g.items.map((e,i)=>row(e,i,false))]}))]});
+}
+
 function ReinvestDash({data,persist,onClose,onView,getFrom}){
   useState(()=>{const f=getFrom&&getFrom();if(f&&f!=="reinvest")_rvOrigin=f;return 0});
-  const cur=data.currency,pf=riPortfolio(data),invs=data.investments||[];
-  const[pick,sPick]=useState(false);const[addL,sAddL]=useState(null);
-  const jump=(L,tab)=>{_lnJump={id:L.id,tab:tab||"reinvest"};onView("loanTracker")};
-  const good=pf.net>=0,pts=riTimeline(pf.items);
+  const cur=data.currency,pf=riPortfolio(data),invs=data.investments||[],cats=riCatList(data);
+  const rows=riRows(data);
+  const[tab,sTab]=useState("overview");const[f,sF]=useState(RI_F0);const[allocBy,sAllocBy]=useState("cat");
+  const[sh,sSh]=useState(null);const[openId,sOpenId]=useState(null);const[sel,sSel]=useState(()=>new Set());const[undo,sUndo]=useState(null);
+  const lp=useRef({timer:null,fired:false});const undoT=useRef(0);
+  const selMode=sel.size>0;
+  useEffect(()=>{if(!selMode)return;document.body.classList.add("sel-open");return()=>document.body.classList.remove("sel-open")},[selMode]);
+  useEffect(()=>()=>clearTimeout(undoT.current),[]);
+  const jump=(L,tb)=>{_lnJump={id:L.id,tab:tb||"reinvest"};onView("loanTracker")};
+  const shown=useMemo(()=>rows.filter(r=>riMatch(r,f)).sort(RI_SORTS[f.sort][1]),[data.investments,data.loanTracker,data.calculators,f]);
+  const act=riFActive(f),pts=riTimeline(rows),good=pf.net>=0;
   const today=lnDay(Date.now()),soon=pf.events.filter(e=>lnDay(e.date)<=today+90*864e5);
+  // ---- writes ----
+  const commit=(next,label)=>{const prev={investments:data.investments||[],calculators:data.calculators||{}};persist(next);if(label){sUndo({label,prev});clearTimeout(undoT.current);undoT.current=setTimeout(()=>sUndo(null),7000)}};
+  const applyOps=(ops,label)=>{const r=riApplyOps(data,ops);commit({investments:r.investments,calculators:r.calculators},label||"Updated");sSh(null);sSel(new Set())};
+  const updInv=(id,patch)=>persist({investments:invs.map(x=>x.id===id?{...x,...patch}:x)});
+  const withLog=(log)=>{const last=[...log].sort((a,b)=>b.date-a.date)[0];return{valueLog:log,current:last?last.value:null}};
+  const saveEntry=(inv,kind,e)=>{if(kind==="pay"){const ps=inv.payouts||[];updInv(inv.id,{payouts:ps.some(x=>x.id===e.id)?ps.map(x=>x.id===e.id?e:x):[...ps,e]})}else{const vs=inv.valueLog||[];updInv(inv.id,withLog(vs.some(x=>x.id===e.id)?vs.map(x=>x.id===e.id?e:x):[...vs,e]))}sSh({k:"ri",id:inv.id})};
+  const delEntry=(inv,kind,e)=>{if(kind==="pay")updInv(inv.id,{payouts:(inv.payouts||[]).filter(x=>x.id!==e.id)});else updInv(inv.id,withLog((inv.valueLog||[]).filter(x=>x.id!==e.id)));sSh({k:"ri",id:inv.id})};
+  const find=id=>rows.find(r=>r.inv.id===id);
+  const savedNew=(L,pt)=>{const id="inv_"+uid();persist({investments:[...invs,{...pt,id,loanId:L.id,payouts:[],valueLog:pt.valueLog||[],createdAt:Date.now()}]});sSh(null);sTab("holdings")};
+  // ---- selection (long-press / tap) ----
+  const toggle=ids=>sSel(p=>{const n=new Set(p);const all=ids.every(x=>n.has(x));ids.forEach(x=>all?n.delete(x):n.add(x));return n});
+  const down=r=>{lp.current.fired=false;clearTimeout(lp.current.timer);if(selMode)return;lp.current.timer=setTimeout(()=>{lp.current.fired=true;try{navigator.vibrate&&navigator.vibrate(12)}catch{}toggle([r.inv.id])},450)};
+  const cancel=()=>clearTimeout(lp.current.timer);
+  const tap=r=>{if(lp.current.fired){lp.current.fired=false;return}if(selMode)toggle([r.inv.id]);else sOpenId(id=>id===r.inv.id?null:r.inv.id)};
+  const cardAct=(r,a)=>{if(a==="pay")sSh({k:"ri_pay",id:r.inv.id});else if(a==="val")sSh({k:"ri_val",id:r.inv.id});else if(a==="det")sSh({k:"ri",id:r.inv.id});else if(a==="cat")sSh({k:"assign",ids:[r.inv.id]});else if(a==="loan")jump(r.L)};
+  // ---- lists ----
+  const card=(r,i)=>t(RiCard,{key:r.inv.id,r,cur,i,sel:sel.has(r.inv.id),selMode,open:openId===r.inv.id&&!selMode,onTap:()=>tap(r),onDown:()=>down(r),onCancel:cancel,onAct:a=>cardAct(r,a)});
+  const groups=riGroups(shown,f.group,cur);
+  const list=f.group==="none"?shown.map(card):groups.flatMap(g=>[o("div",{key:"h_"+g.key,className:"f ia jb",style:{margin:"14px 2px 8px"},children:[o("span",{className:"f ia",style:{gap:7,fontFamily:c.hf,fontSize:15,fontWeight:600,color:c.tx},children:[t("span",{style:{width:9,height:9,borderRadius:5,background:g.color}}),g.emoji+" "+g.label,t("span",{style:{fontSize:11,color:c.tm,fontWeight:400},children:"· "+g.rows.length})]}),o("span",{style:{fontFamily:'var(--nf)',fontSize:11.5,color:g.ret>=0?c.mt:c.co},children:fs(g.value,cur)+" · "+riSigned(g.ret,cur)})]}),...g.rows.map(card)]);
+  const allocSegs=riGroups(rows,allocBy,cur).map(g=>({key:g.key,label:g.label,emoji:g.emoji,color:g.color,v:Math.max(0,g.value),ret:g.ret,n:g.rows.length}));
+  const allocTot=allocSegs.reduce((a,x)=>a+x.v,0);
+  const drill=(key)=>{sF({...RI_F0,[allocBy==="cat"?"cats":allocBy==="type"?"types":"loans"]:[key]});sTab("holdings")};
+  const best=[...rows].filter(r=>r.s.pnlPct!=null).sort((a,b)=>b.s.pnlPct-a.s.pnlPct);
   const evRow=(e,i)=>{const d=Math.round((lnDay(e.date)-today)/864e5),late=d<0;
     return o("button",{key:e.inv.id+e.kind,onClick:()=>jump(e.L),className:"w100 f ia jb act98 trt",style:{padding:"10px 0",background:"transparent",border:"none",borderTop:i?`1px solid ${c.brs}`:"none",color:"inherit",textAlign:"left",gap:10},children:[
       o("div",{className:"tl minw0",children:[t("div",{className:"tru",style:{fontSize:13.5,color:c.tx},children:(e.kind==="payout"?"💸 Payout · ":"🏁 Matures · ")+e.inv.name}),t("div",{className:"tru",style:{fontSize:11,color:c.tm,marginTop:1},children:e.L.lender||"Loan"})]}),
       o("div",{className:"tr",style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontSize:12.5,color:late?c.ro:d<=7?c.gd:c.td},children:lnFmtD(e.date)}),t("div",{style:{fontSize:10.5,color:late?c.ro:c.tm},children:late?(-d)+" day"+(d===-1?"":"s")+" overdue":d===0?"today":"in "+d+" day"+(d===1?"":"s")})]})]})};
-  const savedNew=(L,pt)=>{const id="inv_"+uid();persist({investments:[...invs,{...pt,id,loanId:L.id,payouts:[],valueLog:pt.valueLog||[],createdAt:Date.now()}]});sAddL(null)};
+  const filterBar=o("div",{style:{marginBottom:12},children:[
+    o("div",{className:"f ia",style:{gap:8},children:[
+      t("input",{value:f.q,onChange:e=>sF(p=>({...p,q:e.target.value})),placeholder:"Search name, loan, category…",style:{...lnInp(),padding:"10px 13px",fontSize:13.5,flex:1}}),
+      t("button",{onClick:()=>sSh({k:"filter"}),className:"act95 trt",style:{flexShrink:0,padding:"10px 13px",borderRadius:10,background:act?c.ac+"26":c.sf2,border:`1px solid ${act?c.ac:c.brs}`,color:c.tx,fontSize:13},children:"⚙ Filters"+(act?` · ${act}`:"")})]}),
+    o("div",{className:"f",style:{gap:6,overflowX:"auto",marginTop:10,paddingBottom:2},children:[
+      riChip(!f.cats.length,"All",()=>sF(p=>({...p,cats:[]})),"all"),
+      ...cats.map(k=>riChip(f.cats.includes(k.id),k.emoji+" "+k.name,()=>sF(p=>({...p,cats:p.cats.includes(k.id)?p.cats.filter(x=>x!==k.id):[...p.cats,k.id]})),k.id,k.color)),
+      riChip(f.cats.includes("none"),"🗂️ Uncategorised",()=>sF(p=>({...p,cats:p.cats.includes("none")?p.cats.filter(x=>x!=="none"):[...p.cats,"none"]})),"none"),
+      riChip(false,"✎ Manage",()=>sSh({k:"catmgr"}),"mg")]})]});
+  const holdings=o(Fragment,{children:[filterBar,
+    o("div",{className:"f jb",style:{fontSize:11.5,color:c.tm,margin:"0 2px 10px"},children:[t("span",{children:`${shown.length} of ${rows.length}${act?" · filtered":""}`+(selMode?` · ${sel.size} selected`:" · long-press to select")}),t("span",{style:{fontFamily:'var(--nf)'},children:fs(shown.reduce((a,r)=>a+r.s.value,0),cur)})]}),
+    shown.length?o("div",{children:list}):t("div",{style:{textAlign:"center",color:c.tm,fontSize:13,padding:"30px 0"},children:rows.length?"No holdings match these filters.":"No reinvestments yet."}),
+    act>0&&t("button",{onClick:()=>sF(p=>({...RI_F0,group:p.group,sort:p.sort})),className:"w100 act95 trt",style:{marginTop:6,padding:"10px 0",background:"transparent",border:"none",color:c.ac,fontSize:13},children:"Clear filters"})]});
+  const overview=o(Fragment,{children:[
+    pts.length>1&&lnCard([t("div",{key:"t",style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx,marginBottom:10},children:"Invested vs worth"}),t(RiChart,{key:"c",pts,cur})],{animation:RI_ANIM,animationDelay:"60ms"}),
+    lnCard([
+      o("div",{key:"t",className:"f ia jb",style:{marginBottom:12},children:[t("span",{style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx},children:"Where it's invested"}),o("div",{className:"f",style:{gap:5},children:[["cat","Category"],["type","Type"],["loan","Loan"]].map(([k,l])=>riChip(allocBy===k,l,()=>sAllocBy(k),k))})]}),
+      o("div",{key:"d",className:"f ia",style:{gap:16},children:[t(RiDonut,{key:allocBy,segs:allocSegs,size:128,total:allocTot,cur,onSeg:drill}),
+        t("div",{className:"f1 minw0",children:allocSegs.slice(0,6).map(x=>o("button",{key:x.key,onClick:()=>drill(x.key),className:"w100 f ia jb act98 trt",style:{padding:"5px 0",background:"transparent",border:"none",color:"inherit",gap:8,textAlign:"left"},children:[o("span",{className:"f ia minw0",style:{gap:7,fontSize:12.5,color:c.tx},children:[t("span",{style:{width:9,height:9,borderRadius:5,background:x.color,flexShrink:0}}),t("span",{className:"tru",children:x.emoji+" "+x.label})]}),t("span",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.tm,flexShrink:0},children:allocTot>0?Math.round(x.v/allocTot*100)+"%":"—"})]}))})]}),
+      allocBy==="cat"&&!cats.length&&t("button",{key:"n",onClick:()=>sSh({k:"catmgr"}),className:"w100 act95 trt",style:{marginTop:10,padding:"9px 0",background:c.sf2,border:`1px dashed ${c.brs}`,borderRadius:10,color:c.ac,fontSize:12.5},children:"+ Create your first category"})
+    ],{animation:RI_ANIM,animationDelay:"120ms"}),
+    best.length>1&&o("div",{className:"f",style:{gap:10,marginBottom:12},children:[["🏆 BEST",best[0],c.mt],["⚠️ WEAKEST",best[best.length-1],c.co]].map(([k,r,col])=>o("button",{key:k,onClick:()=>{sOpenId(r.inv.id);sTab("holdings")},className:"f1 minw0 act98 trt ri-in",style:{textAlign:"left",padding:"12px 13px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,color:"inherit"},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1},children:k}),t("div",{className:"tru",style:{fontSize:13,color:c.tx,marginTop:4},children:r.inv.name}),t("div",{style:{fontFamily:'var(--nf)',fontSize:13,color:col,marginTop:2},children:(r.s.pnlPct>=0?"▲ ":"▼ ")+Math.abs(r.s.pnlPct).toFixed(1)+"%"})]}))}),
+    lnCard([t("div",{key:"t",style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx,marginBottom:4},children:"Coming up"}),
+      ...(soon.length?soon.slice(0,8).map(evRow):[t("div",{key:"n",style:{fontSize:12,color:c.tm,lineHeight:1.45,padding:"6px 0"},children:"Nothing due in the next 90 days. Set a payout frequency or maturity date on a reinvestment to get reminders here."})])],{animation:RI_ANIM,animationDelay:"180ms"})]});
+  const timeline=o(Fragment,{children:[filterBar,t(RiTimeline,{rows:shown,cur,onOpen:r=>{sOpenId(r.inv.id);sTab("holdings")}})]});
+  const scopeRows=selMode?rows.filter(r=>sel.has(r.inv.id)):shown;
+  const selIds=[...sel];
+  const bulkBtn=(l,fn,col)=>t("button",{key:l,onClick:fn,className:"act95 trt",style:{flexShrink:0,padding:"9px 13px",background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:10,color:col||c.tx,fontSize:12.5,whiteSpace:"nowrap"},children:l});
+  const subj=sh&&sh.ids?sh.ids:selIds;
   return o("div",{style:{padding:"8px 20px 150px"},children:[
+    t("style",{children:RI_CSS}),
     o("div",{className:"f ia jb",style:{marginBottom:14},children:[t(BB,{onClick:onClose}),t("div",{style:{fontFamily:c.hf,fontSize:24},children:t("em",{children:"Reinvestments"})}),
-      t("button",{onClick:()=>sPick(true),"aria-label":"Add reinvestment",className:"act90 trt",style:{width:38,height:38,borderRadius:19,background:c.ac,border:"none",color:"#0a0a0a",fontSize:20,lineHeight:1},children:"+"})]}),
+      o("div",{className:"f ia",style:{gap:8},children:[pf.items.length>0&&t("button",{onClick:()=>sSh({k:"ai"}),"aria-label":"Ask AI",className:"act90 trt",style:{width:38,height:38,borderRadius:19,background:c.sf2,border:`1px solid ${c.brs}`,color:c.tx,fontSize:16},children:"✨"}),
+        t("button",{onClick:()=>sSh({k:"pick"}),"aria-label":"Add reinvestment",className:"act90 trt",style:{width:38,height:38,borderRadius:19,background:c.ac,border:"none",color:"#0a0a0a",fontSize:20,lineHeight:1},children:"+"})]})]}),
     pf.items.length===0?lnCard([
       t("div",{key:"t",style:{fontFamily:c.hf,fontSize:17,fontWeight:600,color:c.tx,marginBottom:6},children:"Put your loan money to work"}),
-      t("div",{key:"b",style:{fontSize:13,color:c.td,lineHeight:1.5},children:"Add where a loan's money went — FDs, bonds, funds, stocks. See whether it earns more than the loan costs, log payouts, and get reminded when one is due."}),
-      t("div",{key:"c",className:"f",style:{marginTop:14},children:lnBtn(pf.loans.length?"+ Add reinvestment":"No borrowed loans yet",()=>pf.loans.length?sPick(true):onView("loanTracker"),true,{fontSize:13,padding:"11px 0"})})
+      t("div",{key:"b",style:{fontSize:13,color:c.td,lineHeight:1.5},children:"Add where a loan's money went — FDs, bonds, funds, stocks. See whether it earns more than the loan costs, group holdings into categories, log payouts, and get reminded when one is due."}),
+      t("div",{key:"c",className:"f",style:{marginTop:14},children:lnBtn(pf.loans.length?"+ Add reinvestment":"No borrowed loans yet",()=>pf.loans.length?sSh({k:"pick"}):onView("loanTracker"),true,{fontSize:13,padding:"11px 0"})})
     ]):o(Fragment,{children:[
-      lnCard([
-        t("div",{key:"t",style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,letterSpacing:1.5},children:"AHEAD OF LOAN COST"}),
-        o("div",{key:"v",style:{margin:"6px 0 12px"},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:30,fontWeight:300,color:good?c.mt:c.co},children:riSigned(pf.net,cur)}),t("span",{style:{fontSize:12.5,color:c.td},children:good?" ahead so far":" behind so far"})]}),
-        o("div",{key:"g",className:"g",style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8},children:[["REINVESTED",fm(pf.P,cur),c.tx],["CURRENT VALUE",fm(pf.value,cur),c.tx],["PAYOUTS",fm(pf.payouts,cur),c.mt],["LOAN INTEREST",fm(pf.cost,cur),c.gd]].map(([k,v,col])=>o("div",{key:k,style:{background:c.sf2,borderRadius:10,padding:"9px 11px",minWidth:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:8.5,color:c.tm,letterSpacing:.8},children:k}),t("div",{className:"tru",style:{fontFamily:'var(--nf)',fontSize:14,color:col,marginTop:3},children:v})]}))}),
-        t("div",{key:"n",style:{fontSize:10.5,color:c.tm,marginTop:8,lineHeight:1.45},children:"Ahead = total return (value + payouts − invested) minus the interest the loans cost on the same money."})
-      ]),
-      pts.length>1&&lnCard([t("div",{key:"t",style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx,marginBottom:10},children:"Invested vs worth"}),t(RiChart,{key:"c",pts,cur})]),
-      lnCard([
-        t("div",{key:"t",style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx,marginBottom:4},children:"Coming up"}),
-        ...(soon.length?soon.slice(0,8).map(evRow):[t("div",{key:"n",style:{fontSize:12,color:c.tm,lineHeight:1.45,padding:"6px 0"},children:"Nothing due in the next 90 days. Set a payout frequency or maturity date on a reinvestment to get reminders here."})])
-      ]),
-      ...pf.groups.map(({L,sm})=>lnCard([
-        o("button",{key:"h",onClick:()=>jump(L),className:"w100 f ia jb act98 trt",style:{background:"transparent",border:"none",color:"inherit",padding:0,textAlign:"left",gap:10},children:[
-          o("div",{className:"tl minw0",children:[t("div",{className:"tru",style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx},children:(LOAN_KINDS[L.kind]||{}).e+" "+(L.lender||"Loan")}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:`Paying ${lnCurRate(L).toFixed(2)}% · earning ${riPct(sm.annual)}`})]}),
-          o("div",{className:"tr",style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:15,color:sm.net>=0?c.mt:c.co},children:riSigned(sm.net,cur)}),t("div",{style:{fontSize:10.5,color:c.tm},children:"open ›"})]})]}),
-        ...sm.items.map(({inv,s},i)=>{const tp=invType(inv.type);return o("div",{key:inv.id,className:"f ia jb",style:{padding:"9px 0",borderTop:`1px solid ${c.brs}`,marginTop:i?0:10,gap:10},children:[
-          o("div",{className:"f ia minw0",style:{gap:9},children:[t("span",{style:{fontSize:17},children:inv.emoji||tp.emoji}),o("div",{className:"tl minw0",children:[t("div",{className:"tru",style:{fontSize:13,color:c.tx},children:inv.name}),t("div",{className:"tru",style:{fontSize:10.5,color:c.tm},children:`${fs(s.P,cur)} in${s.closed?" · exited":""}`})]})]}),
-          o("div",{className:"tr",style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:13,color:c.tx},children:fm(s.value,cur)}),t("div",{style:{fontSize:10.5,color:s.ret>=0?c.mt:c.co},children:riSigned(s.ret,cur)})]})]})})
-      ]))
-    ]}),
-    pick&&t(Sht,{onClose:()=>sPick(false),children:o(Fragment,{children:[lnSheetTitle("Which loan funded it?","Pick the loan the money came from — the reinvestment is compared against that loan's rate."),
-      ...(pf.loans.length?pf.loans.map(L=>t("button",{key:L.id,onClick:()=>{sPick(false);sAddL(L)},className:"w100 f ia act99 trt",style:{padding:"12px 4px",gap:12,background:"transparent",border:"none",borderBottom:`1px solid ${c.brs}`,color:"inherit",textAlign:"left"},children:[t("span",{style:{fontSize:20,width:28,textAlign:"center"},children:(LOAN_KINDS[L.kind]||{}).e}),o("div",{className:"tl",children:[t("div",{style:{fontSize:14,color:c.tx},children:L.lender||"Loan"}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:1},children:`${fs(L.principal||0,cur)} · ${lnCurRate(L).toFixed(2)}%`+(L.purpose?" · "+L.purpose:"")})]})]})):[t("div",{key:"n",style:{fontSize:13,color:c.td,padding:"10px 0",lineHeight:1.5},children:"Add a loan in the Loan Tracker first — reinvestments are tracked against the loan that funded them."})])]})}),
-    addL&&t(RiFormSheet,{L:addL,data,onClose:()=>sAddL(null),onSave:pt=>savedNew(addL,pt)})
+      o("div",{className:"ri-in",style:{background:`linear-gradient(135deg,${(good?c.mt:c.co)}22 0%,${c.sfg} 70%)`,border:`1px solid ${(good?c.mt:c.co)}44`,borderRadius:20,padding:18,marginBottom:14},children:[
+        t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,letterSpacing:1.5},children:"AHEAD OF LOAN COST"}),
+        o("div",{style:{margin:"6px 0 12px"},children:[t(CountUp,{v:pf.net,fmt:v=>riSigned(v,cur),style:{fontFamily:'var(--nf)',fontSize:32,fontWeight:300,color:good?c.mt:c.co}}),t("span",{style:{fontSize:12.5,color:c.td},children:good?"  ahead so far":"  behind so far"})]}),
+        o("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8},children:[["REINVESTED",pf.P,c.tx],["CURRENT VALUE",pf.value,c.tx],["PAYOUTS",pf.payouts,c.mt],["LOAN INTEREST",pf.cost,c.gd]].map(([k,v,col])=>o("div",{key:k,style:{background:c.sf2+"cc",borderRadius:10,padding:"9px 11px",minWidth:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:8.5,color:c.tm,letterSpacing:.8},children:k}),t(CountUp,{v,fmt:x=>fm(x,cur),className:"tru",style:{display:"block",fontFamily:'var(--nf)',fontSize:14,color:col,marginTop:3}})]}))}),
+        t("div",{style:{fontSize:10.5,color:c.tm,marginTop:9,lineHeight:1.45},children:`${pf.items.length} holding${pf.items.length===1?"":"s"} across ${pf.groups.length} loan${pf.groups.length===1?"":"s"} · return = value + payouts − invested, minus the interest the loans cost on the same money.`})]}),
+      o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,marginBottom:14},children:[["overview","Overview"],["holdings","Holdings · "+rows.length],["timeline","Timeline"]].map(([k,l])=>t("button",{key:k,onClick:()=>sTab(k),className:"act95 tr",style:{flex:1,padding:"9px 0",borderRadius:9,border:"none",fontSize:13,fontWeight:tab===k?600:400,background:tab===k?c.sf3:"transparent",color:tab===k?c.tx:c.td},children:l}))}),
+      tab==="overview"&&overview,tab==="holdings"&&holdings,tab==="timeline"&&timeline]}),
+    undo&&t("div",{className:"ri-in",style:{position:"fixed",left:16,right:16,bottom:"calc(env(safe-area-inset-bottom,0px) + 90px)",zIndex:60,maxWidth:AW-32,margin:"0 auto",background:c.sf3,border:`1px solid ${c.br}`,borderRadius:12,padding:"11px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,boxShadow:"0 8px 30px rgba(0,0,0,.45)"},children:[t("span",{style:{fontSize:13,color:c.tx},children:undo.label}),t("button",{onClick:()=>{persist(undo.prev);sUndo(null)},className:"act95 trt",style:{background:"transparent",border:"none",color:c.ac,fontSize:13,fontWeight:600},children:"Undo"})]}),
+    selMode&&t("div",{style:{height:84}}),
+    selMode&&createPortal(t("div",{style:{position:"fixed",left:0,right:0,bottom:0,zIndex:45,display:"flex",justifyContent:"center",zoom:"var(--fz)"},children:o("div",{style:{width:"100%",maxWidth:AW,background:c.sfg,borderTop:`1px solid ${c.br}`,boxShadow:"0 -8px 30px rgba(0,0,0,.45)",padding:"10px 12px calc(env(safe-area-inset-bottom,0px) + 10px)"},children:[
+      o("div",{className:"f ia jb",style:{marginBottom:8},children:[t("span",{style:{fontSize:13,color:c.tx,fontWeight:600},children:sel.size+" selected"}),o("div",{className:"f ia",style:{gap:12},children:[t("button",{onClick:()=>sSel(sel.size<shown.length?new Set(shown.map(r=>r.inv.id)):new Set()),style:{background:"transparent",border:"none",color:c.ac,fontSize:12,cursor:"pointer"},children:sel.size<shown.length?"Select all":"Clear"}),t("button",{onClick:()=>sSel(new Set()),style:{background:"transparent",border:"none",color:c.tm,fontSize:12,cursor:"pointer"},children:"Done"})]})]}),
+      o("div",{style:{display:"flex",gap:8,overflowX:"auto"},children:[bulkBtn("🏷️ Category",()=>sSh({k:"assign"})),bulkBtn("🏦 Move loan",()=>sSh({k:"move"})),bulkBtn("💸 Exit / payout",()=>sSh({k:"exit"})),bulkBtn("✨ Ask AI",()=>sSh({k:"ai"})),bulkBtn("🗑 Remove",()=>sSh({k:"remove"}),c.ro)]})]})}),document.body),
+    // ---- sheets ----
+    sh&&sh.k==="filter"&&t(RiFilterSheet,{f,setF:sF,loans:pf.loans,cats,onClose:()=>sSh(null)}),
+    sh&&sh.k==="catmgr"&&t(RiCatManager,{cats,rows,onClose:()=>sSh(null),onSave:list=>{const keep=new Set(list.map(k=>k.id));commit({calculators:{...(data.calculators||{}),riCats:list},investments:invs.map(x=>(x.cats||[]).some(id=>!keep.has(id))?{...x,cats:x.cats.filter(id=>keep.has(id))}:x)});sSh(null)}}),
+    sh&&sh.k==="assign"&&t(RiAssignSheet,{cats,count:subj.length,onClose:()=>sSh(null),onManage:()=>sSh({k:"catmgr"}),onApply:(mode,pick)=>{
+      const nm=id=>(cats.find(k=>k.id===id)||{}).name;
+      const ops=mode==="add"?pick.map(id=>({op:"addCategory",ids:subj,category:nm(id)})):mode==="remove"?pick.map(id=>({op:"removeCategory",ids:subj,category:nm(id)})):(pick.length?[{op:"setCategory",ids:subj,category:nm(pick[0])},...pick.slice(1).map(id=>({op:"addCategory",ids:subj,category:nm(id)}))]:subj.length?[{op:"setCategory",ids:subj,category:""}]:[]);
+      // "Replace" with nothing picked clears the holdings' categories.
+      if(mode==="set"&&!pick.length){commit({investments:invs.map(x=>subj.includes(x.id)?{...x,cats:[]}:x)},"Categories cleared");sSh(null);sSel(new Set());return}
+      applyOps(ops,"Categories updated")}}),
+    sh&&sh.k==="move"&&t(RiMoveSheet,{loans:pf.loans,cur,count:selIds.length,onClose:()=>sSh(null),onPick:id=>applyOps([{op:"moveLoan",ids:selIds,loanId:id}],"Moved "+selIds.length+" to "+((pf.loans.find(L=>L.id===id)||{}).lender||"loan"))}),
+    sh&&sh.k==="exit"&&t(RiExitSheet,{count:selIds.length,cur,onClose:()=>sSh(null),onApply:op=>applyOps([{...op,ids:selIds}],op.op==="markExited"?"Marked exited":"Payouts logged")}),
+    sh&&sh.k==="remove"&&t(Sht,{onClose:()=>sSh(null),children:o(Fragment,{children:[lnSheetTitle("Remove "+selIds.length+" holding"+(selIds.length===1?"":"s"),"Unlink keeps them in My Investments but stops comparing them with a loan. Delete removes them everywhere, including payout and value history."),
+      o("div",{className:"f fc",style:{gap:8,marginTop:8},children:[lnBtn("Unlink only",()=>applyOps([{op:"unlink",ids:selIds}],"Unlinked "+selIds.length),true),lnBtn("Delete everywhere",()=>applyOps([{op:"delete",ids:selIds}],"Deleted "+selIds.length),false,{color:c.ro}),lnBtn("Cancel",()=>sSh(null),false,{border:"none"})]})]})}),
+    sh&&sh.k==="ai"&&t(RiAiSheet,{data,rows,scope:scopeRows,scopeLabel:selMode?sel.size+" selected holding"+(sel.size===1?"":"s"):(act?"the "+shown.length+" filtered holdings":"all "+rows.length+" holdings"),onClose:()=>sSh(null),onApply:ops=>applyOps(ops,"AI changes applied ("+ops.length+")")}),
+    sh&&sh.k==="pick"&&t(Sht,{onClose:()=>sSh(null),children:o(Fragment,{children:[lnSheetTitle("Which loan funded it?","Pick the loan the money came from — the reinvestment is compared against that loan's rate."),
+      ...(pf.loans.length?pf.loans.map(L=>t("button",{key:L.id,onClick:()=>sSh({k:"form",L}),className:"w100 f ia act99 trt",style:{padding:"12px 4px",gap:12,background:"transparent",border:"none",borderBottom:`1px solid ${c.brs}`,color:"inherit",textAlign:"left"},children:[t("span",{style:{fontSize:20,width:28,textAlign:"center"},children:(LOAN_KINDS[L.kind]||{}).e}),o("div",{className:"tl",children:[t("div",{style:{fontSize:14,color:c.tx},children:L.lender||"Loan"}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:1},children:`${fs(L.principal||0,cur)} · ${lnCurRate(L).toFixed(2)}%`+(L.purpose?" · "+L.purpose:"")})]})]})):[t("div",{key:"n",style:{fontSize:13,color:c.td,padding:"10px 0",lineHeight:1.5},children:"Add a loan in the Loan Tracker first — reinvestments are tracked against the loan that funded them."})])]})}),
+    sh&&sh.k==="form"&&t(RiFormSheet,{L:sh.L,data,onClose:()=>sSh(null),onSave:pt=>savedNew(sh.L,pt)}),
+    sh&&sh.k==="ri"&&find(sh.id)&&t(RiDetailSheet,{L:find(sh.id).L,data,inv:find(sh.id).inv,onClose:()=>sSh(null),onAct:(a,e)=>sSh({k:"ri_"+a,id:sh.id,e})}),
+    sh&&sh.k==="ri_edit"&&find(sh.id)&&t(RiFormSheet,{L:find(sh.id).L,data,inv:find(sh.id).inv,onClose:()=>sSh({k:"ri",id:sh.id}),onSave:p=>{updInv(sh.id,p);sSh({k:"ri",id:sh.id})}}),
+    sh&&(sh.k==="ri_pay"||sh.k==="ri_val")&&find(sh.id)&&t(RiEntrySheet,{data,inv:find(sh.id).inv,kind:sh.k==="ri_pay"?"pay":"val",entry:sh.e,onClose:()=>sSh(null),onSave:e=>saveEntry(find(sh.id).inv,sh.k==="ri_pay"?"pay":"val",e),onDelete:()=>delEntry(find(sh.id).inv,sh.k==="ri_pay"?"pay":"val",sh.e)}),
+    sh&&sh.k==="ri_del"&&find(sh.id)&&t(Sht,{onClose:()=>sSh({k:"ri",id:sh.id}),children:o(Fragment,{children:[lnSheetTitle("Remove this reinvestment?","Unlink keeps it in My Investments but stops comparing it with a loan. Delete removes the holding everywhere."),
+      o("div",{className:"f fc",style:{gap:8,marginTop:8},children:[lnBtn("Unlink only",()=>{updInv(sh.id,{loanId:null});sSh(null)},true),lnBtn("Delete everywhere",()=>{persist({investments:invs.filter(x=>x.id!==sh.id)});sSh(null)},false,{color:c.ro}),lnBtn("Cancel",()=>sSh({k:"ri",id:sh.id}),false,{border:"none"})]})]})})
   ]});
 }
 // Calculators-tab card.
