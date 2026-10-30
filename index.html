@@ -2339,6 +2339,7 @@ function App(){
         v==="budgetCalc"&&t(BudgetPage,{data:d,persist:pst,onClose:()=>sV("calculators"),onView:sV}),
         v==="reinvest"&&t(ReinvestDash,{data:d,persist:pst,onTx:sAtx,getFrom:()=>navFromRef.current,onClose:()=>sV(_rvOrigin||"calculators"),onView:(id)=>{navFromRef.current="reinvest";sV(id)}}),
         v==="loanTracker"&&t(LoanTracker,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"calculators"),onView:(id)=>{navFromRef.current="loanTracker";sV(id)}}),
+        v==="loanFlow"&&t(FlowDash,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"calculators"),onView:(id)=>{navFromRef.current="loanFlow";sV(id)}}),
         v==="categoryBudgets"&&t(CatBud,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
         v==="settings"&&t(Settings,{data:d,persist:pst,onClose:()=>sV("home"),onBackup:()=>sV("backup"),onCategories:()=>{navFromRef.current="settings";sV("categories")},onView:sV,theme,onSetTheme:applyTheme}),
         v==="backup"&&t(Backup,{data:d,persist:pst,onClose:()=>sV("home")}),
@@ -12641,7 +12642,7 @@ function LnPaySheet({L,data,row,onClose,onSave}){
   const[n,sN]=useState(row?row.n:(st.next?st.next.n:null));
   const r=st.unpaid.find(x=>x.n===n)||st.next;
   const[date,sDate]=useState(lnYMD(Date.now()));const[amt,sAmt]=useState(r?String(r.emi):"");
-  const[log,sLog]=useState(!lent);const[pw,sPw]=useState(((data.accounts||[])[0]?"acc:"+data.accounts[0].id:""));
+  const[log,sLog]=useState(!lent);const[pw,sPw]=useState(((data.accounts||[])[0]?"acc:"+data.accounts[0].id:""));const[fund,sFund]=useState(null);
   if(!r)return t(Sht,{onClose,children:lnSheetTitle("All EMIs are paid 🎉")});
   const ok=parseFloat(amt)>0&&lnFromYMD(date);
   return t(Sht,{onClose,children:o(Fragment,{children:[
@@ -12654,13 +12655,14 @@ function LnPaySheet({L,data,row,onClose,onSave}){
     r&&parseFloat(amt)>0&&parseFloat(amt)<r.emi-0.005&&t("div",{style:{fontSize:11.5,color:c.td,marginTop:6,lineHeight:1.45},children:`Less than the EMI of ${fm(r.emi,cur)}. This instalment is still marked paid, and your total paid shows ${fm(parseFloat(amt),cur)}.`}),
     !lent&&lnToggle(log,()=>sLog(v=>!v),"Also log as an expense","Adds it to your spending under Bills · EMI"),
     !lent&&log&&o("div",{children:[lnLbl("PAID FROM"),t(LnPayWith,{data,value:pw,onChange:sPw})]}),
-    o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn("Save",()=>{if(!ok)return;onSave({n:r.n,date:lnFromYMD(date),amount:parseFloat(amt)},log&&!lent?pw:null)},ok,{opacity:ok?1:.5})]})
+    !lent&&t(FfFundedBy,{data,destId:L.id,total:parseFloat(amt)||0,value:fund,onChange:sFund}),
+    o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn("Save",()=>{if(!ok)return;onSave({n:r.n,date:lnFromYMD(date),amount:parseFloat(amt)},log&&!lent?pw:null,!lent?ffFundOut(fund,parseFloat(amt)):null)},ok,{opacity:ok?1:.5})]})
   ]})});
 }
 function LnPrepaySheet({L,data,onClose,onSave}){
   const st=loanState(L),cur=data.currency;
   const[amt,sAmt]=useState("");const[mode,sMode]=useState("tenure");const[date,sDate]=useState(lnYMD(Date.now()));
-  const[log,sLog]=useState(L.direction!=="lent");const[pw,sPw]=useState(((data.accounts||[])[0]?"acc:"+data.accounts[0].id:""));
+  const[log,sLog]=useState(L.direction!=="lent");const[pw,sPw]=useState(((data.accounts||[])[0]?"acc:"+data.accounts[0].id:""));const[fund,sFund]=useState(null);
   const a=parseFloat(amt)||0,w=a>0?loanWhatIf(L,a,mode):null,over=a>st.outstanding+0.005;
   const chip=(k,l)=>t("button",{key:k,onClick:()=>sMode(k),className:"act95 trt",style:{flex:1,padding:"10px 6px",borderRadius:10,fontSize:12.5,background:mode===k?c.ac+"26":c.sf2,border:`1px solid ${mode===k?c.ac:c.brs}`,color:mode===k?c.tx:c.td},children:l});
   return t(Sht,{onClose,children:o(Fragment,{children:[
@@ -12677,7 +12679,8 @@ function LnPrepaySheet({L,data,onClose,onSave}){
     lnLbl("DATE"),t("input",{type:"date",value:date,onChange:e=>sDate(e.target.value),style:lnInp()}),
     L.direction!=="lent"&&lnToggle(log,()=>sLog(v=>!v),"Also log as an expense"),
     L.direction!=="lent"&&log&&o("div",{children:[lnLbl("PAID FROM"),t(LnPayWith,{data,value:pw,onChange:sPw})]}),
-    o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn("Record",()=>{if(a>0&&!over&&lnFromYMD(date))onSave({id:"pp_"+uid(),date:lnFromYMD(date),amount:a,mode},log&&L.direction!=="lent"?pw:null)},a>0&&!over,{opacity:a>0&&!over?1:.5})]})
+    L.direction!=="lent"&&t(FfFundedBy,{data,destId:L.id,total:a,value:fund,onChange:sFund}),
+    o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn("Record",()=>{if(a>0&&!over&&lnFromYMD(date))onSave({id:"pp_"+uid(),date:lnFromYMD(date),amount:a,mode},log&&L.direction!=="lent"?pw:null,L.direction!=="lent"?ffFundOut(fund,a):null)},a>0&&!over,{opacity:a>0&&!over?1:.5})]})
   ]})});
 }
 // Floating-rate reset: the new rate applies from the chosen date to the end of the loan (or the next reset).
@@ -12713,7 +12716,7 @@ function LnRateSheet({L,data,onClose,onSave}){
 function LnForeSheet({L,data,onClose,onSave}){
   const st=loanState(L),cur=data.currency;
   const[pct,sPct]=useState("0");const[date,sDate]=useState(lnYMD(Date.now()));
-  const[log,sLog]=useState(L.direction!=="lent");const[pw,sPw]=useState(((data.accounts||[])[0]?"acc:"+data.accounts[0].id:""));
+  const[log,sLog]=useState(L.direction!=="lent");const[pw,sPw]=useState(((data.accounts||[])[0]?"acc:"+data.accounts[0].id:""));const[fund,sFund]=useState(null);
   const charge=lnR2(st.outstanding*(parseFloat(pct)||0)/100),total=lnR2(st.outstanding+charge);
   return t(Sht,{onClose,children:o(Fragment,{children:[
     lnSheetTitle("Foreclose loan","Pay off the whole principal outstanding today and close the loan."),
@@ -12728,7 +12731,8 @@ function LnForeSheet({L,data,onClose,onSave}){
     L.direction!=="lent"&&lnToggle(log,()=>sLog(v=>!v),"Also log as an expense"),
     L.direction!=="lent"&&log&&o("div",{children:[lnLbl("PAID FROM"),t(LnPayWith,{data,value:pw,onChange:sPw})]}),
     t("div",{style:{fontSize:11,color:c.tm,marginTop:10,lineHeight:1.45},children:"Interest accrued since the last EMI isn't included — confirm the final figure with your lender."}),
-    o("div",{className:"f",style:{gap:10,marginTop:16},children:[lnBtn("Cancel",onClose),lnBtn("Close loan",()=>{if(lnFromYMD(date))onSave({date:lnFromYMD(date),outstanding:st.outstanding,charge,total},log&&L.direction!=="lent"?pw:null)},true)]})
+    L.direction!=="lent"&&t(FfFundedBy,{data,destId:L.id,total,value:fund,onChange:sFund}),
+    o("div",{className:"f",style:{gap:10,marginTop:16},children:[lnBtn("Cancel",onClose),lnBtn("Close loan",()=>{if(lnFromYMD(date))onSave({date:lnFromYMD(date),outstanding:st.outstanding,charge,total},log&&L.direction!=="lent"?pw:null,L.direction!=="lent"?ffFundOut(fund,total):null)},true)]})
   ]})});
 }
 function LnRemindSheet({L,onClose,onSave}){
@@ -12800,7 +12804,7 @@ function LnFxSheet({L,data,kind,cycle,onClose,onSave}){
   const iDue0=cycle?Math.max(0,lnR2(cycle.interest-cycle.ipaid)):at0.U;
   const sp=useLnSplit(settle||draw?0:(mode==="prin"?0:iDue0),settle||draw?0:(mode==="int"?0:Math.min(plan,at0.P)));
   const[amt,sAmt]=useState("");const[note,sNote]=useState("");const[date,sDate]=useState(lnYMD(d0));
-  const[log,sLog]=useState(!lent);const[pw,sPw]=useState(((data.accounts||[])[0]?"acc:"+data.accounts[0].id:""));
+  const[log,sLog]=useState(!lent);const[pw,sPw]=useState(((data.accounts||[])[0]?"acc:"+data.accounts[0].id:""));const[fund,sFund]=useState(null);
   const ts=lnFromYMD(date),at=ts?loanFlexi(L,Math.max(ts,lnDay(L.sanction||ts))):null;
   const a=settle?(at?at.totalDue:0):draw?(parseFloat(amt)||0):sp.a;
   const overI=!settle&&!draw&&at&&sp.i>at.U+0.005,overP=!settle&&!draw&&at&&sp.p>at.P+0.005;
@@ -12824,12 +12828,13 @@ function LnFxSheet({L,data,kind,cycle,onClose,onSave}){
     lnLbl("NOTE (OPTIONAL)"),t("input",{value:note,onChange:e=>sNote(e.target.value),style:lnInp()}),
     !draw&&!lent&&lnToggle(log,()=>sLog(v=>!v),"Also log as an expense","Adds it to your spending under Bills"),
     !draw&&!lent&&log&&o("div",{children:[lnLbl("PAID FROM"),t(LnPayWith,{data,value:pw,onChange:sPw})]}),
-    o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn(settle?"Close loan":"Save",()=>{if(!ok)return;onSave({id:"fx_"+uid(),date:ts,amount:a,kind:draw?"draw":"repay",note:note.trim(),...(settle?{settle:true}:{}),...(!draw&&!settle?{split:true,toInt:sp.i,toPrin:sp.p,...(cycle?{forCycle:cycle.to}:{})}:{})},!draw&&!lent&&log?pw:null)},ok,{opacity:ok?1:.5})]})
+    !draw&&!lent&&t(FfFundedBy,{data,destId:L.id,total:a,value:fund,onChange:sFund}),
+    o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn(settle?"Close loan":"Save",()=>{if(!ok)return;onSave({id:"fx_"+uid(),date:ts,amount:a,kind:draw?"draw":"repay",note:note.trim(),...(settle?{settle:true}:{}),...(!draw&&!settle?{split:true,toInt:sp.i,toPrin:sp.p,...(cycle?{forCycle:cycle.to}:{})}:{})},!draw&&!lent&&log?pw:null,!draw&&!lent?ffFundOut(fund,a):null)},ok,{opacity:ok?1:.5})]})
   ]})});
 }
 function LnOdSheet({L,data,kind,onClose,onSave}){
   const cur=data.currency,rep=kind!=="draw";
-  const sp=useLnSplit(0,0);const[amt,sAmt]=useState("");const[note,sNote]=useState("");const[date,sDate]=useState(lnYMD(Date.now()));
+  const sp=useLnSplit(0,0);const[amt,sAmt]=useState("");const[note,sNote]=useState("");const[date,sDate]=useState(lnYMD(Date.now()));const[fund,sFund]=useState(null);
   const a=rep?sp.a:(parseFloat(amt)||0),over=rep&&sp.p>(L.principal||0)+0.005;
   const ok=a>0&&lnFromYMD(date)&&!over;
   return t(Sht,{onClose,children:o(Fragment,{children:[
@@ -12839,7 +12844,8 @@ function LnOdSheet({L,data,kind,onClose,onSave}){
     over&&t("div",{style:{fontSize:11.5,color:c.ro,marginTop:6},children:`The principal part is more than the amount used (${fm(L.principal||0,cur)}).`}),
     lnLbl("DATE"),t("input",{type:"date",value:date,onChange:e=>sDate(e.target.value),style:lnInp()}),
     lnLbl("NOTE (OPTIONAL)"),t("input",{value:note,onChange:e=>sNote(e.target.value),style:lnInp()}),
-    o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn("Save",()=>{if(!ok)return;onSave({id:"od_"+uid(),date:lnFromYMD(date),amount:a,kind,note:note.trim(),...(rep?{interest:sp.i,prin:sp.p}:{})})},ok,{opacity:ok?1:.5})]})
+    rep&&t(FfFundedBy,{data,destId:L.id,total:a,value:fund,onChange:sFund}),
+    o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn("Save",()=>{if(!ok)return;onSave({id:"od_"+uid(),date:lnFromYMD(date),amount:a,kind,note:note.trim(),...(rep?{interest:sp.i,prin:sp.p}:{})},rep?ffFundOut(fund,a):null)},ok,{opacity:ok?1:.5})]})
   ]})});
 }
 
@@ -13048,10 +13054,12 @@ function RiTradingCard({tr,loans,cur,onManage,onDays}){
 function riLoanSummary(data,L){
   const items=riOf(data,L.id).map(inv=>({inv,s:riStats(inv,lnCurRate(L))}));
   const sum=f=>lnR2(items.reduce((a,x)=>a+f(x.s),0));
-  const trade=riTradeFor(data,L.id),P=sum(s=>s.P),ret=lnR2(sum(s=>s.ret)+trade),cost=riLoanCost(L),moneyYrs=items.reduce((a,x)=>a+x.s.P*x.s.yrs,0);
+  // Trading capital recorded in "Where it went" is money at work too, so it counts in the yearly return.
+  const nowT=Date.now(),tYrs=ffTradingCapital(data,L.id).reduce((a,e)=>a+ffNum(e.amount)*Math.max(0,(nowT-e.date)/RI_YR),0);
+  const trade=riTradeFor(data,L.id),P=sum(s=>s.P),ret=lnR2(sum(s=>s.ret)+trade),cost=riLoanCost(L),moneyYrs=items.reduce((a,x)=>a+x.s.P*x.s.yrs,0)+tYrs;
   const base=L.kind==="od"?(L.limit||L.principal||0):L.kind==="flexi"?loanFlexi(L).borrowed:(L.principal||0);
   return{items,trade,P,value:sum(s=>s.value),payouts:sum(s=>s.payouts),ret,cost,net:lnR2(ret-cost),hurdleNet:sum(s=>s.net),
-    annual:items.some(x=>x.s.annual!=null)&&moneyYrs>0?ret/moneyYrs*100:null,rate:lnCurRate(L),base,deployed:base>0?Math.min(100,P/base*100):0};
+    annual:(items.some(x=>x.s.annual!=null)||tYrs>0)&&moneyYrs>0?ret/moneyYrs*100:null,rate:lnCurRate(L),base,deployed:base>0?Math.min(100,P/base*100):0};
 }
 // Earning vs paying, as two bars.
 function riRateBars(annual,rate){
@@ -13137,7 +13145,7 @@ function RiLinkSheet({L,data,onClose,onLink}){
   ]})});
 }
 // Summary for one loan: deployed, value, payouts, interest so far, net, earning vs paying.
-function riSummaryCard(sm,cur,onTap){
+function riSummaryCard(sm,cur,onTap,onFlow){
   const good=sm.net>=0;
   const kv=(k,v,col)=>o("div",{key:k,className:"f jb",style:{padding:"7px 0",borderTop:`1px solid ${c.brs}`,gap:12,fontSize:13},children:[t("span",{style:{color:c.td},children:k}),t("span",{style:{color:col||c.tx,fontFamily:'var(--nf)',textAlign:"right"},children:v})]});
   return lnCard([
@@ -13146,7 +13154,8 @@ function riSummaryCard(sm,cur,onTap){
     o("div",{key:"b",children:[riRateBars(sm.annual,sm.rate)]}),
     o("div",{key:"d",style:{marginTop:6},children:[
       o("div",{className:"f jb",style:{fontSize:12,color:c.td,marginBottom:4},children:[t("span",{children:"Reinvested"}),t("span",{style:{fontFamily:'var(--nf)'},children:`${fs(sm.P,cur)} of ${fs(sm.base,cur)} · ${Math.round(sm.deployed)}%`})]}),
-      t("div",{style:{height:6,borderRadius:3,background:c.sf2,overflow:"hidden",marginBottom:8},children:t("div",{style:{width:sm.deployed+"%",height:"100%",background:c.ac}})})]}),
+      t("div",{style:{height:6,borderRadius:3,background:c.sf2,overflow:"hidden",marginBottom:8},children:t("div",{style:{width:sm.deployed+"%",height:"100%",background:c.ac}})}),
+      onFlow&&sm.deployed<99.5&&t("button",{onClick:onFlow,className:"act95 trt",style:{background:"transparent",border:"none",color:c.ac,fontSize:12,padding:"0 0 8px"},children:`Where did the other ${Math.max(0,100-Math.round(sm.deployed))}% go? ›`})]}),
     kv("Current value",fm(sm.value,cur)),kv("Payouts received",fm(sm.payouts,cur),c.mt),sm.trade!==0&&kv("Trading profit",riSigned(sm.trade,cur),sm.trade>=0?c.mt:c.co),kv("Total return",riSigned(sm.ret,cur),sm.ret>=0?c.mt:c.co),kv("Loan interest so far",fm(sm.cost,cur),c.gd),
     t("div",{key:"n",style:{fontSize:10.5,color:c.tm,marginTop:8,lineHeight:1.45},children:"Return = current value + payouts + trading profit − invested. Loan interest = interest on EMIs due up to today plus charges."}),
     onTap&&t("button",{key:"go",onClick:onTap,className:"w100 act95 trt",style:{marginTop:10,background:"transparent",border:"none",color:c.ac,fontSize:13,padding:"4px 0"},children:"See each reinvestment ›"})
@@ -13163,18 +13172,22 @@ function LnDetail({L,data,persist,onBack,initTab}){
   const addExp=(exp)=>exp?{expenses:[exp,...(data.expenses||[])].sort((a,b)=>b.date-a.date)}:{};
   const pays=new Map((L.payments||[]).map(p=>[p.n,p]));
   const words=lent?{paid:"received till date",rem:"Left to receive",next:"Next instalment",none:"No payments received yet."}:{paid:"paid till date",rem:"Remaining Amount",next:"Next EMI",none:"No payments made for this loan yet."};
-  const doPay=(p,pw)=>{const r0=st.rows.find(x=>x.n===p.n),extra=r0&&p.amount>r0.emi+0.005?lnR2(p.amount-r0.emi):0,pay=extra?{...p,amount:r0.emi}:p;const exp=lnMakeExpense(data,L,p.amount,pw,p.date,`EMI ${p.n}/${st.rows.length} · ${L.purpose||K.l}`);upd({payments:[...(L.payments||[]),{...pay,expenseId:exp?exp.id:null}],...(extra?{prepayments:[...(L.prepayments||[]),{id:"pp_"+uid(),date:p.date,amount:extra,mode:"tenure"}]}:{})},addExp(exp));sSheet(null)};
-  const undo=(n)=>{const p=pays.get(n);if(!p)return;const extra=p.expenseId?{expenses:(data.expenses||[]).filter(e=>e.id!==p.expenseId)}:{};upd({payments:(L.payments||[]).filter(x=>x.n!==n),closedAt:null,foreclosure:null},extra)};
-  const doPre=(p,pw)=>{const exp=lnMakeExpense(data,L,p.amount,pw,p.date,"Part payment · "+(L.purpose||K.l));upd({prepayments:[...(L.prepayments||[]),{...p,expenseId:exp?exp.id:null}]},addExp(exp));sSheet(null)};
-  const doFore=(f,pw)=>{const exp=lnMakeExpense(data,L,f.total,pw,f.date,"Foreclosure · "+(L.purpose||K.l));upd({prepayments:[...(L.prepayments||[]),{id:"pp_"+uid(),date:f.date,amount:f.outstanding,mode:"tenure",foreclosure:true,expenseId:exp?exp.id:null}],closedAt:f.date,foreclosure:f},addExp(exp));sSheet(null)};
-  const doFx=(tx,pw)=>{const exp=tx.kind==="repay"&&!lent?lnMakeExpense(data,L,tx.amount,pw,tx.date,(tx.settle?"Loan settled · ":"Repayment · ")+(L.purpose||K.l)):null;upd({fxTxns:[...(L.fxTxns||[]),{...tx,expenseId:exp?exp.id:null}],...(tx.settle?{closedAt:tx.date}:{})},addExp(exp));sSheet(null)};
-  const delFx=(id)=>{const x=(L.fxTxns||[]).find(q=>q.id===id);if(!x)return;upd({fxTxns:(L.fxTxns||[]).filter(q=>q.id!==id),...(x.settle?{closedAt:null}:{})},x.expenseId?{expenses:(data.expenses||[]).filter(e=>e.id!==x.expenseId)}:{})};
-  const doOd=(tx)=>{upd({odTxns:[tx,...(L.odTxns||[])],principal:Math.max(0,lnR2((L.principal||0)+(tx.kind==="draw"?tx.amount:-(tx.prin!=null?tx.prin:tx.amount))))});sSheet(null)};
+  const doPay=(p,pw,fund)=>{const r0=st.rows.find(x=>x.n===p.n),extra=r0&&p.amount>r0.emi+0.005?lnR2(p.amount-r0.emi):0,pay=extra?{...p,amount:r0.emi}:p,ppId="pp_"+uid();const exp=lnMakeExpense(data,L,p.amount,pw,p.date,`EMI ${p.n}/${st.rows.length} · ${L.purpose||K.l}`);
+    const emiPart=lnR2(p.amount-extra),sc=r0&&r0.emi>0?Math.min(1,emiPart/r0.emi):0,ff=fund?ffFromPay(data,L,fund,p.amount,p.date,{int:r0?lnR2(r0.interest*sc):0,prin:r0?lnR2(emiPart-r0.interest*sc):emiPart},{k:"pay",lid:L.id,n:p.n},extra?{amt:extra,ref:{k:"pre",lid:L.id,id:ppId}}:null):null;
+    upd({payments:[...(L.payments||[]),{...pay,expenseId:exp?exp.id:null}],...(extra?{prepayments:[...(L.prepayments||[]),{id:ppId,date:p.date,amount:extra,mode:"tenure"}]}:{})},{...addExp(exp),...(ff||{})});sSheet(null)};
+  const undo=(n)=>{const p=pays.get(n);if(!p)return;const extra=p.expenseId?{expenses:(data.expenses||[]).filter(e=>e.id!==p.expenseId)}:{};upd({payments:(L.payments||[]).filter(x=>x.n!==n),closedAt:null,foreclosure:null},{...extra,...ffDropRefs(data,r=>r.k==="pay"&&r.lid===L.id&&r.n===n)})};
+  const doPre=(p,pw,fund)=>{const exp=lnMakeExpense(data,L,p.amount,pw,p.date,"Part payment · "+(L.purpose||K.l));const ff=fund?ffFromPay(data,L,fund,p.amount,p.date,{prin:p.amount},{k:"pre",lid:L.id,id:p.id}):null;upd({prepayments:[...(L.prepayments||[]),{...p,expenseId:exp?exp.id:null}]},{...addExp(exp),...(ff||{})});sSheet(null)};
+  const doFore=(f,pw,fund)=>{const exp=lnMakeExpense(data,L,f.total,pw,f.date,"Foreclosure · "+(L.purpose||K.l)),ppId="pp_"+uid();const ff=fund?ffFromPay(data,L,fund,f.total,f.date,{prin:f.outstanding,fee:f.charge},{k:"pre",lid:L.id,id:ppId}):null;upd({prepayments:[...(L.prepayments||[]),{id:ppId,date:f.date,amount:f.outstanding,mode:"tenure",foreclosure:true,expenseId:exp?exp.id:null}],closedAt:f.date,foreclosure:f},{...addExp(exp),...(ff||{})});sSheet(null)};
+  const doFx=(tx,pw,fund)=>{const exp=tx.kind==="repay"&&!lent?lnMakeExpense(data,L,tx.amount,pw,tx.date,(tx.settle?"Loan settled · ":"Repayment · ")+(L.purpose||K.l)):null;
+    let ff=null;if(fund&&tx.kind==="repay"&&!lent){let parts;if(tx.settle){const at=loanFlexi(L,Math.max(lnDay(tx.date),lnDay(L.sanction||tx.date)));parts={int:lnR2(at.U+at.accruing),prin:at.P}}else parts={int:tx.toInt||0,prin:tx.toPrin||0};ff=ffFromPay(data,L,fund,tx.amount,tx.date,parts,{k:"fx",lid:L.id,id:tx.id})}
+    upd({fxTxns:[...(L.fxTxns||[]),{...tx,expenseId:exp?exp.id:null}],...(tx.settle?{closedAt:tx.date}:{})},{...addExp(exp),...(ff||{})});sSheet(null)};
+  const delFx=(id)=>{const x=(L.fxTxns||[]).find(q=>q.id===id);if(!x)return;upd({fxTxns:(L.fxTxns||[]).filter(q=>q.id!==id),...(x.settle?{closedAt:null}:{})},{...(x.expenseId?{expenses:(data.expenses||[]).filter(e=>e.id!==x.expenseId)}:{}),...ffDropRefs(data,r=>r.k==="fx"&&r.lid===L.id&&r.id===id)})};
+  const doOd=(tx,fund)=>{const ff=fund&&tx.kind==="repay"?ffFromPay(data,L,fund,tx.amount,tx.date,{int:tx.interest||0,prin:tx.prin!=null?tx.prin:lnR2(tx.amount-(tx.interest||0))},{k:"od",lid:L.id,id:tx.id}):null;upd({odTxns:[tx,...(L.odTxns||[])],principal:Math.max(0,lnR2((L.principal||0)+(tx.kind==="draw"?tx.amount:-(tx.prin!=null?tx.prin:tx.amount))))},ff||undefined);sSheet(null)};
   const doRate=(ch)=>{upd({rateChanges:[...(L.rateChanges||[]).filter(x=>lnDay(x.date)!==lnDay(ch.date)),ch]});sSheet(null)};
   const delRate=(id)=>upd({rateChanges:(L.rateChanges||[]).filter(x=>x.id!==id)});
-  const delPre=(id)=>{const p=(L.prepayments||[]).find(x=>x.id===id);upd({prepayments:(L.prepayments||[]).filter(x=>x.id!==id)},p&&p.expenseId?{expenses:(data.expenses||[]).filter(e=>e.id!==p.expenseId)}:{})};
+  const delPre=(id)=>{const p=(L.prepayments||[]).find(x=>x.id===id);upd({prepayments:(L.prepayments||[]).filter(x=>x.id!==id)},{...(p&&p.expenseId?{expenses:(data.expenses||[]).filter(e=>e.id!==p.expenseId)}:{}),...ffDropRefs(data,r=>r.k==="pre"&&r.lid===L.id&&r.id===id)})};
   const kv=(k,v,key)=>o("div",{key:key||k,className:"f jb",style:{padding:"9px 0",borderBottom:`1px solid ${c.brs}`,gap:12},children:[t("span",{style:{fontSize:13,color:c.td},children:k}),t("span",{style:{fontSize:13,color:c.tx,textAlign:"right"},children:v})]});
-  const tabs=[["details","Loan Details"],["reinvest","Reinvestments"],["history","Payment History"],["docs","Documents"],["activity","Loan Activity"]].filter(([k])=>!(isOD&&k==="history")&&!(lent&&k==="reinvest"));
+  const tabs=[["details","Loan Details"],["flow","Where it went"],["reinvest","Reinvestments"],["history","Payment History"],["docs","Documents"],["activity","Loan Activity"]].filter(([k])=>!(isOD&&k==="history")&&!(lent&&(k==="reinvest"||k==="flow")));
   // ---- reinvestments (holdings in data.investments with loanId === L.id) ----
   const ri=riLoanSummary(data,L);
   const invs=data.investments||[];
@@ -13189,7 +13202,7 @@ function LnDetail({L,data,persist,onBack,initTab}){
       o("div",{className:"tr",style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:14,color:c.tx},children:fm(s.value,cur)}),t("div",{style:{fontSize:10.5,color:c.tm},children:s.payouts>0?"+ "+fm(s.payouts,cur)+" paid out":s.closed?"exit value":"value"})]})]}),
     o("div",{className:"f ia fw",style:{gap:6,marginTop:8},children:[riMarket(inv.type)?t(LnPill,{col:s.ret>=0?c.mt:c.co,children:`${s.closed?"Realised":"Unrealised"} ${riSigned(s.ret,cur)}${s.pnlPct!=null?" · "+(s.pnlPct>=0?"+":"−")+Math.abs(s.pnlPct).toFixed(1)+"%":""}`}):t(LnPill,{col:s.annual==null?c.tm:s.annual>=lnCurRate(L)?c.mt:c.co,children:s.annual==null?"Too early for a yearly %":`${riPct(s.annual)} vs ${riPct(L.rate||0)} / yr`}),t(LnPill,{col:good?c.mt:c.co,children:(good?"Ahead ":"Behind ")+fm(Math.abs(s.net),cur)})]})]})};
   const riTab=o(Fragment,{children:[
-    (ri.items.length>0||ri.trade!==0)&&riSummaryCard(ri,cur),
+    (ri.items.length>0||ri.trade!==0)&&riSummaryCard(ri,cur,null,()=>sTab("flow")),
     lnCard([
       o("div",{key:"h",className:"f ia jb",style:{marginBottom:6},children:[t("span",{style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx},children:"Reinvestments"}),t("button",{onClick:()=>sSheet({k:"riAdd"}),"aria-label":"Add reinvestment",className:"act90 trt",style:{width:30,height:30,borderRadius:15,border:"none",background:c.ac,color:"#0a0a0a",fontSize:18,lineHeight:1},children:"+"})]}),
       ri.items.length===0&&o("div",{key:"e",style:{textAlign:"center",color:c.td,fontSize:12.5,lineHeight:1.5,padding:"6px 0 10px"},children:[t("div",{style:{color:c.tx,fontWeight:600,marginBottom:4},children:"Reinvested this loan?"}),"Add where the money went (bonds, SGB, FD, funds, stocks…). Log payouts and value updates over time and see if it earns more than the "+riPct(lnCurRate(L))+" this loan charges."]}),
@@ -13198,6 +13211,9 @@ function LnDetail({L,data,persist,onBack,initTab}){
       t("div",{key:"s",style:{fontSize:10.5,color:c.tm,textAlign:"center",marginTop:8},children:"These also appear in My Investments. Edits on either screen stay in sync."})
     ])
   ]});
+  // ---- where the loan's money went (its own tab; the Reinvestments tab opens from the entries) ----
+  const flowPool=lent?null:ffPools(data).find(p=>p.id===L.id);
+  const flowTab=flowPool?t(FfPanel,{data,persist,pool:flowPool,onOpenInvest:r=>{sTab("reinvest");sSheet({k:"ri",id:r.h.id})}}):null;
   const last=st.rows[st.rows.length-1];
   // ---- tab bodies ----
   const detailsTab=lnCard([
@@ -13347,9 +13363,10 @@ function LnDetail({L,data,persist,onBack,initTab}){
       kv(isOD?"Amount Used":"Principal Outstanding",fm(isFx?fx.P:st.outstanding,cur)),kv("Interest Rate",lnCurRate(L).toFixed(2)+"% Yearly"),(L.rateChanges||[]).length>0&&kv("Opening Rate",(L.rate||0).toFixed(2)+"% Yearly"),!noEmi&&kv("Remaining Tenure",st.remainingN+" month"+(st.remainingN===1?"":"s"))
     ].filter(Boolean)),
     breakdown,
+    flowPool&&tab!=="flow"&&t(FfLoanLink,{data,pool:flowPool,onTap:()=>sTab("flow")}),
     !lent&&(ri.items.length>0||ri.trade!==0)&&tab!=="reinvest"&&t("button",{onClick:()=>sTab("reinvest"),className:"w100 f ia jb act98 trt",style:{padding:"12px 16px",marginBottom:12,background:c.sfg,border:`1px solid ${(ri.net>=0?c.mt:c.co)}55`,borderRadius:16,color:"inherit",textAlign:"left",gap:10},children:[o("div",{className:"tl minw0",children:[t("div",{style:{fontSize:13,color:c.tx},children:`📈 ${fm(ri.P,cur)} reinvested`}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:2},children:`Earning ${riPct(ri.annual)} vs paying ${riPct(ri.rate)} / yr`})]}),o("div",{className:"tr",style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:15,color:ri.net>=0?c.mt:c.co},children:riSigned(ri.net,cur)}),t("div",{style:{fontSize:10.5,color:c.tm},children:ri.net>=0?"ahead ›":"behind ›"})]})]}),
     o("div",{className:"f",style:{borderBottom:`1px solid ${c.brs}`,margin:"16px 0 12px",overflowX:"auto"},children:tabs.map(([k,l])=>t("button",{key:k,onClick:()=>sTab(k),className:"act95 trt",style:{flexShrink:0,padding:"11px 14px",background:"transparent",border:"none",borderBottom:`2px solid ${tab===k?c.ac:"transparent"}`,color:tab===k?c.ac:c.td,fontSize:13.5,whiteSpace:"nowrap"},children:l}))}),
-    tab==="details"&&detailsTab,tab==="reinvest"&&!lent&&riTab,tab==="history"&&!isOD&&histTab,tab==="docs"&&docsTab,tab==="activity"&&actTab,
+    tab==="details"&&detailsTab,tab==="flow"&&!lent&&flowTab,tab==="reinvest"&&!lent&&riTab,tab==="history"&&!isOD&&histTab,tab==="docs"&&docsTab,tab==="activity"&&actTab,
     open&&t(Sht,{onClose:()=>sOpen(false),children:o(Fragment,{children:[lnSheetTitle("Manage Loan"),...actions.map(a=>t("button",{key:a.l,onClick:()=>{sOpen(false);a.f()},className:"w100 f ia act99 trt",style:{padding:"12px 4px",gap:12,background:"transparent",border:"none",borderBottom:`1px solid ${c.brs}`,color:"inherit",textAlign:"left"},children:[t("span",{style:{fontSize:20,width:28,textAlign:"center"},children:a.e}),o("div",{className:"tl",children:[t("div",{style:{fontSize:14,color:a.danger?c.ro:c.tx},children:a.l}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:1},children:a.s})]})]}))]})}),
     sheet&&sheet.k==="pay"&&t(LnPaySheet,{L,data,row:sheet.row,onClose:()=>sSheet(null),onSave:doPay}),
     sheet&&sheet.k==="pre"&&t(LnPrepaySheet,{L,data,onClose:()=>sSheet(null),onSave:doPre}),
@@ -13366,7 +13383,7 @@ function LnDetail({L,data,persist,onBack,initTab}){
     sheet&&(sheet.k==="ri_pay"||sheet.k==="ri_val")&&riFind(sheet.id)&&t(RiEntrySheet,{data,inv:riFind(sheet.id),kind:sheet.k==="ri_pay"?"pay":"val",entry:sheet.e,onClose:()=>sSheet({k:"ri",id:sheet.id}),onSave:e=>riSaveEntry(riFind(sheet.id),sheet.k==="ri_pay"?"pay":"val",e),onDelete:()=>riDelEntry(riFind(sheet.id),sheet.k==="ri_pay"?"pay":"val",sheet.e)}),
     sheet&&sheet.k==="ri_del"&&riFind(sheet.id)&&t(Sht,{onClose:()=>sSheet({k:"ri",id:sheet.id}),children:o(Fragment,{children:[lnSheetTitle("Remove this reinvestment?","Unlink keeps it in My Investments but stops comparing it with this loan. Delete removes the holding everywhere, including its payout and value history."),
       o("div",{className:"f fc",style:{gap:8,marginTop:8},children:[lnBtn("Unlink only",()=>{updInv(sheet.id,{loanId:null});sSheet(null)},true),lnBtn("Delete everywhere",()=>{persist({investments:invs.filter(x=>x.id!==sheet.id)});sSheet(null)},false,{color:c.ro}),lnBtn("Cancel",()=>sSheet({k:"ri",id:sheet.id}),false,{border:"none"})]})]})}),
-    del&&t(CSht,{onClose:()=>sDel(false),title:"Delete this loan?",subtitle:"The loan, its schedule and payment history are removed. Expenses already logged stay in your spending, and reinvestments stay in My Investments.",onConfirm:()=>{(L.docs||[]).forEach(d=>idbDelFile(d.id));persist({loanTracker:list.filter(x=>x.id!==L.id),...(ri.items.length?{investments:invs.map(x=>x.loanId===L.id?{...x,loanId:null}:x)}:{})});sDel(false);onBack()},confirmLabel:"Delete"})
+    del&&t(CSht,{onClose:()=>sDel(false),title:"Delete this loan?",subtitle:"The loan, its schedule and payment history are removed. Expenses already logged stay in your spending, and reinvestments stay in My Investments.",onConfirm:()=>{(L.docs||[]).forEach(d=>idbDelFile(d.id));persist({loanTracker:list.filter(x=>x.id!==L.id),...(ri.items.length?{investments:invs.map(x=>x.loanId===L.id?{...x,loanId:null}:x)}:{}),...ffOnLoanDelete(data,L)});sDel(false);onBack()},confirmLabel:"Delete"})
   ]});
 }
 
@@ -13449,6 +13466,8 @@ function LnOverview({data,persist,onOpen,onAdd,onView,onTab}){
       [["↗","You'll Pay",youPay,owe.length+sm.lasN,c.co],["↙","You'll Receive",youRecv,recv.length,c.mt]].map(([ic,l,v,n,col],i)=>o("div",{key:l,className:"f ia jb",style:{padding:"13px 0",borderTop:i?`1px solid ${c.brs}`:"none"},children:[o("div",{className:"f ia",style:{gap:12},children:[t("span",{style:{width:42,height:42,borderRadius:11,background:col+"30",color:col,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20},children:ic}),o("div",{className:"tl",children:[t("div",{style:{fontSize:12.5,color:c.td},children:l}),t("div",{style:{fontFamily:'var(--nf)',fontSize:20,color:c.tx,marginTop:2},children:fm(v,cur)})]})]}),t(LnPill,{children:n+" loan"+(n===1?"":"s")})]})),
       owe.length>0&&o("div",{key:"d",style:{paddingTop:13,borderTop:`1px solid ${c.brs}`},children:[o("div",{className:"f ia jb",children:[o("div",{style:{fontSize:17,color:c.td},children:["You'll be debt-free in ",t("b",{style:{color:c.tx},children:lnDur(months)})]}),t(LnPill,{children:pctDone+"% completed"})]}),t("div",{style:{height:8,borderRadius:4,background:c.sf2,marginTop:12,overflow:"hidden"},children:t("div",{style:{width:pctDone+"%",height:"100%",background:c.mt}})})]})
     ]),
+    // Where all the borrowed money went
+    t(FfOverviewCard,{data,onOpen:()=>onView&&onView("loanFlow")}),
     // Loan-funded investments across all loans
     riAll.length>0&&card([
       sect("Loan-funded Investments"),
@@ -13678,6 +13697,904 @@ function riParseAi(txt){
   try{const j=JSON.parse(m?m[0]:s);return{answer:String(j.answer||""),ops:Array.isArray(j.ops)?j.ops:[]}}catch{return null}
 }
 
+// === LOAN MONEY FLOW — where each loan's money went ===
+// A "pool" is one borrowed loan (or LAS). Every rupee that came out of a pool lands in a type: invested, interest of this
+// loan, interest/EMI of another loan, the loan's purpose, fees… Whatever is not assigned is "not used yet".
+// Entries live in data.calculators.ffEntries, custom types in ffTypes, dismissed suggestions in ffSeen:
+//   entry = {id,loanId:poolId,type,amount,date,toId:poolId|null,toName,note,src:"manual"|"ai"|"rule"|"pay"|"move",lock,off,
+//            ref:{k,lid?,n?,id?}|null (the payment/holding it came from),inv:holding|null (snapshot of a holding moved out)}
+// Holdings in data.investments linked to a loan count as "Invested" without needing an entry. A holding that was really a
+// payment is moved out: it leaves the investments list and a snapshot stays on its entry, so it can be moved back.
+const FF_NONE=[];
+const FF_GROUPS=[["earn","Working for you","#6BD9B5"],["debt","Paying debt","#FF9F6B"],["spend","Spent","#FFC857"],["lend","Lent out","#5EC8C8"]];
+const FF_TYPES=[
+  {id:"invest",l:"Invested",e:"📈",col:"#6BD9B5",g:"earn",d:"Put into an FD, bond, fund, stock…"},
+  {id:"trading",l:"Trading",e:"📊",col:"#7FB8FF",g:"earn",d:"Money you used as trading capital"},
+  {id:"own_int",l:"This loan's own interest",e:"🔁",col:"#FF9F6B",g:"debt",d:"Interest of this same loan, paid from its own money"},
+  {id:"own_prin",l:"This loan's own EMI / principal",e:"↩️",col:"#F2C38B",g:"debt",d:"EMI or part-payment of this same loan, paid from its own money"},
+  {id:"other_int",l:"Another loan's interest",e:"🔗",col:"#F49BD0",g:"debt",d:"Interest of a different loan"},
+  {id:"other_emi",l:"Another loan's EMI / part-payment",e:"🏦",col:"#C9A6FF",g:"debt",d:"EMI, principal or part-payment of a different loan"},
+  {id:"purpose",l:"The loan's purpose",e:"🎯",col:"#FFC857",g:"spend",d:"What you borrowed it for — wedding, repairs, a purchase…"},
+  {id:"fees",l:"Fees & charges",e:"🧾",col:"#A8A29E",g:"spend",d:"Processing fee, GST, insurance, foreclosure charge"},
+  {id:"lent",l:"Lent to someone",e:"🤝",col:"#5EC8C8",g:"lend",d:"Money you passed on to a person"},
+  {id:"other",l:"Other",e:"🧩",col:"#9AA5B1",g:"spend",d:"Anything else"}
+];
+// What a payment can be, as the AI and the quick-add see it. "loan" is a payment to a loan; its type is worked out from whose money paid it.
+const FF_KINDS={loan:"Payment to a loan",invest:"Invested",trading:"Trading",purpose:"The loan's purpose",fees:"Fees & charges",lent:"Lent to someone",other:"Other"};
+const FF_KIND_TYPE={invest:"invest",trading:"trading",purpose:"purpose",fees:"fees",lent:"lent",other:"other"};
+const ffNum=x=>{const n=Number(x);return isFinite(n)?n:0};
+const ffEntriesRaw=data=>((data.calculators||{}).ffEntries)||FF_NONE;
+const ffCustom=data=>((data.calculators||{}).ffTypes)||FF_NONE;
+function ffTypeMap(data){const m=new Map();FF_TYPES.forEach(x=>m.set(x.id,x));ffCustom(data).forEach(x=>m.set(x.id,{g:"spend",e:"🏷️",col:"#9AA5B1",...x}));return m}
+const ffTy=(tm,id)=>tm.get(id)||tm.get("other");
+const ffIntType=id=>id==="own_int"||id==="other_int";
+// Money that has come in from a loan so far (not what is left): drawdowns and repaid principal both count.
+function ffBase(L){
+  if(L.kind==="od")return lnR2((L.principal||0)+(L.odTxns||[]).filter(x=>x.kind==="repay").reduce((a,x)=>a+(x.prin!=null?x.prin:x.amount),0));
+  if(L.kind==="flexi")return loanFlexi(L).borrowed;
+  return L.principal||0;
+}
+let _ffPc={a:null,b:null,e:null,v:null};
+// Every borrowed loan plus LAS, with the figures the flow needs.
+function ffPools(data){
+  const a=data.loanTracker,b=data.las,e0=ffEntriesRaw(data);
+  if(_ffPc.v&&_ffPc.a===a&&_ffPc.b===b&&_ffPc.e===e0)return _ffPc.v;
+  const out=[];
+  for(const L of a||[]){
+    if(L.direction==="lent")continue;
+    const K=LOAN_KINDS[L.kind]||{e:"🏦",l:"Loan"};
+    out.push({id:L.id,name:L.lender||K.l,e:K.e,rate:lnCurRate(L),base:ffBase(L),from:L.sanction||L.createdAt||0,L,las:false,closed:!!loanState(L).closed});
+  }
+  if(b){
+    const loan=Math.max(0,ffNum(b.loan)),rep=(b.txns||[]).filter(x=>x.type==="repay").reduce((s,x)=>s+ffNum(x.amount),0);
+    if(loan>0||e0.some(x=>x.loanId==="las"||x.toId==="las"))out.push({id:"las",name:"LAS",e:"📈",rate:ffNum(b.rate),base:lnR2(loan+rep),from:b.loanDate||0,L:null,las:true,closed:loan<=0});
+  }
+  _ffPc={a,b,e:e0,v:out};return out;
+}
+// Everything that came out of a pool, newest first: stored entries plus holdings linked to a loan (shown as "Invested").
+function ffRows(data){
+  const ids=new Set(ffPools(data).map(p=>p.id)),es=ffEntriesRaw(data),rows=[];
+  const moved=new Set(es.filter(e=>e.ref&&e.ref.k==="inv").map(e=>e.ref.id));
+  for(const e of es)if(ids.has(e.loanId))rows.push({...e,amount:ffNum(e.amount),derived:false});
+  for(const h of data.investments||[]){
+    if(!h.loanId||!ids.has(h.loanId)||moved.has(h.id))continue;
+    rows.push({id:"inv:"+h.id,loanId:h.loanId,type:"invest",amount:ffNum(h.invested),date:h.startDate||h.createdAt||0,toId:null,toName:"",note:h.name||"",src:"inv",lock:true,off:false,ref:{k:"inv",id:h.id},derived:true,h});
+  }
+  return rows.sort((a,b)=>b.date-a.date);
+}
+// One pool's split: amount per type, what is left unassigned, and how much of it went on interest.
+function ffSummary(data,pool,rows,tm){
+  rows=rows||ffRows(data);tm=tm||ffTypeMap(data);
+  const mine=rows.filter(r=>r.loanId===pool.id&&!r.off),by=new Map(),g={earn:0,debt:0,spend:0,lend:0};let used=0;
+  for(const r of mine){by.set(r.type,lnR2((by.get(r.type)||0)+r.amount));used=lnR2(used+r.amount)}
+  by.forEach((v,k)=>{const gk=ffTy(tm,k).g;g[gk]=lnR2((g[gk]||0)+v)});
+  const base=pool.base,idle=Math.max(0,lnR2(base-used)),over=Math.max(0,lnR2(used-base)),now=Date.now();
+  const ir=mine.filter(r=>ffIntType(r.type)),intAmt=lnR2(ir.reduce((a,r)=>a+r.amount,0));
+  return{pool,rows:mine,by,g,used,base,idle,over,n:mine.length,intAmt,
+    carryYr:lnR2(intAmt*pool.rate/100),carrySoFar:lnR2(ir.reduce((a,r)=>a+r.amount*pool.rate/100*Math.max(0,(now-r.date)/RI_YR),0)),idleYr:lnR2(idle*pool.rate/100)};
+}
+// All pools together, plus the money moving from one loan into another.
+function ffAll(data){
+  const pools=ffPools(data),rows=ffRows(data),tm=ffTypeMap(data),sums=pools.map(p=>ffSummary(data,p,rows,tm));
+  const by=new Map(),g={earn:0,debt:0,spend:0,lend:0};let base=0,used=0,idle=0,intAmt=0,carryYr=0,idleYr=0;
+  for(const s of sums){base+=s.base;used+=s.used;idle+=s.idle;intAmt+=s.intAmt;carryYr+=s.carryYr;idleYr+=s.idleYr;s.by.forEach((v,k)=>by.set(k,lnR2((by.get(k)||0)+v)));for(const k in g)g[k]=lnR2(g[k]+s.g[k])}
+  const mv=new Map();
+  for(const r of rows){
+    if(r.off||!r.toId||r.toId===r.loanId)continue;
+    const k=r.loanId+">"+r.toId;let m=mv.get(k);if(!m){m={from:r.loanId,to:r.toId,amt:0,int:0,emi:0,other:0,n:0};mv.set(k,m)}
+    m.amt=lnR2(m.amt+r.amount);m.n++;if(r.type==="other_int")m.int=lnR2(m.int+r.amount);else if(r.type==="other_emi")m.emi=lnR2(m.emi+r.amount);else m.other=lnR2(m.other+r.amount);
+  }
+  return{pools,rows,tm,sums,by,g,base:lnR2(base),used:lnR2(used),idle:lnR2(idle),intAmt:lnR2(intAmt),carryYr:lnR2(carryYr),idleYr:lnR2(idleYr),moves:[...mv.values()].sort((a,b)=>b.amt-a.amt)};
+}
+// Segments for the split bar: one per type used, then "not used yet".
+function ffSegs(sm,tm){
+  const segs=[...sm.by.entries()].map(([k,v])=>{const ty=ffTy(tm,k);return{key:k,label:ty.l,e:ty.e,col:ty.col,v}}).sort((a,b)=>b.v-a.v);
+  if(sm.idle>0)segs.push({key:"idle",label:"Not used yet",e:"💤",col:null,idle:true,v:sm.idle});
+  return segs;
+}
+// The same facts as plain sentences. {e:emoji,t:text,warn?:true}
+function ffWords(sm,cur,what){
+  const out=[],base=sm.base,pct=v=>base>0?Math.round(v/base*100):0,rate=sm.pool.rate,nm=what||"this loan";
+  if(!sm.n)return[{e:"🧭",t:"Nothing recorded yet for "+nm+". Let AI find the payments, or add them yourself."}];
+  const earn=sm.g.earn;
+  if(base>0)out.push(earn>=base*.9?{e:"✅",t:`Almost all of ${nm} (${fs(earn,cur)}) is working for you — invested or used for trading.`}
+    :earn>0?{e:"📈",t:`${pct(earn)}% of ${nm} (${fs(earn,cur)}) is working for you — invested or used for trading.`}
+    :{e:"📈",t:`None of ${nm} is invested or traded yet.`,warn:true});
+  if(sm.intAmt>0)out.push({e:"🔁",warn:true,t:`${fs(sm.intAmt,cur)} went to paying interest. That money earns nothing, and you still pay about ${fs(sm.carryYr,cur)} a year in interest on it (at ${rate.toFixed(2)}%).`});
+  const emi=(sm.by.get("other_emi")||0)+(sm.by.get("own_prin")||0);
+  if(emi>0)out.push({e:"🏦",t:`${fs(emi,cur)} went to EMIs and part-payments of loans.`});
+  if(sm.g.spend>0)out.push({e:"🎯",t:`${fs(sm.g.spend,cur)} was spent — the loan's purpose, fees or other things.`});
+  if(sm.g.lend>0)out.push({e:"🤝",t:`${fs(sm.g.lend,cur)} was lent to others.`});
+  if(sm.idle>0&&base>0)out.push({e:"💤",t:`${fs(sm.idle,cur)} (${pct(sm.idle)}%) isn't assigned to anything yet. Unused money still costs about ${fs(sm.idleYr,cur)} a year in interest.`});
+  if(sm.over>0)out.push({e:"⚠️",warn:true,t:`You've assigned ${fs(sm.over,cur)} more than the ${fs(base,cur)} borrowed. Check the amounts.`});
+  return out;
+}
+
+// --- writing: every change is a pure patch for persist() ---
+function ffPatch(data,{add,del,upd,seen,types,invRemove,invAdd}){
+  const cals=data.calculators||{},delSet=new Set(del||[]),updMap=new Map((upd||[]).map(u=>[u.id,u]));
+  let es=ffEntriesRaw(data).filter(e=>!delSet.has(e.id)).map(e=>updMap.has(e.id)?{...e,...updMap.get(e.id)}:e);
+  if(add&&add.length)es=[...es,...add];
+  const out={calculators:{...cals,ffEntries:es}};
+  if(seen&&seen.length)out.calculators.ffSeen=[...new Set([...(cals.ffSeen||[]),...seen])].slice(-600);
+  if(types)out.calculators.ffTypes=types;
+  if((invRemove&&invRemove.length)||(invAdd&&invAdd.length)){
+    const rm=new Set(invRemove||[]);
+    out.investments=[...(data.investments||[]).filter(h=>!rm.has(h.id)),...(invAdd||[])];
+  }
+  return out;
+}
+// Entries tied to a payment that was undone or deleted go with it.
+function ffDropRefs(data,pred){
+  const es=ffEntriesRaw(data);if(!es.some(e=>e.ref&&pred(e.ref)))return{};
+  return{calculators:{...(data.calculators||{}),ffEntries:es.filter(e=>!(e.ref&&pred(e.ref)))}};
+}
+// A deleted loan takes its own entries with it; entries that paid it keep the name but lose the link.
+function ffOnLoanDelete(data,L){
+  const es=ffEntriesRaw(data);if(!es.some(e=>e.loanId===L.id||e.toId===L.id))return{};
+  return{calculators:{...(data.calculators||{}),ffEntries:es.filter(e=>e.loanId!==L.id).map(e=>e.toId===L.id?{...e,toId:null,toName:e.toName||L.lender||"a deleted loan"}:e)}};
+}
+// Loan money used to pay a loan, recorded from that loan's own payment sheet. parts = {int,prin,fee} for the whole payment;
+// fund = {from:poolId,amt} is how much of it came from that pool's money (the rest was the person's own).
+function ffFromPay(data,L,fund,total,date,parts,ref,extra){
+  if(!fund||!fund.from||!(fund.amt>0)||!(total>0))return null;
+  const take=Math.min(fund.amt,total),sc=take/total,pools=ffPools(data),same=fund.from===L.id,name=L.lender||"Loan";
+  const mk=(type,amt,r)=>amt*sc>0.004?{id:"ff_"+uid(),loanId:fund.from,type,amount:lnR2(amt*sc),date,toId:L.id,toName:name,note:"",src:"pay",lock:true,off:false,ref:r||ref}:null;
+  const es=[mk(same?"own_int":"other_int",parts.int||0),mk(same?"own_prin":"other_emi",parts.prin||0),mk("fees",parts.fee||0),extra?mk(same?"own_prin":"other_emi",extra.amt,extra.ref):null].filter(Boolean);
+  if(!es.length||!pools.some(p=>p.id===fund.from))return null;
+  return ffPatch(data,{add:es});
+}
+
+// --- finding payments that may have used loan money ---
+const FF_RX_LOAN=/\b(emi|interest|instal+ment|loan|repay\w*|principal|overdraft|las|flexi)\b/i;
+const ffRefKey=r=>r?(r.k+":"+(r.lid||"")+":"+(r.n!=null?r.n:(r.id||""))):"";
+const ffEsc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+// People say "HDFC" for "HDFC Personal Loan" and "Bajaj" for "Bajaj Flexi", so a loan is recognised by its distinctive words.
+const FF_STOP=new Set("loan loans personal home vehicle car bike bank finance limited ltd the of and flexi od overdraft credit card friends family emi".split(" "));
+function ffToks(p){const w=p.name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean),k=w.filter(x=>x.length>=3&&!FF_STOP.has(x));return k.length?k:w.filter(x=>x.length>=3)}
+// The one loan a text names, or null when it names none or can't tell two apart.
+function ffMention(txt,pools){
+  const low=String(txt||"").toLowerCase();let best=null,tie=false;
+  for(const p of pools){
+    const tk=ffToks(p);if(!tk.length)continue;
+    const hit=tk.filter(x=>new RegExp("\\b"+ffEsc(x)+"\\b").test(low)).length;if(!hit)continue;
+    const sc=hit/tk.length+hit/10;
+    if(!best||sc>best.sc){best={p,sc};tie=false}else if(sc===best.sc)tie=true;
+  }
+  return best&&!tie?best.p:null;
+}
+// "paid from HDFC", "using LAS funds": which loan's money, and which loan is named elsewhere in the text (the one paid).
+function ffMentions(txt,pools){
+  const low=String(txt||"").toLowerCase();let from=null,rest=low;
+  for(const p of pools){
+    const alt=ffToks(p).map(ffEsc).join("|");if(!alt)continue;
+    const rx=new RegExp("\\b(?:from|using|via|out of|with|by)\\s+(?:the\\s+|my\\s+)?(?:"+alt+")\\b|\\b(?:"+alt+")\\s+(?:\\w+\\s+)?(?:money|funds?|limit|amount)\\b","i");
+    const m=rx.exec(low);if(m){from=p;rest=low.slice(0,m.index)+" "+low.slice(m.index+m[0].length);break}
+  }
+  return{from,to:ffMention(rest,pools)};
+}
+const ffGuessTo=(txt,pools)=>{const m=ffMentions(txt,pools).to;return m?m.id:null};
+
+// Payments made to loans (and loan-looking expenses) that no entry covers yet, newest first.
+function ffCandidates(data,pools){
+  pools=pools||ffPools(data);
+  const have=new Set(ffEntriesRaw(data).map(e=>ffRefKey(e.ref))),seen=new Set((data.calculators||{}).ffSeen||[]);
+  const exps=new Map((data.expenses||[]).map(e=>[e.id,e])),accs=new Map((data.accounts||[]).map(a=>[a.id,a.name])),cards=new Map((data.cards||[]).map(a=>[a.id,a.name]));
+  const acct=e=>e?((e.accountId?accs.get(e.accountId):e.cardId?cards.get(e.cardId):null)||""):"";
+  const out=[],linked=new Set();
+  const add=c=>{c.key=ffRefKey(c.ref);if(!(c.amount>0)||have.has(c.key)||seen.has(c.key))return;out.push(c)};
+  for(const p of pools){
+    const L=p.L;if(!L)continue;
+    const rows=new Map(loanSchedule(L).map(r=>[r.n,r]));
+    for(const x of L.payments||[]){
+      if(x.auto)continue;
+      const e=exps.get(x.expenseId);if(e)linked.add(e.id);
+      const r=rows.get(x.n),sc=r&&r.emi>0?Math.min(1,x.amount/r.emi):0;
+      add({kind:"pay",lid:L.id,date:x.date,amount:x.amount,interest:r?lnR2(r.interest*sc):0,principal:r?lnR2(r.principal*sc):0,label:"EMI "+x.n+" · "+p.name,acct:acct(e),ref:{k:"pay",lid:L.id,n:x.n}});
+    }
+    for(const x of L.prepayments||[]){
+      const e=exps.get(x.expenseId);if(e)linked.add(e.id);
+      add({kind:"pre",lid:L.id,date:x.date,amount:x.amount,interest:0,principal:x.amount,label:(x.foreclosure?"Foreclosure":"Part payment")+" · "+p.name,acct:acct(e),ref:{k:"pre",lid:L.id,id:x.id}});
+    }
+    for(const x of L.fxTxns||[]){
+      if(x.kind!=="repay")continue;
+      const e=exps.get(x.expenseId);if(e)linked.add(e.id);
+      const sp=x.toInt!=null||x.toPrin!=null;
+      add({kind:"fx",lid:L.id,date:x.date,amount:x.amount,interest:sp?ffNum(x.toInt):0,principal:sp?ffNum(x.toPrin):0,label:(x.settle?"Settled · ":"Repayment · ")+p.name+(x.note?" · "+x.note:""),acct:acct(e),ref:{k:"fx",lid:L.id,id:x.id}});
+    }
+    for(const x of L.odTxns||[]){
+      if(x.kind!=="repay")continue;
+      const it=ffNum(x.interest);
+      add({kind:"od",lid:L.id,date:x.date,amount:x.amount,interest:it,principal:x.prin!=null?ffNum(x.prin):Math.max(0,x.amount-it),label:"Repayment · "+p.name+(x.note?" · "+x.note:""),acct:"",ref:{k:"od",lid:L.id,id:x.id}});
+    }
+  }
+  for(const x of (data.las&&data.las.txns)||[]){
+    if(x.type!=="interest"&&x.type!=="repay")continue;
+    add({kind:"las",lid:"las",date:x.date,amount:x.amount,interest:x.type==="interest"?x.amount:0,principal:x.type==="repay"?x.amount:0,label:(x.type==="interest"?"LAS interest":"LAS repayment")+(x.note?" · "+x.note:""),acct:"",ref:{k:"las",id:x.id}});
+  }
+  // Other expenses that read like loan payments. One that matches a loan record (same amount, within a few days) is the same
+  // payment logged twice: its note is merged into the record instead of becoming a second line.
+  const minD=pools.reduce((m,p)=>p.from?Math.min(m,p.from):m,Infinity);
+  for(const e of data.expenses||[]){
+    if(e.type!=="expense"||linked.has(e.id)||e.source==="loan_emi")continue;
+    if(isFinite(minD)&&e.date<minD)continue;
+    const txt=[e.merchant,e.note,e.subcategory,e.payee].filter(Boolean).join(" · ");
+    if(!txt||!(FF_RX_LOAN.test(txt)||pools.some(p=>ffToks(p).length&&ffMention(txt,[p]))))continue;
+    const twin=out.find(r=>r.kind!=="exp"&&Math.abs(r.amount-e.amount)<0.5&&Math.abs(r.date-e.date)<=4*864e5&&(!ffGuessTo(txt,pools)||ffGuessTo(txt,pools)===r.lid));
+    if(twin){twin.label+=" · "+txt;twin.acct=twin.acct||acct(e);continue}
+    const isInt=/interest/i.test(txt);
+    add({kind:"exp",lid:ffGuessTo(txt,pools),date:e.date,amount:e.amount,interest:isInt?e.amount:0,principal:isInt?0:e.amount,label:txt,acct:acct(e),ref:{k:"exp",id:e.id}});
+  }
+  return out.sort((a,b)=>b.date-a.date).slice(0,200);
+}
+// Rules that work without any AI: an explicit mention in the note, or a payment soon after another loan's money arrived.
+function ffGuessFrom(c,pools){
+  const txt=String(c.label||"").toLowerCase();
+  if(/\b(from|using|via|out of|with)\s+(my\s+)?(own|salary|savings?|pocket|income)\b/.test(txt))return{from:"own",why:"The note says it was your own money",conf:"high"};
+  const m=ffMentions(txt,pools).from;
+  if(m)return{from:m.id,why:"The note mentions "+m.name,conf:"high"};
+  let best=null;
+  for(const p of pools){
+    if(!p.from||p.id===c.lid)continue;
+    const d=(c.date-p.from)/864e5;if(d>=0&&d<=10&&(!best||d<best.d))best={p,d};
+  }
+  if(best){const n=Math.round(best.d);return{from:best.p.id,why:`Paid ${n} day${n===1?"":"s"} after ${best.p.name} was disbursed`,conf:"low"}}
+  return{from:null,why:"",conf:"none"};
+}
+function ffRuleProposal(c,pools){
+  const g=ffGuessFrom(c,pools);
+  return{pk:c.key,from:g.from,kind:c.lid||FF_RX_LOAN.test(c.label||"")?"loan":"other",to:c.lid||null,why:g.why,conf:g.conf,src:"rule"};
+}
+// A proposal says whose money paid a payment and what it was; this turns it into entries.
+// A payment to a loan is split into interest and principal from that loan's own schedule.
+function ffExpand(p,c,pools){
+  if(!p.from||p.from==="own")return[];
+  const nm=id=>(pools.find(x=>x.id===id)||{}).name||"";
+  const mk=(type,amount,toId)=>amount>0.004?{id:"ff_"+uid(),loanId:p.from,type,amount:lnR2(amount),date:c.date,toId:toId||null,toName:toId?nm(toId):"",note:String(c.label||"").slice(0,90),src:p.src||"ai",lock:false,off:false,ref:c.ref||null}:null;
+  if(p.kind==="loan"){
+    const to=p.to||c.lid||null,same=!!to&&to===p.from;
+    let i=ffNum(c.interest),pr=ffNum(c.principal);const sum=i+pr;
+    if(sum<=0.004){if(/interest/i.test(c.label||""))i=c.amount;else pr=c.amount}
+    else if(Math.abs(sum-c.amount)>0.5){const k=c.amount/sum;i*=k;pr*=k}
+    return[mk(same?"own_int":"other_int",i,to),mk(same?"own_prin":"other_emi",pr,to)].filter(Boolean);
+  }
+  return[mk(FF_KIND_TYPE[p.kind]||"other",c.amount,null)].filter(Boolean);
+}
+// Same thing for a typed sentence when no AI key is set: amount, date, loan names and the kind of payment, by keyword.
+const FF_MONTHS=["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+function ffBasicParse(text,pools,today){
+  const s=String(text||"").replace(/,/g,""),low=s.toLowerCase();let amount=0,m;
+  const rx=/(?:₹|rs\.?\s*|inr\s*)?(\d+(?:\.\d+)?)\s*(k|thousand|l|lac|lakh|lakhs|cr|crore)?(?![a-z0-9])/gi;
+  while((m=rx.exec(s))){
+    const after=s.slice(m.index+m[0].length,m.index+m[0].length+5).toLowerCase(),before=s.slice(Math.max(0,m.index-12),m.index).toLowerCase();
+    if(/^\s*(st|nd|rd|th)\b/.test(after)||/^\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/.test(after)||/\bon\s*$/.test(before)||/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*$/.test(before))continue;
+    const u=(m[2]||"").toLowerCase(),mult=/^(k|thousand)$/.test(u)?1e3:/^(l|lac|lakh|lakhs)$/.test(u)?1e5:/^(cr|crore)$/.test(u)?1e7:1,v=parseFloat(m[1])*mult;
+    if(v>amount)amount=v;
+  }
+  if(!(amount>0))return[];
+  let date=lnDay(today);
+  if(/\byesterday\b/.test(low))date=lnDay(today-864e5);
+  else{
+    const d1=low.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(?:\s+(\d{4}))?/),d2=low.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s+(\d{4}))?/);
+    const dd=d1?{d:+d1[1],m:FF_MONTHS.indexOf(d1[2]),y:d1[3]}:d2?{d:+d2[2],m:FF_MONTHS.indexOf(d2[1]),y:d2[3]}:null;
+    if(dd&&dd.d>=1&&dd.d<=31){const now=new Date(today);let ts=new Date(dd.y?+dd.y:now.getFullYear(),dd.m,dd.d).getTime();if(!dd.y&&ts>today+864e5)ts=new Date(now.getFullYear()-1,dd.m,dd.d).getTime();date=ts}
+  }
+  // which loan's money, and which loan was paid
+  const mm=ffMentions(low,pools),named=pools.filter(p=>ffMention(low,[p])),own=/\b(same|its own|own interest|this loan|itself)\b/.test(low);
+  let from=mm.from?mm.from.id:null,to=mm.to?mm.to.id:null;
+  if(!from&&to&&own)from=to;
+  else if(!from&&to&&named.length>1)from=(named.find(p=>p.id!==to)||{}).id||null;
+  else if(!from&&!to&&named.length===1)from=named[0].id;
+  if(from&&!to&&own)to=from;
+  const isInt=/interest/.test(low);
+  let kind="other";
+  if(isInt||/\b(emi|instal+ment|principal|part ?payment|prepay\w*|repay\w*|foreclos\w*)\b/.test(low))kind="loan";
+  else if(/\b(invest\w*|fd|fixed deposit|bond|sgb|mutual|mf|stocks?|shares?|sip|nps|ppf)\b/.test(low))kind="invest";
+  else if(/\btrad(e|ing)\b/.test(low))kind="trading";
+  else if(/\b(fees?|charges?|gst|processing|insurance|stamp)\b/.test(low))kind="fees";
+  else if(/\b(lent|lend|gave|friend|brother|sister|cousin)\b/.test(low))kind="lent";
+  else if(/\b(wedding|renovat\w*|repairs?|bought|buy|purchase|furniture|tuition|travel|medical|purpose)\b/.test(low))kind="purpose";
+  if(kind==="loan"&&!to)to=from&&named.length===1?from:null;
+  return[{pk:"d_"+uid(),from,kind,to,why:"Read from your sentence",conf:"low",src:"rule",c:{date,amount,interest:kind==="loan"&&isInt?amount:0,principal:kind==="loan"&&!isInt?amount:0,label:s.trim().slice(0,90),ref:null,lid:to}}];
+}
+
+// --- AI: it only proposes; every reply is checked against known ids before anything is shown ---
+function ffParseAi(txt){
+  let s=String(txt||"").replace(/<think>[\s\S]*?<\/think>/gi,"").replace(/<thinking>[\s\S]*?<\/thinking>/gi,"");
+  const fence=s.match(/```(?:json)?\s*([\s\S]*?)```/i);if(fence)s=fence[1];
+  const m=s.match(/\{[\s\S]*\}/);
+  try{const j=JSON.parse(m?m[0]:s);return{answer:String(j.answer||""),items:Array.isArray(j.items)?j.items:[]}}catch{return null}
+}
+const ffAiText=r=>(r.content&&r.content[0]&&r.content[0].text)||"";
+function ffAiErr(e){return e.code==="NO_API_KEY"?"Add an AI API key in Settings → AI Assistant to use this.":(e.message||"Something went wrong.")}
+function ffCleanScan(raw,keys,poolIds){
+  const out=[];
+  for(const x of Array.isArray(raw)?raw:[]){
+    if(!x||!keys.has(String(x.key)))continue;
+    const from=x.from==null||x.from==="own"?"own":String(x.from);
+    if(from!=="own"&&!poolIds.has(from))continue;
+    out.push({pk:String(x.key),from,kind:FF_KINDS[x.kind]?x.kind:"loan",to:x.to&&poolIds.has(String(x.to))?String(x.to):null,why:String(x.why||"").slice(0,140),conf:x.conf==="low"?"low":"high",src:"ai"});
+  }
+  return out;
+}
+async function ffAiScan(data,cands,pools){
+  const pl=pools.map(p=>({id:p.id,name:p.name,rate:p.rate,amount:Math.round(p.base),disbursed:p.from?lnYMD(p.from):null}));
+  const sys=`You sort a person's payments for a loan-money tracker (India, ₹). They have several loans and sometimes use one loan's money to pay another loan's interest or EMI, or the same loan's own interest. For each payment decide: (1) "from" — the id of the loan whose money paid it, or "own" if it came from their own income or savings; (2) "kind" — "loan" if it pays a loan, otherwise invest | trading | purpose | fees | lent | other; (3) "to" — for kind loan, the id of the loan that was paid (use paid_to when it is given). Decide "from" only from evidence: the text (for example "from HDFC", "using LAS"), the account, and timing (a payment soon after a loan was disbursed or drawn is often paid from it). With no evidence choose "own" and set conf "low". Reply with ONLY a JSON object: {"answer":"one short sentence","items":[{"key":"<key>","from":"<loan id>|own","kind":"loan|invest|trading|purpose|fees|lent|other","to":"<loan id>|null","conf":"high|low","why":"max 12 words"}]}. Use only keys from PAYMENTS and ids from LOANS.`;
+  const poolIds=new Set(pools.map(p=>p.id)),out=[];let answer="";
+  for(let i=0;i<cands.length;i+=40){
+    const chunk=cands.slice(i,i+40),keys=new Set(chunk.map(c=>c.key));
+    const pay=chunk.map(c=>({key:c.key,date:lnYMD(c.date),amount:c.amount,text:String(c.label||"").slice(0,120),paid_to:c.lid||null,account:c.acct||undefined}));
+    const r=await cAPI({system:sys,max_tokens:2500,messages:[{role:"user",content:`TODAY: ${lnYMD(Date.now())}\nLOANS:\n${JSON.stringify(pl)}\n\nPAYMENTS:\n${JSON.stringify(pay)}`}]});
+    const p=ffParseAi(ffAiText(r));if(!p)throw new Error("The AI reply wasn't in a usable format — try again.");
+    if(p.answer)answer=p.answer;out.push(...ffCleanScan(p.items,keys,poolIds));
+  }
+  return{answer,items:out};
+}
+async function ffAiDescribe(data,text,pools){
+  const pl=pools.map(p=>({id:p.id,name:p.name,rate:p.rate}));
+  const sys=`You turn a sentence about loan money into records for a tracker (India, ₹). Reply with ONLY a JSON object: {"answer":"one short plain sentence","items":[{"amount":number,"date":"YYYY-MM-DD","from":"<loan id>|null","kind":"loan|invest|trading|purpose|fees|lent|other","to":"<loan id>|null","interest":number,"principal":number,"note":"short","why":"max 12 words"}]}. "from" is the loan whose money was used; "to" is the loan that was paid (kind loan only). For kind loan give "interest" and "principal" when the sentence says how the payment splits, otherwise leave them 0. Work out dates relative to TODAY. Use only ids from LOANS. If the sentence does not say which loan's money was used, set "from" to null. Never invent amounts.`;
+  const r=await cAPI({system:sys,max_tokens:1200,messages:[{role:"user",content:`TODAY: ${lnYMD(Date.now())}\nLOANS:\n${JSON.stringify(pl)}\n\nSENTENCE: ${String(text).slice(0,600)}`}]});
+  const p=ffParseAi(ffAiText(r));if(!p)throw new Error("The AI reply wasn't in a usable format — try rephrasing.");
+  const ids=new Set(pools.map(x=>x.id)),today=lnDay(Date.now()),out=[];
+  for(const x of p.items){
+    if(!x)continue;const amount=ffNum(x.amount);if(!(amount>0))continue;
+    const from=x.from==null?null:(x.from==="own"?"own":(ids.has(String(x.from))?String(x.from):null)),to=x.to&&ids.has(String(x.to))?String(x.to):null,kind=FF_KINDS[x.kind]?x.kind:"other";
+    out.push({pk:"d_"+uid()+out.length,from,kind,to,why:String(x.why||"").slice(0,140),conf:"high",src:"ai",c:{date:(x.date&&lnFromYMD(String(x.date)))||today,amount,interest:Math.max(0,ffNum(x.interest)),principal:Math.max(0,ffNum(x.principal)),label:String(x.note||"").slice(0,90),ref:null,lid:to}});
+  }
+  return{answer:p.answer,items:out};
+}
+
+// --- reinvestments that are really payments ---
+const FF_RX_PAY=/\b(interest|emi|instal+ment|loan|repay\w*|principal|processing|fees?|charges?|gst|penalt\w*|overdraft)\b/i;
+function ffInvType(h,kind,to,part){
+  if(kind==="loan"){const same=!to||to===h.loanId;return part==="interest"?(same?"own_int":"other_int"):(same?"own_prin":"other_emi")}
+  return FF_KIND_TYPE[kind]||"other";
+}
+// Holdings whose name or note reads like a payment. Real FDs, funds and stocks are never flagged.
+function ffInvFlags(data,pools){
+  pools=pools||ffPools(data);
+  const ids=new Set(pools.map(p=>p.id)),out=[];
+  for(const h of data.investments||[]){
+    if(!h.loanId||!ids.has(h.loanId))continue;
+    const txt=[h.name,h.note].filter(Boolean).join(" · ");
+    if(!FF_RX_PAY.test(txt)||riMarket(h.type)||(ffNum(h.rate)>0&&h.maturityDate))continue;
+    const low=txt.toLowerCase(),named=ffMention(low,pools),toId=named?named.id:h.loanId;
+    const fee=/\b(fees?|charges?|gst|processing|penalt\w*)\b/.test(low),int=/\binterest\b/.test(low);
+    out.push({h,type:fee?"fees":ffInvType(h,"loan",toId,int?"interest":"principal"),toId:fee?null:toId,why:"“"+String(h.name||"").slice(0,40)+"” reads like a payment, not an investment",src:"rule"});
+  }
+  return out;
+}
+async function ffAiInv(data,pools){
+  const hs=(data.investments||[]).filter(h=>h.loanId&&pools.some(p=>p.id===h.loanId));
+  if(!hs.length)return{answer:"",items:[]};
+  const pl=pools.map(p=>({id:p.id,name:p.name}));
+  const sys=`You review the list of "reinvestments" a person recorded for money borrowed from loans. Some entries are not real investments: they are payments of loan interest or EMI, fees, or spending. A real investment is an FD, bond, SGB, mutual fund, stock, NPS or similar that can earn a return. Reply with ONLY a JSON object: {"answer":"one short sentence","items":[{"id":"<holding id>","investment":false,"kind":"loan|fees|purpose|lent|other","part":"interest|principal","to":"<loan id>|null","why":"max 12 words"}]}. Include ONLY entries that are not real investments. For kind loan, "to" is the loan that was paid and "part" says whether it was interest or principal/EMI. Use only ids from HOLDINGS and LOANS.`;
+  const list=hs.slice(0,80).map(h=>({id:h.id,name:String(h.name||"").slice(0,60),type:h.type,invested:ffNum(h.invested),note:String(h.note||"").slice(0,80),rate:h.rate==null?null:ffNum(h.rate),maturity:h.maturityDate?lnYMD(h.maturityDate):null,funded_by:h.loanId}));
+  const r=await cAPI({system:sys,max_tokens:2000,messages:[{role:"user",content:`LOANS:\n${JSON.stringify(pl)}\n\nHOLDINGS:\n${JSON.stringify(list)}`}]});
+  const p=ffParseAi(ffAiText(r));if(!p)throw new Error("The AI reply wasn't in a usable format — try again.");
+  const ids=new Set(pools.map(x=>x.id)),byId=new Map(hs.map(h=>[h.id,h])),out=[];
+  for(const x of p.items){
+    const h=x&&byId.get(String(x.id));if(!h||x.investment!==false)continue;
+    const kind=FF_KINDS[x.kind]&&x.kind!=="invest"&&x.kind!=="trading"?x.kind:"other",to=x.to&&ids.has(String(x.to))?String(x.to):null;
+    out.push({h,type:ffInvType(h,kind,to,x.part==="interest"?"interest":"principal"),toId:kind==="loan"?(to||h.loanId):null,why:String(x.why||"").slice(0,140),src:"ai"});
+  }
+  return{answer:p.answer,items:out};
+}
+// Moving a holding out of Reinvestments: it leaves the investments list; a snapshot stays on its entry so it can be moved back.
+function ffMoveOut(data,items){
+  const pools=ffPools(data),nm=id=>(pools.find(x=>x.id===id)||{}).name||"",es=[],rm=[];
+  for(const it of items){
+    const h=it.h;rm.push(h.id);
+    es.push({id:"ff_"+uid(),loanId:h.loanId,type:it.type,amount:ffNum(h.invested),date:h.startDate||h.createdAt||Date.now(),toId:it.toId||null,toName:it.toId?nm(it.toId):"",note:String(h.name||"").slice(0,90),src:it.src||"rule",lock:false,off:false,ref:{k:"inv",id:h.id},inv:h});
+  }
+  return ffPatch(data,{add:es,invRemove:rm});
+}
+function ffMoveBack(data,entryId){
+  const e=ffEntriesRaw(data).find(x=>x.id===entryId);if(!e||!e.inv)return null;
+  const has=(data.investments||[]).some(h=>h.id===e.inv.id);
+  return ffPatch(data,{del:[entryId],invAdd:has?[]:[e.inv]});
+}
+// Capital put into trading from a loan, for the yearly-return maths in riLoanSummary.
+const ffTradingCapital=(data,loanId)=>ffEntriesRaw(data).filter(e=>e.loanId===loanId&&e.type==="trading"&&!e.off);
+
+// === LOAN MONEY FLOW — building blocks ===
+// Stacked split of a loan's money: one coloured segment per type, hatched for "not used yet".
+function FfBar({segs,total,h=14}){
+  const m=RiMounted(),tot=Math.max(total||0,segs.reduce((a,x)=>a+x.v,0))||1;
+  return t("div",{role:"img","aria-label":"How the loan's money was used",className:"f",style:{height:h,borderRadius:h/2,overflow:"hidden",background:c.sf2,gap:1.5},children:segs.filter(x=>x.v>0).map(x=>t("div",{key:x.key,title:x.label,style:{width:m?(x.v/tot*100)+"%":"0%",background:x.idle?`repeating-linear-gradient(135deg,${c.sf3} 0 4px,${c.sf2} 4px 8px)`:x.col,transition:"width .9s cubic-bezier(.2,.8,.2,1)",minWidth:2}}))});
+}
+// One row per use, with its amount and share. Tapping a row filters the list below.
+function FfLegend({segs,base,cur,sel,onSel}){
+  const tot=Math.max(base||0,segs.reduce((a,x)=>a+x.v,0))||1;
+  return t("div",{children:segs.map((x,i)=>o("button",{key:x.key,onClick:()=>onSel&&!x.idle&&onSel(sel===x.key?null:x.key),className:"w100 f ia jb act98 trt",style:{padding:"9px 0",background:"transparent",border:"none",borderTop:i?`1px solid ${c.brs}`:"none",color:"inherit",gap:10,textAlign:"left",opacity:sel&&sel!==x.key?.4:1,cursor:onSel&&!x.idle?"pointer":"default"},children:[
+    o("span",{className:"f ia minw0",style:{gap:9},children:[t("span",{style:{width:10,height:10,borderRadius:3,background:x.idle?c.sf3:x.col,border:x.idle?`1px dashed ${c.tm}`:"none",flexShrink:0}}),t("span",{style:{fontSize:13,color:c.tx,lineHeight:1.3},children:x.e+" "+x.label})]}),
+    o("span",{className:"f ia",style:{gap:10,flexShrink:0},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:c.tx},children:fm(x.v,cur)}),t("span",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.tm,minWidth:34,textAlign:"right"},children:Math.round(x.v/tot*100)+"%"})]})]}))});
+}
+// What an entry says in words: title and a line of detail.
+function ffLine(r,pools,tm,showPool){
+  const ty=ffTy(tm,r.type),from=(pools.find(p=>p.id===r.loanId)||{}).name||"this loan",to=(pools.find(p=>p.id===r.toId)||{}).name||r.toName||"",who=showPool?from:"this loan";
+  const title=r.derived?(r.h.name||"Investment"):r.type==="own_int"?"Interest of "+who:r.type==="own_prin"?"EMI / part-payment of "+who:r.type==="other_int"?"Interest of "+(to||"another loan"):r.type==="other_emi"?"EMI / part-payment of "+(to||"another loan"):ty.l;
+  const own=r.type==="own_int"||r.type==="own_prin";
+  const sub=[r.derived?"Reinvestment":(showPool&&!own?"From "+from+"'s money":null),r.date?lnFmtD(r.date):null,r.derived?null:(r.note&&r.note!==title?r.note:null)].filter(Boolean).join(" · ");
+  return{title,sub,ty};
+}
+function FfRowItem({r,pools,tm,cur,showPool,onOpen}){
+  const{title,sub,ty}=ffLine(r,pools,tm,showPool);
+  const badge=r.derived?null:r.src==="ai"?"AI":r.src==="rule"?"Auto":r.src==="pay"?"From payment":r.src==="move"?"Moved":null;
+  return o("button",{onClick:onOpen,className:"w100 f ia jb act98 trt",style:{padding:"11px 0",background:"transparent",border:"none",borderTop:`1px solid ${c.brs}`,color:"inherit",textAlign:"left",gap:10,opacity:r.off?.5:1},children:[
+    o("div",{className:"f ia minw0",style:{gap:10},children:[
+      t("span",{style:{width:36,height:36,borderRadius:10,background:ty.col+"26",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0},children:ty.e}),
+      o("div",{className:"tl minw0",children:[t("div",{style:{fontSize:13.5,color:c.tx,fontWeight:500,lineHeight:1.3},children:title}),
+        o("div",{className:"f ia fw",style:{gap:"2px 6px",marginTop:2},children:[t("span",{style:{fontSize:11,color:c.tm,lineHeight:1.35},children:sub}),badge&&t("span",{style:{fontSize:9.5,color:c.td,border:`1px solid ${c.brs}`,borderRadius:999,padding:"0 6px",flexShrink:0},children:badge}),!r.derived&&r.lock&&t("span",{title:"Your choice is kept",style:{fontSize:10,flexShrink:0},children:"🔒"}),r.off&&t("span",{style:{fontSize:9.5,color:c.gd,flexShrink:0},children:"not counted"})]})]})]}),
+    t("span",{style:{fontFamily:'var(--nf)',fontSize:14,color:c.tx,flexShrink:0,textDecoration:r.off?"line-through":"none"},children:fm(r.amount,cur)})]});
+}
+// Changes can be undone for a few seconds, like in the Reinvestment hub.
+function useFfUndo(data,persist){
+  const[u,sU]=useState(null),tm=useRef(0);
+  useEffect(()=>()=>clearTimeout(tm.current),[]);
+  const commit=(patch,label)=>{
+    const prev={calculators:data.calculators||{}};if(patch.investments)prev.investments=data.investments||[];
+    persist(patch);
+    if(label){sU({label,prev});clearTimeout(tm.current);tm.current=setTimeout(()=>sU(null),7000)}
+  };
+  const snack=u?t("div",{className:"ri-in",style:{position:"fixed",left:16,right:16,bottom:"calc(env(safe-area-inset-bottom,0px) + 90px)",zIndex:60,maxWidth:AW-32,margin:"0 auto",background:c.sf3,border:`1px solid ${c.br}`,borderRadius:12,padding:"11px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,boxShadow:"0 8px 30px rgba(0,0,0,.45)"},children:[t("span",{style:{fontSize:13,color:c.tx},children:u.label}),t("button",{onClick:()=>{persist(u.prev);sU(null)},className:"act95 trt",style:{background:"transparent",border:"none",color:c.ac,fontSize:13,fontWeight:600},children:"Undo"})]}):null;
+  return{commit,snack};
+}
+const ffSel=(value,onChange,opts,extra)=>t("select",{value,onChange:e=>onChange(e.target.value),style:{...lnInp(),padding:"10px 12px",fontSize:13.5,...extra},children:opts.map(([v,l])=>t("option",{key:v,value:v,children:l}))});
+
+// --- add or edit one entry ---
+function FfEntrySheet({data,pools,tm,entry,init,fixedLoan,onSave,onDelete,onSplit,onMoveBack,onClose}){
+  const e0=entry||init||{},cur=data.currency,types=[...tm.values()];
+  const[f,sF]=useState({type:e0.type||"invest",loanId:e0.loanId||fixedLoan||(pools[0]||{}).id||"",amount:e0.amount!=null?String(e0.amount):"",date:lnYMD(e0.date||Date.now()),toId:e0.toId||"",note:e0.note||"",lock:true,off:!!e0.off});
+  const set=(k,v)=>sF(p=>({...p,[k]:v}));
+  const ty=ffTy(tm,f.type),own=f.type==="own_int"||f.type==="own_prin",other=f.type==="other_int"||f.type==="other_emi",debt=own||other||(!FF_TYPES.some(x=>x.id===f.type)&&ty.g==="debt");
+  const pickType=id=>sF(p=>{const own2=id==="own_int"||id==="own_prin",oth=id==="other_int"||id==="other_emi";
+    let toId=p.toId;if(own2)toId=p.loanId;else if(oth){const others=pools.filter(x=>x.id!==p.loanId);toId=others.some(x=>x.id===p.toId)?p.toId:(others.length===1?others[0].id:"")}else if(!(ffTy(tm,id).g==="debt"))toId="";
+    return{...p,type:id,toId}});
+  const pickLoan=id=>sF(p=>({...p,loanId:id,toId:(p.type==="own_int"||p.type==="own_prin")?id:(p.toId===id?"":p.toId)}));
+  const amt=parseFloat(f.amount),ok=amt>0&&lnFromYMD(f.date)&&pools.some(p=>p.id===f.loanId);
+  const toName=id=>(pools.find(p=>p.id===id)||{}).name||"";
+  const save=()=>{if(!ok)return;onSave({...(entry||{}),id:entry?entry.id:"ff_"+uid(),loanId:f.loanId,type:f.type,amount:lnR2(amt),date:lnFromYMD(f.date),toId:debt&&f.toId?f.toId:null,toName:debt&&f.toId?toName(f.toId):"",note:f.note.trim(),src:entry?entry.src:"manual",lock:f.lock,off:f.off,ref:entry?entry.ref||null:null},!entry)};
+  const chip=(on,l,fn,k,col)=>riChip(on,l,fn,k,col);
+  return t(Sht,{onClose,children:o(Fragment,{children:[
+    lnSheetTitle(entry?"Edit entry":"Add where money went","Record the part of a loan's money that went to one thing. Enter only the amount that came from the loan's money."),
+    entry&&entry.src&&entry.src!=="manual"&&t("div",{style:{fontSize:11.5,color:c.td,background:c.sf2,borderRadius:10,padding:"8px 11px",marginBottom:4,lineHeight:1.45},children:entry.src==="ai"?"✨ Suggested by AI. Your edits are kept — AI won't change them again.":entry.src==="pay"?"Recorded from a payment you made. Your edits are kept.":entry.src==="move"?"Moved out of Reinvestments.":"Found by the app's rules. Your edits are kept."}),
+    !fixedLoan&&o(Fragment,{children:[lnLbl("WHOSE MONEY"),o("div",{className:"f fw",style:{gap:6},children:pools.map(p=>chip(f.loanId===p.id,p.e+" "+p.name,()=>pickLoan(p.id),p.id))})]}),
+    lnLbl("WHAT DID IT GO TO"),
+    o("div",{className:"f fw",style:{gap:6},children:types.map(x=>chip(f.type===x.id,x.e+" "+x.l,()=>pickType(x.id),x.id,x.col))}),
+    ty.d&&t("div",{style:{fontSize:11.5,color:c.tm,marginTop:6,lineHeight:1.45},children:ty.d}),
+    debt&&o(Fragment,{children:[lnLbl("WHICH LOAN WAS PAID"),
+      own?t("div",{style:{fontSize:13,color:c.td,padding:"2px 0"},children:"The same loan: "+(toName(f.loanId)||"this loan")})
+      :o("div",{className:"f fw",style:{gap:6},children:[...pools.filter(p=>p.id!==f.loanId).map(p=>chip(f.toId===p.id,p.e+" "+p.name,()=>set("toId",p.id),p.id)),chip(!f.toId,"Not in my app",()=>set("toId",""),"none")]})]}),
+    lnLbl("AMOUNT ("+cur+")"),t("input",{value:f.amount,inputMode:"decimal",autoFocus:!entry,placeholder:"0",onChange:e=>set("amount",e.target.value.replace(/[^\d.]/g,"")),style:lnInp()}),
+    lnLbl("DATE"),t("input",{type:"date",value:f.date,onChange:e=>set("date",e.target.value),style:riDateInp()}),
+    lnLbl("NOTE (OPTIONAL)"),t("input",{value:f.note,placeholder:"e.g., June interest of Bajaj",onChange:e=>set("note",e.target.value),style:lnInp()}),
+    lnToggle(f.lock,()=>set("lock",!f.lock),"🔒 Keep my choice","AI and the app's rules will never change this entry"),
+    entry&&lnToggle(f.off,()=>set("off",!f.off),"Don't count this","Keeps the entry but leaves it out of every total"),
+    entry&&entry.inv&&t("div",{style:{background:c.sf2,borderRadius:12,padding:"11px 13px",marginTop:14},children:[t("div",{key:"a",style:{fontSize:12,color:c.td,lineHeight:1.5,marginBottom:8},children:"This was moved out of Reinvestments because it was really a payment. Move it back if that was a mistake."}),lnBtn("↩ Move back to Reinvestments",()=>onMoveBack(entry),false,{fontSize:13,padding:"10px 0",width:"100%",flex:"none"})]}),
+    o("div",{className:"f",style:{gap:10,marginTop:18},children:[entry?lnBtn("Delete",()=>onDelete(entry),false,{color:c.ro}):lnBtn("Cancel",onClose),entry&&parseFloat(f.amount)>0&&lnBtn("✂️ Split",()=>onSplit(entry),false),lnBtn("Save",save,true,ok?null:{opacity:.5})]})
+  ]})});
+}
+// --- split one entry in two: for example an EMI into its interest and its principal ---
+function FfSplitSheet({entry,pools,tm,cur,onSave,onClose}){
+  const guess=entry.type==="own_int"?"own_prin":entry.type==="other_int"?"other_emi":entry.type==="own_prin"?"own_int":entry.type==="other_emi"?"other_int":"other";
+  const[a2,sA]=useState("");const[type,sT]=useState(guess);const[toId,sTo]=useState(entry.toId||"");
+  const a=parseFloat(a2),ok=a>0&&a<entry.amount-0.004,ty=ffTy(tm,type);
+  const debt=ty.g==="debt"&&!(type==="own_int"||type==="own_prin"),nm=id=>(pools.find(p=>p.id===id)||{}).name||"";
+  return t(Sht,{onClose,children:o(Fragment,{children:[
+    lnSheetTitle("Split this entry",`${fm(entry.amount,cur)} is one entry now. Move part of it to something else — the total stays the same.`),
+    lnLbl("AMOUNT TO MOVE ("+cur+")"),t("input",{value:a2,inputMode:"decimal",autoFocus:true,placeholder:"less than "+fm(entry.amount,cur),onChange:e=>sA(e.target.value.replace(/[^\d.]/g,"")),style:lnInp()}),
+    lnLbl("MOVE IT TO"),ffSel(type,sT,[...tm.values()].map(x=>[x.id,x.e+" "+x.l])),
+    debt&&o(Fragment,{children:[lnLbl("WHICH LOAN WAS PAID"),ffSel(toId,sTo,[["","Not in my app"],...pools.filter(p=>p.id!==entry.loanId).map(p=>[p.id,p.name])])]}),
+    ok&&t("div",{style:{fontSize:12,color:c.td,marginTop:12,lineHeight:1.5},children:`${fm(entry.amount-a,cur)} stays as it is, and ${fm(a,cur)} becomes “${ty.l}”.`}),
+    o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn("Split",()=>{if(!ok)return;const own=type==="own_int"||type==="own_prin",to=own?entry.loanId:(debt&&toId?toId:null);
+      onSave([{id:entry.id,amount:lnR2(entry.amount-a),lock:true}],[{...entry,id:"ff_"+uid(),type,amount:lnR2(a),toId:to,toName:to?nm(to):"",lock:true,src:"manual"}])},true,ok?null:{opacity:.5})]})
+  ]})});
+}
+// --- a reinvestment shown in the flow: open it, or say it isn't an investment ---
+function FfInvSheet({r,pools,tm,cur,onClose,onOpen,onMove}){
+  const h=r.h,tp=invType(h.type),s=riStats(h,0);
+  const[mv,sMv]=useState(false);const[type,sT]=useState("other_int");const[toId,sTo]=useState(r.loanId);
+  const own=type==="own_int"||type==="own_prin",debt=ffTy(tm,type).g==="debt";
+  const opts=[...tm.values()].filter(x=>x.id!=="invest"&&x.id!=="trading");
+  const nm=id=>(pools.find(p=>p.id===id)||{}).name||"";
+  const kv=(k,v)=>o("div",{key:k,className:"f jb",style:{padding:"7px 0",borderBottom:`1px solid ${c.brs}`,gap:12,fontSize:13},children:[t("span",{style:{color:c.td},children:k}),t("span",{style:{color:c.tx,fontFamily:'var(--nf)',textAlign:"right"},children:v})]});
+  return t(Sht,{onClose,children:o(Fragment,{children:[
+    lnSheetTitle((h.emoji||tp.emoji)+" "+h.name,"A reinvestment. It is counted as “Invested” in the loan's split."),
+    kv("Put in",fm(s.P,cur)),kv("Date",lnFmtD(h.startDate||h.createdAt)),kv("Type",tp.label),kv("Worth now",fm(s.value,cur)),
+    !mv&&o("div",{className:"f fc",style:{gap:8,marginTop:16},children:[lnBtn("Open in Reinvestments ›",onOpen,true),lnBtn("This isn't an investment…",()=>sMv(true),false)]}),
+    mv&&o(Fragment,{children:[
+      t("div",{style:{fontSize:12.5,color:c.td,margin:"14px 0 2px",lineHeight:1.5},children:"It will leave Reinvestments (and the returns maths) and be counted as the use you pick. You can move it back later."}),
+      lnLbl("WHAT WAS IT"),ffSel(type,v=>{sT(v);if(v==="own_int"||v==="own_prin")sTo(r.loanId);else if(v==="other_int"||v==="other_emi")sTo(toId===r.loanId?"":toId)},opts.map(x=>[x.id,x.e+" "+x.l])),
+      debt&&!own&&o(Fragment,{children:[lnLbl("WHICH LOAN WAS PAID"),ffSel(toId,sTo,[["","Not in my app"],...pools.filter(p=>p.id!==r.loanId).map(p=>[p.id,p.name])])]}),
+      o("div",{className:"f",style:{gap:10,marginTop:16},children:[lnBtn("Back",()=>sMv(false)),lnBtn("Move out",()=>onMove({h,type,toId:own?r.loanId:(debt&&toId?toId:null),src:"manual"}),true)]})]})
+  ]})});
+}
+// --- your own types ---
+function FfTypesSheet({data,onSave,onClose}){
+  const[list,sL]=useState(ffCustom(data).map(x=>({...x})));const[nn,sNn]=useState("");
+  const upd=(id,p)=>sL(l=>l.map(k=>k.id===id?{...k,...p}:k));
+  const add=()=>{const n=nn.trim();if(!n||list.some(k=>k.l.toLowerCase()===n.toLowerCase())||FF_TYPES.some(k=>k.l.toLowerCase()===n.toLowerCase()))return;sL(l=>[...l,{id:"ct_"+uid(),l:n,e:"🏷️",col:RI_CAT_COLORS[l.length%RI_CAT_COLORS.length],g:"spend"}]);sNn("")};
+  return t(Sht,{onClose,children:o(Fragment,{children:[
+    lnSheetTitle("Types of use","The ready-made types cover most things. Add your own for anything else."),
+    ...FF_TYPES.map(x=>o("div",{key:x.id,className:"f ia",style:{gap:10,padding:"8px 0",borderBottom:`1px solid ${c.brs}`},children:[t("span",{style:{width:30,height:30,borderRadius:9,background:x.col+"26",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,flexShrink:0},children:x.e}),o("div",{className:"tl minw0",children:[t("div",{style:{fontSize:13,color:c.tx},children:x.l}),t("div",{style:{fontSize:11,color:c.tm,lineHeight:1.35},children:x.d})]})]})),
+    lnLbl("YOUR OWN TYPES"),
+    !list.length&&t("div",{style:{fontSize:12,color:c.tm,padding:"2px 0 6px"},children:"None yet."}),
+    ...list.map(k=>o("div",{key:k.id,style:{padding:"8px 0",borderBottom:`1px solid ${c.brs}`},children:[
+      o("div",{className:"f ia",style:{gap:8},children:[t("input",{value:k.e,onChange:e=>upd(k.id,{e:e.target.value.slice(0,2)}),style:{...lnInp(),width:52,padding:"10px 0",textAlign:"center",fontSize:20}}),t("input",{value:k.l,onChange:e=>upd(k.id,{l:e.target.value.slice(0,30)}),style:{...lnInp(),flex:1}}),t("button",{onClick:()=>sL(l=>l.filter(x=>x.id!==k.id)),"aria-label":"Delete type",className:"act90 trt",style:{background:"transparent",border:"none",color:c.ro,fontSize:18},children:"🗑"})]}),
+      o("div",{className:"f ia",style:{gap:8,marginTop:8},children:[t("span",{style:{fontSize:11,color:c.tm,flexShrink:0},children:"Counts as"}),ffSel(k.g,v=>upd(k.id,{g:v}),FF_GROUPS.map(([id,l])=>[id,l]),{flex:1})]})]})),
+    o("div",{className:"f ia",style:{gap:8,marginTop:12},children:[t("input",{value:nn,placeholder:"New type, e.g., Gold purchase",onChange:e=>sNn(e.target.value),onKeyDown:e=>{if(e.key==="Enter")add()},style:{...lnInp(),flex:1}}),lnBtn("Add",add,true,{flex:"none",padding:"0 18px",opacity:nn.trim()?1:.5})]}),
+    o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn("Save",()=>onSave(list.filter(k=>k.l.trim())),true)]})
+  ]})});
+}
+// --- on a payment sheet: whose money paid this? ---
+function FfFundedBy({data,destId,total,value,onChange}){
+  const pools=ffPools(data),cur=data.currency;
+  if(!pools.length)return null;
+  const v=value||{from:null,amt:""},src=pools.find(p=>p.id===v.from);
+  return o("div",{children:[lnLbl("WHOSE MONEY PAID THIS?"),
+    o("div",{className:"f fw",style:{gap:6},children:[riChip(!v.from,"My own money",()=>onChange(null),"own"),...pools.map(p=>riChip(v.from===p.id,p.id===destId?"This loan's own money":p.e+" "+p.name,()=>onChange({from:p.id,amt:v.amt===""||!v.from?String(total||""):v.amt}),p.id))]}),
+    v.from&&o("div",{children:[lnLbl("AMOUNT FROM "+(src?src.name.toUpperCase():"")+" ("+cur+")"),t("input",{value:v.amt,inputMode:"decimal",onChange:e=>onChange({...v,amt:e.target.value.replace(/[^\d.]/g,"")}),style:lnInp()}),
+      t("div",{style:{fontSize:11,color:c.tm,marginTop:5,lineHeight:1.4},children:"The rest came from your own money. This is recorded in “Where it went”, split into interest and principal."})]})]});
+}
+// The fund choice a payment sheet hands back, limited to what was actually paid.
+const ffFundOut=(v,total)=>{if(!v||!v.from)return null;const a=v.amt===""?total:parseFloat(v.amt);return a>0?{from:v.from,amt:Math.min(a,total)}:null};
+
+// === LOAN MONEY FLOW — AI sheet: find payments, describe one in a sentence, check reinvestments ===
+const ffOnByDefault=p=>!!p.from&&p.from!=="own"&&p.conf!=="low";
+// One suggestion in words: whose money paid it and where it went.
+function ffPropSummary(p,cd,pools,tm,cur){
+  const nm=id=>(pools.find(x=>x.id===id)||{}).name||"";
+  if(!p.from)return{t:"Whose money paid this? Pick below.",warn:true};
+  if(p.from==="own")return{t:"Your own money — nothing to record."};
+  const es=ffExpand(p,cd,pools);
+  if(!es.length)return{t:"Nothing to record.",warn:true};
+  const short=e=>{const to=nm(e.toId);return(e.type==="own_int"?"its own interest":e.type==="own_prin"?"its own EMI / principal":e.type==="other_int"?"interest"+(to?" of "+to:""):e.type==="other_emi"?"EMI / principal"+(to?" of "+to:""):ffTy(tm,e.type).l.toLowerCase())+" "+fs(e.amount,cur)};
+  return{t:nm(p.from)+"'s money → "+es.map(short).join(" + ")};
+}
+function FfPropRow({p,cd,pools,tm,cur,on,onTog,onSet}){
+  const[open,sOpen]=useState(false);
+  const sm=ffPropSummary(p,cd,pools,tm,cur),show=!p.from||open;
+  return o("div",{style:{padding:"11px 0",borderTop:`1px solid ${c.brs}`},children:o("div",{className:"f",style:{gap:10,alignItems:"flex-start"},children:[
+    t("button",{onClick:onTog,"aria-label":on?"Untick":"Tick",className:"act90",style:{marginTop:2,width:20,height:20,borderRadius:6,border:`1.5px solid ${on?c.ac:c.td}`,background:on?c.ac:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,padding:0},children:on&&t(Check,{size:13,color:"#0a0a0a"})}),
+    o("div",{className:"f1 minw0",children:[
+      o("div",{className:"f jb",style:{gap:8,alignItems:"flex-start"},children:[t("span",{style:{fontSize:13.5,color:c.tx,lineHeight:1.35,minWidth:0},children:cd.label||"Payment"}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13.5,color:c.tx,flexShrink:0},children:fm(cd.amount,cur)})]}),
+      t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:[lnFmtD(cd.date),cd.acct].filter(Boolean).join(" · ")}),
+      t("div",{style:{fontSize:12,color:sm.warn?c.gd:c.td,marginTop:5,lineHeight:1.45},children:sm.t}),
+      p.why&&t("div",{style:{fontSize:10.5,color:c.tm,marginTop:2},children:(p.src==="ai"?"✨ ":"")+p.why}),
+      show?o("div",{style:{marginTop:8,display:"flex",flexDirection:"column",gap:6},children:[
+        ffSel(p.from||"",v=>onSet({from:v===""?null:v}),[["","Whose money paid this?"],["own","My own money"],...pools.map(x=>[x.id,x.name+"'s money"])]),
+        p.from&&p.from!=="own"&&ffSel(p.kind,v=>onSet({kind:v}),Object.entries(FF_KINDS)),
+        p.from&&p.from!=="own"&&p.kind==="loan"&&ffSel(p.to||"",v=>onSet({to:v||null}),[["","Which loan was paid? (not in my app)"],...pools.map(x=>[x.id,"Paid "+x.name])])
+      ]}):t("button",{onClick:()=>sOpen(true),className:"act95 trt",style:{marginTop:6,background:"transparent",border:"none",color:c.ac,fontSize:12,padding:0},children:"Change"})
+    ]})]})});
+}
+function FfAiSheet({data,scopeId,initMode,onApply,onClose}){
+  const cur=data.currency,pools=ffPools(data),tm=ffTypeMap(data),hasKey=!!gAK();
+  const[mode,sMode]=useState(initMode||"find");const[busy,sBusy]=useState(false);const[err,sErr]=useState("");const[ans,sAns]=useState("");
+  // ---- find: payments no entry covers yet, sorted by the app's rules at once; AI can improve them ----
+  const cands=useMemo(()=>ffCandidates(data,pools),[]);
+  const cmap=useMemo(()=>new Map(cands.map(cd=>[cd.key,cd])),[cands]);
+  const[showOwn,sShowOwn]=useState(false);
+  const[P,sP]=useState(()=>{
+    const rows=cands.map(cd=>ffRuleProposal(cd,pools)),scoped=scopeId?rows.filter(p=>p.to===scopeId||p.from===scopeId):rows;
+    return(scoped.length?scoped:rows).map(p=>({...p,on:ffOnByDefault(p)}));
+  });
+  const setP=(pk,patch)=>sP(l=>l.map(p=>{if(p.pk!==pk)return p;const n={...p,...patch};if("from"in patch&&patch.from&&patch.from!=="own"&&!p.on)n.on=true;if("from"in patch&&(!patch.from||patch.from==="own"))n.on=false;return n}));
+  const improve=async()=>{
+    sBusy(true);sErr("");
+    try{
+      const r=await ffAiScan(data,P.map(p=>cmap.get(p.pk)).filter(Boolean),pools),byKey=new Map(r.items.map(x=>[x.pk,x]));
+      sP(l=>l.map(p=>{const a=byKey.get(p.pk);return a?{...p,...a,on:ffOnByDefault(a)}:p}));
+      sAns(r.answer||"Done — check the suggestions below.");
+    }catch(e){sErr(ffAiErr(e))}
+    sBusy(false);
+  };
+  const ready=P.filter(p=>p.from&&p.from!=="own"),need=P.filter(p=>!p.from),mine=P.filter(p=>p.from==="own"),nSeen=((data.calculators||{}).ffSeen||[]).length;
+  // ---- say: type what happened ----
+  const[txt,sTxt]=useState("");const[S,sS]=useState(null);
+  const read=async()=>{
+    if(!txt.trim()||busy)return;sBusy(true);sErr("");sS(null);sAns("");
+    let items=[],a="";
+    if(hasKey){try{const r=await ffAiDescribe(data,txt,pools);items=r.items;a=r.answer}catch(e){sErr(ffAiErr(e)+" Showing a basic reading instead.")}}
+    if(!items.length){items=ffBasicParse(txt,pools,Date.now());if(!a)a=hasKey?"":"Read with simple rules. Add an AI key in Settings → AI Assistant for smarter results."}
+    sS(items.map(p=>({...p,on:!!p.from&&p.from!=="own"})));sAns(a);sBusy(false);
+  };
+  const setS=(pk,patch)=>sS(l=>l.map(p=>{if(p.pk!==pk)return p;const n={...p,...patch,c:"to"in patch?{...p.c,lid:patch.to}:p.c};if("from"in patch&&patch.from&&patch.from!=="own"&&!p.on)n.on=true;return n}));
+  // ---- inv: reinvestments that are really payments ----
+  const[I,sI]=useState(()=>ffInvFlags(data,pools).map(x=>({...x,on:true})));const[aiDone,sAiDone]=useState(false);
+  const aiInv=async()=>{sBusy(true);sErr("");try{const r=await ffAiInv(data,pools);sI(r.items.map(x=>({...x,on:true})));sAns(r.answer||(r.items.length?"":"None of your reinvestments look like payments."));sAiDone(true)}catch(e){sErr(ffAiErr(e))}sBusy(false)};
+  const setI=(id,patch)=>sI(l=>l.map(x=>x.h.id===id?{...x,...patch}:x));
+  const nInv=(data.investments||[]).filter(h=>h.loanId&&pools.some(p=>p.id===h.loanId)).length;
+  // ---- accept ----
+  const picked=mode==="find"?P.filter(p=>p.on):mode==="say"?(S||[]).filter(p=>p.on):I.filter(x=>x.on);
+  const expand=()=>{const es=[],seen=[];
+    if(mode==="find")for(const p of picked){const cd=cmap.get(p.pk);if(!cd)continue;if(p.from==="own"){seen.push(p.pk);continue}if(p.from)es.push(...ffExpand(p,cd,pools))}
+    else for(const p of picked)if(p.from&&p.from!=="own")es.push(...ffExpand(p,p.c,pools));
+    return{es,seen}};
+  const accept=()=>{
+    if(mode==="inv"){if(!picked.length)return;onApply(ffMoveOut(data,picked),`Moved ${picked.length} out of Reinvestments`);return}
+    const{es,seen}=expand();if(!es.length&&!seen.length)return;
+    onApply(ffPatch(data,{add:es,seen}),es.length?`Added ${es.length} entr${es.length===1?"y":"ies"}`:`Hidden ${seen.length} suggestion${seen.length===1?"":"s"}`);
+  };
+  const nAdd=mode==="inv"?picked.length:expand().es.length,nHide=mode==="find"?picked.filter(p=>p.from==="own").length:0;
+  const list=(items,get,set)=>items.map(p=>t(FfPropRow,{key:p.pk,p,cd:get(p),pools,tm,cur,on:!!p.on,onTog:()=>set(p.pk,{on:!p.on}),onSet:pa=>set(p.pk,pa)}));
+  const modeBtn=(k,l)=>riChip(mode===k,l,()=>{sMode(k);sErr("");sAns("")},k);
+  const sub=mode==="find"?"It reads your loan payments and expenses and works out whose money paid them. Nothing is saved until you accept.":mode==="say"?"Type what happened in your own words. You review it before anything is saved.":"Checks whether anything in Reinvestments is really a payment (interest, EMI, fee) and moves it to the right place.";
+  const foot=o("div",{className:"f",style:{gap:10},children:[lnBtn("Close",onClose),lnBtn(mode==="inv"?(nAdd?`Move ${nAdd} out`:"Nothing to move"):nAdd&&nHide?`Add ${nAdd} · hide ${nHide}`:nAdd?`Add ${nAdd} to Where it went`:nHide?`Hide ${nHide}`:"Tick something to add",accept,true,{opacity:(nAdd||nHide)?1:.5})]});
+  return t(Sht,{onClose,footer:foot,children:o(Fragment,{children:[
+    lnSheetTitle("✨ Sort loan money with AI",sub),
+    o("div",{className:"f fw",style:{gap:6,marginBottom:4},children:[modeBtn("find","🔎 Find payments"),modeBtn("say","✍️ Describe it"),modeBtn("inv","🧹 Check reinvestments"+(I.length&&!aiDone?" · "+I.length:""))]}),
+    err&&t("div",{style:{fontSize:12.5,color:c.ro,marginTop:10,lineHeight:1.45},children:err}),
+    ans&&t("div",{style:{background:c.sf2,borderRadius:12,padding:"10px 12px",fontSize:12.5,color:c.tx,lineHeight:1.5,marginTop:10},children:ans}),
+    busy&&t("div",{className:"ri-in",style:{fontSize:13,color:c.td,marginTop:14,textAlign:"center"},children:"Thinking…"}),
+    // ----- find -----
+    mode==="find"&&o("div",{children:[
+      !P.length?t("div",{style:{textAlign:"center",color:c.tm,fontSize:13,lineHeight:1.5,padding:"26px 8px"},children:"No unsorted loan payments found. Everything that looks like a loan payment is already recorded or hidden. You can still describe a payment in your own words."})
+      :o(Fragment,{children:[
+        o("div",{className:"f ia jb",style:{margin:"12px 0 2px",gap:10},children:[t("span",{style:{fontSize:12,color:c.td},children:`${P.length} payment${P.length===1?"":"s"} found · ${ready.length} sorted · ${need.length} need your answer`}),
+          t("button",{onClick:improve,disabled:busy||!hasKey,className:"act95 trt",style:{flexShrink:0,background:hasKey?c.ac+"26":c.sf2,border:`1px solid ${hasKey?c.ac:c.brs}`,borderRadius:999,color:hasKey?c.tx:c.tm,fontSize:12,padding:"6px 12px",opacity:busy?.6:1},children:"✨ Improve with AI"})]}),
+        !hasKey&&t("div",{style:{fontSize:11,color:c.tm,lineHeight:1.45,marginBottom:2},children:"Sorted with the app's own rules. Add an AI key in Settings → AI Assistant for smarter results."}),
+        ready.length>0&&lnLbl("SORTED · UNTICK TO SKIP"),...list(ready,p=>cmap.get(p.pk),setP),
+        need.length>0&&o("div",{className:"f ia jb",style:{margin:"14px 0 6px"},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,letterSpacing:1},children:"NEED YOUR ANSWER"}),t("button",{onClick:()=>sP(l=>l.map(p=>p.from?p:{...p,from:"own",on:true})),className:"act95 trt",style:{background:"transparent",border:"none",color:c.ac,fontSize:12,padding:0},children:"All my own money"})]}),...list(need,p=>cmap.get(p.pk),setP),
+        mine.length>0&&o(Fragment,{children:[t("button",{onClick:()=>sShowOwn(v=>!v),className:"w100 act95 trt",style:{marginTop:14,padding:"9px 0",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:10,color:c.td,fontSize:12.5},children:(showOwn?"Hide":"Show")+` ${mine.length} that look like your own money`}),
+          showOwn&&o(Fragment,{children:[t("div",{style:{fontSize:11,color:c.tm,margin:"8px 0 0",lineHeight:1.45},children:"Tick these to stop suggesting them."}),...list(mine,p=>cmap.get(p.pk),setP)]})]})
+      ]})]}),
+    mode==="find"&&nSeen>0&&t("button",{onClick:()=>onApply({calculators:{...(data.calculators||{}),ffSeen:[]}},"Hidden suggestions are back"),className:"w100 act95 trt",style:{marginTop:12,background:"transparent",border:"none",color:c.tm,fontSize:11.5,padding:"6px 0"},children:`${nSeen} hidden suggestion${nSeen===1?"":"s"} · show again`}),
+    // ----- say -----
+    mode==="say"&&o("div",{children:[
+      t("textarea",{value:txt,onChange:e=>sTxt(e.target.value),placeholder:"e.g., Paid ₹12,000 interest of Bajaj Flexi from HDFC Personal Loan on 5 Oct",rows:3,autoFocus:true,style:{...lnInp(),resize:"none",fontFamily:"inherit",lineHeight:1.4,marginTop:12}}),
+      !S&&!busy&&o("div",{className:"f fw",style:{gap:6,marginTop:10},children:["Paid ₹12,000 interest of Bajaj from HDFC","Used 50k of LAS to pay its own interest","₹1.5 lakh of HDFC loan went into an FD","Processing fee of ₹5,000 from HDFC"].map(h=>riChip(false,h,()=>sTxt(h),h))}),
+      o("div",{className:"f",style:{gap:10,marginTop:12},children:[lnBtn(busy?"Reading…":"Read it",read,true,{opacity:txt.trim()&&!busy?1:.5})]}),
+      S&&(S.length?o(Fragment,{children:[lnLbl("WHAT I UNDERSTOOD · UNTICK TO SKIP"),...list(S,p=>p.c,setS)]}):t("div",{style:{fontSize:12.5,color:c.td,marginTop:12,lineHeight:1.5},children:"I couldn't find an amount in that. Try something like “paid 12000 interest of Bajaj from HDFC”."}))]}),
+    // ----- inv -----
+    mode==="inv"&&o("div",{children:[
+      o("div",{className:"f ia jb",style:{margin:"12px 0 2px",gap:10},children:[t("span",{style:{fontSize:12,color:c.td},children:I.length?`${I.length} of your ${nInv} reinvestment${nInv===1?"":"s"} look${I.length===1?"s":""} like a payment`:`None of your ${nInv} reinvestment${nInv===1?"":"s"} look like payments.`}),
+        t("button",{onClick:aiInv,disabled:busy||!hasKey||!nInv,className:"act95 trt",style:{flexShrink:0,background:hasKey?c.ac+"26":c.sf2,border:`1px solid ${hasKey?c.ac:c.brs}`,borderRadius:999,color:hasKey?c.tx:c.tm,fontSize:12,padding:"6px 12px",opacity:busy?.6:1},children:"✨ Ask AI to check all"})]}),
+      !hasKey&&t("div",{style:{fontSize:11,color:c.tm,lineHeight:1.45},children:"Checked by name with the app's own rules. Add an AI key in Settings → AI Assistant to have AI read every reinvestment."}),
+      ...I.map(x=>{const own=x.type==="own_int"||x.type==="own_prin",debt=ffTy(tm,x.type).g==="debt";
+        return o("div",{style:{padding:"11px 0",borderTop:`1px solid ${c.brs}`},children:o("div",{className:"f",style:{gap:10,alignItems:"flex-start"},children:[
+          t("button",{onClick:()=>setI(x.h.id,{on:!x.on}),"aria-label":x.on?"Untick":"Tick",className:"act90",style:{marginTop:2,width:20,height:20,borderRadius:6,border:`1.5px solid ${x.on?c.ac:c.td}`,background:x.on?c.ac:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,padding:0},children:x.on&&t(Check,{size:13,color:"#0a0a0a"})}),
+          o("div",{className:"f1 minw0",children:[
+            o("div",{className:"f ia jb",style:{gap:8},children:[t("span",{className:"tru",style:{fontSize:13.5,color:c.tx},children:(x.h.emoji||"")+" "+x.h.name}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13.5,color:c.tx,flexShrink:0},children:fm(ffNum(x.h.invested),cur)})]}),
+            t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:`${lnFmtD(x.h.startDate||x.h.createdAt)} · funded by ${(pools.find(p=>p.id===x.h.loanId)||{}).name||"a loan"}`}),
+            x.why&&t("div",{style:{fontSize:10.5,color:c.tm,marginTop:3},children:(x.src==="ai"?"✨ ":"")+x.why}),
+            o("div",{style:{marginTop:8,display:"flex",flexDirection:"column",gap:6},children:[
+              ffSel(x.type,v=>setI(x.h.id,{type:v,toId:(v==="own_int"||v==="own_prin")?x.h.loanId:((v==="other_int"||v==="other_emi")?(x.toId&&x.toId!==x.h.loanId?x.toId:null):null)}),[...tm.values()].filter(y=>y.id!=="invest"&&y.id!=="trading").map(y=>[y.id,"Move to: "+y.e+" "+y.l])),
+              debt&&!own&&ffSel(x.toId||"",v=>setI(x.h.id,{toId:v||null}),[["","Which loan was paid? (not in my app)"],...pools.filter(p=>p.id!==x.h.loanId).map(p=>[p.id,"Paid "+p.name])])]})]})]})})}),
+      I.length>0&&t("div",{style:{fontSize:11,color:c.tm,marginTop:10,lineHeight:1.45},children:"Moved holdings leave Reinvestments and its returns maths. You can move one back from its entry in Where it went."})
+    ]})
+  ]})});
+}
+
+// === LOAN MONEY FLOW — screens ===
+// The sheets and what each one saves, shared by the loan tab and the all-loans page.
+function useFfSheets({data,persist,fixedLoan,onOpenInvest}){
+  const[sh,sSh]=useState(null);
+  const{commit,snack}=useFfUndo(data,persist);
+  const pools=ffPools(data),tm=ffTypeMap(data),cur=data.currency,done=()=>sSh(null);
+  const el=!sh?null
+    :sh.k==="entry"?t(FfEntrySheet,{data,pools,tm,entry:sh.e,init:sh.init,fixedLoan,onClose:done,
+      onSave:(en,isNew)=>{commit(isNew?ffPatch(data,{add:[en]}):ffPatch(data,{upd:[en]}),isNew?"Added":"Saved");done()},
+      onDelete:en=>en.inv?sSh({k:"del",e:en}):(commit(ffPatch(data,{del:[en.id]}),"Deleted"),done()),
+      onSplit:en=>sSh({k:"split",e:en}),
+      onMoveBack:en=>{const p=ffMoveBack(data,en.id);if(p)commit(p,"Moved back to Reinvestments");done()}})
+    :sh.k==="split"?t(FfSplitSheet,{entry:sh.e,pools,tm,cur,onClose:done,onSave:(upd,add)=>{commit(ffPatch(data,{upd,add}),"Split into two");done()}})
+    :sh.k==="ai"?t(FfAiSheet,{data,scopeId:fixedLoan,initMode:sh.mode,onClose:done,onApply:(patch,label)=>{commit(patch,label);done()}})
+    :sh.k==="inv"?t(FfInvSheet,{r:sh.r,pools,tm,cur,onClose:done,onOpen:()=>{done();onOpenInvest&&onOpenInvest(sh.r)},onMove:it=>{commit(ffMoveOut(data,[it]),"Moved out of Reinvestments");done()}})
+    :sh.k==="types"?t(FfTypesSheet,{data,onClose:done,onSave:list=>{commit(ffPatch(data,{types:list}),"Types saved");done()}})
+    :sh.k==="del"?t(CSht,{onClose:done,title:"Delete for good?",subtitle:"This entry was moved out of Reinvestments. Deleting it removes the original holding completely. To keep the holding, use “Move back to Reinvestments” instead.",onConfirm:()=>{commit(ffPatch(data,{del:[sh.e.id]}),"Deleted");done()},confirmLabel:"Delete"})
+    :null;
+  return{open:sSh,el,snack,commit,pools,tm};
+}
+const ffTile=(k,v,sub,col)=>o("div",{key:k,style:{flex:1,minWidth:0,background:c.sf2,borderRadius:10,padding:"9px 11px"},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:8.5,color:c.tm,letterSpacing:.8},children:k}),t("div",{className:"tru",style:{fontFamily:'var(--nf)',fontSize:14,color:col||c.tx,marginTop:3},children:v}),sub&&t("div",{className:"tru",style:{fontSize:10,color:c.tm,marginTop:1},children:sub})]});
+// The sentences, in a soft box.
+function FfWords({words}){
+  return t("div",{style:{background:c.sf2,borderRadius:12,padding:"4px 12px",marginTop:12},children:words.map((w,i)=>o("div",{key:i,className:"f",style:{gap:9,padding:"9px 0",borderTop:i?`1px solid ${c.brs}`:"none",alignItems:"flex-start"},children:[t("span",{style:{fontSize:15,flexShrink:0,lineHeight:1.35},children:w.e}),t("span",{style:{fontSize:12.5,color:w.warn?c.gd:c.td,lineHeight:1.5},children:w.t})]}))});
+}
+// Is it worth it? The invested part against the loan's rate, the whole loan's result, and what borrowed-money interest costs.
+function FfVerdict({data,pool,sm}){
+  const cur=data.currency;
+  const kv=(k,v,col,sub)=>o("div",{key:k,style:{padding:"8px 0",borderTop:`1px solid ${c.brs}`},children:[o("div",{className:"f jb",style:{gap:12,fontSize:13},children:[t("span",{style:{color:c.td},children:k}),t("span",{style:{color:col||c.tx,fontFamily:'var(--nf)',textAlign:"right"},children:v})]}),sub&&t("div",{style:{fontSize:11,color:c.tm,marginTop:2,lineHeight:1.4},children:sub})]});
+  const carry=sm.intAmt>0&&kv("Interest paid with borrowed money",fm(sm.intAmt,cur),c.gd,`Costs about ${fm(sm.carryYr,cur)} a year in extra interest (${fm(sm.carrySoFar,cur)} so far).`);
+  const idle=sm.idle>0&&kv("Not used yet",fm(sm.idle,cur),c.tx,`Costs about ${fm(sm.idleYr,cur)} a year while it sits unused.`);
+  if(!pool.L){
+    const paid=ffLasInterest(data);
+    return lnCard([
+      t("div",{key:"t",style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx,marginBottom:6},children:"What it costs"}),
+      t("div",{key:"s",style:{fontSize:12.5,color:c.td,lineHeight:1.5,marginBottom:4},children:`LAS charges ${pool.rate.toFixed(2)}% a year on what you have drawn.`}),
+      paid>0&&kv("LAS interest recorded so far",fm(paid,cur)),carry,idle
+    ].filter(Boolean),{animation:RI_ANIM});
+  }
+  const ri=riLoanSummary(data,pool.L),has=ri.items.length>0||ri.trade!==0,good=ri.net>=0;
+  const line=!has?"Nothing is invested yet, so there is no return to compare with the interest."
+    :ri.annual==null?"It is too early to compare the invested part's yearly return with the loan's rate."
+    :`The invested part earns ${riPct(ri.annual)} a year and the loan charges ${riPct(ri.rate)} — ${ri.annual>=ri.rate?"the investments are ahead of the loan's rate":"the investments are behind the loan's rate"}.`
+      +(sm.intAmt>0?` But ${fs(sm.intAmt,cur)} of the loan went to paying interest, which earns nothing, so the loan as a whole is ${good?"ahead":"behind"} by ${fs(Math.abs(ri.net),cur)}.`:` The loan as a whole is ${good?"ahead":"behind"} by ${fs(Math.abs(ri.net),cur)} so far.`);
+  return lnCard([
+    t("div",{key:"t",style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx,marginBottom:2},children:"Is it worth it?"}),
+    has&&o("div",{key:"v",style:{margin:"6px 0 10px"},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:26,fontWeight:300,color:good?c.mt:c.co},children:riSigned(ri.net,cur)}),t("span",{style:{fontSize:12.5,color:c.td},children:good?" ahead so far":" behind so far"})]}),
+    has&&o("div",{key:"b",children:[riRateBars(ri.annual,ri.rate)]}),
+    t("div",{key:"s",style:{fontSize:12.5,color:c.td,lineHeight:1.55,marginBottom:6},children:line}),
+    has&&kv("Returns so far",riSigned(ri.ret,cur),ri.ret>=0?c.mt:c.co,"Value + payouts + trading profit − invested"),
+    kv("Interest this loan has charged",fm(ri.cost,cur),c.gd),
+    has&&kv("Net so far",riSigned(ri.net,cur),good?c.mt:c.co,"Returns minus the interest the loan has charged"),
+    carry,idle
+  ].filter(Boolean),{animation:RI_ANIM,animationDelay:"60ms"});
+}
+const ffLasInterest=data=>((data.las&&data.las.txns)||[]).filter(x=>x.type==="interest").reduce((a,x)=>a+ffNum(x.amount),0);
+
+// --- one loan (or LAS): the tab inside a loan, and the focused view on the all-loans page ---
+function FfPanel({data,persist,pool,what,onOpenLoan,onOpenInvest}){
+  const cur=data.currency,tm=ffTypeMap(data),rows=ffRows(data),sm=ffSummary(data,pool,rows,tm);
+  const hub=useFfSheets({data,persist,fixedLoan:pool.id,onOpenInvest}),pools=hub.pools;
+  const[flt,sFlt]=useState(null);
+  const segs=ffSegs(sm,tm),words=ffWords(sm,cur,what||"this loan"),earnPct=sm.base>0?Math.round(sm.g.earn/sm.base*100):0;
+  const flags=ffInvFlags(data,pools).filter(f=>f.h.loanId===pool.id);
+  const mine=rows.filter(r=>r.loanId===pool.id),shown=mine.filter(r=>!flt||r.type===flt);
+  const used=[...new Set(mine.map(r=>r.type))];
+  const act=o("div",{className:"f",style:{gap:8,marginBottom:12},children:[lnBtn("✨ Find with AI",()=>hub.open({k:"ai",mode:"find"}),true,{fontSize:13,padding:"11px 0"}),lnBtn("✍️ Describe",()=>hub.open({k:"ai",mode:"say"}),false,{fontSize:13,padding:"11px 0"}),lnBtn("+ Add",()=>hub.open({k:"entry",e:null,init:{loanId:pool.id}}),false,{fontSize:13,padding:"11px 0"})]});
+  return o("div",{children:[
+    t("style",{children:RI_CSS}),
+    flags.length>0&&t("button",{onClick:()=>hub.open({k:"ai",mode:"inv"}),className:"w100 f ia jb act98 trt",style:{padding:"12px 14px",marginBottom:12,background:c.gd+"18",border:`1px solid ${c.gd}66`,borderRadius:14,color:"inherit",textAlign:"left",gap:10},children:[o("div",{className:"tl minw0",children:[t("div",{style:{fontSize:13,color:c.tx},children:`⚠️ ${flags.length} reinvestment${flags.length===1?"":"s"} look${flags.length===1?"s":""} like a payment`}),t("div",{style:{fontSize:11.5,color:c.td,marginTop:2,lineHeight:1.4},children:"These may be interest or EMI, not investments. They distort the returns until you review them."})]}),t("span",{style:{color:c.ac,fontSize:13,flexShrink:0},children:"Review ›"})]}),
+    sm.n===0?o(Fragment,{children:[lnCard([
+      t("div",{key:"t",style:{fontFamily:c.hf,fontSize:17,fontWeight:600,color:c.tx,marginBottom:6},children:"Where did "+(what||"this loan")+"'s money go?"}),
+      t("div",{key:"b",style:{fontSize:13,color:c.td,lineHeight:1.55},children:`Not everything you take from a loan is an investment. Some pays this loan's own interest, some pays other loans, some is spent. Record where ${what||"this loan"}'s ${fm(sm.base,cur)} went and see what it really earns and costs.`}),
+      o("div",{key:"a",style:{marginTop:14},children:act})
+    ],{animation:RI_ANIM}),pool.las&&ffLasInterest(data)>0&&t(FfVerdict,{data,pool,sm})]}):o(Fragment,{children:[
+      lnCard([
+        o("div",{key:"h",className:"f ia jb",children:[t("span",{style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx},children:"Where "+(what?what+"'s":"this loan's")+" money went"}),o("div",{className:"f ia",style:{gap:6},children:[onOpenLoan&&t("button",{onClick:onOpenLoan,className:"act95 trt",style:{background:"transparent",border:`1px solid ${c.brs}`,borderRadius:8,color:c.ac,fontSize:12,padding:"4px 10px"},children:"Open loan ›"}),t("button",{onClick:()=>hub.open({k:"types"}),"aria-label":"Types of use",className:"act95 trt",style:{background:"transparent",border:`1px solid ${c.brs}`,borderRadius:8,color:c.ac,fontSize:12,padding:"4px 10px"},children:"⚙ Types"})]})]}),
+        sm.base>0&&o("div",{key:"v",style:{margin:"8px 0 12px"},children:[t(CountUp,{v:earnPct,fmt:v=>Math.round(v)+"%",style:{fontFamily:'var(--nf)',fontSize:34,fontWeight:300,color:earnPct>=70?c.mt:earnPct>=30?c.gd:c.co}}),t("span",{style:{fontSize:12.5,color:c.td},children:"  working for you"}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:2},children:`${fm(sm.g.earn,cur)} of ${fm(sm.base,cur)} borrowed is invested or traded`})]}),
+        t("div",{key:"b",children:t(FfBar,{segs,total:sm.base})}),
+        o("div",{key:"l",style:{marginTop:8},children:[t(FfLegend,{segs,base:sm.base,cur,sel:flt,onSel:sFlt})]}),
+        t(FfWords,{key:"w",words})
+      ],{animation:RI_ANIM}),
+      t(FfVerdict,{data,pool,sm}),
+      act
+    ]}),
+    mine.length>0&&lnCard([
+      o("div",{key:"h",className:"f ia jb",style:{marginBottom:6},children:[t("span",{style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx},children:"Entries · "+shown.length}),flt&&t("button",{onClick:()=>sFlt(null),className:"act95 trt",style:{background:"transparent",border:"none",color:c.ac,fontSize:12},children:"Show all"})]}),
+      used.length>1&&o("div",{key:"f",className:"f",style:{gap:6,overflowX:"auto",paddingBottom:6},children:[riChip(!flt,"All",()=>sFlt(null),"all"),...used.map(id=>{const ty=ffTy(tm,id);return riChip(flt===id,ty.e+" "+ty.l,()=>sFlt(flt===id?null:id),id,ty.col)})]}),
+      ...shown.map(r=>t(FfRowItem,{key:r.id,r,pools,tm,cur,showPool:false,onOpen:()=>hub.open(r.derived?{k:"inv",r}:{k:"entry",e:r})})),
+      t("div",{key:"n",style:{fontSize:10.5,color:c.tm,marginTop:8,lineHeight:1.45},children:"Reinvestments count as Invested automatically. Tap any entry to change it. Entries you edit are locked, so AI never overrides them."})
+    ],{animation:RI_ANIM,animationDelay:"120ms"}),
+    hub.el,hub.snack
+  ]});
+}
+
+// --- all loans together ---
+const ffMonthBar=(g,mx)=>o("div",{className:"f",style:{height:8,borderRadius:4,overflow:"hidden",background:c.sf2,width:Math.max(6,g.total/mx*100)+"%",gap:1},children:FF_GROUPS.map(([k,,col])=>g[k]>0&&t("div",{key:k,style:{width:(g[k]/g.total*100)+"%",background:col}}))});
+function ffMonths(rows,tm){
+  const m=new Map();
+  for(const r of rows){
+    if(r.off)continue;
+    const k=riMk(r.date);let g=m.get(k);if(!g){g={mk:k,earn:0,debt:0,spend:0,lend:0,total:0,rows:[]};m.set(k,g)}
+    const gk=ffTy(tm,r.type).g;g[gk]=lnR2(g[gk]+r.amount);g.total=lnR2(g.total+r.amount);g.rows.push(r);
+  }
+  return[...m.values()].sort((a,b)=>a.mk<b.mk?1:-1).slice(0,12);
+}
+// A→B→C paths: money one loan gave to a second that then gave to a third.
+function ffChains(moves){
+  const out=new Map(),inc=new Set(moves.map(m=>m.to)),paths=[];
+  moves.forEach(m=>{if(!out.has(m.from))out.set(m.from,[]);out.get(m.from).push(m.to)});
+  const walk=path=>{const nx=(out.get(path[path.length-1])||[]).filter(x=>!path.includes(x));if(!nx.length){if(path.length>=3)paths.push(path);return}nx.forEach(x=>walk([...path,x]))};
+  [...out.keys()].filter(k=>!inc.has(k)).forEach(k=>walk([k]));
+  return paths.slice(0,3);
+}
+// Two loans paying each other: the same money going round in a circle.
+function ffLoops(moves){return moves.filter(m=>m.from<m.to&&moves.some(x=>x.from===m.to&&x.to===m.from)).map(m=>[m.from,m.to])}
+function FlowDash({data,persist,onClose,onView}){
+  const cur=data.currency,A=ffAll(data),pools=A.pools,tm=A.tm;
+  const[focus,sFocus]=useState(null);const[flt,sFlt]=useState(null);const[loanFlt,sLoanFlt]=useState(null);const[openM,sOpenM]=useState(null);
+  const jump=(L,tb)=>{_lnJump={id:L.id,tab:tb||"details"};onView("loanTracker")};
+  const goInvest=r=>{const L=(data.loanTracker||[]).find(x=>x.id===r.loanId);if(L){_lnJump={id:L.id,tab:"reinvest"};onView("loanTracker")}};
+  const hub=useFfSheets({data,persist,onOpenInvest:goInvest});
+  const fp=pools.find(p=>p.id===focus);
+  const earnPct=A.base>0?Math.round(A.g.earn/A.base*100):0,segs=ffSegs({by:A.by,idle:A.idle},tm);
+  const agg={pool:{rate:0},base:A.base,idle:A.idle,over:0,n:A.sums.reduce((a,s)=>a+s.n,0),g:A.g,by:A.by,intAmt:A.intAmt,carryYr:A.carryYr,idleYr:A.idleYr};
+  const words=ffWords(agg,cur,"your loans").map(w=>w.t.includes("(at 0.00%)")?{...w,t:w.t.replace("(at 0.00%)","(at each loan's own rate)")}:w);
+  const flags=ffInvFlags(data,pools),name=id=>(pools.find(p=>p.id===id)||{}).name||"a loan";
+  const months=ffMonths(A.rows,tm),mx=Math.max(1,...months.map(g=>g.total)),chains=ffChains(A.moves),loops=ffLoops(A.moves);
+  const total=A.moves.reduce((a,m)=>a+m.amt,0),totInt=A.moves.reduce((a,m)=>a+m.int,0),totEmi=A.moves.reduce((a,m)=>a+m.emi,0);
+  const listRows=A.rows.filter(r=>(!flt||r.type===flt)&&(!loanFlt||r.loanId===loanFlt));
+  const usedTypes=[...new Set(A.rows.map(r=>r.type))];
+  const header=o("div",{className:"f ia jb",style:{marginBottom:14},children:[t(BB,{onClick:()=>fp?sFocus(null):onClose()}),t("div",{className:"tru",style:{fontFamily:c.hf,fontSize:fp?20:24,maxWidth:"60%"},children:t("em",{children:fp?fp.name:"Where it went"})}),
+    o("div",{className:"f ia",style:{gap:8},children:[t("button",{onClick:()=>hub.open({k:"ai",mode:"find"}),"aria-label":"Sort with AI",className:"act90 trt",style:{width:38,height:38,borderRadius:19,background:c.sf2,border:`1px solid ${c.brs}`,color:c.tx,fontSize:16},children:"✨"}),pools.length>0&&t("button",{onClick:()=>hub.open({k:"entry",e:null,init:fp?{loanId:fp.id}:{}}),"aria-label":"Add an entry",className:"act90 trt",style:{width:38,height:38,borderRadius:19,background:c.ac,border:"none",color:"#0a0a0a",fontSize:20,lineHeight:1},children:"+"})]})]});
+  if(!pools.length)return o("div",{style:{padding:"8px 20px 150px"},children:[header,lnCard([
+    t("div",{key:"t",style:{fontFamily:c.hf,fontSize:17,fontWeight:600,color:c.tx,marginBottom:6},children:"Where does your loan money go?"}),
+    t("div",{key:"b",style:{fontSize:13,color:c.td,lineHeight:1.55},children:"Add a loan you borrowed in the Loan Tracker. Then you can see how much of it is invested, how much paid interest, how much paid other loans, and how much is still unused."}),
+    t("div",{key:"c",className:"f",style:{marginTop:14},children:lnBtn("Open Loan Tracker",()=>onView("loanTracker"),true,{fontSize:13,padding:"11px 0"})})
+  ])]});
+  if(fp)return o("div",{style:{padding:"8px 20px 150px"},children:[header,t(FfPanel,{key:fp.id,data,persist,pool:fp,what:fp.name,onOpenLoan:fp.L?()=>jump(fp.L,"details"):null,onOpenInvest:goInvest}),hub.el,hub.snack]});
+  return o("div",{style:{padding:"8px 20px 150px"},children:[
+    t("style",{children:RI_CSS}),header,
+    flags.length>0&&t("button",{onClick:()=>hub.open({k:"ai",mode:"inv"}),className:"w100 f ia jb act98 trt",style:{padding:"12px 14px",marginBottom:12,background:c.gd+"18",border:`1px solid ${c.gd}66`,borderRadius:14,color:"inherit",textAlign:"left",gap:10},children:[o("div",{className:"tl minw0",children:[t("div",{style:{fontSize:13,color:c.tx},children:`⚠️ ${flags.length} reinvestment${flags.length===1?"":"s"} look${flags.length===1?"s":""} like a payment`}),t("div",{style:{fontSize:11.5,color:c.td,marginTop:2,lineHeight:1.4},children:"These may be interest or EMI, not investments. Review them so the returns are right."})]}),t("span",{style:{color:c.ac,fontSize:13,flexShrink:0},children:"Review ›"})]}),
+    o("div",{className:"ri-in",style:{background:`linear-gradient(135deg,${(earnPct>=50?c.mt:c.gd)}22 0%,${c.sfg} 70%)`,border:`1px solid ${(earnPct>=50?c.mt:c.gd)}44`,borderRadius:20,padding:18,marginBottom:14},children:[
+      t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,letterSpacing:1.5},children:"WHERE ALL YOUR LOAN MONEY WENT"}),
+      o("div",{style:{margin:"6px 0 4px"},children:[t(CountUp,{v:earnPct,fmt:v=>Math.round(v)+"%",style:{fontFamily:'var(--nf)',fontSize:34,fontWeight:300,color:earnPct>=70?c.mt:earnPct>=30?c.gd:c.co}}),t("span",{style:{fontSize:12.5,color:c.td},children:"  working for you"})]}),
+      t("div",{style:{fontSize:11.5,color:c.tm,marginBottom:12},children:`${fm(A.g.earn,cur)} of ${fm(A.base,cur)} borrowed across ${pools.length} loan${pools.length===1?"":"s"}`}),
+      t(FfBar,{segs,total:A.base}),
+      o("div",{style:{marginTop:8},children:[t(FfLegend,{segs,base:A.base,cur,sel:flt,onSel:sFlt})]}),
+      o("div",{className:"f",style:{gap:8,marginTop:12},children:[ffTile("TO INTEREST",fs(A.intAmt,cur),A.intAmt>0?`≈ ${fs(A.carryYr,cur)} / yr extra`:"none",A.intAmt>0?c.gd:c.tx),ffTile("UNUSED",fs(A.idle,cur),A.idle>0?`≈ ${fs(A.idleYr,cur)} / yr`:"all assigned",A.idle>0?c.tx:c.mt),ffTile("TO OTHER LOANS",fs(total,cur),total>0?"EMIs + interest":"none",c.tx)]}),
+      t(FfWords,{words})
+    ]}),
+    lnCard([
+      t("div",{key:"t",style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx,marginBottom:4},children:"Loan by loan"}),
+      ...A.sums.sort((a,b)=>b.base-a.base).map((s,i)=>{const p=s.pool,e=ffSegs(s,tm),w=s.base>0?Math.round(s.g.earn/s.base*100):0;
+        return o("button",{key:p.id,onClick:()=>sFocus(p.id),className:"w100 act98 trt",style:{display:"block",textAlign:"left",padding:"12px 0",background:"transparent",border:"none",borderTop:i?`1px solid ${c.brs}`:"none",color:"inherit"},children:[
+          o("div",{className:"f ia jb",style:{gap:10,marginBottom:8},children:[t("span",{className:"tru",style:{fontSize:14,color:c.tx,fontWeight:500},children:p.e+" "+p.name+(p.closed?" · closed":"")}),o("span",{className:"f ia",style:{gap:6,flexShrink:0},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:c.tx},children:fs(s.base,cur)}),t("span",{style:{color:c.tm,fontSize:16},children:"›"})]})]}),
+          t(FfBar,{segs:e,total:s.base,h:8}),
+          t("div",{style:{fontSize:11,color:c.tm,marginTop:6,lineHeight:1.4},children:s.n?`${w}% working · ${fs(s.intAmt,cur)} to interest · ${fs(s.idle,cur)} unused`:"Nothing recorded yet — tap to add"})]})})
+    ],{animation:RI_ANIM,animationDelay:"60ms"}),
+    lnCard([
+      t("div",{key:"t",style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx,marginBottom:4},children:"Money moving between your loans"}),
+      A.moves.length===0?t("div",{key:"e",style:{fontSize:12.5,color:c.tm,lineHeight:1.5,padding:"4px 0"},children:"No loan has paid another loan yet. When one loan's money pays another loan's interest or EMI, it shows up here."})
+      :o(Fragment,{children:[
+        t("div",{key:"s",style:{fontSize:12.5,color:c.td,lineHeight:1.5,marginBottom:4},children:`${fm(total,cur)} of borrowed money went to other loans${totInt>0?` — ${fm(totInt,cur)} of it interest`:""}${totEmi>0?`, ${fm(totEmi,cur)} EMIs and part-payments`:""}.`}),
+        ...A.moves.map((m,i)=>o("div",{key:m.from+m.to,className:"f ia jb",style:{padding:"10px 0",borderTop:`1px solid ${c.brs}`,gap:10},children:[
+          o("div",{className:"tl minw0",children:[o("div",{className:"tru",style:{fontSize:13.5,color:c.tx},children:[name(m.from)," ",t("span",{style:{color:c.ac},children:"→"})," ",name(m.to)]}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:[m.int>0?"interest "+fs(m.int,cur):null,m.emi>0?"EMI / principal "+fs(m.emi,cur):null,m.other>0?"other "+fs(m.other,cur):null,m.n+" payment"+(m.n===1?"":"s")].filter(Boolean).join(" · ")})]}),
+          t("span",{style:{fontFamily:'var(--nf)',fontSize:14,color:c.tx,flexShrink:0},children:fm(m.amt,cur)})]})),
+        chains.length>0&&t("div",{key:"c",style:{background:c.gd+"18",border:`1px solid ${c.gd}55`,borderRadius:12,padding:"10px 12px",marginTop:8,fontSize:12,color:c.td,lineHeight:1.5},children:["⛓️ The same borrowed money is being passed along: ",chains.map((p,i)=>(i?"  ·  ":"")+p.map(name).join(" → "))]}),
+        loops.length>0&&t("div",{key:"lp",style:{background:c.gd+"18",border:`1px solid ${c.gd}55`,borderRadius:12,padding:"10px 12px",marginTop:8,fontSize:12,color:c.td,lineHeight:1.5},children:["🔄 ",loops.length===1?name(loops[0][0])+" and "+name(loops[0][1])+" pay each other":"Some loans pay each other ("+loops.map(([a,b])=>name(a)+" and "+name(b)).join("; ")+")"," — the same borrowed money is going round in a circle, and you pay interest on it each time."]})
+      ]})
+    ],{animation:RI_ANIM,animationDelay:"120ms"}),
+    months.length>0&&lnCard([
+      t("div",{key:"t",style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx,marginBottom:2},children:"Month by month"}),
+      o("div",{key:"k",className:"f fw",style:{gap:10,fontSize:10.5,color:c.tm,margin:"4px 0 6px"},children:FF_GROUPS.map(([k,l,col])=>o("span",{key:k,className:"f ia",style:{gap:5},children:[t("span",{style:{width:8,height:8,borderRadius:2,background:col}}),l]}))}),
+      ...months.map(g=>o("div",{key:g.mk,style:{borderTop:`1px solid ${c.brs}`,padding:"9px 0"},children:[
+        o("button",{onClick:()=>sOpenM(openM===g.mk?null:g.mk),className:"w100 act98 trt",style:{display:"block",background:"transparent",border:"none",color:"inherit",textAlign:"left",padding:0},children:[o("div",{className:"f ia jb",style:{marginBottom:6},children:[t("span",{style:{fontSize:13,color:c.tx},children:riMonthLabel(g.mk)}),o("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:c.tx},children:[fm(g.total,cur),t("span",{style:{color:c.tm,marginLeft:6,display:"inline-block",transform:openM===g.mk?"rotate(90deg)":"none",transition:"transform .2s"},children:"›"})]})]}),ffMonthBar(g,mx)]}),
+        openM===g.mk&&o("div",{className:"ri-in",style:{marginTop:6},children:g.rows.sort((a,b)=>b.date-a.date).map(r=>t(FfRowItem,{key:r.id,r,pools,tm,cur,showPool:true,onOpen:()=>hub.open(r.derived?{k:"inv",r}:{k:"entry",e:r})}))})]}))
+    ],{animation:RI_ANIM,animationDelay:"180ms"}),
+    A.rows.length>0&&lnCard([
+      o("div",{key:"h",className:"f ia jb",style:{marginBottom:6},children:[t("span",{style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx},children:"All entries · "+listRows.length}),(flt||loanFlt)&&t("button",{onClick:()=>{sFlt(null);sLoanFlt(null)},className:"act95 trt",style:{background:"transparent",border:"none",color:c.ac,fontSize:12},children:"Clear filters"})]}),
+      o("div",{key:"f",className:"f",style:{gap:6,overflowX:"auto",paddingBottom:6},children:[riChip(!flt,"All types",()=>sFlt(null),"all"),...usedTypes.map(id=>{const ty=ffTy(tm,id);return riChip(flt===id,ty.e+" "+ty.l,()=>sFlt(flt===id?null:id),id,ty.col)})]}),
+      pools.length>1&&o("div",{key:"p",className:"f",style:{gap:6,overflowX:"auto",paddingBottom:6},children:[riChip(!loanFlt,"All loans",()=>sLoanFlt(null),"allp"),...pools.map(p=>riChip(loanFlt===p.id,p.e+" "+p.name,()=>sLoanFlt(loanFlt===p.id?null:p.id),p.id))]}),
+      ...listRows.slice(0,60).map(r=>t(FfRowItem,{key:r.id,r,pools,tm,cur,showPool:true,onOpen:()=>hub.open(r.derived?{k:"inv",r}:{k:"entry",e:r})})),
+      listRows.length>60&&t("div",{key:"m",style:{fontSize:11,color:c.tm,textAlign:"center",padding:"10px 0 2px"},children:`Showing the newest 60 of ${listRows.length}. Use the filters to narrow down.`}),
+      !listRows.length&&t("div",{key:"z",style:{fontSize:12.5,color:c.tm,textAlign:"center",padding:"14px 0"},children:"Nothing matches these filters."})
+    ],{animation:RI_ANIM,animationDelay:"240ms"}),
+    A.rows.length===0&&lnCard([
+      t("div",{key:"t",style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx,marginBottom:6},children:"Nothing recorded yet"}),
+      t("div",{key:"b",style:{fontSize:12.5,color:c.td,lineHeight:1.55},children:"Let AI read your loan payments and expenses and work out whose money paid them, or add an entry yourself."}),
+      o("div",{key:"a",className:"f",style:{gap:8,marginTop:12},children:[lnBtn("✨ Find with AI",()=>hub.open({k:"ai",mode:"find"}),true,{fontSize:13,padding:"11px 0"}),lnBtn("+ Add",()=>hub.open({k:"entry",e:null,init:{}}),false,{fontSize:13,padding:"11px 0"})]})
+    ]),
+    t("button",{onClick:()=>hub.open({k:"types"}),className:"w100 act95 trt",style:{padding:"11px 0",background:"transparent",border:`1px solid ${c.brs}`,borderRadius:12,color:c.tx,fontSize:13,marginTop:2},children:"⚙ Types of use"}),
+    hub.el,hub.snack
+  ]});
+}
+
+// --- cards that lead to the page ---
+function FlowCard({data,onView}){
+  const cur=data.currency,A=ffAll(data),n=A.pools.length,earn=A.base>0?Math.round(A.g.earn/A.base*100):0;
+  return t("button",{onClick:()=>onView&&onView("loanFlow"),className:"w100 act98 trt",style:{display:"block",textAlign:"left",marginTop:14,padding:18,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:18,color:"inherit"},children:[
+    o("div",{className:"f ia jb",children:[o("div",{className:"f ia",style:{gap:12},children:[t("span",{style:{width:42,height:42,borderRadius:12,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:21},children:"🧭"}),o("div",{className:"tl",children:[t("div",{style:{fontFamily:c.hf,fontSize:17,fontWeight:600,color:c.tx},children:"Where loan money went"}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:2},children:n?`${n} loan${n===1?"":"s"} · ${fs(A.base,cur)} borrowed`:"Invested, paid interest, paid other loans…"})]})]}),t("span",{style:{color:c.tm,fontSize:20},children:"›"})]}),
+    n>0&&o("div",{className:"f",style:{gap:10,marginTop:14,paddingTop:12,borderTop:`1px solid ${c.brs}`},children:[
+      o("div",{className:"f1 minw0",children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1},children:"WORKING"}),t("div",{className:"tru",style:{fontFamily:'var(--nf)',fontSize:15,color:earn>=70?c.mt:earn>=30?c.gd:c.co,marginTop:3},children:earn+"%"})]}),
+      o("div",{className:"f1 minw0",children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1},children:"TO INTEREST"}),t("div",{className:"tru",style:{fontFamily:'var(--nf)',fontSize:15,color:A.intAmt>0?c.gd:c.tx,marginTop:3},children:fs(A.intAmt,cur)})]}),
+      o("div",{className:"f1 minw0",children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:9,color:c.tm,letterSpacing:1},children:"UNUSED"}),t("div",{className:"tru",style:{fontFamily:'var(--nf)',fontSize:15,color:c.tx,marginTop:3},children:fs(A.idle,cur)})]})]})
+  ]});
+}
+// On the Loan Tracker overview.
+function FfOverviewCard({data,onOpen}){
+  const cur=data.currency,A=ffAll(data);
+  if(!A.pools.length)return null;
+  const segs=ffSegs({by:A.by,idle:A.idle},A.tm),earn=A.base>0?Math.round(A.g.earn/A.base*100):0,none=A.rows.length===0;
+  return t("button",{onClick:onOpen,className:"w100 act98 trt",style:{display:"block",textAlign:"left",padding:16,marginBottom:12,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,color:"inherit"},children:[
+    o("div",{className:"f ia jb",style:{marginBottom:8},children:[t("span",{style:{fontFamily:c.hf,fontSize:17,fontWeight:600,color:c.tx},children:"Where your loan money went"}),t("span",{style:{color:c.tm,fontSize:20},children:"›"})]}),
+    none?t("div",{style:{fontSize:12.5,color:c.td,lineHeight:1.5},children:`You've borrowed ${fm(A.base,cur)}. Tell the app where it went — invested, interest, other loans — and let AI do the sorting.`})
+    :o(Fragment,{children:[t(FfBar,{segs,total:A.base,h:10}),
+      t("div",{style:{fontSize:12,color:c.td,marginTop:8,lineHeight:1.45},children:`${earn}% is working for you`+(A.intAmt>0?` · ${fs(A.intAmt,cur)} went to interest`:"")+(A.idle>0?` · ${fs(A.idle,cur)} unused`:"")})]})
+  ]});
+}
+// On a loan's Details tab: a short summary that opens the "Where it went" tab.
+function FfLoanLink({data,pool,onTap}){
+  const cur=data.currency,tm=ffTypeMap(data),sm=ffSummary(data,pool,ffRows(data),tm),segs=ffSegs(sm,tm),earn=sm.base>0?Math.round(sm.g.earn/sm.base*100):0;
+  return t("button",{onClick:onTap,className:"w100 act98 trt",style:{display:"block",textAlign:"left",padding:"12px 16px",marginBottom:12,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,color:"inherit"},children:[
+    o("div",{className:"f ia jb",style:{marginBottom:sm.n?8:0},children:[t("span",{style:{fontSize:13,color:c.tx},children:"🧭 Where this loan's money went"}),t("span",{style:{color:c.ac,fontSize:12.5},children:sm.n?"See all ›":"Add ›"})]}),
+    sm.n?o(Fragment,{children:[t(FfBar,{segs,total:sm.base,h:8}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:6},children:`${earn}% working`+(sm.intAmt>0?` · ${fs(sm.intAmt,cur)} to interest`:"")+(sm.idle>0?` · ${fs(sm.idle,cur)} unused`:"")})]})
+    :t("div",{style:{fontSize:11.5,color:c.tm,marginTop:4,lineHeight:1.45},children:"Invested it? Paid interest or another loan? Record it and see what this loan really earns and costs."})
+  ]});
+}
 // === REINVESTMENT HUB — UI ===
 const RI_CSS=`@keyframes riIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes riDraw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
@@ -13921,6 +14838,7 @@ function ReinvestDash({data,persist,onClose,onView,getFrom,onTx}){
     shown.length?o("div",{children:list}):t("div",{style:{textAlign:"center",color:c.tm,fontSize:13,padding:"30px 0"},children:rows.length?"No holdings match these filters.":"No reinvestments yet."}),
     act>0&&t("button",{onClick:()=>sF(p=>({...RI_F0,group:p.group,sort:p.sort})),className:"w100 act95 trt",style:{marginTop:6,padding:"10px 0",background:"transparent",border:"none",color:c.ac,fontSize:13},children:"Clear filters"})]});
   const overview=o(Fragment,{children:[
+    t(FfOverviewCard,{data,onOpen:()=>onView("loanFlow")}),
     t(RiTradingCard,{tr:pf.tr,loans:pf.loans,cur,onManage:()=>sSh({k:"trade"}),onDays:()=>sTab("trading")}),
     pts.length>1&&lnCard([t("div",{key:"t",style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx,marginBottom:10},children:"Invested vs worth"}),t(RiChart,{key:"c",pts,cur})],{animation:RI_ANIM,animationDelay:"60ms"}),
     lnCard([
@@ -14008,7 +14926,7 @@ function ReinvestHomeCard({data,onView}){
         t("div",{style:{fontSize:11,color:late?c.ro:c.tm,marginTop:3},children:`${fs(pf.value,cur)} invested value`+(due.length?` · ${due.length} due${late?` (${late} overdue)`:" soon"}`:"")})]}),
       t("span",{style:{color:c.tm,fontSize:20},children:"›"})]})});
 }
-const CALCULATORS=[{id:"loans",label:"Loan Tracker",emoji:"🏦",component:LoanTrackerCard},{id:"reinvest",label:"Reinvestments",emoji:"📈",component:ReinvestCard},{id:"budget",label:"Monthly Budget",emoji:"🧮",component:BudgetCalculator}];
+const CALCULATORS=[{id:"loans",label:"Loan Tracker",emoji:"🏦",component:LoanTrackerCard},{id:"reinvest",label:"Reinvestments",emoji:"📈",component:ReinvestCard},{id:"flow",label:"Where loan money went",emoji:"🧭",component:FlowCard},{id:"budget",label:"Monthly Budget",emoji:"🧮",component:BudgetCalculator}];
 function CalculatorsScreen({data,persist,onView}){
   const[spendFlt]=useState(()=>{try{const s=localStorage.getItem("etp-spend-flt");return s?JSON.parse(s):{from:"",to:""}}catch{return{from:"",to:""}}});
   return o("div",{style:{padding:`8px ${GUT}px 100px`},children:[
