@@ -47,6 +47,11 @@ if(typeof Recharts === 'undefined') {
 :root{--nf:'JetBrains Mono','SF Mono',ui-monospace,monospace;--lf:'JetBrains Mono','SF Mono',ui-monospace,monospace;--tf:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display',system-ui,sans-serif;--ns:14px;--nsc:1;--fz:1}
 *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
 :root{--hdr-h:calc(52px + max(env(safe-area-inset-top),var(--sat-fb,0px)))} /* height of the solid app header: drawers, sheets and scrims start below it so nothing covers the top of the screen */
+/* iOS 27 draws a system blur over the top of installed web apps unless something solid is fixed to the very top edge. This strip is that something:
+   fixed, full width, the page colour (inherited from <body>, so it follows the theme), and painted with background-clip:text so it shows nothing and never takes a tap.
+   Only iPhone/iPad home-screen apps get it. */
+#ios-top-strip{display:none}
+@supports (-webkit-touch-callout:none){@media (display-mode:standalone){#ios-top-strip{display:block;position:fixed;top:0;left:0;right:0;height:max(env(safe-area-inset-top,0px),var(--sat-fb,0px),11px);background:inherit;-webkit-background-clip:text;background-clip:text;pointer-events:none;z-index:56}}}
 html{height:-webkit-fill-available;height:100dvh;background:#1B1B1D}body{min-height:-webkit-fill-available;min-height:100dvh;margin:0;padding:0;background:#1B1B1D;overflow:hidden}#root{height:100dvh;margin:0;padding:0;overflow:hidden;background:#1B1B1D}
 body{overscroll-behavior-y:none;-webkit-font-smoothing:antialiased;-webkit-touch-callout:none;font-family:var(--tf)}
 [data-nz]{zoom:var(--nsc,1)}
@@ -251,6 +256,7 @@ body[data-theme="snow"] .neu-flat,body[data-theme="snow"] .nb-fab{border-radius:
 </style>
 </head>
 <body>
+<div id="ios-top-strip" aria-hidden="true"></div>
 <div id="root"></div>
 <div id="splash" style="position:fixed;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#1B1B1D;color:#F5F1E8;font-family:-apple-system,system-ui,sans-serif;font-size:18px;z-index:99999;padding:20px;text-align:center;">
   <div id="splashTitle" style="font-family:'Fraunces','Instrument Serif',serif;font-style:italic;font-size:36px;color:#F4F4F6;margin-bottom:18px;">loading&hellip;</div>
