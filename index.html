@@ -10,11 +10,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/>
 <meta name="theme-color" content="#1B1B1D"/>
 <script>
-/* iOS 27 home-screen apps can report env(safe-area-inset-top) as 0 while the web view still draws under the status bar / Dynamic Island, which dims the header. Measure it, and when it is missing fall back to the device's usual inset. */
-(function(){try{var ua=navigator.userAgent||"";if(!/iPhone/.test(ua)||!(navigator.standalone||(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)))return;var p=document.createElement("div");p.style.cssText="position:fixed;top:0;left:0;height:0;padding-top:env(safe-area-inset-top,0px);visibility:hidden;pointer-events:none";document.documentElement.appendChild(p);var v=parseFloat(getComputedStyle(p).paddingTop)||0;document.documentElement.removeChild(p);if(v>=20)return;var h=Math.max(screen.height,screen.width);var fb=h<=736?20:(h<=926?47:([874,912,956].indexOf(h)>-1?62:59));document.documentElement.style.setProperty("--sat-fb",fb+"px")}catch(e){}})();
+/* With the solid ("default") status bar the page already starts below it, so the fallback is skipped when the web view is shorter than the screen. iOS 27 home-screen apps can report env(safe-area-inset-top) as 0 while the web view still draws under the status bar / Dynamic Island, which dims the header. Measure it, and when it is missing fall back to the device's usual inset. */
+(function(){try{var ua=navigator.userAgent||"";if(!/iPhone/.test(ua)||!(navigator.standalone||(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)))return;var p=document.createElement("div");p.style.cssText="position:fixed;top:0;left:0;height:0;padding-top:env(safe-area-inset-top,0px);visibility:hidden;pointer-events:none";document.documentElement.appendChild(p);var v=parseFloat(getComputedStyle(p).paddingTop)||0;document.documentElement.removeChild(p);if(v>=20)return;if(Math.max(screen.height,screen.width)-Math.max(innerHeight,innerWidth)>=15)return;var h=Math.max(screen.height,screen.width);var fb=h<=736?20:(h<=926?47:([874,912,956].indexOf(h)>-1?62:59));document.documentElement.style.setProperty("--sat-fb",fb+"px")}catch(e){}})();
 </script>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
 <meta name="apple-mobile-web-app-title" content="Expense Pro"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <link rel="apple-touch-icon" href="icon-180.png"/>
@@ -1933,7 +1933,7 @@ function App(){
   // back to the UA default (black) and vanished on Luxe/Slate/Navy. Painting the
   // theme's text colour onto <body> makes the portal inherit it like the rest of
   // the app does.
-  useEffect(()=>{document.body.dataset.theme=theme;document.documentElement.style.background=THEME_BG[theme];document.body.style.background=THEME_BG[theme];document.body.style.color=themeC.tx;paintNavVars(themeC,theme)},[theme]);
+  useEffect(()=>{document.body.dataset.theme=theme;document.documentElement.style.background=THEME_BG[theme];document.body.style.background=THEME_BG[theme];document.body.style.color=themeC.tx;try{document.querySelector('meta[name="theme-color"]').setAttribute("content",THEME_BG[theme])}catch(e){}paintNavVars(themeC,theme)},[theme]);
 
   // Screen-transition direction. Moving right along the tab order slides the
   // incoming screen in from the right; anything that isn't a tab-to-tab move
