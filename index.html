@@ -12215,7 +12215,7 @@ function BudgetPlanner({data,persist,cur,income,baseStart,onClose,onOpenLoan}){
   const mk=plKey(from),label=new Date(from).toLocaleDateString("en-US",{month:"long",year:"numeric"}),cut=planCut(data),active=from>=cut;
   const cals=data.calculators||{},PL=cals.planner||{},P=plData(data),mo=P.months[mk]||{},{cats,caps}=plMonthOf(data,mk);
   const now=Date.now(),isCur=now>=from&&now<to,today0=new Date(now).setHours(0,0,0,0),endToday=today0+86399999;
-  const[gf,sGf]=useState(null),[rev,sRev]=useState(null),[sugg,sSugg]=useState(null),[busy,sBusy]=useState(""),[err,sErr]=useState(""),[chat,sChat]=useState(null),[ask,sAsk]=useState(""),[extra,sExtra]=useState([]);
+  const[openG,sOpenG]=useState({}),[gf,sGf]=useState(null),[rev,sRev]=useState(null),[sugg,sSugg]=useState(null),[busy,sBusy]=useState(""),[err,sErr]=useState(""),[chat,sChat]=useState(null),[ask,sAsk]=useState(""),[extra,sExtra]=useState([]);
   useEffect(()=>{sExtra([]);sSugg(null);sChat(null);sErr("")},[mk]);
   useEffect(()=>{const k=e=>{if(e.key==="Escape")onClose()};window.addEventListener("keydown",k);return()=>window.removeEventListener("keydown",k)},[onClose]);
   const exps=data.expenses||[],bm=plBudMap(data),spent=plByLine(bm,plSpend(exps,from,to,data.loanTracker)),base0=plBaseline(exps,from,3,data.loanTracker),base={avg:plByLine(bm,base0.avg),rec:plByLine(bm,base0.rec),months:base0.months},rec=plRecMonth(data,from,to,cut);
@@ -12347,6 +12347,19 @@ function BudgetPlanner({data,persist,cur,income,baseStart,onClose,onOpenLoan}){
       ...sec.lines.map(lineRow)]});
   };
   const chgList=(o2,from2)=>[...Object.entries(o2.cats||{}).map(([id,v])=>({k:"c"+id,l:nameOf(id),a:from2.cats[id]||0,b:v})),...Object.entries(o2.caps||{}).map(([id,v])=>({k:"g"+id,l:"Cap · "+((bm.secs.find(sc=>sc.id===id)||{}).label||id),a:from2.caps[id]||0,b:v}))];
+  // A daily / weekly item has many dates in a month: show it as one row (with its dates folded away) instead of one row per date.
+  const recGroups=(()=>{const m=new Map();rec.forEach(x=>{const k=x.r?x.r.id:x.id;if(!m.has(k))m.set(k,[]);m.get(k).push(x)});return[...m.values()].sort((a,b)=>a[0].ts-b[0].ts)})();
+  const recGroupRow=items=>{
+    if(items.length===1)return recRow(items[0]);
+    const f=items[0],gid=f.r?f.r.id:f.id,cc=co((f.r&&f.r.category)||(f.e&&f.e.category)),open=!!openG[gid];
+    const live=items.filter(x=>x.state!=="skipped"),done=items.filter(x=>x.state==="done").length,due=items.filter(x=>x.state==="due"&&!x.auto),dueNowG=due.filter(x=>x.ts<=endToday),auto=items.some(x=>x.auto&&x.state==="due");
+    const total=live.reduce((a,x)=>a+(x.amount||0),0);
+    return o("div",{key:"g"+gid,style:{borderBottom:`1px solid ${c.brs}`},children:[
+      o("div",{className:"f ia jb",style:{padding:"10px 0",gap:10},children:[
+        o("button",{onClick:()=>sOpenG(v=>({...v,[gid]:!v[gid]})),"aria-expanded":open,"aria-label":(open?"Hide":"Show")+" dates of "+planRecLabel(f),className:"f ia minw0 act98 trt",style:{gap:10,background:"transparent",border:"none",color:"inherit",textAlign:"left",padding:0,flex:1},children:[t("span",{style:{fontSize:20,flexShrink:0},children:cc?cc.emoji:"🔁"}),o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:13.5,color:c.tx},children:planRecLabel(f)}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:(f.r?(plFreq[f.r.frequency]||"")+" · ":"")+items.length+" times"+(done?" · "+done+" logged":"")+(due.length?" · "+due.length+" to log":"")}),t("span",{style:{fontSize:10.5,color:c.tm,display:"inline-block",transform:open?"rotate(90deg)":"none",transition:"transform .2s"},children:"›"})]})]}),
+        o("div",{className:"f ia",style:{gap:12,flexShrink:0},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:13.5,color:c.tx},children:fm(total,cur)}),dueNowG.length>0?t("button",{onClick:()=>logRows(dueNowG),className:"act95 tr",style:{padding:"7px 14px",borderRadius:10,border:"none",background:c.ac,color:"#0a0a0a",fontSize:13,fontWeight:600},children:"Log "+dueNowG.length}):t("span",{style:{fontSize:11.5,color:due.length||auto?c.tm:c.mt,minWidth:56,textAlign:"right"},children:auto?"Adds itself":due.length?"Not yet due":"✓ All logged"})]})]}),
+      open&&o("div",{style:{paddingLeft:12,borderLeft:`2px solid ${c.brs}`,marginBottom:6},children:items.map(recRow)})]});
+  };
   const suggEl=sugg&&t(PlSheet,{onClose:()=>sSugg(null),children:o(Fragment,{children:[
     t("div",{style:{fontFamily:c.hf,fontSize:21,fontWeight:700,color:c.tx},children:"Suggested plan · "+label}),
     t("div",{style:{fontSize:12,color:c.td,margin:"4px 0 10px",lineHeight:1.45},children:(sugg.ai?"✨ ":"")+(sugg.note||"")}),
@@ -12412,7 +12425,7 @@ function BudgetPlanner({data,persist,cur,income,baseStart,onClose,onOpenLoan}){
     secLabel("RECURRING"+(active&&dueRows.length?" · "+dueRows.length+" TO LOG":"")),
     rec.length===0?t("div",{style:{fontSize:12.5,color:c.tm,lineHeight:1.5,padding:"2px 2px 6px"},children:"No recurring expenses fall in "+label+". Add them from Recurring and they will show up here with a Log button."}):o("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,padding:"2px 14px"},children:[
       dueNow.length>1&&o("div",{className:"f ia jb",style:{padding:"10px 0",borderBottom:`1px solid ${c.brs}`},children:[t("span",{style:{fontSize:12,color:c.td},children:dueNow.length+" due on or before today"}),t("button",{onClick:()=>logRows(dueNow),className:"act95 tr",style:{padding:"7px 14px",borderRadius:10,border:`1px solid ${c.ac}66`,background:c.ac+"1f",color:c.ac,fontSize:12.5,fontWeight:600},children:"Log all due"})]}),
-      ...rec.map(recRow)]}),
+      ...recGroups.map(recGroupRow)]}),
     emi.length>0&&secLabel("LOAN EMIs · "+emi.filter(e=>!e.paid).length+" TO PAY"),
     emi.length>0&&o("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,padding:"2px 14px"},children:emi.map(e=>{const od=!e.paid&&e.due<today0;
       return o("div",{key:e.id,className:"f ia jb",style:{padding:"10px 0",borderBottom:`1px solid ${c.brs}`,gap:10},children:[
