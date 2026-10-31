@@ -1052,8 +1052,29 @@ function nws(acc,exp,months=12,inv=[]){const s=[],tt=new Date();const invTot=(in
 
 const INV_TYPES=[{id:"nps",label:"NPS",emoji:"🏛️",color:"#A8E6CF"},{id:"mf",label:"Mutual Fund",emoji:"📈",color:"#7FDBFF"},{id:"fd",label:"Fixed Deposit",emoji:"🏦",color:"#C8A465"},{id:"stock",label:"Stocks",emoji:"📊",color:"#FF8C5A"},{id:"gold",label:"Gold",emoji:"🪙",color:"#FDE047"},{id:"other",label:"Other",emoji:"💼",color:"#C8B6FF"}];
 const invType=id=>INV_TYPES.find(x=>x.id===id)||INV_TYPES[INV_TYPES.length-1];
-const invCurrent=inv=>{if(inv.current!=null&&inv.current!=="")return Number(inv.current)||0;if(inv.type==="fd"&&inv.rate&&inv.startDate){const yrs=Math.max(0,(Date.now()-inv.startDate)/(365*864e5));return Math.round((Number(inv.invested)||0)*Math.pow(1+(Number(inv.rate)||0)/100,yrs))}return Number(inv.invested)||0};
+const invCurrent=inv=>{if(inv.current!=null&&inv.current!=="")return Number(inv.current)||0;if(inv.type==="fd"&&inv.rate&&inv.startDate){const yrs=Math.max(0,(Date.now()-inv.startDate)/(365*864e5));return Math.round((Number(inv.invested)||0)*Math.pow(Math.max(0,1+(Number(inv.rate)||0)/100),yrs))}return Number(inv.invested)||0};
 const invGainPct=inv=>{const iv=Number(inv.invested)||0;if(iv<=0)return 0;return ((invCurrent(inv)-iv)/iv)*100};
+// === SIGNED % FIELDS (a return can be a loss) ===
+// iPhone's decimal keypad has no minus key, so a signed field gets a "+ Gain / − Loss" button beside it.
+// The text is the single source of truth: "-4.5" is a loss. A typed - − or – also works (hardware keyboard, paste).
+const SGN_MIN=-100; // a yearly return can't go below losing everything
+const sgnTxt=s=>{s=String(s==null?"":s);const neg=/^\s*[-−–]/.test(s),d=s.replace(/[^\d.]/g,""),i=d.indexOf(".");return(neg?"-":"")+(i<0?d:d.slice(0,i+1)+d.slice(i+1).replace(/\./g,""))};
+const sgnVal=s=>{const n=parseFloat(s);return isFinite(n)?(n===0?0:n):null}; // "", "-" and "." mean nothing was entered
+function SgnBtn({value,onChange,inputRef}){
+  // Neutral grey until a number or a minus is entered, so an empty field doesn't read as "gain".
+  const v=String(value==null?"":value),neg=v.startsWith("-"),set=neg||sgnVal(v)!=null,col=neg?c.co:set?c.mt:c.td;
+  return t("button",{type:"button","aria-label":neg?"Loss. Tap to switch to a gain":"Gain. Tap to switch to a loss",
+    onMouseDown:e=>e.preventDefault(),
+    onClick:()=>{onChange(neg?v.slice(1):"-"+v);if(inputRef&&inputRef.current)inputRef.current.focus()},
+    className:"act90 trt",style:{flexShrink:0,minWidth:88,padding:"0 12px",borderRadius:10,border:`1px solid ${set?col:c.brs}`,background:set?col+"22":c.sf2,color:col,fontSize:13,fontWeight:600,fontFamily:'var(--nf)',whiteSpace:"nowrap"},children:neg?"− Loss":"+ Gain"});
+}
+// A plain input row with the Gain / Loss button beside it.
+function SgnInp({value,onChange,placeholder,style}){
+  const ref=useRef(null);
+  return o("div",{className:"f",style:{gap:8,alignItems:"stretch"},children:[
+    t("input",{ref,value,inputMode:"decimal",placeholder,onChange:e=>onChange(sgnTxt(e.target.value)),style:{...style,flex:1,minWidth:0,width:"auto"}}),
+    t(SgnBtn,{value,onChange,inputRef:ref})]});
+}
 
 // === QUARTERLY NET WORTH ===
 // A snapshot is a manual point-in-time record: {id,qKey:"2026-Q3",date,assets:[],liabilities:[],note}.
@@ -10223,8 +10244,10 @@ function NewInvestment({data,editing,onSave,onCancel}){
   const[sipAmt,sSipAmt]=useState(iE&&editing.sip?String(editing.sip.amount||""):"");
   const[sipDay,sSipDay]=useState(iE&&editing.sip?String(editing.sip.day||1):"1");
   const[note,sNote]=useState(iE&&editing.note||"");
-  const isFd=tp==="fd",va=nm.trim()&&parseFloat(invd)>0;
-  const save=()=>{const sip=sipOn&&parseFloat(sipAmt)>0?{enabled:true,amount:parseFloat(sipAmt),day:Math.min(28,Math.max(1,parseInt(sipDay)||1)),lastPosted:(iE&&editing.sip&&editing.sip.lastPosted)?editing.sip.lastPosted:Date.now()}:null;onSave({type:tp,name:nm.trim(),emoji:em||invType(tp).emoji,invested:parseFloat(invd)||0,current:curv!==""?parseFloat(curv)||0:null,startDate:sd?new Date(sd).getTime():null,maturityDate:md?new Date(md).getTime():null,rate:rate!==""?parseFloat(rate)||0:null,sip,note:note.trim()||null})};
+  const rateRef=useRef(null);
+  const rv=sgnVal(rate),rateBad=rv!=null&&rv<SGN_MIN; // a return can be negative (a loss); a lone "-" means not set
+  const isFd=tp==="fd",va=nm.trim()&&parseFloat(invd)>0&&!rateBad;
+  const save=()=>{const sip=sipOn&&parseFloat(sipAmt)>0?{enabled:true,amount:parseFloat(sipAmt),day:Math.min(28,Math.max(1,parseInt(sipDay)||1)),lastPosted:(iE&&editing.sip&&editing.sip.lastPosted)?editing.sip.lastPosted:Date.now()}:null;onSave({type:tp,name:nm.trim(),emoji:em||invType(tp).emoji,invested:parseFloat(invd)||0,current:curv!==""?parseFloat(curv)||0:null,startDate:sd?new Date(sd).getTime():null,maturityDate:md?new Date(md).getTime():null,rate:rv,sip,note:note.trim()||null})};
   return o("div",{style:{padding:"8px 0 32px"},className:"st",children:[
     t(SH,{title:t("em",{children:iE?"Edit investment":"New investment"}),onBack:onCancel}),
     o("div",{style:{padding:"0 24px"},children:[
@@ -10241,7 +10264,9 @@ function NewInvestment({data,editing,onSave,onCancel}){
         o("div",{children:[t("label",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"START DATE"}),t("input",{type:"date",value:sd,onChange:e=>sSd(e.target.value),style:{width:"100%",boxSizing:"border-box",background:c.sf,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px",color:c.tx,fontSize:13,outline:"none",fontFamily:'var(--tf)',colorScheme:"dark"}})]}),
         o("div",{children:[t("label",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:isFd?"MATURITY DATE":"MATURITY (OPTIONAL)"}),t("input",{type:"date",value:md,onChange:e=>sMd(e.target.value),style:{width:"100%",boxSizing:"border-box",background:c.sf,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px",color:c.tx,fontSize:13,outline:"none",fontFamily:'var(--tf)',colorScheme:"dark"}})]}),
       ]}),
-      o("div",{style:{marginBottom:14},children:[t("label",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:isFd?"INTEREST RATE %":"EXPECTED RETURN % (OPTIONAL)"}),o("div",{className:"f ia",style:{gap:6,background:c.sf,border:`1px solid ${c.brs}`,borderRadius:12,padding:"12px 14px"},children:[t("input",{type:"text",inputMode:"decimal",value:rate,onChange:e=>sRate(e.target.value.replace(/[^\d.]/g,"")),placeholder:"0.0",style:{flex:1,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:16,fontFamily:'var(--nf)',fontWeight:500}}),t("span",{style:{color:c.td,fontFamily:'var(--nf)',fontSize:16},children:"%"})]})]}),
+      o("div",{style:{marginBottom:14},children:[t("label",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:isFd?"INTEREST RATE %":"EXPECTED RETURN % (OPTIONAL)"}),o("div",{className:"f",style:{gap:8,alignItems:"stretch"},children:[
+        o("div",{className:"f ia",style:{flex:1,minWidth:0,gap:6,background:c.sf,border:`1px solid ${rateBad?c.ro:c.brs}`,borderRadius:12,padding:"12px 14px"},children:[t("input",{ref:rateRef,type:"text",inputMode:"decimal",value:rate,onChange:e=>sRate(sgnTxt(e.target.value)),placeholder:"0.0",style:{flex:1,minWidth:0,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:16,fontFamily:'var(--nf)',fontWeight:500}}),t("span",{style:{color:c.td,fontFamily:'var(--nf)',fontSize:16},children:"%"})]}),
+        t(SgnBtn,{value:rate,onChange:sRate,inputRef:rateRef})]}),rateBad&&t("div",{style:{fontSize:11.5,color:c.ro,marginTop:6},children:"A yearly return can't be below −100%."})]}),
       o("div",{style:{marginBottom:14},children:[
         t(TR,{icon:t(Rpt,{size:16}),label:"Recurring SIP",subtitle:"Auto-log a monthly contribution",active:sipOn,onToggle:()=>sSipOn(!sipOn)}),
         sipOn&&o("div",{className:"g g2",style:{gap:12,marginTop:12},children:[
@@ -10250,7 +10275,7 @@ function NewInvestment({data,editing,onSave,onCancel}){
         ]}),
       ]}),
       o("div",{style:{marginBottom:14},children:[t("label",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"NOTE (OPTIONAL)"}),t("textarea",{value:note,onChange:e=>sNote(e.target.value),placeholder:"Any details…",rows:2,style:{width:"100%",boxSizing:"border-box",background:c.sf,border:`1px solid ${c.brs}`,borderRadius:12,padding:"10px 14px",color:c.tx,fontSize:14,outline:"none",resize:"vertical",fontFamily:'var(--tf)'}})]}),
-      t("button",{disabled:!va,onClick:save,className:"w100 act98 tr",style:{marginTop:10,padding:"16px 0",background:va?c.ac:c.sf2,color:va?"#0a0a0a":c.tm,borderRadius:14,fontWeight:600,fontSize:15,letterSpacing:.3,border:"none"},children:va?(iE?"Save changes":"Add investment"):"Enter name & amount"}),
+      t("button",{disabled:!va,onClick:save,className:"w100 act98 tr",style:{marginTop:10,padding:"16px 0",background:va?c.ac:c.sf2,color:va?"#0a0a0a":c.tm,borderRadius:14,fontWeight:600,fontSize:15,letterSpacing:.3,border:"none"},children:va?(iE?"Save changes":"Add investment"):(rateBad?"Fix the return %":"Enter name & amount")}),
     ]}),
   ]});
 }
@@ -12878,6 +12903,13 @@ function riLoanCost(L,now){
   if(L.kind==="flexi")return lnR2(loanFlexi(L,now).interestTotal+(L.charges||0));
   return lnR2(loanSchedule(L).filter(r=>lnDay(r.due)<=today).reduce((a,r)=>a+r.interest,0)+(L.charges||0));
 }
+// Gain or loss in words, from what is being typed ("Down ₹1,000.00 (−10.0%) so far", "Sold at a loss of …"), so a loss is visible as it's entered.
+function riPnlNote(P,value,payouts,closed,mkt,cur){
+  if(!(P>0)||!isFinite(value))return null;
+  const ret=lnR2(value+(payouts||0)-P),loss=ret<0,col=loss?c.co:ret>0?c.mt:c.td,pc=(loss?"−":"+")+Math.abs(ret/P*100).toFixed(1)+"%",amt=fm(Math.abs(ret),cur);
+  const msg=ret===0?(closed?"Sold at break-even":"Break-even so far"):closed?`${mkt?"Sold":"Exited"} at a ${loss?"loss":"profit"} of ${amt} (${pc})`:`${loss?"Down":"Up"} ${amt} (${pc}) so far`;
+  return t("div",{style:{marginTop:8,padding:"8px 12px",borderRadius:10,background:col+"18",border:`1px solid ${col}44`,fontSize:12.5,color:col,fontFamily:'var(--nf)',lineHeight:1.4},children:msg});
+}
 // === TRADING PROFIT FROM LOAN MONEY — added to reinvestment returns ===
 // Settings live in data.calculators.riTrading:
 //   {start:"YYYY-MM"|null, lossCat:expenseCategoryId|null, skip:[entryId],
@@ -13074,12 +13106,18 @@ function RiFormSheet({L,data,inv,onClose,onSave}){
   const set=(k,v)=>sF(p=>({...p,[k]:v}));
   const num=(k,ph)=>t("input",{value:f[k],inputMode:"decimal",placeholder:ph||"",onChange:e=>set(k,e.target.value.replace(/[^\d.]/g,"")),style:lnInp()});
   const mkt=riMarket(f.type),hasExit=f.exit!=="";
-  const ok=!!(f.name.trim()&&parseFloat(f.invested)>0&&lnFromYMD(f.date)&&(!hasExit||lnFromYMD(f.exitDate)));
+  // The expected return can be negative (an investment expected to lose money); nothing typed, a lone "-" or "." means "not set".
+  const rv=mkt?null:sgnVal(f.rate),rateBad=rv!=null&&rv<SGN_MIN;
+  const ok=!!(f.name.trim()&&parseFloat(f.invested)>0&&lnFromYMD(f.date)&&(!hasExit||lnFromYMD(f.exitDate))&&!rateBad);
+  // What is typed so far, as a gain or loss in words (value + payouts − invested).
+  const P0=parseFloat(f.invested)||0,paid0=iE?(inv.payouts||[]).reduce((a,p)=>a+(Number(p.amount)||0),0):0,cv0=f.current!==""?(parseFloat(f.current)||0):null,ev0=parseFloat(f.exit)||0;
+  const pnl=P0>0&&(hasExit||cv0!=null||paid0>0||(f.type==="fd"&&rv))?riPnlNote(P0,hasExit?ev0:invCurrent({type:f.type,invested:P0,startDate:lnFromYMD(f.date),rate:rv,current:cv0}),paid0,hasExit,mkt,data.currency):null;
+  const hint=x=>t("div",{style:{fontSize:11,color:c.tm,marginTop:5,lineHeight:1.4},children:x});
   const save=()=>{if(!ok)return;let cv=f.current!==""?parseFloat(f.current)||0:null;
     // Selling sets the holding's value to the exit value so My Investments shows the realised figure; clearing the exit restores the last known value.
     const ev=hasExit?parseFloat(f.exit)||0:null;
     if(hasExit)cv=ev;else if(iE&&riExited(inv)){const vl=[...(inv.valueLog||[])].sort((a,b)=>b.date-a.date)[0];cv=vl?vl.value:null}
-    const patch={type:f.type,name:f.name.trim(),emoji:iE&&inv.type===f.type&&inv.emoji?inv.emoji:invType(f.type).emoji,invested:parseFloat(f.invested),startDate:lnFromYMD(f.date),rate:mkt||f.rate===""?null:parseFloat(f.rate)||0,current:cv,maturityDate:!mkt&&f.maturity?lnFromYMD(f.maturity):null,payFreq:mkt?0:f.freq,exitValue:ev,exitDate:hasExit?lnFromYMD(f.exitDate):null,note:f.note.trim()};
+    const patch={type:f.type,name:f.name.trim(),emoji:iE&&inv.type===f.type&&inv.emoji?inv.emoji:invType(f.type).emoji,invested:parseFloat(f.invested),startDate:lnFromYMD(f.date),rate:rv,current:cv,maturityDate:!mkt&&f.maturity?lnFromYMD(f.maturity):null,payFreq:mkt?0:f.freq,exitValue:ev,exitDate:hasExit?lnFromYMD(f.exitDate):null,note:f.note.trim()};
     // A changed current value is also kept in the value history.
     if(!hasExit&&cv!=null&&(!iE||cv!==inv.current))patch.valueLog=[...((iE&&inv.valueLog)||[]),{id:"rv_"+uid(),date:Date.now(),value:cv}];
     onSave(patch)};
@@ -13089,11 +13127,14 @@ function RiFormSheet({L,data,inv,onClose,onSave}){
     lnLbl("NAME (E.G., SGB 2026 SERIES I, BANK FD)"),t("input",{value:f.name,autoFocus:!iE,onChange:e=>set("name",e.target.value),style:lnInp()}),
     lnLbl("AMOUNT INVESTED ("+data.currency+")"),num("invested","0"),
     lnLbl(mkt?"BUY DATE":"DATE INVESTED"),t("input",{type:"date",value:f.date,onChange:e=>set("date",e.target.value),style:riDateInp()}),
-    !mkt&&lnLbl("EXPECTED RETURN % YEARLY (OPTIONAL)"),!mkt&&num("rate",lnCurRate(L)+" is what the loan charges"),
+    !mkt&&lnLbl("EXPECTED RETURN % YEARLY (OPTIONAL)"),!mkt&&t(SgnInp,{value:f.rate,onChange:v=>set("rate",v),placeholder:"e.g. 8",style:lnInp()}),
+    !mkt&&(rateBad?t("div",{style:{fontSize:11.5,color:c.ro,marginTop:5,lineHeight:1.4},children:"A yearly return can't be below −100%."}):hint(rv!=null&&rv<0?`Recorded as losing ${Math.abs(rv)}% a year. Tap “− Loss” to switch it back to a gain.`:`${L.lender||"The loan"} charges ${riPct(lnCurRate(L))} a year. Losing money on this one? Tap “+ Gain” to switch it to a loss.`)),
     !hasExit&&lnLbl(mkt?"CURRENT MARKET VALUE (OPTIONAL)":"CURRENT VALUE (OPTIONAL)"),!hasExit&&num("current",f.type==="fd"?"Leave empty to grow at the expected rate":"Leave empty if unchanged"),
+    !hasExit&&(pnl||hint("Worth less than you invested? Enter the lower value and it's recorded as a loss.")),
     !mkt&&lnLbl("MATURITY DATE (OPTIONAL)"),!mkt&&t("input",{type:"date",value:f.maturity,onChange:e=>set("maturity",e.target.value),style:riDateInp()}),
     !mkt&&lnLbl("PAYOUT FREQUENCY (FOR REMINDERS)"),!mkt&&t("div",{className:"f fw",style:{gap:6},children:RI_FREQ.map(([k,l])=>t("button",{key:k,onClick:()=>set("freq",k),className:"act95 tr",style:{padding:"7px 12px",borderRadius:999,fontSize:12,background:f.freq===k?c.sf3:"transparent",border:`1px solid ${f.freq===k?c.ac:c.brs}`,color:f.freq===k?c.tx:c.td},children:l}))}),
     lnLbl(mkt?"SOLD FOR / EXIT VALUE (OPTIONAL)":"EXIT / REDEEMED VALUE (OPTIONAL)"),num("exit","Fill in once you sell to lock in the P&L"),
+    hasExit&&pnl,
     hasExit&&lnLbl(mkt?"SELL DATE":"EXIT DATE"),hasExit&&t("input",{type:"date",value:f.exitDate,onChange:e=>set("exitDate",e.target.value),style:riDateInp()}),
     lnLbl("NOTE (OPTIONAL)"),t("input",{value:f.note,onChange:e=>set("note",e.target.value),style:lnInp()}),
     o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn(iE?"Save":"Add",save,true,ok?null:{opacity:.5})]})
@@ -13104,9 +13145,13 @@ function RiEntrySheet({data,inv,kind,entry,onClose,onSave,onDelete}){
   const pay=kind==="pay";
   const[amt,sAmt]=useState(entry?String(pay?entry.amount:entry.value):"");const[date,sDate]=useState(lnYMD(entry?entry.date:Date.now()));const[note,sNote]=useState(entry&&entry.note||"");
   const ok=parseFloat(amt)>=(pay?0.01:0)&&amt!==""&&lnFromYMD(date);
+  // A value below what was invested is a loss: say so as it's typed (value + payouts − invested).
+  const P=Number(inv.invested)||0,paid=(inv.payouts||[]).reduce((a,p)=>a+(Number(p.amount)||0),0),av=parseFloat(amt);
+  const gl=!pay&&(amt!==""&&isFinite(av)?riPnlNote(P,av,paid,false,riMarket(inv.type),data.currency):t("div",{style:{fontSize:11,color:c.tm,marginTop:5,lineHeight:1.4},children:`Worth less than the ${fm(P,data.currency)} you invested? Enter the lower value and it's recorded as a loss.`}));
   return t(Sht,{onClose,children:o(Fragment,{children:[
     lnSheetTitle(pay?(entry?"Edit payout":"Payout received"):(entry?"Edit value update":"Update value"),pay?"Interest, dividend, coupon or part redemption you received from "+inv.name+".":"What "+inv.name+" is worth on this date. The latest update is used as its current value."),
     lnLbl((pay?"AMOUNT RECEIVED":"VALUE")+" ("+data.currency+")"),t("input",{value:amt,inputMode:"decimal",autoFocus:true,onChange:e=>sAmt(e.target.value.replace(/[^\d.]/g,"")),style:lnInp()}),
+    gl,
     lnLbl("DATE"),t("input",{type:"date",value:date,onChange:e=>sDate(e.target.value),style:riDateInp()}),
     pay&&lnLbl("NOTE (OPTIONAL)"),pay&&t("input",{value:note,placeholder:"e.g., Half-yearly interest",onChange:e=>sNote(e.target.value),style:lnInp()}),
     o("div",{className:"f",style:{gap:10,marginTop:18},children:[entry?lnBtn("Delete",onDelete,false,{color:c.ro}):lnBtn("Cancel",onClose),lnBtn("Save",()=>{if(!ok)return;const d=lnFromYMD(date),a=parseFloat(amt);onSave(pay?{id:entry?entry.id:"rp_"+uid(),date:d,amount:a,note:note.trim()}:{id:entry?entry.id:"rv_"+uid(),date:d,value:a})},true,ok?null:{opacity:.5})]})
@@ -14870,7 +14915,7 @@ function ReinvestDash({data,persist,onClose,onView,getFrom,onTx}){
       o("div",{className:"ri-in",style:{background:`linear-gradient(135deg,${(good?c.mt:c.co)}22 0%,${c.sfg} 70%)`,border:`1px solid ${(good?c.mt:c.co)}44`,borderRadius:20,padding:18,marginBottom:14},children:[
         t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,letterSpacing:1.5},children:"AHEAD OF LOAN COST"}),
         o("div",{style:{margin:"6px 0 12px"},children:[t(CountUp,{v:pf.net,fmt:v=>riSigned(v,cur),style:{fontFamily:'var(--nf)',fontSize:32,fontWeight:300,color:good?c.mt:c.co}}),t("span",{style:{fontSize:12.5,color:c.td},children:good?"  ahead so far":"  behind so far"})]}),
-        o("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8},children:[["REINVESTED",pf.P,c.tx],["CURRENT VALUE",pf.value,c.tx],["PAYOUTS",pf.payouts,c.mt],["TRADING PROFIT",pf.trade,pf.trade>=0?c.mt:c.co],["LOAN INTEREST",pf.cost,c.gd],["TOTAL RETURN",pf.ret,pf.ret>=0?c.mt:c.co]].map(([k,v,col])=>{const go=k==="TRADING PROFIT";return o(go?"button":"div",{key:k,...(go?{onClick:()=>sTab("trading"),"aria-label":"Trading profit, day by day",className:"act95 trt"}:{}),style:{background:c.sf2+"cc",borderRadius:10,padding:"9px 11px",minWidth:0,...(go?{border:"none",textAlign:"left",color:"inherit",cursor:"pointer"}:{})},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:8.5,color:c.tm,letterSpacing:.8},children:go?k+" ›":k}),t(CountUp,{v,fmt:x=>fm(x,cur),className:"tru",style:{display:"block",fontFamily:'var(--nf)',fontSize:14,color:col,marginTop:3}})]})})}),
+        o("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8},children:[["REINVESTED",pf.P,c.tx],["CURRENT VALUE",pf.value,c.tx],["PAYOUTS",pf.payouts,c.mt],["TRADING PROFIT",pf.trade,pf.trade>=0?c.mt:c.co],["LOAN INTEREST",pf.cost,c.gd],["TOTAL RETURN",pf.ret,pf.ret>=0?c.mt:c.co]].map(([k,v,col])=>{const go=k==="TRADING PROFIT";return o(go?"button":"div",{key:k,...(go?{onClick:()=>sTab("trading"),"aria-label":"Trading profit, day by day",className:"act95 trt"}:{}),style:{background:c.sf2+"cc",borderRadius:10,padding:"9px 11px",minWidth:0,...(go?{border:"none",textAlign:"left",color:"inherit",cursor:"pointer"}:{})},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:8.5,color:c.tm,letterSpacing:.8},children:go?k+" ›":k}),t(CountUp,{v,fmt:x=>x<0?"−"+fm(-x,cur):fm(x||0,cur),className:"tru",style:{display:"block",fontFamily:'var(--nf)',fontSize:14,color:col,marginTop:3}})]})})}),
         t("div",{style:{fontSize:10.5,color:c.tm,marginTop:9,lineHeight:1.45},children:`${pf.items.length} holding${pf.items.length===1?"":"s"} across ${pf.groups.length} loan${pf.groups.length===1?"":"s"} · return = value + payouts + trading profit − invested, minus the interest the loans cost on the same money.`})]}),
       o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,marginBottom:14,overflowX:"auto"},children:[["overview","Overview"],["holdings","Holdings · "+rows.length],["timeline","Timeline"],["trading","Trading"+(nTrade?" · "+nTrade:"")]].map(([k,l])=>t("button",{key:k,onClick:()=>sTab(k),className:"act95 tr",style:{flex:"1 0 auto",padding:"9px 10px",borderRadius:9,border:"none",fontSize:12.5,whiteSpace:"nowrap",fontWeight:tab===k?600:400,background:tab===k?c.sf3:"transparent",color:tab===k?c.tx:c.td},children:l}))}),
       tab==="overview"&&overview,tab==="holdings"&&holdings,tab==="timeline"&&timeline,tab==="trading"&&tradingTab]}),
