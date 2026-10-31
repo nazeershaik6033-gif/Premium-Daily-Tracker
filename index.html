@@ -12081,13 +12081,27 @@ const plRound=n=>n<=0?0:n<1000?Math.ceil(n/50)*50:Math.ceil(n/100)*100;
 const plFreq={daily:"Daily",weekly:"Weekly",biweekly:"Every 2 weeks",monthly:"Monthly",quarterly:"Quarterly",yearly:"Yearly"};
 const plShort=ts=>new Date(ts).toLocaleDateString("en-GB",{day:"numeric",month:"short"});
 // Spend per expense category (net of reimbursed / lent parts) inside [from,to).
-function plSpend(exps,from,to){const m={};for(const e of exps||[]){if(e.type!=="expense"||e.archived||e.date<from||e.date>=to)continue;m[e.category]=(m[e.category]||0)+netAmt(e)}return m}
+function plSpend(exps,from,to,loans){const lm=loans?plEmiLineOf(loans):null,m={};for(const e of exps||[]){if(e.type!=="expense"||e.archived||e.date<from||e.date>=to)continue;const k=lm&&e.source==="loan_emi"&&e.loanId&&lm[e.loanId]?"@line:"+lm[e.loanId]:e.category;m[k]=(m[k]||0)+netAmt(e)}return m}
+// Loan EMIs live in their own budget lines (Home / Car / Personal / Other EMIs), not under the "bills" category they are logged with.
+const plEmiLineKind={home:"homeloan",vehicle:"carloan",personal:"personalloan"};
+function plEmiLineOf(loans){const m={};for(const L of loans||[])m[L.id]=plEmiLineKind[L.kind]||"otheremi";return m}
+// EMIs of borrowed term loans that fall due in [from,to), with whether each is already recorded as paid on the loan.
+function plEmiMonth(data,from,to){
+  const out=[];
+  for(const L of data.loanTracker||[]){
+    if(L.direction==="lent"||L.kind==="flexi"||L.kind==="od"||L.closedAt||!(L.tenure>0))continue;
+    let rows;try{rows=loanSchedule(L)}catch(e){continue}
+    const pays=new Map((L.payments||[]).map(q=>[q.n,q]));
+    for(const r of rows){const d=lnDay(r.due);if(d>=from&&d<to){const q=pays.get(r.n);out.push({id:"emi_"+L.id+"_"+r.n,L,n:r.n,total:rows.length,due:d,amount:r.emi,paid:!!q,paidOn:q?q.date:null,line:plEmiLineKind[L.kind]||"otheremi"})}}
+  }
+  return out.sort((a,b)=>a.due-b.due);
+}
 // What each category usually costs: the average of the last `n` earlier periods that had any spending.
-function plBaseline(exps,from,n=3){
-  const sums=[],recs=[],rx=(exps||[]).filter(e=>e.source==="recurring");
-  for(let k=1;k<=n+3&&sums.length<n;k++){const a=new Date(from),b=new Date(from);a.setMonth(a.getMonth()-k);b.setMonth(b.getMonth()-k+1);const s=plSpend(exps,a.getTime(),b.getTime());if(Object.keys(s).length){sums.push(s);recs.push(plSpend(rx,a.getTime(),b.getTime()))}}
+function plBaseline(exps,from,n=3,loans){
+  const sums=[],recs=[],rx=(exps||[]).filter(e=>e.source==="recurring"||e.source==="loan_emi");
+  for(let k=1;k<=n+3&&sums.length<n;k++){const a=new Date(from),b=new Date(from);a.setMonth(a.getMonth()-k);b.setMonth(b.getMonth()-k+1);const s=plSpend(exps,a.getTime(),b.getTime(),loans);if(Object.keys(s).length){sums.push(s);recs.push(plSpend(rx,a.getTime(),b.getTime(),loans))}}
   const mean=arr=>{const o2={};for(const k of new Set(arr.flatMap(x=>Object.keys(x))))o2[k]=Math.round(arr.reduce((a,x)=>a+(x[k]||0),0)/(arr.length||1));return o2};
-  return{avg:mean(sums),rec:mean(recs),months:sums.length};  // rec = the part of the average that came from recurring expenses
+  return{avg:mean(sums),rec:mean(recs),months:sums.length};  // rec = the part of the average that came from recurring expenses and EMIs
 }
 // Income logged in a period, and the usual income (average of the last `n` earlier periods that had any).
 function plIncomeSum(exps,from,to){let s=0;for(const e of exps||[]){if(e.type==="income"&&!e.archived&&e.date>=from&&e.date<to)s+=e.amount||0}return Math.round(s)}
@@ -12134,14 +12148,14 @@ function plBudMap(data){
   for(const cat of ceAll()){if(!lineOf[cat.id]){const lid=budSuggestLine(cat,"expense",groups);if(lid&&lineSec[lid])lineOf[cat.id]=lid}}
   return{secs,lineSec,lineLabel,lineOf};
 }
-const plLineKey=(bm,cid)=>bm.lineOf[cid]||"__other";
+const plLineKey=(bm,cid)=>String(cid).startsWith("@line:")?(bm.lineSec[String(cid).slice(6)]?String(cid).slice(6):"__other"):(bm.lineOf[cid]||"__other");
 function plByLine(bm,byCat){const o2={};for(const[k,v]of Object.entries(byCat||{})){const l=plLineKey(bm,k);o2[l]=(o2[l]||0)+(Number(v)||0)}return o2}
 const planRecLabel=x=>(x.r&&(x.r.merchant||x.r.payee||x.r.note))||(x.e&&(x.e.merchant||x.e.payee||x.e.note))||((co((x.r&&x.r.category)||(x.e&&x.e.category))||{}).label)||"Recurring";
 // Budget lines running ahead of plan this period ("ahead" = ≥80% used and faster than the days gone by; "over" = past the plan).
 function planWarnings(data,now=Date.now()){
   const{from,to}=(()=>{const f=ps(new Date(now),data.monthStartDay||1),d=new Date(f);d.setMonth(d.getMonth()+1);return{from:f,to:d.getTime()}})();
   if(from<planCut(data))return[];
-  const bm=plBudMap(data),{cats}=plMonthOf(data,plKey(from)),spent=plByLine(bm,plSpend(data.expenses,from,to)),frac=Math.min(1,Math.max(.03,(now-from)/(to-from))),daysLeft=Math.max(0,Math.ceil((to-now)/864e5)),out=[];
+  const bm=plBudMap(data),{cats}=plMonthOf(data,plKey(from)),spent=plByLine(bm,plSpend(data.expenses,from,to,data.loanTracker)),frac=Math.min(1,Math.max(.03,(now-from)/(to-from))),daysLeft=Math.max(0,Math.ceil((to-now)/864e5)),out=[];
   for(const[cid,plan]of Object.entries(cats)){
     if(!(plan>0))continue;
     const s=Math.round(spent[cid]||0),pct=s/plan,label=bm.lineLabel[cid]||"Other";
@@ -12153,9 +12167,10 @@ function planWarnings(data,now=Date.now()){
 const planWarnText=(w,cur)=>{const nm=w.label||w.cid;return w.level==="over"?`${nm} is over plan by ${fm(w.spent-w.plan,cur)}.`:`${nm} is at ${Math.round(w.pct*100)}% of plan with ${w.daysLeft} day${w.daysLeft===1?"":"s"} left.`};
 // ---- AI ----
 function plContext(data,from,to,income,savePct){
-  const base0=plBaseline(data.expenses,from),bm=plBudMap(data),avg=plByLine(bm,base0.avg),recH=plByLine(bm,base0.rec),months=base0.months,{cats,caps}=plMonthOf(data,plKey(from)),spent=plByLine(bm,plSpend(data.expenses,from,to));
+  const base0=plBaseline(data.expenses,from,3,data.loanTracker),bm=plBudMap(data),avg=plByLine(bm,base0.avg),recH=plByLine(bm,base0.rec),months=base0.months,{cats,caps}=plMonthOf(data,plKey(from)),spent=plByLine(bm,plSpend(data.expenses,from,to,data.loanTracker));
   const rec=plRecMonth(data,from,to,planCut(data)).filter(x=>x.state!=="skipped"),recBy={};
   rec.forEach(x=>{const k=(x.r&&x.r.category)||(x.e&&x.e.category);if(k){const l=plLineKey(bm,k);recBy[l]=(recBy[l]||0)+(x.amount||0)}});
+  plEmiMonth(data,from,to).forEach(e=>{const l=bm.lineSec[e.line]?e.line:"__other";recBy[l]=(recBy[l]||0)+e.amount});
   const ids=new Set([...Object.keys(avg),...Object.keys(cats),...Object.keys(recBy),...Object.keys(spent)]);
   const categories=[...ids].map(id=>({id,label:bm.lineLabel[id]||"Other",group:bm.lineSec[id]||"other",avgPerMonth:Math.round(avg[id]||0),recurringInThatAverage:Math.round(recH[id]||0),spentSoFar:Math.round(spent[id]||0),recurringThisMonth:Math.round(recBy[id]||0),plan:cats[id]||0})).sort((a,b)=>b.avgPerMonth-a.avgPerMonth).slice(0,45);
   return{currency:data.currency,month:new Date(from).toLocaleDateString("en-US",{month:"long",year:"numeric"}),monthlyIncome:Math.round(income||0)||null,savingsTargetPercent:savePct>0?savePct:null,historyMonthsUsed:months,groups:bm.secs.map(sc=>({id:sc.id,label:sc.label,limitPercentOfIncome:sc.thresh!=null?Math.round(sc.thresh*100):null,cap:caps[sc.id]||null})),categories,recurring:rec.map(x=>({what:planRecLabel(x),line:bm.lineLabel[plLineKey(bm,(x.r&&x.r.category)||(x.e&&x.e.category))]||"Other",amount:x.amount,date:new Date(x.ts).toISOString().slice(0,10),state:x.state}))};
@@ -12193,17 +12208,17 @@ async function plAIChat(ctx,message){
 function PlSheet({onClose,children}){
   return createPortal(t("div",{style:{position:"fixed",inset:0,zIndex:90,display:"flex",alignItems:"flex-end",justifyContent:"center",background:"rgba(0,0,0,.6)"},onClick:onClose,children:t("div",{onClick:e=>e.stopPropagation(),style:{width:"100%",maxWidth:640,maxHeight:"88dvh",overflowY:"auto",background:c.bg,border:`1px solid ${c.brs}`,borderRadius:"22px 22px 0 0",padding:"18px 18px calc(18px + env(safe-area-inset-bottom,0px))"},children})}),document.body);
 }
-function BudgetPlanner({data,persist,cur,income,baseStart,onClose}){
+function BudgetPlanner({data,persist,cur,income,baseStart,onClose,onOpenLoan}){
   const[off,sOff]=useState(0);
   const from=useMemo(()=>{const d=new Date(baseStart);d.setMonth(d.getMonth()+off);return d.getTime()},[baseStart,off]);
   const to=useMemo(()=>{const d=new Date(from);d.setMonth(d.getMonth()+1);return d.getTime()},[from]);
   const mk=plKey(from),label=new Date(from).toLocaleDateString("en-US",{month:"long",year:"numeric"}),cut=planCut(data),active=from>=cut;
   const cals=data.calculators||{},PL=cals.planner||{},P=plData(data),mo=P.months[mk]||{},{cats,caps}=plMonthOf(data,mk);
   const now=Date.now(),isCur=now>=from&&now<to,today0=new Date(now).setHours(0,0,0,0),endToday=today0+86399999;
-  const[sugg,sSugg]=useState(null),[busy,sBusy]=useState(""),[err,sErr]=useState(""),[chat,sChat]=useState(null),[ask,sAsk]=useState(""),[extra,sExtra]=useState([]);
+  const[gf,sGf]=useState(null),[rev,sRev]=useState(null),[sugg,sSugg]=useState(null),[busy,sBusy]=useState(""),[err,sErr]=useState(""),[chat,sChat]=useState(null),[ask,sAsk]=useState(""),[extra,sExtra]=useState([]);
   useEffect(()=>{sExtra([]);sSugg(null);sChat(null);sErr("")},[mk]);
   useEffect(()=>{const k=e=>{if(e.key==="Escape")onClose()};window.addEventListener("keydown",k);return()=>window.removeEventListener("keydown",k)},[onClose]);
-  const exps=data.expenses||[],bm=plBudMap(data),spent=plByLine(bm,plSpend(exps,from,to)),base0=plBaseline(exps,from),base={avg:plByLine(bm,base0.avg),rec:plByLine(bm,base0.rec),months:base0.months},rec=plRecMonth(data,from,to,cut);
+  const exps=data.expenses||[],bm=plBudMap(data),spent=plByLine(bm,plSpend(exps,from,to,data.loanTracker)),base0=plBaseline(exps,from,3,data.loanTracker),base={avg:plByLine(bm,base0.avg),rec:plByLine(bm,base0.rec),months:base0.months},rec=plRecMonth(data,from,to,cut);
   const savePL=patch=>persist({calculators:{...cals,planner:{...PL,start:PL.start||PLAN_START_DEFAULT,months:{...P.months,[mk]:{...mo,...patch}}}}});
   const setCat=(lid,n)=>{const nc={...cats};if(n==null||!(n>0))delete nc[lid];else nc[lid]=n;savePL({lines:nc,cats:undefined})};
   const setCap=(sid,n)=>{const nc={...caps};if(n==null||!(n>0))delete nc[sid];else nc[sid]=n;savePL({caps:nc})};
@@ -12225,13 +12240,20 @@ function BudgetPlanner({data,persist,cur,income,baseStart,onClose}){
   const dueRows=rec.filter(x=>x.state==="due"&&!x.auto),dueNow=dueRows.filter(x=>x.ts<=endToday),toLog=dueRows.reduce((a,x)=>a+(x.amount||0),0);
   const recDue={};dueRows.forEach(x=>{const k=x.r&&x.r.category;if(k){const lk=plLineKey(bm,k);recDue[lk]=(recDue[lk]||0)+(x.amount||0)}});
   const warns=isCur&&active?planWarnings(data,now):[];
+  // ---- fixed commitments: recurring expenses + loan EMIs for this month ----
+  const emi=plEmiMonth(data,from,to),emiLn=e=>bm.lineSec[e.line]?e.line:"__other",fixedBy={};
+  rec.filter(x=>x.state!=="skipped").forEach(x=>{const k=(x.r&&x.r.category)||(x.e&&x.e.category);if(k){const lk=plLineKey(bm,k);fixedBy[lk]=(fixedBy[lk]||0)+(x.amount||0)}});
+  emi.forEach(e=>{const lk=emiLn(e);fixedBy[lk]=(fixedBy[lk]||0)+e.amount});
+  const fixedRec=rec.filter(x=>x.state!=="skipped").reduce((a,x)=>a+(x.amount||0),0),fixedEmi=emi.reduce((a,e)=>a+e.amount,0),fixedTot=fixedRec+fixedEmi;
+  const flexPlan=Object.keys(cats).reduce((a,l)=>a+Math.max(0,(cats[l]||0)-(fixedBy[l]||0)),0),shortfall=Object.keys(fixedBy).reduce((a,l)=>a+Math.max(0,(fixedBy[l]||0)-(cats[l]||0)),0);
   // ---- income & what is left ----
   const incHist=plIncomeAvg(exps,from),incNow=plIncomeSum(exps,from,to),incAuto=off===0&&income>0?income:incHist.avg,incSet=mo.income>0,inc=incSet?mo.income:incAuto;
   const incNote=incSet?"Set by you":(off===0&&income>0?"From your Monthly Budget":incHist.months?"Average of your last "+incHist.months+" month"+(incHist.months===1?"":"s"):"Not set yet");
-  const savePct=mo.savePct>0?mo.savePct:0,saveAmt=Math.round(inc*savePct/100),leftAlloc=inc-saveAmt-planned,usable=inc-saveAmt;
+  const goals=PL.goals||[],goalDone=mo.goalDone||{},goalsMonthly=goals.filter(g=>!((g.saved||0)>=g.target)).reduce((a,g)=>a+(g.monthly||0),0);
+  const savePct=mo.savePct>0?mo.savePct:0,saveAmt=Math.round(inc*savePct/100),leftAlloc=inc-saveAmt-goalsMonthly-planned,usable=inc-saveAmt-goalsMonthly;
   const pf=new Date(from);pf.setMonth(pf.getMonth()-1);const prevPlan=plMonthOf(data,plKey(pf.getTime())),prevHas=Object.keys(prevPlan.cats).length>0,prevName=pf.toLocaleDateString("en-US",{month:"short"});
   // ---- budget lines under their sections, like the Monthly Budget ----
-  const otherKey="__other",otherUsed=(cats[otherKey]>0)||(spent[otherKey]>0)||(base.avg[otherKey]>0)||(recDue[otherKey]>0);
+  const otherKey="__other",otherUsed=(cats[otherKey]>0)||(spent[otherKey]>0)||(base.avg[otherKey]>0)||(recDue[otherKey]>0)||(fixedBy[otherKey]>0);
   const secList=[...bm.secs,...(otherUsed?[{id:"other",label:"Other",emoji:"📌",color:c.td,thresh:null,neutral:true,lines:[{id:otherKey,label:"Other (not in a budget line)"}]}]:[])].filter(sc=>sc.lines.length);
   // ---- AI ----
   const nameOf=id=>bm.lineLabel[id]||"Other";
@@ -12254,6 +12276,40 @@ function BudgetPlanner({data,persist,cur,income,baseStart,onClose}){
   };
   const applyChat=()=>{savePL({lines:{...cats,...chat.cats},cats:undefined,caps:{...caps,...chat.caps}});sChat(null);sAsk("")};
   const applySugg=()=>{savePL({lines:{...cats,...sugg.cats},cats:undefined,caps:{...caps,...sugg.caps}});sSugg(null)};
+  // ---- goals ----
+  const saveTop=patch=>persist({calculators:{...cals,planner:{...PL,start:PL.start||PLAN_START_DEFAULT,...patch}}});
+  const setGoal=(id,patch)=>saveTop({goals:goals.map(g=>g.id===id?{...g,...patch}:g)});
+  const delGoal=id=>saveTop({goals:goals.filter(g=>g.id!==id)});
+  const putAside=g=>{const amt=Math.round(Math.min(g.monthly||0,Math.max(0,g.target-(g.saved||0))));if(!(amt>0))return;saveTop({goals:goals.map(x=>x.id===g.id?{...x,saved:(x.saved||0)+amt}:x),months:{...P.months,[mk]:{...mo,goalDone:{...goalDone,[g.id]:amt}}}})};
+  const undoAside=g=>{const amt=goalDone[g.id]||0,gd={...goalDone};delete gd[g.id];saveTop({goals:goals.map(x=>x.id===g.id?{...x,saved:Math.max(0,(x.saved||0)-amt)}:x),months:{...P.months,[mk]:{...mo,goalDone:gd}}})};
+  const addGoal=()=>{const target=parseFloat(gf.target),monthly=parseFloat(gf.monthly)||0;if(!gf.name.trim()||!(target>0))return;saveTop({goals:[...goals,{id:"goal_"+uid(),name:gf.name.trim(),target,saved:0,monthly}]});sGf(null)};
+  // ---- month-end review ----
+  const nf=new Date(from);nf.setMonth(nf.getMonth()+1);const nk=plKey(nf.getTime()),nName=nf.toLocaleDateString("en-US",{month:"short"});
+  const buildReview=()=>{
+    const rows=[...new Set([...Object.keys(cats),...Object.keys(spent)])].map(id=>({id,label:bm.lineLabel[id]||"Other",plan:cats[id]||0,sp:Math.round(spent[id]||0)})).filter(r=>r.plan||r.sp).map(r=>({...r,diff:r.sp-r.plan}));
+    const over=rows.filter(r=>r.plan>0&&r.diff>0).sort((a,b)=>b.diff-a.diff).slice(0,5),under=rows.filter(r=>r.plan>0&&r.diff<0).sort((a,b)=>a.diff-b.diff).slice(0,3),unplanned=rows.filter(r=>!r.plan&&r.sp>0).sort((a,b)=>b.sp-a.sp);
+    const unplannedTotal=unplanned.reduce((a,r)=>a+r.sp,0),saved=incNow>0?incNow-spentAll:null,rate=incNow>0?Math.round(saved/incNow*100):null,lines=[];
+    if(planned>0)lines.push(spentAll<=planned?"You spent "+fm(planned-spentAll,cur)+" less than planned.":"You spent "+fm(spentAll-planned,cur)+" more than planned.");
+    if(over[0])lines.push(over[0].label+" went furthest over plan, by "+fm(over[0].diff,cur)+".");
+    if(unplannedTotal>0)lines.push(fm(unplannedTotal,cur)+" went on lines you had not planned"+(unplanned[0]?", mostly "+unplanned[0].label:"")+".");
+    if(rate!=null)lines.push("You kept "+fm(saved,cur)+" of "+fm(incNow,cur)+" received ("+rate+"%)"+(savePct>0?(rate>=savePct?", meeting your "+savePct+"% target.":", short of your "+savePct+"% target."):"."));
+    if(!lines.length)lines.push("There is not enough in this month to review yet.");
+    return{rows,over,under,unplanned,unplannedTotal,saved,rate,lines};
+  };
+  const openReview=()=>{sErr("");sRev({r:buildReview(),ai:null})};
+  const reviewAI=async()=>{
+    if(!gAK()){sErr("Add your AI key in Settings to use this.");return}
+    sBusy("review");sErr("");
+    try{
+      const ctx=plContext(data,from,to,inc,savePct);
+      const sys="You review a household's month and plan the next one. Reply with ONLY one JSON object and no other text: {\"note\":\"<3-5 short plain sentences: what went well, what went over and the likely reason, and one or two concrete changes>\",\"cats\":{\"<lineId>\":<whole number>}}. \"cats\" is a suggested plan for NEXT month using only the line ids in \"categories\", whole numbers, and only for lines you would set; a line's plan is never below its recurringThisMonth. Use only the numbers given.";
+      const r=await cAPI({system:sys,max_tokens:1500,messages:[{role:"user",content:"Month to review:\n"+JSON.stringify({ctx,planVsActual:rev.r.rows.map(x=>({id:x.id,label:x.label,plan:x.plan,spent:x.sp})),incomeReceived:incNow})}]});
+      const j=plParseJSON((r.content&&r.content[0]&&r.content[0].text)||"");
+      sRev(v=>({...v,ai:{...plClean(j,ctx),note:String(j.note||"").slice(0,800)}}));
+    }catch(e){sErr(e&&e.code==="NO_API_KEY"?"Add your AI key in Settings to use this.":"AI could not answer: "+((e&&e.message)||e))}
+    finally{sBusy("")}
+  };
+  const applyNext=()=>{const nm=P.months[nk]||{},curN=plMonthOf(data,nk).cats;persist({calculators:{...cals,planner:{...PL,start:PL.start||PLAN_START_DEFAULT,months:{...P.months,[nk]:{...nm,lines:{...curN,...rev.ai.cats},cats:undefined}}}}});sRev(null)};
   // ---- UI pieces ----
   const tile=(k,v,sub,col)=>o("div",{key:k,style:{flex:1,minWidth:0,background:c.sf2,borderRadius:10,padding:"9px 11px"},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:8.5,color:c.tm,letterSpacing:.8},children:k}),t("div",{className:"tru",style:{fontFamily:'var(--nf)',fontSize:14,color:col,marginTop:3},children:v}),t("div",{className:"tru",style:{fontSize:10,color:c.tm,marginTop:1},children:sub})]});
   const secLabel=x=>t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,margin:"18px 2px 8px"},children:x});
@@ -12268,14 +12324,14 @@ function BudgetPlanner({data,persist,cur,income,baseStart,onClose}){
       o("div",{className:"f ia minw0",style:{gap:10},children:[t("span",{style:{fontSize:20,flexShrink:0},children:cc?cc.emoji:"🔁"}),o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:13.5,color:c.tx},children:planRecLabel(x)}),o("div",{className:"f ia",style:{gap:6,marginTop:2,flexWrap:"wrap"},children:[t("span",{style:{fontSize:11,color:c.tm},children:plShort(x.ts)+(x.r?" · "+(plFreq[x.r.frequency]||""):"")}),overdue&&pill("Overdue",c.co)]})]})]}),
       o("div",{className:"f ia",style:{gap:12,flexShrink:0},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:13.5,color:c.tx},children:fm(x.amount,cur)}),right]})]});
   };
-  const fillSec=sec=>{const nl={...cats};sec.lines.forEach(l=>{if(!(nl[l.id]>0)){const v=Math.max(plRound((base.avg[l.id]||0)-(base.rec[l.id]||0)+(recDue[l.id]||0)),Math.ceil(recDue[l.id]||0));if(v>0)nl[l.id]=v}});savePL({lines:nl,cats:undefined})};
+  const fillSec=sec=>{const nl={...cats};sec.lines.forEach(l=>{if(!(nl[l.id]>0)){const v=Math.max(plRound((base.avg[l.id]||0)-(base.rec[l.id]||0)+(fixedBy[l.id]||0)),Math.ceil(fixedBy[l.id]||0));if(v>0)nl[l.id]=v}});savePL({lines:nl,cats:undefined})};
   const lineRow=l=>{
-    const plan=cats[l.id]||0,sp=Math.round(spent[l.id]||0),left=plan-sp,pct=plan>0?sp/plan:0,col=sp>plan&&plan>0?c.co:pct>=.8?c.gd:c.mt,rd=recDue[l.id]||0,us=base.avg[l.id]||0,quiet=!plan&&!sp&&!us&&!rd;
+    const plan=cats[l.id]||0,sp=Math.round(spent[l.id]||0),left=plan-sp,pct=plan>0?sp/plan:0,col=sp>plan&&plan>0?c.co:pct>=.8?c.gd:c.mt,rd=recDue[l.id]||0,us=base.avg[l.id]||0,fx=fixedBy[l.id]||0,quiet=!plan&&!sp&&!us&&!rd&&!fx;
     return o("div",{key:l.id,style:{padding:quiet?"6px 0":"9px 0",borderBottom:`1px solid ${c.brs}`},children:[
       o("div",{className:"f ia jb",style:{gap:8},children:[t("span",{className:"tru",style:{fontSize:12.5,color:quiet?c.td:c.tx},children:l.label}),t(ASNum,{value:plan>0?plan:null,placeholder:us>0?String(Math.round(us)):"0",prefix:cur,width:92,onSave:n=>setCat(l.id,n)})]}),
       plan>0&&t("div",{style:{height:5,borderRadius:3,background:c.sf2,overflow:"hidden",marginTop:7},children:t("div",{style:{width:Math.min(100,pct*100)+"%",height:"100%",background:col,borderRadius:3}})}),
       !quiet&&o("div",{className:"f jb",style:{fontSize:10.5,color:c.tm,marginTop:4,gap:8},children:[t("span",{children:fm(sp,cur)+" spent"+(rd>0?" · "+fm(rd,cur)+" recurring due":"")}),t("span",{style:{color:plan>0?(left<0?c.co:c.td):c.tm},children:plan>0?(left>=0?fm(left,cur)+" left":fm(-left,cur)+" over"):(us>0?"usually "+fm(us,cur):"not planned")})]}),
-      rd>0&&plan>0&&plan<rd&&t("div",{style:{fontSize:10.5,color:c.gd,marginTop:3},children:"Plan is below what recurring expenses will add ("+fm(rd,cur)+")"})]});
+      fx>0&&plan>0&&plan<fx&&t("div",{style:{fontSize:10.5,color:c.gd,marginTop:3},children:"Plan is below its fixed items this month ("+fm(fx,cur)+")"})]});
   };
   const secBlock=sec=>{
     const gp=sec.lines.reduce((a,l)=>a+(cats[l.id]||0),0),cap=caps[sec.id]||0,overCap=cap>0&&gp>cap;
@@ -12321,11 +12377,32 @@ function BudgetPlanner({data,persist,cur,income,baseStart,onClose}){
       prevHas&&t("div",{key:"cn",style:{fontSize:10,color:c.tm,marginTop:6},children:"Only fills categories you haven't planned yet."})
     ],{marginTop:12}),
     warns.length>0&&lnCard([t("div",{key:"t",style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:8},children:"HEADS-UP"}),...warns.slice(0,4).map(w=>o("div",{key:w.cid,className:"f ia",style:{gap:8,padding:"4px 0"},children:[t("span",{style:{width:8,height:8,borderRadius:4,background:w.level==="over"?c.co:c.gd,flexShrink:0}}),t("span",{style:{fontSize:12.5,color:c.tx,lineHeight:1.4},children:planWarnText(w,cur)})]}))],{marginTop:12}),
+    (fixedTot>0||planned>0)&&lnCard([
+      o("div",{key:"h",className:"f ia jb",children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5},children:"FIXED vs FLEXIBLE"}),inc>0&&fixedTot>0&&t("span",{style:{fontSize:10.5,color:c.tm},children:Math.round(fixedTot/inc*100)+"% of income is fixed"})]}),
+      o("div",{key:"b",className:"f",style:{gap:8,marginTop:10},children:[tile("FIXED",fm(fixedTot,cur),fixedRec>0||fixedEmi>0?(fixedRec>0?"recurring "+fm(fixedRec,cur):"")+(fixedRec>0&&fixedEmi>0?" · ":"")+(fixedEmi>0?"EMIs "+fm(fixedEmi,cur):""):"nothing fixed",c.gd),tile("FLEXIBLE",fm(flexPlan,cur),"planned on top of fixed",c.tx)]}),
+      fixedTot+flexPlan>0&&o("div",{key:"p",style:{display:"flex",height:7,borderRadius:4,overflow:"hidden",background:c.sf2,marginTop:10},children:[t("div",{key:"f",style:{width:fixedTot/(fixedTot+flexPlan)*100+"%",background:c.gd}}),t("div",{key:"x",style:{flex:1,background:c.mt}})]}),
+      shortfall>0&&t("div",{key:"s",style:{fontSize:11,color:c.co,marginTop:8,lineHeight:1.45},children:"Some lines are planned below their fixed items, "+fm(shortfall,cur)+" short in total. Raise those lines so the fixed items are covered."})
+    ],{marginTop:12}),
+    lnCard([
+      o("div",{key:"h",className:"f ia jb",children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5},children:"🎯 SAVINGS GOALS"}),goalsMonthly>0&&t("span",{style:{fontSize:10.5,color:c.tm},children:fm(goalsMonthly,cur)+" a month"})]}),
+      goals.length===0&&!gf&&t("div",{key:"e",style:{fontSize:12,color:c.td,margin:"8px 0 4px",lineHeight:1.45},children:"Add a goal (a trip, an emergency fund…) and its monthly amount is set aside before you plan spending."}),
+      ...goals.map(g=>{const sv=g.saved||0,done=sv>=g.target,pct=Math.min(100,g.target>0?sv/g.target*100:0),put=goalDone[g.id]>0,mleft=g.monthly>0&&!done?Math.ceil((g.target-sv)/g.monthly):null;
+        return o("div",{key:g.id,style:{padding:"10px 0",borderTop:`1px solid ${c.brs}`,marginTop:8},children:[
+          o("div",{className:"f ia jb",style:{gap:8},children:[o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:13.5,color:c.tx},children:g.name}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:2},children:fm(sv,cur)+" of "+fm(g.target,cur)+(done?" · reached 🎉":mleft?" · about "+mleft+" month"+(mleft===1?"":"s")+" to go":"")})]}),t("button",{onClick:()=>delGoal(g.id),"aria-label":"Remove goal "+g.name,className:"act90 trt",style:{background:"transparent",border:"none",color:c.tm,fontSize:16},children:"×"})]}),
+          t("div",{style:{height:5,borderRadius:3,background:c.sf2,overflow:"hidden",marginTop:8},children:t("div",{style:{width:pct+"%",height:"100%",background:done?c.mt:c.ac,borderRadius:3}})}),
+          !done&&o("div",{className:"f ia jb",style:{marginTop:8,gap:8},children:[o("div",{className:"f ia",style:{gap:6},children:[t("span",{style:{fontSize:11,color:c.tm},children:"a month"}),t(ASNum,{value:g.monthly>0?g.monthly:null,placeholder:"0",prefix:cur,width:88,onSave:n=>setGoal(g.id,{monthly:n>0?n:0})})]}),put?o("div",{className:"f ia",style:{gap:10},children:[t("button",{onClick:()=>undoAside(g),className:"act95 trt","aria-label":"Undo put aside "+g.name,style:{background:"transparent",border:"none",color:c.tm,fontSize:11,textDecoration:"underline",padding:0},children:"Undo"}),t("span",{style:{fontSize:11.5,color:c.mt},children:"✓ "+fm(goalDone[g.id],cur)+" put aside"})]}):(g.monthly>0&&t("button",{onClick:()=>putAside(g),className:"act95 tr",style:{padding:"7px 14px",borderRadius:10,border:`1px solid ${c.ac}66`,background:c.ac+"1f",color:c.ac,fontSize:12.5,fontWeight:600},children:"Put "+fm(Math.min(g.monthly,g.target-sv),cur)+" aside"}))]})]})}),
+      gf?o("div",{key:"f",style:{marginTop:10},children:[
+        t("input",{value:gf.name,onChange:e=>sGf(v=>({...v,name:e.target.value})),placeholder:"Goal name, e.g. Emergency fund",style:{...lnInp(),marginBottom:8}}),
+        o("div",{className:"f",style:{gap:8},children:[t("input",{value:gf.target,inputMode:"decimal",onChange:e=>sGf(v=>({...v,target:e.target.value.replace(/[^\d.]/g,"")})),placeholder:"Target amount",style:{...lnInp(),flex:1,minWidth:0}}),t("input",{value:gf.monthly,inputMode:"decimal",onChange:e=>sGf(v=>({...v,monthly:e.target.value.replace(/[^\d.]/g,"")})),placeholder:"Per month",style:{...lnInp(),flex:1,minWidth:0}})]}),
+        o("div",{className:"f",style:{gap:8,marginTop:10},children:[lnBtn("Cancel",()=>sGf(null),false,{fontSize:13,padding:"10px 0"}),lnBtn("Add goal",addGoal,true,{fontSize:13,padding:"10px 0",opacity:gf.name.trim()&&parseFloat(gf.target)>0?1:.5})]})]})
+       :o("div",{key:"a",className:"f",style:{marginTop:10},children:[lnBtn("＋ Add a goal",()=>sGf({name:"",target:"",monthly:""}),false,{fontSize:13,padding:"10px 0"})]})
+    ],{marginTop:12}),
     lnCard([
       t("div",{key:"t",style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5},children:"✨ AI PLANNER"}),
       t("div",{key:"s",style:{fontSize:12,color:c.td,margin:"6px 0 12px",lineHeight:1.45},children:"Plans from the expenses you've logged, your recurring items and EMIs. You review everything before it is applied."}),
       o("div",{key:"b",className:"f",children:[lnBtn(busy==="suggest"?"Thinking…":"✨ Suggest my plan for "+new Date(from).toLocaleDateString("en-US",{month:"short"}),suggest,true,busy?{opacity:.6,pointerEvents:"none"}:null)]}),
       o("div",{key:"c",className:"f",style:{gap:8,marginTop:10},children:[t("input",{value:ask,onChange:e=>sAsk(e.target.value),onKeyDown:e=>{if(e.key==="Enter")send()},placeholder:"Ask AI: “cut lifestyle by 10%”",style:{...lnInp(),flex:1,minWidth:0}}),t("button",{onClick:send,disabled:!ask.trim()||!!busy,className:"act95 tr",style:{padding:"0 16px",borderRadius:10,border:`1px solid ${c.brs}`,background:"transparent",color:c.ac,fontSize:13,fontWeight:600,opacity:ask.trim()&&!busy?1:.5},children:busy==="chat"?"…":"Ask"})]}),
+      from<=now&&o("div",{key:"rv",className:"f",style:{marginTop:10},children:[lnBtn("📋 Month-end review · "+new Date(from).toLocaleDateString("en-US",{month:"short"}),openReview,false,{fontSize:13,padding:"11px 0"})]}),
       err&&t("div",{key:"e",style:{fontSize:11.5,color:c.co,marginTop:8,lineHeight:1.45},children:err}),
       chat&&o("div",{key:"r",style:{marginTop:12,background:c.sf2,borderRadius:12,padding:"11px 13px"},children:[
         t("div",{style:{fontSize:12.5,color:c.tx,lineHeight:1.5},children:chat.reply||"Done."}),
@@ -12336,11 +12413,34 @@ function BudgetPlanner({data,persist,cur,income,baseStart,onClose}){
     rec.length===0?t("div",{style:{fontSize:12.5,color:c.tm,lineHeight:1.5,padding:"2px 2px 6px"},children:"No recurring expenses fall in "+label+". Add them from Recurring and they will show up here with a Log button."}):o("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,padding:"2px 14px"},children:[
       dueNow.length>1&&o("div",{className:"f ia jb",style:{padding:"10px 0",borderBottom:`1px solid ${c.brs}`},children:[t("span",{style:{fontSize:12,color:c.td},children:dueNow.length+" due on or before today"}),t("button",{onClick:()=>logRows(dueNow),className:"act95 tr",style:{padding:"7px 14px",borderRadius:10,border:`1px solid ${c.ac}66`,background:c.ac+"1f",color:c.ac,fontSize:12.5,fontWeight:600},children:"Log all due"})]}),
       ...rec.map(recRow)]}),
+    emi.length>0&&secLabel("LOAN EMIs · "+emi.filter(e=>!e.paid).length+" TO PAY"),
+    emi.length>0&&o("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,padding:"2px 14px"},children:emi.map(e=>{const od=!e.paid&&e.due<today0;
+      return o("div",{key:e.id,className:"f ia jb",style:{padding:"10px 0",borderBottom:`1px solid ${c.brs}`,gap:10},children:[
+        o("div",{className:"f ia minw0",style:{gap:10},children:[t("span",{style:{fontSize:20,flexShrink:0},children:"🏦"}),o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:13.5,color:c.tx},children:e.L.lender||"Loan"}),o("div",{className:"f ia",style:{gap:6,marginTop:2,flexWrap:"wrap"},children:[t("span",{style:{fontSize:11,color:c.tm},children:"EMI "+e.n+"/"+e.total+" · "+plShort(e.due)}),od&&pill("Overdue",c.co)]})]})]}),
+        o("div",{className:"f ia",style:{gap:12,flexShrink:0},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:13.5,color:c.tx},children:fm(e.amount,cur)}),e.paid?t("span",{style:{fontSize:11.5,color:c.mt,minWidth:56,textAlign:"right"},children:"✓ Paid"}):(onOpenLoan?t("button",{onClick:()=>onOpenLoan(e.L),"aria-label":"Pay EMI for "+(e.L.lender||"loan"),className:"act95 tr",style:{padding:"7px 14px",borderRadius:10,border:"none",background:c.ac,color:"#0a0a0a",fontSize:13,fontWeight:600},children:"Pay ›"}):t("span",{style:{fontSize:11,color:c.tm},children:"Due"}))]})]})})}),
+    emi.length>0&&t("div",{style:{fontSize:10.5,color:c.tm,margin:"6px 2px 0",lineHeight:1.45},children:"Pay opens the loan so the payment is recorded properly (account, funding). Once paid it shows here."}),
     secLabel("PLAN BY BUDGET LINE"),
     ...secList.map(secBlock),
     t("div",{style:{fontSize:10.5,color:c.tm,marginTop:14,lineHeight:1.5},children:"Amounts are only a plan: change them any time and nothing you've logged is touched. “usually” is your average over the last "+(base.months||0)+" month"+(base.months===1?"":"s")+" with spending."})
   ]})});
-  return o(Fragment,{children:[createPortal(overlay,document.body),suggEl]});
+  const revEl=rev&&t(PlSheet,{onClose:()=>sRev(null),children:o(Fragment,{children:[
+    t("div",{style:{fontFamily:c.hf,fontSize:21,fontWeight:700,color:c.tx},children:"Review · "+label}),
+    o("div",{className:"f",style:{gap:8,margin:"12px 0 4px"},children:[tile("PLANNED",fm(planned,cur),"",c.tx),tile("SPENT",fm(spentAll,cur),"",spentAll>planned&&planned>0?c.co:c.mt),tile(spentAll<=planned?"UNDER":"OVER",fm(Math.abs(planned-spentAll),cur),"",spentAll<=planned?c.mt:c.co)]}),
+    ...rev.r.lines.map((x,i)=>t("div",{key:"l"+i,style:{fontSize:12.5,color:c.td,lineHeight:1.5,marginTop:6},children:"• "+x})),
+    rev.r.over.length>0&&t("div",{key:"o",style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,margin:"14px 0 4px"},children:"WENT OVER PLAN"}),
+    ...rev.r.over.map(r=>o("div",{key:"o"+r.id,className:"f jb",style:{fontSize:12.5,padding:"4px 0"},children:[t("span",{style:{color:c.tx},children:r.label}),t("span",{style:{fontFamily:'var(--nf)',color:c.co},children:"+"+fm(r.diff,cur)+" ("+fm(r.sp,cur)+" of "+fm(r.plan,cur)+")"})]})),
+    rev.r.under.length>0&&t("div",{key:"u",style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,margin:"14px 0 4px"},children:"CAME IN UNDER PLAN"}),
+    ...rev.r.under.map(r=>o("div",{key:"u"+r.id,className:"f jb",style:{fontSize:12.5,padding:"4px 0"},children:[t("span",{style:{color:c.tx},children:r.label}),t("span",{style:{fontFamily:'var(--nf)',color:c.mt},children:"−"+fm(-r.diff,cur)})]})),
+    rev.r.unplanned.length>0&&t("div",{key:"p",style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,margin:"14px 0 4px"},children:"NOT PLANNED"}),
+    ...rev.r.unplanned.slice(0,4).map(r=>o("div",{key:"p"+r.id,className:"f jb",style:{fontSize:12.5,padding:"4px 0"},children:[t("span",{style:{color:c.tx},children:r.label}),t("span",{style:{fontFamily:'var(--nf)',color:c.gd},children:fm(r.sp,cur)})]})),
+    rev.ai?o("div",{key:"ai",style:{marginTop:14,background:c.sf2,borderRadius:12,padding:"11px 13px"},children:[
+      t("div",{style:{fontSize:12.5,color:c.tx,lineHeight:1.5},children:"✨ "+(rev.ai.note||"Here is a plan for next month.")}),
+      ...Object.entries(rev.ai.cats).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([id,v])=>o("div",{key:"a"+id,className:"f jb",style:{fontSize:12,color:c.td,marginTop:5},children:[t("span",{children:nameOf(id)}),t("span",{style:{fontFamily:'var(--nf)'},children:fm(v,cur)})]})),
+      Object.keys(rev.ai.cats).length>0&&o("div",{className:"f",style:{marginTop:10},children:[lnBtn("Use as "+nName+" plan",applyNext,true,{fontSize:13,padding:"10px 0"})]})]})
+     :o("div",{key:"ab",className:"f",style:{marginTop:14},children:[lnBtn(busy==="review"?"Thinking…":"✨ Ask AI for advice & next month's plan",reviewAI,false,{fontSize:13,padding:"11px 0",...(busy?{opacity:.6,pointerEvents:"none"}:{})})]}),
+    err&&t("div",{key:"er",style:{fontSize:11.5,color:c.co,marginTop:8,lineHeight:1.45},children:err}),
+    o("div",{className:"f",style:{marginTop:14},children:[lnBtn("Close",()=>sRev(null))]})]})});
+  return o(Fragment,{children:[createPortal(overlay,document.body),suggEl,revEl]});
 }
 function BudgetCalculator({data,persist,cur,spendFlt,onView,mode="card",onClose}){
   const cals=data.calculators||{};
@@ -12643,7 +12743,7 @@ function BudgetCalculator({data,persist,cur,spendFlt,onView,mode="card",onClose}
     o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:13.5,color:c.tx},children:x.l.label}),sumTag(x.l)&&t("div",{style:{fontFamily:'var(--nf)',fontSize:9,letterSpacing:.5,color:x.l.id&&values[x.l.id]!=null?c.gd:c.mt,marginTop:2},children:sumTag(x.l).toUpperCase()})]}),
     o("div",{className:"f ia",style:{gap:8,flexShrink:0},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:14,color:c.tx},children:fm(x.v,cur)}),t("span",{style:{fontFamily:'var(--nf)',fontSize:10.5,color:c.tm,minWidth:40,textAlign:"right"},children:income>0?fp(x.v/income):""})]})]});
   const sumCard=(key,head,arr,empty)=>o("div",{key,style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,padding:"14px 16px",marginBottom:12},children:[head,...(arr.length?arr.map(sumRow):[t("div",{key:"e",style:{fontSize:12,color:c.tm,padding:"8px 0"},children:empty})])]});
-  const plannerEl=showPlanner&&t(BudgetPlanner,{data,persist,cur,income,baseStart:periodStart,onClose:()=>sShowPlanner(false)});
+  const plannerEl=showPlanner&&t(BudgetPlanner,{data,persist,cur,income,baseStart:periodStart,onClose:()=>sShowPlanner(false),onOpenLoan:onView?(L=>{sShowPlanner(false);_lnJump={id:L.id,tab:"details"};onView("loanTracker")}):null});
   const summaryEl=showSummary&&createPortal(t("div",{style:{position:"fixed",inset:0,zIndex:80,background:c.bg||"#0a0a0a",overflowY:"auto",WebkitOverflowScrolling:"touch",padding:"0 20px 60px"},children:o("div",{style:{maxWidth:640,margin:"0 auto"},children:[
     o("div",{className:"f ia jb",style:{position:"sticky",top:0,zIndex:2,background:c.bg||"#0a0a0a",padding:"calc(10px + max(env(safe-area-inset-top),var(--sat-fb,0px))) 0 10px",marginBottom:8,gap:8},children:[t("button",{onClick:()=>sShowSummary(false),"aria-label":"Close summary",className:"act95 trt",style:{height:38,padding:"0 14px",borderRadius:12,background:c.sf2,border:`1px solid ${c.brs}`,color:c.tx,fontSize:13,fontWeight:600},children:"✕ Close"}),t("div",{style:{fontFamily:c.hf,fontSize:20},children:t("em",{children:"Summary"})}),t("button",{onClick:printSummary,"aria-label":"Print or save as PDF",className:"act95 trt",style:{height:38,padding:"0 12px",borderRadius:12,background:c.sf2,border:`1px solid ${c.brs}`,color:c.tx,fontSize:12},children:"PDF"})]}),
     o("div",{className:"f ia jb",style:{marginBottom:12},children:[t("div",{style:{fontFamily:c.hf,fontSize:15,color:c.tx},children:monthLabel}),t("div",{style:{fontSize:11,color:c.tm},children:"Only lines with an amount"})]}),
