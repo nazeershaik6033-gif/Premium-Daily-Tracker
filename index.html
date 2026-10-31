@@ -12071,11 +12071,12 @@ function BudgetShell({mode,onOpen,onClose,cur,monthLabel,income,outTotal,leftout
 // === PLANNER (Monthly Budget → PLANNER) ===
 // Plan the month up front: recurring expenses due that month (Log / Skip), an amount per expense category, optional caps per budget group,
 // and AI help built on the logged history. Stored in data.calculators.planner (so it is in backups):
-//   {start:"YYYY-MM", skipped:{[recurringExpenseId]:true}, months:{"YYYY-MM":{cats:{categoryId:amount}, caps:{groupId:amount}}}}
+//   {start:"YYYY-MM", skipped:{[recurringExpenseId]:true}, months:{"YYYY-MM":{lines:{budgetLineId:amount}, caps:{sectionId:amount}}}}  (older saves had cats:{categoryId:amount}; they are folded into lines)
 // Recurring items keep adding themselves BEFORE `start`; from `start` on they only become expenses when you tap Log
 // (pr() stops at planCut). Logging uses the same expense id pr() used, so nothing can be added twice.
 const plData=d=>{const P=((d&&d.calculators)||{}).planner||{};return{start:P.start||PLAN_START_DEFAULT,months:P.months||{},skipped:P.skipped||{}}};
-const plMonthOf=(d,mk)=>{const m=plData(d).months[mk]||{};return{cats:m.cats||{},caps:m.caps||{}}};
+// The month's plan per BUDGET LINE (returned as `cats`, kept under that name so callers stay simple). Old per-category plans are summed into their lines.
+const plMonthOf=(d,mk)=>{const m=plData(d).months[mk]||{};let lines=m.lines;if(!lines&&m.cats)lines=plByLine(plBudMap(d),m.cats);return{cats:lines||{},caps:m.caps||{}}};
 const plRound=n=>n<=0?0:n<1000?Math.ceil(n/50)*50:Math.ceil(n/100)*100;
 const plFreq={daily:"Daily",weekly:"Weekly",biweekly:"Every 2 weeks",monthly:"Monthly",quarterly:"Quarterly",yearly:"Yearly"};
 const plShort=ts=>new Date(ts).toLocaleDateString("en-GB",{day:"numeric",month:"short"});
@@ -12083,10 +12084,10 @@ const plShort=ts=>new Date(ts).toLocaleDateString("en-GB",{day:"numeric",month:"
 function plSpend(exps,from,to){const m={};for(const e of exps||[]){if(e.type!=="expense"||e.archived||e.date<from||e.date>=to)continue;m[e.category]=(m[e.category]||0)+netAmt(e)}return m}
 // What each category usually costs: the average of the last `n` earlier periods that had any spending.
 function plBaseline(exps,from,n=3){
-  const sums=[];
-  for(let k=1;k<=n+3&&sums.length<n;k++){const a=new Date(from),b=new Date(from);a.setMonth(a.getMonth()-k);b.setMonth(b.getMonth()-k+1);const s=plSpend(exps,a.getTime(),b.getTime());if(Object.keys(s).length)sums.push(s)}
-  const avg={};for(const k of new Set(sums.flatMap(s=>Object.keys(s))))avg[k]=Math.round(sums.reduce((a,s)=>a+(s[k]||0),0)/sums.length);
-  return{avg,months:sums.length};
+  const sums=[],recs=[],rx=(exps||[]).filter(e=>e.source==="recurring");
+  for(let k=1;k<=n+3&&sums.length<n;k++){const a=new Date(from),b=new Date(from);a.setMonth(a.getMonth()-k);b.setMonth(b.getMonth()-k+1);const s=plSpend(exps,a.getTime(),b.getTime());if(Object.keys(s).length){sums.push(s);recs.push(plSpend(rx,a.getTime(),b.getTime()))}}
+  const mean=arr=>{const o2={};for(const k of new Set(arr.flatMap(x=>Object.keys(x))))o2[k]=Math.round(arr.reduce((a,x)=>a+(x[k]||0),0)/(arr.length||1));return o2};
+  return{avg:mean(sums),rec:mean(recs),months:sums.length};  // rec = the part of the average that came from recurring expenses
 }
 // Income logged in a period, and the usual income (average of the last `n` earlier periods that had any).
 function plIncomeSum(exps,from,to){let s=0;for(const e of exps||[]){if(e.type==="income"&&!e.archived&&e.date>=from&&e.date<to)s+=e.amount||0}return Math.round(s)}
@@ -12122,42 +12123,45 @@ function plAdvance(recs,exps,skipped,cut){
     return nx&&nx!==r.nextDate?{...r,nextDate:nx}:r;
   });
 }
-// Category → budget group, using the same links / suggestions as the Monthly Budget screen.
-function plSecMap(data){
-  const B=(data.calculators||{}).budget||{},links=B.links||{},groups=budLineGroups(data),cust=Object.fromEntries(((B.lineConfig||{}).customSections||[]).map(s=>[s.id,s]));
-  const secs=groups.expense.map((s,i)=>{const def=BUD_SECTIONS.find(x=>x.id===s.id);return{id:s.id,label:s.label,emoji:s.emoji,color:(def&&def.color)||(cust[s.id]&&cust[s.id].color)||BUD_SECTION_PALETTE[i%BUD_SECTION_PALETTE.length]}});
-  const lineSec={};groups.expense.forEach(s=>s.lines.forEach(l=>{lineSec[l.id]=s.id}));
-  const secOf={};
-  for(const[lid,cids]of Object.entries(links)){const sid=lineSec[lid];if(sid)for(const cid of cids||[])if(!secOf[cid])secOf[cid]=sid}
-  for(const cat of ceAll()){if(!secOf[cat.id]){const lid=budSuggestLine(cat,"expense",groups);if(lid&&lineSec[lid])secOf[cat.id]=lineSec[lid]}}
-  return{secs,secOf};
+// The Monthly Budget's own structure: sections (Essential, Lifestyle…) with their % limit, each holding lines (Groceries, Transportation…).
+// A category belongs to the line it is linked to there (or the best match); anything else goes to "__other".
+function plBudMap(data){
+  const B=(data.calculators||{}).budget||{},links=B.links||{},groups=budLineGroups(data),cust=Object.fromEntries((((B.lineConfig||{}).customSections)||[]).map(x=>[x.id,x]));
+  const secs=groups.expense.map((sc,i)=>{const def=BUD_SECTIONS.find(x=>x.id===sc.id),cs=cust[sc.id];return{id:sc.id,label:sc.label,emoji:sc.emoji,color:(def&&def.color)||(cs&&cs.color)||BUD_SECTION_PALETTE[i%BUD_SECTION_PALETTE.length],thresh:def?def.thresh:(cs&&cs.thresh!=null?cs.thresh:.2),neutral:sc.id==="invest",lines:sc.lines}});
+  const lineSec={},lineLabel={__other:"Other"};secs.forEach(sc=>sc.lines.forEach(l=>{lineSec[l.id]=sc.id;lineLabel[l.id]=l.label}));
+  const lineOf={};
+  for(const[lid,cids]of Object.entries(links)){if(lineSec[lid])for(const cid of cids||[])if(!lineOf[cid])lineOf[cid]=lid}
+  for(const cat of ceAll()){if(!lineOf[cat.id]){const lid=budSuggestLine(cat,"expense",groups);if(lid&&lineSec[lid])lineOf[cat.id]=lid}}
+  return{secs,lineSec,lineLabel,lineOf};
 }
+const plLineKey=(bm,cid)=>bm.lineOf[cid]||"__other";
+function plByLine(bm,byCat){const o2={};for(const[k,v]of Object.entries(byCat||{})){const l=plLineKey(bm,k);o2[l]=(o2[l]||0)+(Number(v)||0)}return o2}
 const planRecLabel=x=>(x.r&&(x.r.merchant||x.r.payee||x.r.note))||(x.e&&(x.e.merchant||x.e.payee||x.e.note))||((co((x.r&&x.r.category)||(x.e&&x.e.category))||{}).label)||"Recurring";
-// Categories running ahead of plan this period ("ahead" = ≥80% used and faster than the days gone by; "over" = past the plan).
+// Budget lines running ahead of plan this period ("ahead" = ≥80% used and faster than the days gone by; "over" = past the plan).
 function planWarnings(data,now=Date.now()){
   const{from,to}=(()=>{const f=ps(new Date(now),data.monthStartDay||1),d=new Date(f);d.setMonth(d.getMonth()+1);return{from:f,to:d.getTime()}})();
   if(from<planCut(data))return[];
-  const{cats}=plMonthOf(data,plKey(from)),spent=plSpend(data.expenses,from,to),frac=Math.min(1,Math.max(.03,(now-from)/(to-from))),daysLeft=Math.max(0,Math.ceil((to-now)/864e5)),out=[];
+  const bm=plBudMap(data),{cats}=plMonthOf(data,plKey(from)),spent=plByLine(bm,plSpend(data.expenses,from,to)),frac=Math.min(1,Math.max(.03,(now-from)/(to-from))),daysLeft=Math.max(0,Math.ceil((to-now)/864e5)),out=[];
   for(const[cid,plan]of Object.entries(cats)){
     if(!(plan>0))continue;
-    const s=Math.round(spent[cid]||0),pct=s/plan;
-    if(s>plan)out.push({cid,spent:s,plan,pct,level:"over",daysLeft});
-    else if(pct>=.8&&pct>frac+.15)out.push({cid,spent:s,plan,pct,level:"ahead",daysLeft});
+    const s=Math.round(spent[cid]||0),pct=s/plan,label=bm.lineLabel[cid]||"Other";
+    if(s>plan)out.push({cid,label,spent:s,plan,pct,level:"over",daysLeft});
+    else if(pct>=.8&&pct>frac+.15)out.push({cid,label,spent:s,plan,pct,level:"ahead",daysLeft});
   }
   return out.sort((a,b)=>b.pct-a.pct);
 }
-const planWarnText=(w,cur)=>{const cc=co(w.cid),nm=cc?cc.label:w.cid;return w.level==="over"?`${nm} is over plan by ${fm(w.spent-w.plan,cur)}.`:`${nm} is at ${Math.round(w.pct*100)}% of plan with ${w.daysLeft} day${w.daysLeft===1?"":"s"} left.`};
+const planWarnText=(w,cur)=>{const nm=w.label||w.cid;return w.level==="over"?`${nm} is over plan by ${fm(w.spent-w.plan,cur)}.`:`${nm} is at ${Math.round(w.pct*100)}% of plan with ${w.daysLeft} day${w.daysLeft===1?"":"s"} left.`};
 // ---- AI ----
 function plContext(data,from,to,income,savePct){
-  const{avg,months}=plBaseline(data.expenses,from),{cats,caps}=plMonthOf(data,plKey(from)),spent=plSpend(data.expenses,from,to),{secs,secOf}=plSecMap(data);
+  const base0=plBaseline(data.expenses,from),bm=plBudMap(data),avg=plByLine(bm,base0.avg),recH=plByLine(bm,base0.rec),months=base0.months,{cats,caps}=plMonthOf(data,plKey(from)),spent=plByLine(bm,plSpend(data.expenses,from,to));
   const rec=plRecMonth(data,from,to,planCut(data)).filter(x=>x.state!=="skipped"),recBy={};
-  rec.forEach(x=>{const k=(x.r&&x.r.category)||(x.e&&x.e.category);if(k)recBy[k]=(recBy[k]||0)+(x.amount||0)});
+  rec.forEach(x=>{const k=(x.r&&x.r.category)||(x.e&&x.e.category);if(k){const l=plLineKey(bm,k);recBy[l]=(recBy[l]||0)+(x.amount||0)}});
   const ids=new Set([...Object.keys(avg),...Object.keys(cats),...Object.keys(recBy),...Object.keys(spent)]);
-  const categories=[...ids].map(id=>{const cc=co(id);return{id,label:cc?cc.label:id,group:secOf[id]||"other",avgPerMonth:avg[id]||0,spentSoFar:Math.round(spent[id]||0),recurringThisMonth:Math.round(recBy[id]||0),plan:cats[id]||0}}).sort((a,b)=>b.avgPerMonth-a.avgPerMonth).slice(0,45);
-  return{currency:data.currency,month:new Date(from).toLocaleDateString("en-US",{month:"long",year:"numeric"}),monthlyIncome:Math.round(income||0)||null,savingsTargetPercent:savePct>0?savePct:null,historyMonthsUsed:months,groups:secs.map(s=>({id:s.id,label:s.label,cap:caps[s.id]||null})),categories,recurring:rec.map(x=>({what:planRecLabel(x),category:(x.r&&x.r.category)||null,amount:x.amount,date:new Date(x.ts).toISOString().slice(0,10),state:x.state}))};
+  const categories=[...ids].map(id=>({id,label:bm.lineLabel[id]||"Other",group:bm.lineSec[id]||"other",avgPerMonth:Math.round(avg[id]||0),recurringInThatAverage:Math.round(recH[id]||0),spentSoFar:Math.round(spent[id]||0),recurringThisMonth:Math.round(recBy[id]||0),plan:cats[id]||0})).sort((a,b)=>b.avgPerMonth-a.avgPerMonth).slice(0,45);
+  return{currency:data.currency,month:new Date(from).toLocaleDateString("en-US",{month:"long",year:"numeric"}),monthlyIncome:Math.round(income||0)||null,savingsTargetPercent:savePct>0?savePct:null,historyMonthsUsed:months,groups:bm.secs.map(sc=>({id:sc.id,label:sc.label,limitPercentOfIncome:sc.thresh!=null?Math.round(sc.thresh*100):null,cap:caps[sc.id]||null})),categories,recurring:rec.map(x=>({what:planRecLabel(x),line:bm.lineLabel[plLineKey(bm,(x.r&&x.r.category)||(x.e&&x.e.category))]||"Other",amount:x.amount,date:new Date(x.ts).toISOString().slice(0,10),state:x.state}))};
 }
 function plLocalSuggest(ctx){
-  const cats={};for(const r of ctx.categories){const v=Math.max(plRound(r.avgPerMonth),Math.ceil(r.recurringThisMonth||0));if(v>0)cats[r.id]=v}
+  const cats={};for(const r of ctx.categories){const v=Math.max(plRound(r.avgPerMonth-(r.recurringInThatAverage||0)+(r.recurringThisMonth||0)),Math.ceil(r.recurringThisMonth||0));if(v>0)cats[r.id]=v}
   return{cats,caps:{},ai:false,note:ctx.historyMonthsUsed?`Based on your usual spending over the last ${ctx.historyMonthsUsed} month${ctx.historyMonthsUsed===1?"":"s"}, and never below what is due from recurring expenses. Add an AI key in Settings for smarter suggestions.`:"There are no earlier months to learn from yet, so only your recurring expenses are filled in."};
 }
 function plParseJSON(txt){
@@ -12174,7 +12178,7 @@ function plClean(o2,ctx){
   return{cats,caps};
 }
 async function plAISuggest(ctx){
-  const sys="You plan a household's monthly spending from their real history. Reply with ONLY one JSON object and no other text: {\"cats\":{\"<categoryId>\":<whole number>},\"caps\":{\"<groupId>\":<whole number>},\"note\":\"<2-3 plain sentences: what you based it on and what you trimmed or kept>\"}. Rules: use only the category ids and group ids given; every amount is a whole number in the given currency; a category's plan is never below its recurringThisMonth; base each plan on avgPerMonth (and spentSoFar if the month has started), trim discretionary categories only gently (at most about 10-15 percent) and never invent spending; leave out categories that have no history and no recurring item; if monthlyIncome is given keep the total at or below monthlyIncome minus the savings target (savingsTargetPercent of income when given, otherwise about 10 percent); caps are optional and must be at least the total of that group's plans.";
+  const sys="You plan a household's monthly spending from their real history. Reply with ONLY one JSON object and no other text: {\"cats\":{\"<categoryId>\":<whole number>},\"caps\":{\"<groupId>\":<whole number>},\"note\":\"<2-3 plain sentences: what you based it on and what you trimmed or kept>\"}. Rules: each entry of \"categories\" is one budget line of the household's monthly budget (for example groceries or rent) and \"groups\" are its sections with a limit as a percent of income; use only the ids given, with the line ids as keys of \"cats\"; every amount is a whole number in the given currency; a line's plan is never below its recurringThisMonth; keep each group's total within its limitPercentOfIncome when monthlyIncome is known; base each plan on avgPerMonth minus recurringInThatAverage plus recurringThisMonth (and spentSoFar if the month has started), trim discretionary categories only gently (at most about 10-15 percent) and never invent spending; leave out categories that have no history and no recurring item; if monthlyIncome is given keep the total at or below monthlyIncome minus the savings target (savingsTargetPercent of income when given, otherwise about 10 percent); caps are optional and must be at least the total of that group's plans.";
   const r=await cAPI({system:sys,max_tokens:1500,messages:[{role:"user",content:"Plan this month:\n"+JSON.stringify(ctx)}]});
   const j=plParseJSON((r.content&&r.content[0]&&r.content[0].text)||"");
   return{...plClean(j,ctx),ai:true,note:String(j.note||"").slice(0,500)};
@@ -12194,14 +12198,14 @@ function BudgetPlanner({data,persist,cur,income,baseStart,onClose}){
   const from=useMemo(()=>{const d=new Date(baseStart);d.setMonth(d.getMonth()+off);return d.getTime()},[baseStart,off]);
   const to=useMemo(()=>{const d=new Date(from);d.setMonth(d.getMonth()+1);return d.getTime()},[from]);
   const mk=plKey(from),label=new Date(from).toLocaleDateString("en-US",{month:"long",year:"numeric"}),cut=planCut(data),active=from>=cut;
-  const cals=data.calculators||{},PL=cals.planner||{},P=plData(data),mo=P.months[mk]||{},cats=mo.cats||{},caps=mo.caps||{};
+  const cals=data.calculators||{},PL=cals.planner||{},P=plData(data),mo=P.months[mk]||{},{cats,caps}=plMonthOf(data,mk);
   const now=Date.now(),isCur=now>=from&&now<to,today0=new Date(now).setHours(0,0,0,0),endToday=today0+86399999;
   const[sugg,sSugg]=useState(null),[busy,sBusy]=useState(""),[err,sErr]=useState(""),[chat,sChat]=useState(null),[ask,sAsk]=useState(""),[extra,sExtra]=useState([]);
   useEffect(()=>{sExtra([]);sSugg(null);sChat(null);sErr("")},[mk]);
   useEffect(()=>{const k=e=>{if(e.key==="Escape")onClose()};window.addEventListener("keydown",k);return()=>window.removeEventListener("keydown",k)},[onClose]);
-  const exps=data.expenses||[],spent=plSpend(exps,from,to),base=plBaseline(exps,from),rec=plRecMonth(data,from,to,cut),sm=plSecMap(data);
+  const exps=data.expenses||[],bm=plBudMap(data),spent=plByLine(bm,plSpend(exps,from,to)),base0=plBaseline(exps,from),base={avg:plByLine(bm,base0.avg),rec:plByLine(bm,base0.rec),months:base0.months},rec=plRecMonth(data,from,to,cut);
   const savePL=patch=>persist({calculators:{...cals,planner:{...PL,start:PL.start||PLAN_START_DEFAULT,months:{...P.months,[mk]:{...mo,...patch}}}}});
-  const setCat=(cid,n)=>{const nc={...cats};if(n==null||!(n>0))delete nc[cid];else nc[cid]=n;savePL({cats:nc})};
+  const setCat=(lid,n)=>{const nc={...cats};if(n==null||!(n>0))delete nc[lid];else nc[lid]=n;savePL({lines:nc,cats:undefined})};
   const setCap=(sid,n)=>{const nc={...caps};if(n==null||!(n>0))delete nc[sid];else nc[sid]=n;savePL({caps:nc})};
   // ---- recurring: log / skip / undo ----
   const nextBack=(recs,row)=>(recs||[]).map(r=>r.id===(row.r&&row.r.id)&&r.nextDate&&row.ts<r.nextDate&&row.ts>=cut?{...r,nextDate:row.ts}:r);
@@ -12219,22 +12223,18 @@ function BudgetPlanner({data,persist,cur,income,baseStart,onClose}){
   // ---- totals ----
   const planned=Object.values(cats).reduce((a,v)=>a+(Number(v)||0),0),spentAll=Object.values(spent).reduce((a,v)=>a+v,0);
   const dueRows=rec.filter(x=>x.state==="due"&&!x.auto),dueNow=dueRows.filter(x=>x.ts<=endToday),toLog=dueRows.reduce((a,x)=>a+(x.amount||0),0);
-  const recDue={};dueRows.forEach(x=>{const k=x.r&&x.r.category;if(k)recDue[k]=(recDue[k]||0)+(x.amount||0)});
+  const recDue={};dueRows.forEach(x=>{const k=x.r&&x.r.category;if(k){const lk=plLineKey(bm,k);recDue[lk]=(recDue[lk]||0)+(x.amount||0)}});
   const warns=isCur&&active?planWarnings(data,now):[];
   // ---- income & what is left ----
   const incHist=plIncomeAvg(exps,from),incNow=plIncomeSum(exps,from,to),incAuto=off===0&&income>0?income:incHist.avg,incSet=mo.income>0,inc=incSet?mo.income:incAuto;
   const incNote=incSet?"Set by you":(off===0&&income>0?"From your Monthly Budget":incHist.months?"Average of your last "+incHist.months+" month"+(incHist.months===1?"":"s"):"Not set yet");
   const savePct=mo.savePct>0?mo.savePct:0,saveAmt=Math.round(inc*savePct/100),leftAlloc=inc-saveAmt-planned,usable=inc-saveAmt;
-  const pf=new Date(from);pf.setMonth(pf.getMonth()-1);const prevMo=P.months[plKey(pf.getTime())]||{},prevHas=Object.keys(prevMo.cats||{}).length>0,prevName=pf.toLocaleDateString("en-US",{month:"short"});
-  // ---- category rows grouped by budget group ----
-  const groups=[...sm.secs.map(s=>({...s,items:[]})),{id:"other",label:"Other categories",emoji:"📌",color:c.td,items:[]}],gi=new Map(groups.map(g=>[g.id,g])),allCats=ceAll(),shownIds=new Set();
-  for(const cat of allCats){
-    const rel=(cats[cat.id]>0)||(spent[cat.id]>0)||(base.avg[cat.id]>0)||(recDue[cat.id]>0)||extra.includes(cat.id);
-    if(!rel)continue;shownIds.add(cat.id);(gi.get(sm.secOf[cat.id])||gi.get("other")).items.push(cat);
-  }
-  const hidden=allCats.filter(x=>!shownIds.has(x.id));
+  const pf=new Date(from);pf.setMonth(pf.getMonth()-1);const prevPlan=plMonthOf(data,plKey(pf.getTime())),prevHas=Object.keys(prevPlan.cats).length>0,prevName=pf.toLocaleDateString("en-US",{month:"short"});
+  // ---- budget lines under their sections, like the Monthly Budget ----
+  const otherKey="__other",otherUsed=(cats[otherKey]>0)||(spent[otherKey]>0)||(base.avg[otherKey]>0)||(recDue[otherKey]>0);
+  const secList=[...bm.secs,...(otherUsed?[{id:"other",label:"Other",emoji:"📌",color:c.td,thresh:null,neutral:true,lines:[{id:otherKey,label:"Other (not in a budget line)"}]}]:[])].filter(sc=>sc.lines.length);
   // ---- AI ----
-  const nameOf=id=>{const cc=co(id);return cc?cc.emoji+" "+cc.label:id};
+  const nameOf=id=>bm.lineLabel[id]||"Other";
   const noKey=()=>{sErr("Add your AI key in Settings to use this. A plan from your own history still works.")};
   const suggest=async()=>{
     sBusy("suggest");sErr("");
@@ -12252,8 +12252,8 @@ function BudgetPlanner({data,persist,cur,income,baseStart,onClose}){
     catch(e){sErr(e&&e.code==="NO_API_KEY"?"Add your AI key in Settings to use this.":"AI could not answer: "+((e&&e.message)||e))}
     finally{sBusy("")}
   };
-  const applyChat=()=>{savePL({cats:{...cats,...chat.cats},caps:{...caps,...chat.caps}});sChat(null);sAsk("")};
-  const applySugg=()=>{savePL({cats:{...cats,...sugg.cats},caps:{...caps,...sugg.caps}});sSugg(null)};
+  const applyChat=()=>{savePL({lines:{...cats,...chat.cats},cats:undefined,caps:{...caps,...chat.caps}});sChat(null);sAsk("")};
+  const applySugg=()=>{savePL({lines:{...cats,...sugg.cats},cats:undefined,caps:{...caps,...sugg.caps}});sSugg(null)};
   // ---- UI pieces ----
   const tile=(k,v,sub,col)=>o("div",{key:k,style:{flex:1,minWidth:0,background:c.sf2,borderRadius:10,padding:"9px 11px"},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:8.5,color:c.tm,letterSpacing:.8},children:k}),t("div",{className:"tru",style:{fontFamily:'var(--nf)',fontSize:14,color:col,marginTop:3},children:v}),t("div",{className:"tru",style:{fontSize:10,color:c.tm,marginTop:1},children:sub})]});
   const secLabel=x=>t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,margin:"18px 2px 8px"},children:x});
@@ -12268,23 +12268,29 @@ function BudgetPlanner({data,persist,cur,income,baseStart,onClose}){
       o("div",{className:"f ia minw0",style:{gap:10},children:[t("span",{style:{fontSize:20,flexShrink:0},children:cc?cc.emoji:"🔁"}),o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:13.5,color:c.tx},children:planRecLabel(x)}),o("div",{className:"f ia",style:{gap:6,marginTop:2,flexWrap:"wrap"},children:[t("span",{style:{fontSize:11,color:c.tm},children:plShort(x.ts)+(x.r?" · "+(plFreq[x.r.frequency]||""):"")}),overdue&&pill("Overdue",c.co)]})]})]}),
       o("div",{className:"f ia",style:{gap:12,flexShrink:0},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:13.5,color:c.tx},children:fm(x.amount,cur)}),right]})]});
   };
-  const catRow=cat=>{
-    const plan=cats[cat.id]||0,sp=Math.round(spent[cat.id]||0),left=plan-sp,pct=plan>0?sp/plan:0,col=sp>plan&&plan>0?c.co:pct>=.8?c.gd:c.mt,rd=recDue[cat.id]||0;
-    return o("div",{key:cat.id,style:{padding:"9px 0",borderBottom:`1px solid ${c.brs}`},children:[
-      o("div",{className:"f ia jb",style:{gap:8},children:[o("div",{className:"f ia minw0",style:{gap:8},children:[t("span",{style:{fontSize:17},children:cat.emoji}),t("span",{className:"tru",style:{fontSize:13,color:c.tx},children:cat.label})]}),t(ASNum,{value:plan>0?plan:null,placeholder:base.avg[cat.id]>0?String(base.avg[cat.id]):"0",prefix:cur,width:92,onSave:n=>setCat(cat.id,n)})]}),
+  const fillSec=sec=>{const nl={...cats};sec.lines.forEach(l=>{if(!(nl[l.id]>0)){const v=Math.max(plRound((base.avg[l.id]||0)-(base.rec[l.id]||0)+(recDue[l.id]||0)),Math.ceil(recDue[l.id]||0));if(v>0)nl[l.id]=v}});savePL({lines:nl,cats:undefined})};
+  const lineRow=l=>{
+    const plan=cats[l.id]||0,sp=Math.round(spent[l.id]||0),left=plan-sp,pct=plan>0?sp/plan:0,col=sp>plan&&plan>0?c.co:pct>=.8?c.gd:c.mt,rd=recDue[l.id]||0,us=base.avg[l.id]||0,quiet=!plan&&!sp&&!us&&!rd;
+    return o("div",{key:l.id,style:{padding:quiet?"6px 0":"9px 0",borderBottom:`1px solid ${c.brs}`},children:[
+      o("div",{className:"f ia jb",style:{gap:8},children:[t("span",{className:"tru",style:{fontSize:12.5,color:quiet?c.td:c.tx},children:l.label}),t(ASNum,{value:plan>0?plan:null,placeholder:us>0?String(Math.round(us)):"0",prefix:cur,width:92,onSave:n=>setCat(l.id,n)})]}),
       plan>0&&t("div",{style:{height:5,borderRadius:3,background:c.sf2,overflow:"hidden",marginTop:7},children:t("div",{style:{width:Math.min(100,pct*100)+"%",height:"100%",background:col,borderRadius:3}})}),
-      o("div",{className:"f jb",style:{fontSize:10.5,color:c.tm,marginTop:4,gap:8},children:[t("span",{children:fm(sp,cur)+" spent"+(rd>0?" · "+fm(rd,cur)+" recurring due":"")}),t("span",{style:{color:plan>0?(left<0?c.co:c.td):c.tm},children:plan>0?(left>=0?fm(left,cur)+" left":fm(-left,cur)+" over"):(base.avg[cat.id]>0?"usually "+fm(base.avg[cat.id],cur):"not planned")})]}),
-      rd>0&&plan>0&&plan<rd+0&&t("div",{style:{fontSize:10.5,color:c.gd,marginTop:3},children:"Plan is below what recurring expenses will add ("+fm(rd,cur)+")"})]});
+      !quiet&&o("div",{className:"f jb",style:{fontSize:10.5,color:c.tm,marginTop:4,gap:8},children:[t("span",{children:fm(sp,cur)+" spent"+(rd>0?" · "+fm(rd,cur)+" recurring due":"")}),t("span",{style:{color:plan>0?(left<0?c.co:c.td):c.tm},children:plan>0?(left>=0?fm(left,cur)+" left":fm(-left,cur)+" over"):(us>0?"usually "+fm(us,cur):"not planned")})]}),
+      rd>0&&plan>0&&plan<rd&&t("div",{style:{fontSize:10.5,color:c.gd,marginTop:3},children:"Plan is below what recurring expenses will add ("+fm(rd,cur)+")"})]});
   };
-  const groupBlock=g=>{
-    if(!g.items.length)return null;
-    const gp=g.items.reduce((a,x)=>a+(cats[x.id]||0),0),cap=caps[g.id]||0,over=cap>0&&gp>cap;
-    return o("div",{key:g.id,style:{marginTop:14},children:[
-      o("div",{className:"f ia jb",style:{marginBottom:2,gap:8},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:10,letterSpacing:1,color:g.color},children:g.emoji+" "+g.label.toUpperCase()}),o("div",{className:"f ia",style:{gap:8},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:12.5,fontWeight:700,color:over?c.co:c.tx},children:fm(gp,cur)}),g.id!=="other"&&o("div",{className:"f ia",style:{gap:4},children:[t("span",{style:{fontSize:9.5,color:c.tm},children:"cap"}),t(ASNum,{value:cap>0?cap:null,placeholder:"none",prefix:"",width:74,onSave:n=>setCap(g.id,n)})]})]})]}),
-      over&&t("div",{style:{fontSize:10.5,color:c.co,marginBottom:2},children:"Plans in this group add up to "+fm(gp-cap,cur)+" more than its cap"}),
-      ...g.items.map(catRow)]});
+  const secBlock=sec=>{
+    const gp=sec.lines.reduce((a,l)=>a+(cats[l.id]||0),0),cap=caps[sec.id]||0,overCap=cap>0&&gp>cap;
+    const pctN=sec.thresh!=null?Math.round(sec.thresh*100):null,lim=inc>0&&pctN!=null?Math.round(inc*sec.thresh):0,ok=sec.neutral?gp>=lim:gp<=lim;
+    const msg=pctN==null||!(inc>0)?"":gp>0?(sec.neutral?(ok?"Meets the "+pctN+"% aim ("+fm(lim,cur)+")":"Below the "+pctN+"% aim by "+fm(lim-gp,cur)):(ok?"Within the "+pctN+"% limit ("+fm(lim,cur)+")":"Over the "+pctN+"% limit by "+fm(gp-lim,cur))):(sec.neutral?"Aim for "+pctN+"% = ":"Limit "+pctN+"% = ")+fm(lim,cur);
+    const col=gp>0&&inc>0&&pctN!=null?(ok?c.mt:sec.neutral?c.gd:c.co):c.td;
+    return o("div",{key:sec.id,style:{marginTop:12,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,padding:"12px 14px"},children:[
+      o("div",{className:"f ia jb",style:{gap:8},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:10,letterSpacing:1,color:sec.color},children:sec.emoji+" "+sec.label.toUpperCase()}),o("div",{className:"f ia",style:{gap:8},children:[inc>0&&gp>0&&t("span",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm},children:(Math.round(gp/inc*1000)/10)+"%"}),t("span",{style:{fontFamily:'var(--nf)',fontSize:14,fontWeight:700,color:c.tx},children:fm(gp,cur)})]})]}),
+      msg&&t("div",{style:{fontSize:11,color:col,marginTop:4},children:msg}),
+      inc>0&&pctN!=null&&lim>0&&o("div",{style:{position:"relative",height:6,borderRadius:3,background:c.sf2,margin:"8px 0 2px"},children:[t("div",{key:"b",style:{width:Math.min(100,gp/(lim*2)*100)+"%",height:"100%",borderRadius:3,background:col==="c.td"?c.td:col}}),t("div",{key:"k",style:{position:"absolute",left:"50%",top:-2,width:2,height:10,background:c.tm,borderRadius:1}})]}),
+      o("div",{className:"f ia jb",style:{marginTop:8},children:[t("button",{onClick:()=>fillSec(sec),className:"act95 trt",style:{background:"transparent",border:"none",color:c.ac,fontSize:11.5,padding:0},children:"✨ Fill from history"}),sec.id!=="other"&&o("div",{className:"f ia",style:{gap:4},children:[t("span",{style:{fontSize:10,color:c.tm},children:"cap"}),t(ASNum,{value:cap>0?cap:null,placeholder:"none",prefix:"",width:74,onSave:n=>setCap(sec.id,n)})]})]}),
+      overCap&&t("div",{style:{fontSize:10.5,color:c.co,marginTop:4},children:"Lines in this section add up to "+fm(gp-cap,cur)+" more than its cap"}),
+      ...sec.lines.map(lineRow)]});
   };
-  const chgList=(o2,from2)=>[...Object.entries(o2.cats||{}).map(([id,v])=>({k:"c"+id,l:nameOf(id),a:from2.cats[id]||0,b:v})),...Object.entries(o2.caps||{}).map(([id,v])=>({k:"g"+id,l:"Cap · "+((sm.secs.find(s=>s.id===id)||{}).label||id),a:from2.caps[id]||0,b:v}))];
+  const chgList=(o2,from2)=>[...Object.entries(o2.cats||{}).map(([id,v])=>({k:"c"+id,l:nameOf(id),a:from2.cats[id]||0,b:v})),...Object.entries(o2.caps||{}).map(([id,v])=>({k:"g"+id,l:"Cap · "+((bm.secs.find(sc=>sc.id===id)||{}).label||id),a:from2.caps[id]||0,b:v}))];
   const suggEl=sugg&&t(PlSheet,{onClose:()=>sSugg(null),children:o(Fragment,{children:[
     t("div",{style:{fontFamily:c.hf,fontSize:21,fontWeight:700,color:c.tx},children:"Suggested plan · "+label}),
     t("div",{style:{fontSize:12,color:c.td,margin:"4px 0 10px",lineHeight:1.45},children:(sugg.ai?"✨ ":"")+(sugg.note||"")}),
@@ -12292,7 +12298,7 @@ function BudgetPlanner({data,persist,cur,income,baseStart,onClose}){
     ...Object.entries(sugg.cats).sort((a,b)=>b[1]-a[1]).map(([cid,v])=>o("div",{key:cid,className:"f ia jb",style:{padding:"7px 0",borderBottom:`1px solid ${c.brs}`,gap:8},children:[
       o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:13,color:c.tx},children:nameOf(cid)}),t("div",{style:{fontSize:10.5,color:c.tm},children:(cats[cid]>0?"Now "+fm(cats[cid],cur)+" · ":"")+(base.avg[cid]>0?"usually "+fm(base.avg[cid],cur):"no history")})]}),
       t(ASNum,{value:v,prefix:cur,width:92,onSave:n=>sSugg(s=>{const nc={...s.cats};if(n>0)nc[cid]=n;else delete nc[cid];return{...s,cats:nc}})})]})),
-    ...Object.entries(sugg.caps||{}).map(([gid,v])=>o("div",{key:"g"+gid,className:"f ia jb",style:{padding:"7px 0",borderBottom:`1px solid ${c.brs}`},children:[t("span",{style:{fontSize:13,color:c.tx},children:"Cap · "+((sm.secs.find(s=>s.id===gid)||{}).label||gid)}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:c.tx},children:fm(v,cur)})]})),
+    ...Object.entries(sugg.caps||{}).map(([gid,v])=>o("div",{key:"g"+gid,className:"f ia jb",style:{padding:"7px 0",borderBottom:`1px solid ${c.brs}`},children:[t("span",{style:{fontSize:13,color:c.tx},children:"Cap · "+((bm.secs.find(sc=>sc.id===gid)||{}).label||gid)}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:c.tx},children:fm(v,cur)})]})),
     o("div",{className:"f jb",style:{margin:"10px 0 0",fontSize:12,color:c.td},children:[t("span",{children:"Total"}),t("span",{style:{fontFamily:'var(--nf)',color:c.tx},children:fm(Object.values(sugg.cats).reduce((a,v)=>a+v,0),cur)})]}),
     o("div",{className:"f",style:{gap:10,marginTop:16},children:[lnBtn("Cancel",()=>sSugg(null)),lnBtn("Apply to plan",applySugg,true,Object.keys(sugg.cats).length?null:{opacity:.5})]}),
     t("div",{style:{fontSize:10.5,color:c.tm,textAlign:"center",marginTop:8},children:"This only fills the plan. You can still change any amount afterwards."})]})});
@@ -12300,7 +12306,7 @@ function BudgetPlanner({data,persist,cur,income,baseStart,onClose}){
     o("div",{className:"f ia jb",style:{position:"sticky",top:0,zIndex:2,background:c.bg||"#0a0a0a",padding:"calc(10px + max(env(safe-area-inset-top),var(--sat-fb,0px))) 0 10px",marginBottom:8,gap:8},children:[t("button",{onClick:onClose,"aria-label":"Close planner",className:"act95 trt",style:{height:38,padding:"0 14px",borderRadius:12,background:c.sf2,border:`1px solid ${c.brs}`,color:c.tx,fontSize:13,fontWeight:600},children:"✕ Close"}),t("div",{style:{fontFamily:c.hf,fontSize:20},children:t("em",{children:"Planner"})}),t("div",{style:{width:78}})]}),
     o("div",{className:"f ia jb",style:{marginBottom:12,gap:8},children:[t(IB,{onClick:()=>sOff(v=>v-1),size:32,children:t(CL,{size:16,color:c.tx})}),t("div",{className:"tc f1",style:{fontFamily:c.hf,fontSize:16,color:c.tx},children:label}),t(IB,{onClick:()=>sOff(v=>v+1),size:32,children:t(CR,{size:16,color:c.tx})})]}),
     !active&&lnCard([t("div",{key:"a",style:{fontSize:12.5,color:c.td,lineHeight:1.5},children:"Recurring expenses before "+new Date(cut).toLocaleDateString("en-US",{month:"long",year:"numeric"})+" still add themselves, so this month is left exactly as it is. You can still set amounts to compare against."})],{background:c.sf2}),
-    o("div",{className:"f",style:{gap:8,marginBottom:6},children:[tile("PLANNED",fm(planned,cur),Object.keys(cats).length+" categories",c.tx),tile("SPENT",fm(spentAll,cur),planned>0?Math.round(spentAll/planned*100)+"% of plan":"so far",spentAll>planned&&planned>0?c.co:c.tx),tile(active?"TO LOG":"LOGGED",fm(active?toLog:rec.filter(x=>x.state==="done").reduce((a,x)=>a+(x.amount||0),0),cur),active?(dueRows.length+" recurring"):"recurring",c.gd)]}),
+    o("div",{className:"f",style:{gap:8,marginBottom:6},children:[tile("PLANNED",fm(planned,cur),Object.keys(cats).length+" budget lines",c.tx),tile("SPENT",fm(spentAll,cur),planned>0?Math.round(spentAll/planned*100)+"% of plan":"so far",spentAll>planned&&planned>0?c.co:c.tx),tile(active?"TO LOG":"LOGGED",fm(active?toLog:rec.filter(x=>x.state==="done").reduce((a,x)=>a+(x.amount||0),0),cur),active?(dueRows.length+" recurring"):"recurring",c.gd)]}),
     lnCard([
       t("div",{key:"t",style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:10},children:"INCOME & LEFT TO ALLOCATE"}),
       o("div",{key:"i",className:"f ia jb",style:{gap:8},children:[o("div",{className:"minw0",children:[t("div",{style:{fontSize:13,color:c.tx},children:"Expected income"}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:2},children:incNote+(incNow>0?" · received so far "+fm(incNow,cur):"")})]}),o("div",{className:"f ia",style:{gap:6},children:[incSet&&t("button",{onClick:()=>savePL({income:undefined}),"aria-label":"Use the automatic income",title:"Use automatic",className:"act95 trt",style:{background:"transparent",border:"none",color:c.tm,fontSize:14,padding:2},children:"↺"}),t(ASNum,{value:incSet?mo.income:null,placeholder:String(incAuto||0),prefix:cur,width:104,onSave:n=>savePL({income:n>0?n:undefined})})]})]}),
@@ -12311,7 +12317,7 @@ function BudgetPlanner({data,persist,cur,income,baseStart,onClose}){
         t("div",{style:{height:6,borderRadius:3,background:c.sf2,overflow:"hidden",marginTop:10},children:t("div",{style:{width:Math.min(100,usable>0?planned/usable*100:100)+"%",height:"100%",background:leftAlloc<0?c.co:planned/Math.max(1,usable)>=.9?c.gd:c.mt,borderRadius:3}})}),
         t("div",{style:{fontSize:10.5,color:c.tm,marginTop:6,lineHeight:1.45},children:leftAlloc>=0?(planned>0?Math.round(planned/Math.max(1,inc)*100)+"% of income planned":"Nothing planned yet")+(saveAmt>0?" · "+fm(saveAmt,cur)+" set aside":""):"Plans and savings add up to more than your income. Trim a category or lower the savings target."})
       ]}):t("div",{key:"n",style:{fontSize:11.5,color:c.tm,marginTop:12,lineHeight:1.45},children:"Enter your expected income to see how much is left to allocate."}),
-      prevHas&&o("div",{key:"c",className:"f",style:{marginTop:12},children:[lnBtn("Copy "+prevName+" plan into "+new Date(from).toLocaleDateString("en-US",{month:"short"}),()=>savePL({cats:{...(prevMo.cats||{}),...cats},caps:{...(prevMo.caps||{}),...caps}}),false,{fontSize:12.5,padding:"10px 0"})]}),
+      prevHas&&o("div",{key:"c",className:"f",style:{marginTop:12},children:[lnBtn("Copy "+prevName+" plan into "+new Date(from).toLocaleDateString("en-US",{month:"short"}),()=>savePL({lines:{...prevPlan.cats,...cats},cats:undefined,caps:{...prevPlan.caps,...caps}}),false,{fontSize:12.5,padding:"10px 0"})]}),
       prevHas&&t("div",{key:"cn",style:{fontSize:10,color:c.tm,marginTop:6},children:"Only fills categories you haven't planned yet."})
     ],{marginTop:12}),
     warns.length>0&&lnCard([t("div",{key:"t",style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:8},children:"HEADS-UP"}),...warns.slice(0,4).map(w=>o("div",{key:w.cid,className:"f ia",style:{gap:8,padding:"4px 0"},children:[t("span",{style:{width:8,height:8,borderRadius:4,background:w.level==="over"?c.co:c.gd,flexShrink:0}}),t("span",{style:{fontSize:12.5,color:c.tx,lineHeight:1.4},children:planWarnText(w,cur)})]}))],{marginTop:12}),
@@ -12330,9 +12336,8 @@ function BudgetPlanner({data,persist,cur,income,baseStart,onClose}){
     rec.length===0?t("div",{style:{fontSize:12.5,color:c.tm,lineHeight:1.5,padding:"2px 2px 6px"},children:"No recurring expenses fall in "+label+". Add them from Recurring and they will show up here with a Log button."}):o("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,padding:"2px 14px"},children:[
       dueNow.length>1&&o("div",{className:"f ia jb",style:{padding:"10px 0",borderBottom:`1px solid ${c.brs}`},children:[t("span",{style:{fontSize:12,color:c.td},children:dueNow.length+" due on or before today"}),t("button",{onClick:()=>logRows(dueNow),className:"act95 tr",style:{padding:"7px 14px",borderRadius:10,border:`1px solid ${c.ac}66`,background:c.ac+"1f",color:c.ac,fontSize:12.5,fontWeight:600},children:"Log all due"})]}),
       ...rec.map(recRow)]}),
-    secLabel("PLAN BY CATEGORY"),
-    ...groups.map(groupBlock),
-    hidden.length>0&&o("div",{style:{marginTop:14},children:[t("select",{value:"",onChange:e=>{if(e.target.value)sExtra(x=>[...x,e.target.value])},"aria-label":"Add a category to the plan",style:{...lnInp(),padding:"11px 12px",fontSize:13.5},children:[t("option",{key:"",value:"",children:"＋ Add another category…"}),...hidden.map(x=>t("option",{key:x.id,value:x.id,children:x.emoji+" "+x.label}))]})]}),
+    secLabel("PLAN BY BUDGET LINE"),
+    ...secList.map(secBlock),
     t("div",{style:{fontSize:10.5,color:c.tm,marginTop:14,lineHeight:1.5},children:"Amounts are only a plan: change them any time and nothing you've logged is touched. “usually” is your average over the last "+(base.months||0)+" month"+(base.months===1?"":"s")+" with spending."})
   ]})});
   return o(Fragment,{children:[createPortal(overlay,document.body),suggEl]});
