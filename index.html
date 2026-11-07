@@ -2349,7 +2349,7 @@ function App(){
         v==="newAccount"&&t(NewAcc,{onSave:a=>{aA(a);sV("accounts")},onCancel:()=>sV("accounts")}),
         v==="editAccount"&&eAcc&&t(NewAcc,{onSave:a=>{uA({...eAcc,...a});sEAcc(null);sV("accounts")},onCancel:()=>{sEAcc(null);sV("accounts")},editing:eAcc}),
         v==="rules"&&t(Rules,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
-        v==="cards"&&t(CardsHub,{data:d,onClose:()=>sV("home"),onAdd:()=>sV("newCard"),onPay:aCP,onUpdateCard:uC,onTx:sAtx,onEdit:cr=>{cdFromRef.current="cards";sCdId(cr.id);sECa(cr);sV("editCard")},onCashback:()=>{navFromRef.current="cards";sV("cashback")},onSelect:cr=>{cdFromRef.current="cards";sCdId(cr.id);sV("cardDetail")},onFlt:sFlt,onReorder:(newCards)=>pst({cards:newCards})}),
+        v==="cards"&&t(CardsHub,{data:d,onClose:()=>sV("home"),onAdd:()=>sV("newCard"),onPay:aCP,onUpdateCard:uC,onTx:sAtx,onAddExpenses:aEMany,onMarkChecked:markStmtChecked,onEdit:cr=>{cdFromRef.current="cards";sCdId(cr.id);sECa(cr);sV("editCard")},onCashback:()=>{navFromRef.current="cards";sV("cashback")},onSelect:cr=>{cdFromRef.current="cards";sCdId(cr.id);sV("cardDetail")},onFlt:sFlt,onReorder:(newCards)=>pst({cards:newCards})}),
         v==="cashback"&&t(CashbackSummary,{data:d,onClose:()=>sV(navFromRef.current&&navFromRef.current!=="cashback"?navFromRef.current:"cards"),onSelectCard:cr=>{cdFromRef.current="cashback";sCdId(cr.id);sV("cardDetail")}}),
         v==="cardDetail"&&cdId&&t(CardDet,{data:d,cardId:cdId,onBulkEdit:bulkEdit,onClose:()=>{const b=cdFromRef.current||"cards";cdFromRef.current="cards";sV(b)},onEdit:()=>{const cr=(d.cards||[]).find(x=>x.id===cdId);sECa(cr);sV("editCard")},onPay:({accountId,amount})=>aCP({cardId:cdId,accountId,amount,date:Date.now()}),onEditPay:(id,patch)=>uCP(id,patch),onDeletePay:(id)=>dCP(id),onDelete:()=>{dC(cdId);sCdId(null);sV("cards")},onTx:sAtx,onAddStmt:aSt,onUpdStmt:uSt,onDelStmt:dSt,onCardReconcile:doCardReconcile,onRevertCardReconcile:doRevertCardReconcile}),
         v==="newCard"&&t(NewCard,{onSave:cr=>{aC(cr);sV("cards")},onCancel:()=>sV("cards")}),
@@ -4464,13 +4464,16 @@ function StmtImports({data,onClose,onTx}){
 }
 
 // === STATEMENT ANALYZER ===
-function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked}){
+function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked,fixedCardId,embedded,onReconcile,reconDone,onTx}){
   const{expenses,currency,accounts}=data;
   const cards=data.cards||[];
   const rupeeMode=currency==="₹";
   const mm=useMemo(()=>buildMerchantMemory(expenses,data.merchantRules),[expenses,data.merchantRules]);
   const guessCat=(merchant)=>{const g=mm(merchant);return(g&&g.category)?g.category:"other"};
-  const[cmpCardId,sCmpCardId]=useState(null);
+  const[cmpCardId,sCmpCardId]=useState(fixedCardId||null);
+  const[links,sLinks]=useState({}),[pick,sPick]=useState(null);
+  const txKey=tx=>tx.date+"|"+tx.amount+"|"+(tx.merchant||"");
+  useEffect(()=>{if(fixedCardId)sCmpCardId(fixedCardId);sLinks({})},[fixedCardId]);
   const[man,sMan]=useState(null);
   const[quick,sQuick]=useState(null);
   const[photos,sPhotos]=useState([]);const[photoProgress,sPhotoProgress]=useState(null);
@@ -4664,8 +4667,13 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked}){
     const{startTs,endTs}=win;
     const txns=parsed.filter(x=>x.date>=startTs&&x.date<=endTs);
     const pool=expenses.filter(e=>(e.type==="expense"||e.type==="card-payment")&&e.date>=startTs-7*864e5&&(endTs===Infinity||e.date<=endTs+7*864e5)&&(!cmpCardId||e.cardId===cmpCardId)).map(e=>({e,used:false}));
-    return txns.map(tx=>{
+    const forced=new Map();
+    // Manual links first, so the automatic pass can't hand their expense to another row.
+    txns.forEach(tx=>{const id=links[txKey(tx)];if(id&&id!=="none"){const hit=pool.find(p=>p.e.id===id)||{e:expenses.find(x=>x.id===id),used:false};if(hit.e&&!hit.used){hit.used=true;forced.set(tx,hit.e)}}});
+    const out=txns.map(tx=>{
+      if(forced.has(tx))return{tx,match:forced.get(tx),manual:true};
       let match=null;
+      if(links[txKey(tx)]==="none")return{tx,match:null};
       for(const p of pool){
         if(p.used)continue;
         const cmpAmt=p.e.splitId?(p.e.splitTotal??p.e.amount):p.e.amount;
@@ -4680,7 +4688,12 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked}){
       }
       return{tx,match};
     });
-  },[parsed,expenses,win,cmpCardId]);
+    // Logged on this card inside the statement's own dates, but not on the statement.
+    const lo=Math.min(...txns.map(x=>x.date)),hi=Math.max(...txns.map(x=>x.date))+864e5-1;
+    out.extras=cmpCardId&&txns.length?pool.filter(p=>!p.used&&p.e.type==="expense"&&p.e.date>=lo-864e5&&p.e.date<=hi).map(p=>p.e):[];
+    out.free=pool.filter(p=>!p.used).map(p=>p.e);
+    return out;
+  },[parsed,expenses,win,cmpCardId,links]);
   const logged=recon.filter(r=>r.match);
   const unlogged=recon.filter(r=>!r.match);
   // A recon match against an already-logged expense is proof it's in the statement, so tick it
@@ -4753,7 +4766,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked}){
   const shownSorted=useMemo(()=>[...shown].sort((a,b)=>sortDir==="asc"?a.tx.date-b.tx.date:b.tx.date-a.tx.date),[shown,sortDir]);
   const removeParsedTx=(tx)=>sParsed(prev=>(prev||[]).filter(x=>x!==tx));
   return o("div",{style:{padding:`8px ${GUT}px 40px`},className:"st",children:[
-    t(SH,{title:t("em",{children:"Statement Analyzer"}),onBack:onClose,right:t("button",{onClick:onViewImports,className:"act95 trt",style:{padding:"8px 12px",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:10,fontSize:11,fontWeight:600,fontFamily:'var(--nf)'},children:"IMPORTS"})}),
+    embedded?null:t(SH,{title:t("em",{children:"Statement Analyzer"}),onBack:onClose,right:t("button",{onClick:onViewImports,className:"act95 trt",style:{padding:"8px 12px",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:10,fontSize:11,fontWeight:600,fontFamily:'var(--nf)'},children:"IMPORTS"})}),
     t("div",{style:{fontSize:13,color:c.td,marginBottom:16,lineHeight:1.5},children:"Bring in your bank or credit card statement — upload a CSV/Excel file, paste CSV text, or snap one or more photos. Each transaction is matched against your logged expenses; log any that are missing, then ask the AI follow-up questions. Rows read from a photo keep that photo attached, so you can tap 🔍 Photo on any of them — logged or not — to check the amount against the original."}),
     o("div",{className:"f ia",style:{gap:6,marginBottom:14},children:[{id:"file",l:"📄 File"},{id:"paste",l:"📋 Paste CSV"},{id:"photo",l:"📷 Photo"}].map(mm=>t("button",{key:mm.id,onClick:()=>{sMode(mm.id);sErr(null)},className:"act95 tr",style:{flex:1,padding:"9px 0",background:mode===mm.id?c.ac:c.sf2,color:mode===mm.id?"#0a0a0a":c.td,border:`1px solid ${mode===mm.id?c.ac:c.brs}`,borderRadius:10,fontSize:12,fontFamily:'var(--nf)'},children:mm.l}))}),
     mode==="file"&&o("div",{style:{background:c.sfg,borderRadius:16,border:`2px dashed ${file?c.mt:c.brs}`,padding:20,textAlign:"center",marginBottom:16,cursor:"pointer"},onClick:()=>fileRef.current?.click(),children:[
@@ -4828,7 +4841,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked}){
         fromD&&toD&&new Date(fromD)>new Date(toD)&&t("div",{style:{fontSize:11,color:c.co,marginTop:7},children:"Start date must be on or before the end date."})
       ]})
     ]}),
-    parsed&&cards.length>0&&o("div",{style:{marginBottom:16},children:[
+    parsed&&cards.length>0&&!fixedCardId&&o("div",{style:{marginBottom:16},children:[
       t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:8},children:"COMPARE AGAINST"}),
       o("div",{className:"f",style:{gap:6,flexWrap:"wrap"},children:[
         t("button",{key:"all",onClick:()=>sCmpCardId(null),className:"act95 tr",style:{padding:"7px 14px",background:!cmpCardId?c.ac:c.sf2,color:!cmpCardId?"#0a0a0a":c.td,border:`1px solid ${!cmpCardId?c.ac:c.brs}`,borderRadius:999,fontSize:12,fontFamily:'var(--nf)'},children:"All expenses"}),
@@ -4852,6 +4865,15 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked}){
       stmtSpan&&t("button",{key:"w",onClick:spanToCustom,className:"act95 tr",style:{marginTop:9,padding:"7px 14px",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:999,fontSize:12,fontFamily:'var(--nf)'},children:"Include them"})
     ]}),
     recon.length>0&&o(Fragment,{children:[
+      (()=>{
+        const rFrom=Math.min(...recon.map(r=>r.tx.date)),rTo=Math.max(...recon.map(r=>r.tx.date)),reconDoneNow=(reconDone||[]).some(x=>Math.abs(x.from-rFrom)<864e5&&Math.abs(x.to-rTo)<864e5);
+        const aOf=e=>e.splitId?(e.splitTotal??e.amount):(e.amount||0),stmtTot=recon.reduce((a,r)=>a+r.tx.amount,0),extras=recon.extras||[],appTot=logged.reduce((a,r)=>a+aOf(r.match),0)+extras.reduce((a,e)=>a+(e.amount||0),0),diff=stmtTot-appTot,ok=Math.abs(diff)<1&&!unlogged.length&&!extras.length;
+        const stat=(k2,v,col)=>o("div",{key:k2,className:"f1",style:{background:c.sf2,borderRadius:10,padding:"9px 10px",minWidth:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:8.5,color:c.tm,letterSpacing:.8},children:k2}),t("div",{className:"tru",style:{fontFamily:'var(--nf)',fontSize:13,color:col||c.tx,marginTop:3},children:v})]});
+        return o("div",{key:"rc",style:{background:c.sfg,borderRadius:16,border:`1px solid ${ok?c.mt+"66":c.brs}`,padding:"14px 16px",marginBottom:14},children:[
+          o("div",{className:"f ia jb",style:{marginBottom:10},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5},children:"RECONCILIATION"}),t("span",{style:{fontSize:11,fontWeight:700,color:ok?c.mt:Math.abs(diff)<1?c.gd:c.co,fontFamily:'var(--nf)'},children:ok?"✓ MATCHES":Math.abs(diff)<1?"TOTALS MATCH":"DIFFERENCE "+fm(Math.abs(diff),currency)})]}),
+          o("div",{className:"f",style:{gap:8},children:[stat("STATEMENT",fm(stmtTot,currency)),stat("IN YOUR APP",fm(appTot,currency)),stat("DIFFERENCE",(diff>0?"+":diff<0?"−":"")+fm(Math.abs(diff),currency),Math.abs(diff)<1?c.mt:c.co)]}),
+          o("div",{className:"f",style:{gap:8,marginTop:8},children:[stat("VERIFIED",String(logged.length),c.mt),stat("NOT LOGGED",String(unlogged.length),unlogged.length?c.co:c.tx),stat(cmpCardId?"NOT ON STMT":"—",cmpCardId?String(extras.length):"pick a card",extras.length?c.gd:c.tx)]}),
+          onReconcile&&cmpCardId&&o("div",{className:"f ia jb",style:{marginTop:12,gap:8},children:[t("span",{style:{fontSize:11,color:c.tm,lineHeight:1.4},children:reconDoneNow?"✓ Already marked reconciled for this period.":ok?"Everything lines up.":"You can still mark it reconciled, with the differences noted."}),t("button",{onClick:()=>onReconcile({id:"rc_"+uid(),at:Date.now(),from:Math.min(...recon.map(r=>r.tx.date)),to:Math.max(...recon.map(r=>r.tx.date)),stmtTotal:Math.round(stmtTot*100)/100,appTotal:Math.round(appTot*100)/100,verified:logged.length,missing:unlogged.length,extra:extras.length}),disabled:reconDoneNow,className:"act95 trt",style:{padding:"8px 14px",borderRadius:10,border:"none",background:reconDoneNow?c.sf2:c.ac,color:reconDoneNow?c.tm:"#0a0a0a",fontSize:12.5,fontWeight:600,flexShrink:0},children:reconDoneNow?"Reconciled":"Mark reconciled"})]})]})})(),
       o("div",{style:{marginBottom:16},children:t(AiChatBox,{getContext:stmtCtx,label:"ASK ABOUT THIS STATEMENT",intro:"Ask anything about these transactions — e.g. \"What's my biggest unlogged expense?\", \"Group the unlogged ones by merchant\", or \"Any subscriptions I forgot?\"",suggestions:["Biggest unlogged?","Group by merchant","Spot subscriptions"]})}),
       o("div",{className:"g g2",style:{gap:10,marginBottom:14},children:[
         o("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.mt}40`,padding:"12px 14px"},children:[
@@ -4885,7 +4907,8 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked}){
           ]}),
           o("div",{style:{textAlign:"right",flexShrink:0},children:[
             t("div",{style:{fontFamily:'var(--nf)',fontSize:14,color:r.match?c.tx:c.co},children:"−"+fm(r.tx.amount,currency)}),
-            r.match?t("div",{style:{fontSize:10,color:c.mt,marginTop:3,fontFamily:'var(--nf)',letterSpacing:.3},children:"✓ LOGGED"}):o("div",{className:"f ia",style:{gap:6,marginTop:6,justifyContent:"flex-end"},children:[
+            r.match?o("div",{children:[t("div",{style:{fontSize:10,color:c.mt,marginTop:3,fontFamily:'var(--nf)',letterSpacing:.3},children:r.manual?"✓ MATCHED BY YOU":"✓ LOGGED"}),o("div",{className:"f ia",style:{gap:6,marginTop:6,justifyContent:"flex-end"},children:[onTx&&t("button",{onClick:()=>onTx(r.match),className:"act95 tr",style:{padding:"4px 9px",background:"transparent",color:c.td,border:`1px solid ${c.brs}`,borderRadius:999,fontSize:10.5},children:"Open"}),t("button",{onClick:()=>sLinks(l=>({...l,[txKey(r.tx)]:"none"})),className:"act95 tr",style:{padding:"4px 9px",background:"transparent",color:c.co,border:`1px solid ${c.co}55`,borderRadius:999,fontSize:10.5},children:"Unmatch"})]})]}):o("div",{className:"f ia",style:{gap:6,marginTop:6,justifyContent:"flex-end"},children:[
+              t("button",{onClick:()=>sPick(r.tx),className:"act95 tr",style:{padding:"5px 11px",background:"transparent",color:c.ac,border:`1px solid ${c.ac}66`,borderRadius:999,fontSize:11,fontWeight:600},children:"Match"}),
               t("button",{onClick:()=>sQuick({...r.tx,category:r.tx.category||guessCat(r.tx.merchant)}),className:"act95 tr",style:{padding:"5px 11px",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:999,fontSize:11,fontWeight:600},children:"+ Quick"}),
               t("button",{onClick:()=>openManual(r.tx),className:"act95 tr",style:{padding:"5px 11px",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:999,fontSize:11,fontWeight:600},children:"Edit"})
             ]}),
@@ -4907,6 +4930,16 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked}){
       ]}),
       t("button",{onClick:()=>{sResult(null);sParsed(null);sFile(null);sPhotos([]);sPhotoProgress(null);sSrcPhotos([]);sVerify(null);sCsvPhotos([]);csvSrcRef.current={}},className:"w100 act98 tr",style:{padding:"12px 0",background:c.sf2,color:c.td,borderRadius:12,border:`1px solid ${c.brs}`,fontSize:13,marginTop:10},children:"Upload another statement"})
     ]}),
+    recon.length>0&&cmpCardId&&(recon.extras||[]).length>0&&o("div",{key:"ex",style:{marginBottom:18},children:[
+      t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.gd,letterSpacing:1.5,marginBottom:4},children:"IN YOUR APP, NOT ON THE STATEMENT · "+recon.extras.length}),
+      t("div",{style:{fontSize:11,color:c.tm,marginBottom:8,lineHeight:1.4},children:"Logged on this card inside the statement's dates, but no statement line matched. A wrong amount or date, a duplicate, or a spend from another cycle."}),
+      t("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:"2px 14px"},children:recon.extras.map((e,i)=>o("button",{key:e.id,onClick:()=>onTx&&onTx(e),className:"w100 f ia jb act98 trt",style:{padding:"11px 0",background:"transparent",border:"none",borderTop:i?`1px solid ${c.brs}`:"none",color:"inherit",textAlign:"left",gap:10},children:[o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:13,color:c.tx},children:co(e.category).emoji+" "+(e.merchant||e.payee||co(e.category).label)}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:new Date(e.date).toLocaleDateString("en-GB",{day:"numeric",month:"short"})})]}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:c.tx},children:fm(e.amount,currency)})]}))})]}),
+    pick&&t(Sht,{onClose:()=>sPick(null),children:o(Fragment,{children:[
+      t("div",{style:{fontFamily:c.hf,fontSize:22,color:c.tx},children:"Match to a logged expense"}),
+      t("div",{style:{fontSize:12.5,color:c.td,margin:"4px 0 12px"},children:(pick.merchant||"Statement line")+" · "+fm(pick.amount,currency)+" · "+new Date(pick.date).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}),
+      ...((recon.free||[]).filter(e=>e.type==="expense").sort((a,b)=>Math.abs(a.amount-pick.amount)-Math.abs(b.amount-pick.amount)||Math.abs(a.date-pick.date)-Math.abs(b.date-pick.date)).slice(0,12).map((e,i)=>o("button",{key:e.id,onClick:()=>{sLinks(l=>({...l,[txKey(pick)]:e.id}));sPick(null)},className:"w100 f ia jb act98 trt",style:{padding:"11px 0",background:"transparent",border:"none",borderTop:i?`1px solid ${c.brs}`:"none",color:"inherit",textAlign:"left",gap:10},children:[o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:13,color:c.tx},children:co(e.category).emoji+" "+(e.merchant||e.payee||co(e.category).label)}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:new Date(e.date).toLocaleDateString("en-GB",{day:"numeric",month:"short"})+(Math.abs(e.amount-pick.amount)<.01?" · same amount":" · "+(e.amount>pick.amount?"+":"−")+fm(Math.abs(e.amount-pick.amount),currency)+" off")})]}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:c.tx},children:fm(e.amount,currency)})]}))),
+      !(recon.free||[]).length&&t("div",{style:{fontSize:12.5,color:c.tm,padding:"10px 0"},children:"No unmatched logged expenses nearby. Use Quick or Edit to log this line instead."}),
+      o("div",{className:"f",style:{marginTop:14},children:[lnBtn("Cancel",()=>sPick(null))]})]})}),
     quick&&t(Sht,{onClose:()=>sQuick(null),children:o(Fragment,{children:[
       t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:6},children:"Log this transaction?"}),
       t("div",{style:{fontSize:13,color:c.td,marginBottom:18,lineHeight:1.5},children:cmpCardId?`Will be added to ${(cards.find(cd=>cd.id===cmpCardId)||{}).name||"the selected card"}.`:"Will be added as an expense."}),
@@ -8709,7 +8742,14 @@ function ChHistory({data,cur,cardId,onTx,onAddPay}){
         t("span",{style:{fontFamily:'var(--nf)',fontSize:14,color:c.tx,flexShrink:0},children:fm(r.e.amount,cur)})]}))})]})),
     exp&&t(Sht,{onClose:()=>sExp(false),children:o(Fragment,{children:[t("div",{style:{fontFamily:c.hf,fontSize:22,color:c.tx},children:"Export payment history"}),t("div",{style:{fontSize:12.5,color:c.td,margin:"4px 0 14px"},children:rows.length+" payments with the current filters."}),o("div",{className:"f",style:{gap:10},children:[lnBtn("📄 PDF",()=>{chExport("pdf",rows,cur);sExp(false)},true),lnBtn("📊 Excel",()=>{chExport("xlsx",rows,cur);sExp(false)}),lnBtn("CSV",()=>{chExport("csv",rows,cur);sExp(false)})]})]})})]});
 }
-function CardsHub({data,onClose,onAdd,onSelect,onFlt,onCashback,onPay,onEdit,onUpdateCard,onTx}){
+function ChStatements({info,data,onAddExpenses,onMarkChecked,onTx,onUpdateCard,cur}){
+  const card=info.card,list=card.stmtRecon||[];
+  const add=en=>onUpdateCard({id:card.id,stmtRecon:[en,...list]});
+  return o(Fragment,{children:[
+    list.length>0&&lnCard([t("div",{key:"h",style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:6},children:"RECONCILED STATEMENTS"}),...list.map((r,i)=>o("div",{key:r.id,className:"f ia jb",style:{padding:"9px 0",borderTop:i?`1px solid ${c.brs}`:"none",gap:8},children:[o("div",{className:"minw0",children:[t("div",{style:{fontSize:13,color:c.tx},children:"✓ "+lnFmtD(r.from)+" – "+lnFmtD(r.to)}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:fm(r.stmtTotal,cur)+" on statement · "+r.verified+" verified"+(r.missing?" · "+r.missing+" not logged":"")+(r.extra?" · "+r.extra+" extra":"")+" · marked "+lnFmtD(r.at)})]}),t("button",{onClick:()=>onUpdateCard({id:card.id,stmtRecon:list.filter(x=>x.id!==r.id)}),"aria-label":"Remove this reconciliation",className:"act90 trt",style:{background:"transparent",border:"none",color:c.tm,fontSize:16,padding:6},children:"×"})]}))],{marginTop:12,marginBottom:0}),
+    t("div",{style:{marginTop:14},children:t(StmtAnalyze,{key:card.id,data,embedded:true,fixedCardId:card.id,onAddExpenses,onMarkChecked,onTx,onReconcile:add,reconDone:list})})]});
+}
+function CardsHub({data,onClose,onAdd,onSelect,onFlt,onCashback,onPay,onEdit,onUpdateCard,onTx,onAddExpenses,onMarkChecked}){
   const{cards=[],expenses,currency:cur}=data,now=useMemo(()=>Date.now(),[]);
   const[idx,sIdx]=useState(0),[tab,sTab]=useState("overview"),[rng,sRng]=useState("cycle"),[payOpen,sPayOpen]=useState(false),[mSel,sMSel]=useState(null);
   const scRef=useRef(null),tick=useRef(0);
@@ -8740,13 +8780,13 @@ function CardsHub({data,onClose,onAdd,onSelect,onFlt,onCashback,onPay,onEdit,onU
     o("div",{className:"f",style:{gap:8,padding:"0 2px"},children:[stat("TOTAL DUE",fm(tot.due,cur),tot.soon?tot.soon.card.name+" · "+(tot.soon.cy.overdue?"overdue":tot.soon.cy.daysUntilDue+"d left"):"all clear",tot.due>0?c.co:c.mt),stat("UTILISATION",tot.util==null?"—":Math.round(tot.util)+"%",tot.util==null?"set limits":"across limits",tot.util>=70?c.ro:tot.util>=30?c.gd:c.mt),stat("CASHBACK",fm(tot.cb,cur),"this cycle",c.mt,onCashback)]}),
     t("div",{ref:scRef,onScroll,style:{display:"flex",gap:10,overflowX:"auto",scrollSnapType:"x mandatory",WebkitOverflowScrolling:"touch",padding:"18px 9% 6px",margin:"0 -"+GUT+"px",scrollbarWidth:"none",overscrollBehaviorX:"contain"},children:infos.map((x,i)=>t(ChCardFace,{key:x.card.id,info:x,cur,active:i===safeIdx,onClick:()=>i===safeIdx?onSelect(x.card):goTo(i)}))}),
     t("div",{className:"f jc",style:{gap:6,margin:"8px 0 4px"},children:infos.map((x,i)=>t("button",{key:x.card.id,onClick:()=>goTo(i),"aria-label":"Show "+x.card.name,style:{width:i===safeIdx?20:7,height:7,borderRadius:4,border:"none",padding:0,background:i===safeIdx?c.ac:c.brs,transition:"width .3s cubic-bezier(.2,.9,.2,1),background .3s"}}))}),
-    o("div",{className:"f",style:{gap:4,background:c.sf2,borderRadius:999,padding:4,margin:"10px 0 0"},children:[["overview","Overview"],["insights","Insights"],["milestones","Milestones"],["history","History"]].map(([k,l])=>t("button",{key:k,onClick:()=>sTab(k),className:"tr f1",style:{padding:"8px 0",borderRadius:999,border:"none",fontSize:11.5,fontWeight:600,background:tab===k?c.cr||c.ac:"transparent",color:tab===k?"#0a0a0a":c.td},children:l}))}),
+    o("div",{className:"f",style:{gap:4,background:c.sf2,borderRadius:999,padding:4,margin:"10px 0 0",overflowX:"auto",scrollbarWidth:"none"},children:[["overview","Overview"],["insights","Insights"],["milestones","Milestones"],["history","History"],["statements","Statements"]].map(([k,l])=>t("button",{key:k,onClick:()=>sTab(k),className:"tr",style:{flex:"1 0 auto",padding:"8px 13px",borderRadius:999,border:"none",fontSize:11.5,whiteSpace:"nowrap",fontWeight:600,background:tab===k?c.cr||c.ac:"transparent",color:tab===k?"#0a0a0a":c.td},children:l}))}),
     o("div",{key:info.card.id+tab,style:{animation:"fu .35s cubic-bezier(.2,.9,.2,1)"},children:[
     tab==="overview"&&o(Fragment,{children:[
       section(info.credit?"BILL":"THIS MONTH",null,[info.credit?o("div",{key:"b",children:[
         o("div",{className:"f ib jb",children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:28,fontWeight:300,color:hasDue?(cy.overdue?c.ro:c.tx):c.mt,letterSpacing:-1},children:hasDue?fm(cy.outstanding,cur):"No dues"}),hasDue&&t("span",{style:{fontSize:12,color:cy.overdue?c.ro:cy.daysUntilDue<=5?c.gd:c.td},children:cy.overdue?"Overdue since "+lnFmtD(cy.dueDate):cy.daysUntilDue===0?"Due today":"Due "+lnFmtD(cy.dueDate)+" · "+cy.daysUntilDue+" days"})]}),
-        o("div",{className:"f",style:{gap:8,marginTop:12},children:[stat("LAST STATEMENT",fm(cy.lastStmt,cur),"closed "+lnFmtD(cy.lastClose)),stat("PAID SINCE",fm(cy.paidSinceClose,cur),"after close"),stat("THIS CYCLE",fm(cy.currentSpend,cur),"closes "+lnFmtD(cy.nextClose))]})]}):t("div",{key:"d",style:{fontFamily:'var(--nf)',fontSize:28,fontWeight:300,color:c.tx},children:fm(info.cycSpend,cur)})]),
-      lnCard([o("div",{key:"g",style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8},children:[info.credit&&action("✅","Mark paid",()=>sPayOpen(true)),action("📄","Statements",()=>onSelect(info.card)),action("🧾","Spends",()=>onFlt&&onFlt({title:info.card.name+" · spends",items:info.spends})),action("💸","Cashback",()=>onCashback&&onCashback()),action("🎯","Milestones",()=>sTab("milestones")),action("🕘","Payments",()=>sTab("history")),action("✏️","Edit",()=>onEdit&&onEdit(info.card)),action("🔍","Details",()=>onSelect(info.card))].filter(Boolean)})],{marginTop:12,marginBottom:0}),
+        o("div",{className:"f",style:{gap:8,marginTop:12},children:[stat("LAST STATEMENT",fm(cy.lastStmt,cur),"closed "+lnFmtD(cy.lastClose)),stat("PAID SINCE",fm(cy.paidSinceClose,cur),"after close"),stat("THIS CYCLE",fm(cy.currentSpend,cur),"closes "+lnFmtD(cy.nextClose))]}),(info.card.stmtRecon||[])[0]&&t("button",{key:"rc",onClick:()=>sTab("statements"),className:"act95 trt",style:{marginTop:10,background:"transparent",border:"none",padding:0,fontSize:11.5,color:c.mt,textAlign:"left"},children:"✓ Statement reconciled · "+lnFmtD(info.card.stmtRecon[0].from)+" – "+lnFmtD(info.card.stmtRecon[0].to)})]}):t("div",{key:"d",style:{fontFamily:'var(--nf)',fontSize:28,fontWeight:300,color:c.tx},children:fm(info.cycSpend,cur)})]),
+      lnCard([o("div",{key:"g",style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8},children:[info.credit&&action("✅","Mark paid",()=>sPayOpen(true)),action("🧮","Verify",()=>sTab("statements")),action("📄","Bills",()=>onSelect(info.card)),action("🧾","Spends",()=>onFlt&&onFlt({title:info.card.name+" · spends",items:info.spends})),action("💸","Cashback",()=>onCashback&&onCashback()),action("🎯","Milestones",()=>sTab("milestones")),action("🕘","Payments",()=>sTab("history")),action("✏️","Edit",()=>onEdit&&onEdit(info.card)),action("🔍","Details",()=>onSelect(info.card))].filter(Boolean)})],{marginTop:12,marginBottom:0}),
       info.lim>0?section("CREDIT LIMIT USED",t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:utilCol},children:Math.round(info.util)+"%"}),[
         t("div",{key:"b",style:{height:9,borderRadius:5,background:c.sf2,overflow:"hidden"},children:t("div",{style:{width:Math.min(100,info.util)+"%",height:"100%",background:utilCol,borderRadius:5,transition:"width .6s cubic-bezier(.2,.9,.2,1)"}})}),
         o("div",{key:"t",className:"f jb",style:{fontSize:11.5,color:c.td,marginTop:8},children:[t("span",{children:fm(info.used,cur)+" used"}),t("span",{children:fm(Math.max(0,info.lim-info.used),cur)+" available of "+fm(info.lim,cur)})]}),
@@ -8754,6 +8794,7 @@ function CardsHub({data,onClose,onAdd,onSelect,onFlt,onCashback,onPay,onEdit,onU
       cb&&section("CASHBACK",t("span",{style:{fontFamily:'var(--nf)',fontSize:14,color:c.mt},children:fm(cb.total,cur)}),[o("div",{key:"c",className:"f",style:{gap:8},children:[stat("RECEIVED",fm(cb.received,cur),"credited",c.mt),stat("PENDING",fm(cb.pending,cur),"to come",c.gd),stat("RATE",cb.avgPct.toFixed(1)+"%",cb.cap?"cap "+fm(cb.cap,cur):"no cap")]}),cb.capped>0&&t("div",{key:"x",style:{fontSize:11,color:c.gd,marginTop:8},children:fm(cb.capped,cur)+" lost to the cashback cap this period."}),cb.missing.length>0&&t("div",{key:"m",style:{fontSize:11,color:c.tm,marginTop:6},children:cb.missing.length+" spend"+(cb.missing.length===1?"":"s")+" without cashback set."})]),
       best.length>1&&section("BEST CARD TO USE TODAY",null,best.map((x,i)=>o("button",{key:x.card.id,onClick:()=>goTo(infos.indexOf(x)),className:"w100 f ia jb act98 trt",style:{padding:"9px 0",borderTop:i?`1px solid ${c.brs}`:"none",background:"transparent",border:"none",borderTopStyle:i?"solid":"none",color:"inherit",textAlign:"left"},children:[o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:13,color:c.tx},children:(i===0?"⭐ ":"")+x.card.name}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:"a spend today is billed on "+lnFmtD(x.nextClose)})]}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:i===0?c.mt:c.td},children:x.freeDays+" days"})]})))
     ]}),
+    tab==="statements"&&t(ChStatements,{key:info.card.id,info,data,cur,onAddExpenses,onMarkChecked,onTx,onUpdateCard}),
     tab==="milestones"&&t(ChMilestones,{info,data,cur,onUpdateCard,onFlt}),
     tab==="history"&&t(ChHistory,{data,cur,cardId:info.card.id,onTx,onAddPay:()=>sPayOpen(true)}),
     tab==="insights"&&o(Fragment,{children:[
