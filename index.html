@@ -4677,7 +4677,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked,fix
   const rupeeMode=currency==="₹";
   const mm=useMemo(()=>buildMerchantMemory(expenses,data.merchantRules),[expenses,data.merchantRules]);
   const guessCat=(merchant)=>{const g=mm(merchant);return(g&&g.category)?g.category:"other"};
-  const[cmpCardId,sCmpCardId]=useState(fixedCardId||null);
+  const[cmpCardId,sCmpCardId]=useState((initial&&initial.cardId)||fixedCardId||null),[cardQ,sCardQ]=useState("");
   const[links,sLinks]=useState(()=>(initial&&initial.links)||{}),[pick,sPick]=useState(null);
   const txKey=tx=>tx.date+"|"+tx.amount+"|"+(tx.merchant||"");
   const firstFix=useRef(true);
@@ -4928,15 +4928,15 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked,fix
   const histSig=useMemo(()=>{if(!parsed||!parsed.length)return null;let h=5381;const str=parsed.map(x=>x.date+":"+x.amount).sort().join("|");for(let i=0;i<str.length;i++)h=((h<<5)+h+str.charCodeAt(i))|0;return"sh_"+(h>>>0).toString(36)+"_"+parsed.length},[parsed]);
   const saveHistRef=useRef(null);saveHistRef.current=onSaveHist;
   useEffect(()=>{
-    if(!saveHistRef.current||!fixedCardId||!histSig||!parsed||!parsed.length||!recon.length)return;
+    if(!saveHistRef.current||!cmpCardId||!histSig||!parsed||!parsed.length||!recon.length)return;
     const tmr=setTimeout(()=>{
       const aOf=e=>e.splitId?(e.splitTotal??e.amount):(e.amount||0),stmtTot=recon.reduce((a,r)=>a+r.tx.amount,0),extras=recon.extras||[];
       const appTot=logged.reduce((a,r)=>a+aOf(r.match),0)+extras.reduce((a,e)=>a+(e.amount||0),0);
       const ds2=parsed.map(x=>x.date);
-      saveHistRef.current&&saveHistRef.current({id:histSig,at:Date.now(),name:(file&&file.name)||"Statement",from:Math.min(...ds2),to:Math.max(...ds2),rows:parsed.slice(0,400).map(x=>({d:x.date,a:x.amount,m:String(x.merchant||"").slice(0,40)})),links,stmtTotal:Math.round(stmtTot*100)/100,appTotal:Math.round(appTot*100)/100,verified:logged.length,missing:recon.length-logged.length,extra:extras.length});
+      saveHistRef.current&&saveHistRef.current({id:histSig,cardId:cmpCardId,at:Date.now(),name:(file&&file.name)||"Statement",from:Math.min(...ds2),to:Math.max(...ds2),rows:parsed.slice(0,400).map(x=>({d:x.date,a:x.amount,m:String(x.merchant||"").slice(0,40)})),links,stmtTotal:Math.round(stmtTot*100)/100,appTotal:Math.round(appTot*100)/100,verified:logged.length,missing:recon.length-logged.length,extra:extras.length});
     },700);
     return()=>clearTimeout(tmr);
-  },[histSig,recon,links]);
+  },[histSig,recon,links,cmpCardId]);
   const unlogged=recon.filter(r=>!r.match);
   // A recon match against an already-logged expense is proof it's in the statement, so tick it
   // the same as a freshly-logged row -- automatic, no extra confirm tap. The write only fires for
@@ -5083,13 +5083,16 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked,fix
         fromD&&toD&&new Date(fromD)>new Date(toD)&&t("div",{style:{fontSize:11,color:c.co,marginTop:7},children:"Start date must be on or before the end date."})
       ]})
     ]}),
-    parsed&&cards.length>0&&!fixedCardId&&o("div",{style:{marginBottom:16},children:[
-      t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:8},children:"COMPARE AGAINST"}),
-      o("div",{className:"f",style:{gap:6,flexWrap:"wrap"},children:[
+    parsed&&cards.length>0&&o("div",{style:{marginBottom:16},children:[
+      o("div",{className:"f ia jb",style:{marginBottom:8},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5},children:"COMPARE AGAINST"}),cmpCardId&&t("span",{className:"tru",style:{fontSize:11,color:c.ac,maxWidth:"55%"},children:"💳 "+((cards.find(x=>x.id===cmpCardId)||{}).name||"")})]}),
+      cards.length>2&&o("div",{className:"f ia",style:{gap:8,background:c.sfg,border:`1px solid ${cardQ?c.ac+"66":c.brs}`,borderRadius:12,padding:"8px 12px",marginBottom:8},children:[t(Srch,{size:14,color:cardQ?c.ac:c.tm}),t("input",{value:cardQ,onChange:e=>sCardQ(e.target.value),placeholder:"Search a card by name, bank, last 4…","aria-label":"Search cards",style:{flex:1,minWidth:0,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:13,fontFamily:'var(--tf)'}}),cardQ&&t("button",{onClick:()=>sCardQ(""),"aria-label":"Clear search",className:"act90 trt",style:{background:"transparent",border:"none",color:c.tm,fontSize:16,padding:0},children:"×"})]}),
+      cardQ.trim()?(()=>{const k=cardQ.trim().toLowerCase(),hits=cards.filter(cd=>[cd.name,cd.bankName,cd.last4,cd.network,cd.type].filter(Boolean).join(" ").toLowerCase().includes(k));
+        return o("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"2px 12px"},children:hits.length?hits.map((cd,i)=>o("button",{key:cd.id,onClick:()=>{sCmpCardId(cd.id);sCardQ("")},className:"w100 f ia jb act98 trt",style:{padding:"10px 0",background:"transparent",border:"none",borderTop:i?`1px solid ${c.brs}`:"none",color:"inherit",textAlign:"left",gap:8},children:[o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:13.5,color:c.tx},children:"💳 "+cd.name}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:[cd.bankName,cd.last4?"··"+cd.last4:"",cd.type].filter(Boolean).join(" · ")})]}),cmpCardId===cd.id&&t("span",{style:{color:c.ac},children:"✓"})]})):[t("div",{key:"no",style:{padding:"12px 0",fontSize:12.5,color:c.tm},children:"No card matches “"+cardQ.trim()+"”."})]})})()
+      :o("div",{className:"f",style:{gap:6,flexWrap:"wrap"},children:[
         t("button",{key:"all",onClick:()=>sCmpCardId(null),className:"act95 tr",style:{padding:"7px 14px",background:!cmpCardId?c.ac:c.sf2,color:!cmpCardId?"#0a0a0a":c.td,border:`1px solid ${!cmpCardId?c.ac:c.brs}`,borderRadius:999,fontSize:12,fontFamily:'var(--nf)'},children:"All expenses"}),
         ...cards.map(cd=>t("button",{key:cd.id,onClick:()=>sCmpCardId(cd.id),className:"act95 tr",style:{padding:"7px 14px",background:cmpCardId===cd.id?c.ac:c.sf2,color:cmpCardId===cd.id?"#0a0a0a":c.td,border:`1px solid ${cmpCardId===cd.id?c.ac:c.brs}`,borderRadius:999,fontSize:12,fontFamily:'var(--nf)'},children:"💳 "+cd.name+(cd.last4?" ··"+cd.last4:"")}))
       ]}),
-      cmpCardId&&t("div",{style:{fontSize:11,color:c.tm,marginTop:8,lineHeight:1.5},children:"Matching only this card's transactions. Anything you log will be assigned to this card."})
+      cmpCardId&&!cardQ.trim()&&t("div",{style:{fontSize:11,color:c.tm,marginTop:8,lineHeight:1.5},children:"Matching only this card's transactions. Anything you log will be assigned to this card."})
     ]}),
     err&&t("div",{style:{background:c.co+"20",border:`1px solid ${c.co}40`,borderRadius:12,padding:"10px 14px",marginBottom:16,fontSize:13,color:c.co,lineHeight:1.5},children:err}),
     // Every statement row fell outside the compare window. Previously this rendered nothing at
@@ -5115,7 +5118,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked,fix
           o("div",{className:"f ia jb",style:{marginBottom:10},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5},children:"RECONCILIATION"}),t("span",{style:{fontSize:11,fontWeight:700,color:ok?c.mt:Math.abs(diff)<1?c.gd:c.co,fontFamily:'var(--nf)'},children:ok?"✓ MATCHES":Math.abs(diff)<1?"TOTALS MATCH":"DIFFERENCE "+fm(Math.abs(diff),currency)})]}),
           o("div",{className:"f",style:{gap:8},children:[stat("STATEMENT",fm(stmtTot,currency)),stat("IN YOUR APP",fm(appTot,currency)),stat("DIFFERENCE",(diff>0?"+":diff<0?"−":"")+fm(Math.abs(diff),currency),Math.abs(diff)<1?c.mt:c.co)]}),
           o("div",{className:"f",style:{gap:8,marginTop:8},children:[stat("VERIFIED",String(logged.length),c.mt),stat("NOT LOGGED",String(unlogged.length),unlogged.length?c.co:c.tx),stat(cmpCardId?"NOT ON STMT":"—",cmpCardId?String(extras.length):"pick a card",extras.length?c.gd:c.tx)]}),
-          onReconcile&&cmpCardId&&o("div",{className:"f ia jb",style:{marginTop:12,gap:8},children:[t("span",{style:{fontSize:11,color:c.tm,lineHeight:1.4},children:reconDoneNow?"✓ Already marked reconciled for this period.":ok?"Everything lines up.":"You can still mark it reconciled, with the differences noted."}),t("button",{onClick:()=>onReconcile({id:"rc_"+uid(),histId:histSig,at:Date.now(),from:Math.min(...recon.map(r=>r.tx.date)),to:Math.max(...recon.map(r=>r.tx.date)),stmtTotal:Math.round(stmtTot*100)/100,appTotal:Math.round(appTot*100)/100,verified:logged.length,missing:unlogged.length,extra:extras.length}),disabled:reconDoneNow,className:"act95 trt",style:{padding:"8px 14px",borderRadius:10,border:"none",background:reconDoneNow?c.sf2:c.ac,color:reconDoneNow?c.tm:"#0a0a0a",fontSize:12.5,fontWeight:600,flexShrink:0},children:reconDoneNow?"Reconciled":"Mark reconciled"})]})]})})(),
+          onReconcile&&cmpCardId&&o("div",{className:"f ia jb",style:{marginTop:12,gap:8},children:[t("span",{style:{fontSize:11,color:c.tm,lineHeight:1.4},children:reconDoneNow?"✓ Already marked reconciled for this period.":ok?"Everything lines up.":"You can still mark it reconciled, with the differences noted."}),t("button",{onClick:()=>onReconcile({id:"rc_"+uid(),histId:histSig,cardId:cmpCardId,at:Date.now(),from:Math.min(...recon.map(r=>r.tx.date)),to:Math.max(...recon.map(r=>r.tx.date)),stmtTotal:Math.round(stmtTot*100)/100,appTotal:Math.round(appTot*100)/100,verified:logged.length,missing:unlogged.length,extra:extras.length}),disabled:reconDoneNow,className:"act95 trt",style:{padding:"8px 14px",borderRadius:10,border:"none",background:reconDoneNow?c.sf2:c.ac,color:reconDoneNow?c.tm:"#0a0a0a",fontSize:12.5,fontWeight:600,flexShrink:0},children:reconDoneNow?"Reconciled":"Mark reconciled"})]})]})})(),
       o("div",{style:{marginBottom:16},children:t(AiChatBox,{getContext:stmtCtx,label:"ASK ABOUT THIS STATEMENT",intro:"Ask anything about these transactions — e.g. \"What's my biggest unlogged expense?\", \"Group the unlogged ones by merchant\", or \"Any subscriptions I forgot?\"",suggestions:["Biggest unlogged?","Group by merchant","Spot subscriptions"]})}),
       o("div",{className:"g g2",style:{gap:10,marginBottom:14},children:[
         o("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.mt}40`,padding:"12px 14px"},children:[
@@ -9012,16 +9015,17 @@ function ChHistory({data,cur,cardId,onTx,onAddPay}){
 function ChStatements({info,data,onAddExpenses,onMarkChecked,onTx,onUpdateCard,cur}){
   const card=info.card,rec=card.stmtRecon||[],hist=card.stmtHist||[];
   const[view,sView]=useState("new"),[reopen,sReopen]=useState(null);
-  const latest=useRef(card);latest.current=card;
+  const latest=useRef(card),dataRef=useRef(data);latest.current=card;dataRef.current=data;
+  const cardOf=id=>(dataRef.current.cards||[]).find(x=>x.id===id)||latest.current;
   // Upsert one statement check (auto-saved by the analyzer). Writes only when something really changed.
   const saveHist=useRef(null);
   saveHist.current=en=>{
-    const cur2=latest.current.stmtHist||[],old=cur2.find(x=>x.id===en.id);
+    const tgt=cardOf(en.cardId||card.id),cur2=tgt.stmtHist||[],old=cur2.find(x=>x.id===en.id);
     if(old){const same=old.verified===en.verified&&old.missing===en.missing&&old.extra===en.extra&&old.stmtTotal===en.stmtTotal&&old.appTotal===en.appTotal&&JSON.stringify(old.links||{})===JSON.stringify(en.links||{})&&old.rows.length===en.rows.length;if(same)return}
     const next=old?cur2.map(x=>x.id===en.id?{...en,at:x.at,upd:Date.now(),status:x.status}:x):[{...en,upd:Date.now(),status:"checked"},...cur2].slice(0,30);
-    onUpdateCard({id:card.id,stmtHist:next});
+    onUpdateCard({id:tgt.id,stmtHist:next});
   };
-  const onRecon=en=>{const nx=hist.map(x=>x.id===en.histId?{...x,status:"reconciled"}:x);onUpdateCard({id:card.id,stmtRecon:[en,...rec],stmtHist:nx})};
+  const onRecon=en=>{const tgt=cardOf(en.cardId||card.id),nx=(tgt.stmtHist||[]).map(x=>x.id===en.histId?{...x,status:"reconciled"}:x);onUpdateCard({id:tgt.id,stmtRecon:[en,...(tgt.stmtRecon||[])],stmtHist:nx})};
   const del=id=>onUpdateCard({id:card.id,stmtHist:hist.filter(x=>x.id!==id)});
   const histIds=new Set(hist.map(x=>x.id));
   const oldRec=rec.filter(r=>!r.histId||!histIds.has(r.histId));
@@ -9038,7 +9042,7 @@ function ChStatements({info,data,onAddExpenses,onMarkChecked,onTx,onUpdateCard,c
       oldRec.length>0&&lnCard([t("div",{key:"h",style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:6},children:"EARLIER RECONCILED (SUMMARY ONLY)"}),...oldRec.map((r,i)=>o("div",{key:r.id,className:"f ia jb",style:{padding:"9px 0",borderTop:i?`1px solid ${c.brs}`:"none",gap:8},children:[o("div",{className:"minw0",children:[t("div",{style:{fontSize:13,color:c.tx},children:"✓ "+lnFmtD(r.from)+" – "+lnFmtD(r.to)}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:fm(r.stmtTotal,cur)+" · "+r.verified+" verified"+(r.missing?" · "+r.missing+" not logged":"")+(r.extra?" · "+r.extra+" extra":"")})]}),t("button",{onClick:()=>onUpdateCard({id:card.id,stmtRecon:rec.filter(x=>x.id!==r.id)}),"aria-label":"Remove",className:"act90 trt",style:{background:"transparent",border:"none",color:c.tm,fontSize:16,padding:6},children:"×"})]}))],{marginBottom:0})]}),
     view==="new"&&o("div",{style:{marginTop:14},children:[
       reopen&&o("div",{className:"f ia jb",style:{gap:8,marginBottom:10,padding:"9px 12px",background:c.ac+"14",border:`1px solid ${c.ac}44`,borderRadius:12},children:[t("span",{style:{fontSize:12,color:c.tx},children:"Reopened from history · "+lnFmtD(reopen.from)+" – "+lnFmtD(reopen.to)}),t("button",{onClick:()=>sReopen(null),className:"act95 trt",style:{background:"transparent",border:"none",color:c.ac,fontSize:12,textDecoration:"underline"},children:"Start a new check"})]}),
-      t(StmtAnalyze,{key:card.id+(reopen?reopen.id:"new"),data,embedded:true,fixedCardId:card.id,onAddExpenses,onMarkChecked,onTx,onReconcile:onRecon,reconDone:rec,onSaveHist:en=>saveHist.current&&saveHist.current(en),initial:reopen||undefined})]})]});
+      t(StmtAnalyze,{key:card.id+(reopen?reopen.id:"new"),data,embedded:true,fixedCardId:card.id,onAddExpenses,onMarkChecked,onTx,onReconcile:onRecon,reconDone:(data.cards||[]).flatMap(x=>x.stmtRecon||[]),onSaveHist:en=>saveHist.current&&saveHist.current(en),initial:reopen||undefined})]})]});
 }
 function CardsHub({data,onClose,onAdd,onSelect,onFlt,onCashback,onPay,onEdit,onUpdateCard,onTx,onAddExpenses,onMarkChecked}){
   const{cards=[],expenses,currency:cur}=data,now=useMemo(()=>Date.now(),[]);
