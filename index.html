@@ -4577,28 +4577,71 @@ function CatField({kind="expense",value,sub,merchant,data,persist,onChange,style
     o("button",{type:"button",onClick:()=>sOpen(true),className:"w100 f ia jb act98 trt",style:{boxSizing:"border-box",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 12px",color:c.tx,fontSize:14,textAlign:"left",gap:8,...style},children:[o("span",{className:"tru",children:[ct?(ct.emoji||"")+" "+ct.label+(sub?" › "+sub:""):(empty||"Choose category")]}),t("span",{style:{color:c.tm,fontSize:12,flexShrink:0},children:"🔍 ▾"})]}),
     open&&t(CatSearchSheet,{kind,value,merchant,data,persist,onPick:onChange,onClose:()=>sOpen(false)})]});
 }
-function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked,fixedCardId,embedded,onReconcile,reconDone,onTx}){
+// === STATEMENT PARSING HELPERS ===
+const STMT_MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+// Day/month/year in any of the layouts banks use; returns a timestamp or 0.
+function stmtDate(raw){
+  const s=String(raw==null?"":raw).trim().replace(/\s+/g," ");if(!s)return 0;
+  const iso=SNAP_ISO(s);if(iso){const p=iso.split("-");return new Date(+p[0],+p[1]-1,+p[2]).getTime()}
+  const yy=v=>{v=+v;return v<100?v+2000:v};
+  let m=s.match(/^(\d{1,2})(?:st|nd|rd|th)?[\s\-\/.,]*([A-Za-z]{3,9})\.?[\s\-\/.,]*(\d{2,4})/);
+  if(m){const mo=STMT_MONTHS[m[2].slice(0,3).toLowerCase()];if(mo!=null){const d=new Date(yy(m[3]),mo,+m[1]);if(d.getMonth()===mo)return d.getTime()}}
+  m=s.match(/^([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{2,4})/);
+  if(m){const mo=STMT_MONTHS[m[1].slice(0,3).toLowerCase()];if(mo!=null){const d=new Date(yy(m[3]),mo,+m[2]);if(d.getMonth()===mo)return d.getTime()}}
+  const pd=new Date(s);return isNaN(pd.getTime())?0:pd.getTime();
+}
+// First balanced {...} or [...] starting at index i, aware of strings; -1 if it never closes.
+function stmtBalanced(s,i){
+  const open=s[i],close=open==="{"?"}":"]";let depth=0,inStr=false,esc=false;
+  for(let k=i;k<s.length;k++){const ch=s[k];
+    if(inStr){if(esc)esc=false;else if(ch==="\\")esc=true;else if(ch==='"')inStr=false;continue}
+    if(ch==='"'){inStr=true;continue}
+    if(ch===open)depth++;else if(ch===close){depth--;if(depth===0)return k}}
+  return -1;
+}
+// Reads transactions out of whatever the AI sent back: a JSON object, a bare array, fenced or
+// chatty text, or a reply that was cut off part-way (long statements). Keeps every complete row.
+function stmtAIRows(txt){
+  let s=String(txt||"").replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi,"");
+  const f=s.match(/```(?:json)?\s*([\s\S]*?)(?:```|$)/i);if(f&&/[\[{]/.test(f[1]))s=f[1];
+  const fix=x=>x.replace(/,\s*([}\]])/g,"$1");
+  const pick=v=>{if(Array.isArray(v))return v;if(v&&typeof v==="object"){if(Array.isArray(v.transactions))return v.transactions;for(const k in v)if(Array.isArray(v[k]))return v[k]}return null};
+  for(let i=0;i<s.length;i++){
+    if(s[i]!=="{"&&s[i]!=="[")continue;
+    const e=stmtBalanced(s,i);if(e<0)continue;
+    try{const arr=pick(JSON.parse(fix(s.slice(i,e+1))));if(arr&&arr.length)return{rows:arr,truncated:false}}catch(_){}
+  }
+  // Truncated or malformed: salvage each complete {...} that looks like a transaction.
+  const rows=[];
+  for(let i=0;i<s.length;i++){
+    if(s[i]!=="{")continue;const e=stmtBalanced(s,i);if(e<0)continue;
+    try{const o2=JSON.parse(fix(s.slice(i,e+1)));if(o2&&typeof o2==="object"&&("amount" in o2)&&("date" in o2||"merchant" in o2)){rows.push(o2);i=e}}catch(_){}
+  }
+  return{rows,truncated:rows.length>0};
+}
+function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked,fixedCardId,embedded,onReconcile,reconDone,onTx,onSaveHist,initial}){
   const{expenses,currency,accounts}=data;
   const cards=data.cards||[];
   const rupeeMode=currency==="₹";
   const mm=useMemo(()=>buildMerchantMemory(expenses,data.merchantRules),[expenses,data.merchantRules]);
   const guessCat=(merchant)=>{const g=mm(merchant);return(g&&g.category)?g.category:"other"};
   const[cmpCardId,sCmpCardId]=useState(fixedCardId||null);
-  const[links,sLinks]=useState({}),[pick,sPick]=useState(null);
+  const[links,sLinks]=useState(()=>(initial&&initial.links)||{}),[pick,sPick]=useState(null);
   const txKey=tx=>tx.date+"|"+tx.amount+"|"+(tx.merchant||"");
-  useEffect(()=>{if(fixedCardId)sCmpCardId(fixedCardId);sLinks({})},[fixedCardId]);
+  const firstFix=useRef(true);
+  useEffect(()=>{if(fixedCardId)sCmpCardId(fixedCardId);if(firstFix.current){firstFix.current=false;return}sLinks({})},[fixedCardId]);
   const[man,sMan]=useState(null);
   const[quick,sQuick]=useState(null);
   const[photos,sPhotos]=useState([]);const[photoProgress,sPhotoProgress]=useState(null);
-  const[file,sFile]=useState(null);
-  const[parsed,sParsed]=useState(null);
+  const[file,sFile]=useState(()=>initial?{name:(initial.name||"Saved statement")+" · from history"}:null);
+  const[parsed,sParsed]=useState(()=>initial&&initial.rows?initial.rows.map(r=>({date:r.d,amount:r.a,merchant:r.m||"Unknown",category:guessCat(r.m||"Unknown")})):null);
   const[analyzing,sAnalyzing]=useState(false);
   const[result,sResult]=useState(null);
   const[err,sErr]=useState(null);
   const[period,sPeriod]=useState(3);
-  const[useCustom,sUseCustom]=useState(false);
-  const[fromD,sFromD]=useState("");
-  const[toD,sToD]=useState("");
+  const[useCustom,sUseCustom]=useState(!!(initial&&initial.from&&initial.to));
+  const[fromD,sFromD]=useState(initial&&initial.from?tsToYMD(initial.from):"");
+  const[toD,sToD]=useState(initial&&initial.to?tsToYMD(initial.to):"");
   const win=useMemo(()=>{
     if(useCustom&&fromD&&toD){const s=new Date(fromD+"T00:00:00").getTime(),e=new Date(toD+"T23:59:59").getTime();if(!isNaN(s)&&!isNaN(e)&&s<=e)return{startTs:s,endTs:e,label:fromD+" → "+toD};}
     const st=new Date();st.setMonth(st.getMonth()-period);st.setHours(0,0,0,0);
@@ -4632,46 +4675,64 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked,fix
   };
   const rowsToTxns=(rows)=>{
     if(!rows||rows.length<2)return{err:"No data found."};
-    const headers=rows[0].map(h=>String(h||"").toLowerCase().trim());
-    const fi=names=>names.map(n=>headers.findIndex(h=>h.includes(n))).find(i=>i>=0)??-1;
-    const aI=fi(["amount","amt","debit","credit","dr","cr"]);
-    const dI=fi(["date","txn date","transaction date","value date","posting date"]);
-    const mI=fi(["merchant","description","desc","narration","particulars","details","name","transaction","remarks"]);
-    if(aI<0||dI<0)return{err:"Could not detect Date or Amount columns. Found headers: "+headers.join(", ")};
-    const txns=[];
-    for(let i=1;i<rows.length;i++){
+    const low=r=>(r||[]).map(h=>String(h==null?"":h).toLowerCase().trim());
+    // Header words. Short ones (dr, cr) must be a whole word so "description" doesn't count as one.
+    const has=(h,n)=>n.length<=3?new RegExp("(^|[^a-z])"+n+"([^a-z]|$)").test(h):h.includes(n);
+    const A_N=["amount","amt","debit","withdrawal","charge","credit","dr","cr"],D_N=["transaction date","txn date","value date","posting date","post date","trans date","date"],M_N=["merchant","description","narration","particulars","details","remarks","transaction details","desc","name","transaction"];
+    const find=(hs,names,skipDate)=>{for(const n of names){const i=hs.findIndex(h=>has(h,n)&&!(skipDate&&h.includes("date")));if(i>=0)return i}return -1};
+    // Bank files often start with account details and end with totals or disclaimers, so look for the
+    // real header row instead of assuming it is the first line.
+    let hRow=-1,hs=null;
+    for(let i=0;i<Math.min(rows.length,60);i++){const h=low(rows[i]);if(find(h,A_N)>=0&&find(h,D_N)>=0){hRow=i;hs=h;break}}
+    if(hRow<0){const first=low(rows.find(r=>r&&r.some(x=>x))||[]).filter(Boolean);return{err:"Could not find a header row with Date and Amount columns"+(first.length?" (first line: "+first.slice(0,6).join(" | ")+")":"")+". Add a header line like: Date,Description,Amount"}}
+    const dI=find(hs,D_N),aI=find(hs,A_N),mI=find(hs,M_N,true);
+    const tI=hs.findIndex(h=>/^(dr\/cr|cr\/dr|type|txn type|transaction type|dr or cr|debit\/credit)$/.test(h));
+    const crI=hs.findIndex((h,i)=>i!==aI&&/^credit(s| amount)?$/.test(h)),hasSplit=hs.some(h=>/^(debit|withdrawal)/.test(h))&&crI>=0;
+    const txns=[];let lost=0,credits=0,lostEx="";
+    for(let i=hRow+1;i<rows.length;i++){
       const row=rows[i];if(!row||row.every(x=>!x))continue;
-      const rawAmt=String(row[aI]||"").replace(/[^0-9.]/g,"");
-      const amt=parseFloat(rawAmt);if(!amt||isNaN(amt)||amt<=0)continue;
-      const rawDate=String(row[dI]||"");let ts=0;
-      if(rawDate){const iso=SNAP_ISO(rawDate);if(iso){const pp=iso.split("-");ts=new Date(+pp[0],+pp[1]-1,+pp[2]).getTime()}else{const pd=new Date(rawDate);if(!isNaN(pd.getTime()))ts=pd.getTime()}}
-      if(!ts)continue;
-      const merchant=mI>=0?String(row[mI]||"").trim().slice(0,60):"";
+      const cell=String(row[aI]==null?"":row[aI]);
+      const ts=stmtDate(row[dI]);
+      const isCr=(tI>=0&&/^(cr|credit)/i.test(String(row[tI]||"").trim()))||/(\bcr\b|\bcredit\b)\.?\s*$/i.test(cell.trim());
+      const amt=parseFloat(cell.replace(/[^0-9.]/g,""));
+      const goodAmt=amt&&!isNaN(amt)&&amt>0;
+      if(!ts||!goodAmt){
+        // A line with a date but no amount in the spend column is usually a credit/payment row; one with an amount but no readable date is a real loss.
+        if(goodAmt&&!ts&&!/\b(total|balance|page \d|end of statement|opening|closing|summary|amount due|minimum|statement date|credit limit|available)\b/i.test(row.join(" "))){lost++;if(!lostEx)lostEx=String(row[dI]||"").slice(0,24)||"(blank date)"}
+        else if(ts&&hasSplit&&parseFloat(String(row[crI]||"").replace(/[^0-9.]/g,""))>0)credits++;
+        continue;
+      }
+      if(isCr){credits++;continue}
+      const merchant=mI>=0?String(row[mI]||"").replace(/\s*\[[^\]]*\]\s*$/,"").trim().slice(0,60):"";
       // Rows that came from the photo→OCR→CSV path carry their photo + ambiguity flags across,
       // matched on date+amount (the description is editable in the CSV box, the numbers aren't).
       const src=csvSrcRef.current[srcKey(ts,amt)]||null;
       txns.push({date:ts,amount:amt,merchant:merchant||"Unknown",category:guessCat(merchant||"Unknown"),...(src?{photoId:src.photoId,alt:src.alt,amtFix:src.amtFix,rawLine:src.rawLine}:{})});
     }
-    if(!txns.length)return{err:"No valid transactions found. Check that Date and Amount columns have data."};
-    txns.sort((a,b)=>b.date-a.date);return{txns};
+    if(!txns.length)return{err:"No valid transactions found under the header (row "+(hRow+1)+"). Check that the Date and Amount columns have data."+(lost?" "+lost+" row(s) had an amount but a date I couldn't read, e.g. \""+lostEx+"\".":"")};
+    txns.sort((a,b)=>b.date-a.date);
+    const bits=[];if(hRow>0)bits.push("Skipped "+hRow+" line"+(hRow===1?"":"s")+" above the header");if(credits)bits.push(credits+" credit/payment row"+(credits===1?"":"s")+" left out");if(lost)bits.push(lost+" row"+(lost===1?"":"s")+" skipped — unreadable date (e.g. \""+lostEx+"\")");
+    return{txns,info:bits.join(" · ")};
   };
   const parseFile=async(f)=>{
     sErr(null);sResult(null);sSrcPhotos([]);csvSrcRef.current={};
     try{
-      const buf=await f.arrayBuffer();const X=window.XLSX||XLSX;const wb=X.read(buf);const ws=wb.Sheets[wb.SheetNames[0]];
+      const X=window.XLSX||XLSX;const isText=/\.(csv|txt|tsv)$/i.test(f.name||"")||/^text\//.test(f.type||"");
+      // Plain-text files are read exactly as written, otherwise 07/10/2026 or 8-Oct-26 get re-read as US dates.
+      const wb=isText?X.read(await f.text(),{type:"string",raw:true}):X.read(await f.arrayBuffer());const ws=wb.Sheets[wb.SheetNames[0]];
       const rows=X.utils.sheet_to_json(ws,{header:1,raw:false,defval:""});
-      const{txns,err}=rowsToTxns(rows);if(err){sErr(err);return}
-      sParsed(txns);sFile(f);
+      const{txns,err,info}=rowsToTxns(rows);if(err){sErr(err);return}
+      sParsed(txns);sFile(f);sNote(info||null);
     }catch(e2){sErr("Parse error: "+e2.message)}
   };
   const parsePaste=()=>{
     sErr(null);sResult(null);
     try{
       const txt=csvText.trim();if(!txt){sErr("Paste some CSV text first.");return}
-      const X=window.XLSX||XLSX;const wb=X.read(txt,{type:"string"});const ws=wb.Sheets[wb.SheetNames[0]];
+      const X=window.XLSX||XLSX;const wb=X.read(txt,{type:"string",raw:true});const ws=wb.Sheets[wb.SheetNames[0]];
       const rows=X.utils.sheet_to_json(ws,{header:1,raw:false,defval:""});
-      const{txns,err}=rowsToTxns(rows);if(err){sErr(err);return}
-      sParsed(txns);sFile({name:`Pasted CSV · ${txns.length} rows`});
+      const{txns,err,info}=rowsToTxns(rows);if(err){sErr(err);return}
+      sParsed(txns);sFile({name:`Pasted CSV · ${txns.length} rows`});sNote(info||null);
     }catch(e2){sErr("Parse error: "+e2.message)}
   };
   const pickPhotos=async(files)=>{const arr=Array.from(files||[]).filter(Boolean);if(!arr.length)return;sErr(null);const tooBig=arr.find(f=>f.size>1.2e7);if(tooBig){sErr(`Each image must be under 12MB — "${tooBig.name||"one photo"}" is too large.`);return}const loaded=[];let loadErr=null;for(const f of arr){try{const{b64}=await normalizePhotoForAI(f);loaded.push({id:uid(),file:f,preview:b64})}catch(e2){loadErr=`Could not read "${f.name||"one photo"}" — ${describeErr(e2)||"try a different photo"}.`}}if(loadErr)sErr(loadErr);sPhotos(p=>[...p,...loaded])};
@@ -4681,20 +4742,21 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked,fix
     if(!gAK()){sErr("Add an AI API key in Settings first.");return}
     sAnalyzing(true);sPhotoProgress(photos.length>1?{done:0,total:photos.length}:null);
     const sys="You extract transactions from a bank or credit card statement image. Be thorough and accurate.";
-    const all=[];let firstErr=null;
+    const all=[];let firstErr=null,truncNote=false;
     for(let i=0;i<photos.length;i++){
       const ph=photos[i];
       try{
         const{b64}=ph.preview?{b64:ph.preview}:await normalizePhotoForAI(ph.file);
         const u=[{type:"image",source:{type:"base64",media_type:"image/jpeg",data:b64.split(",")[1]}},{type:"text",text:(photoPrompt.trim()?photoPrompt.trim()+"\n\n":"")+'Extract ALL spending transactions visible. Respond with ONLY a single JSON object — no markdown fences, no explanation, no apology — in this exact shape: {"transactions":[{"date":"YYYY-MM-DD","amount":N,"merchant":"name","amountText":"exact characters printed for the amount, including any currency symbol"}]}.\nIf the image is blurry, cropped, or you genuinely see no transactions, still return valid JSON with an empty transactions array — never reply with prose alone.\nAmount rules — read these carefully, they are the most common source of error:\n• Never let a currency symbol become a digit. A ₹ sitting flush against the number is NOT a 3.\n• Never drop the amount\'s own leading digit. ₹350.00 is 350.00, not 50.00.\n• Copy every digit exactly as printed; do not round, reformat or infer.\n• amount must be a positive plain number with no symbol, commas or spaces.'}];
-        const r=await cAPI({max_tokens:4096,system:sys,messages:[{role:"user",content:u}]});
+        const r=await cAPI({max_tokens:6000,system:sys,messages:[{role:"user",content:u}]});
         const txt=r.content?.map(x=>x.text||"").join("")||"";
-        const m=txt.match(/\{[\s\S]*\}/);
-        if(!m){const hint=txt.trim().slice(0,150);throw new Error(hint?`Could not read transactions — the AI replied: "${hint}${txt.trim().length>150?"…":""}"`:"Could not read transactions — the AI returned an empty reply.")}
-        const arr=(JSON.parse(m[0]).transactions)||[];
+        const got=stmtAIRows(txt);
+        if(!got.rows.length){const hint=txt.trim().slice(0,150);throw new Error(hint?`Couldn't find any transactions in the AI's reply: "${hint}${txt.trim().length>150?"…":""}"`:"The AI returned an empty reply.")}
+        if(got.truncated||r.stop_reason==="max_tokens"){truncNote=true}
+        const arr=got.rows;
         for(const it of arr){
           const amt=parseFloat(String(it.amount).replace(/[^0-9.]/g,""));if(!amt||isNaN(amt)||amt<=0)continue;
-          const pd=parseAIDate(it.date);const ts=isNaN(pd.getTime())?Date.now():pd.getTime();
+          const ts=stmtDate(it.date)||0;if(!ts)continue;
           // Same ₹-as-3 ambiguity as the OCR path: if the printed text carried no currency symbol
           // and the amount starts with 3, keep the alternate reading so the row can be checked.
           const raw=String(it.amountText||"");
@@ -4712,6 +4774,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked,fix
     all.sort((a,b)=>b.date-a.date);sParsed(all);sFile({name:`${photos.length} photo${photos.length===1?"":"s"} · ${all.length} txns`});
     sSrcPhotos(photos.map((p,pi)=>({id:p.id,preview:p.preview,label:`Photo #${pi+1}`})));csvSrcRef.current={};
     if(firstErr)sErr(firstErr+" — other photos were still processed.");
+    if(truncNote)sNote("A long photo was cut off part-way, so some rows at the bottom may be missing. Take a second photo of the lower part and add it.");
     sAnalyzing(false);sPhotoProgress(null);
   };
   const[csvPhotos,sCsvPhotos]=useState([]);
@@ -4808,6 +4871,20 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked,fix
     return out;
   },[parsed,expenses,win,cmpCardId,links]);
   const logged=recon.filter(r=>r.match);
+  // Every statement you check is remembered on its card, so it can be reopened later without
+  // uploading or re-matching it. The same statement (same rows) always updates the same entry.
+  const histSig=useMemo(()=>{if(!parsed||!parsed.length)return null;let h=5381;const str=parsed.map(x=>x.date+":"+x.amount).sort().join("|");for(let i=0;i<str.length;i++)h=((h<<5)+h+str.charCodeAt(i))|0;return"sh_"+(h>>>0).toString(36)+"_"+parsed.length},[parsed]);
+  const saveHistRef=useRef(null);saveHistRef.current=onSaveHist;
+  useEffect(()=>{
+    if(!saveHistRef.current||!fixedCardId||!histSig||!parsed||!parsed.length||!recon.length)return;
+    const tmr=setTimeout(()=>{
+      const aOf=e=>e.splitId?(e.splitTotal??e.amount):(e.amount||0),stmtTot=recon.reduce((a,r)=>a+r.tx.amount,0),extras=recon.extras||[];
+      const appTot=logged.reduce((a,r)=>a+aOf(r.match),0)+extras.reduce((a,e)=>a+(e.amount||0),0);
+      const ds2=parsed.map(x=>x.date);
+      saveHistRef.current&&saveHistRef.current({id:histSig,at:Date.now(),name:(file&&file.name)||"Statement",from:Math.min(...ds2),to:Math.max(...ds2),rows:parsed.slice(0,400).map(x=>({d:x.date,a:x.amount,m:String(x.merchant||"").slice(0,40)})),links,stmtTotal:Math.round(stmtTot*100)/100,appTotal:Math.round(appTot*100)/100,verified:logged.length,missing:recon.length-logged.length,extra:extras.length});
+    },700);
+    return()=>clearTimeout(tmr);
+  },[histSig,recon,links]);
   const unlogged=recon.filter(r=>!r.match);
   // A recon match against an already-logged expense is proof it's in the statement, so tick it
   // the same as a freshly-logged row -- automatic, no extra confirm tap. The write only fires for
@@ -4986,7 +5063,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked,fix
           o("div",{className:"f ia jb",style:{marginBottom:10},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5},children:"RECONCILIATION"}),t("span",{style:{fontSize:11,fontWeight:700,color:ok?c.mt:Math.abs(diff)<1?c.gd:c.co,fontFamily:'var(--nf)'},children:ok?"✓ MATCHES":Math.abs(diff)<1?"TOTALS MATCH":"DIFFERENCE "+fm(Math.abs(diff),currency)})]}),
           o("div",{className:"f",style:{gap:8},children:[stat("STATEMENT",fm(stmtTot,currency)),stat("IN YOUR APP",fm(appTot,currency)),stat("DIFFERENCE",(diff>0?"+":diff<0?"−":"")+fm(Math.abs(diff),currency),Math.abs(diff)<1?c.mt:c.co)]}),
           o("div",{className:"f",style:{gap:8,marginTop:8},children:[stat("VERIFIED",String(logged.length),c.mt),stat("NOT LOGGED",String(unlogged.length),unlogged.length?c.co:c.tx),stat(cmpCardId?"NOT ON STMT":"—",cmpCardId?String(extras.length):"pick a card",extras.length?c.gd:c.tx)]}),
-          onReconcile&&cmpCardId&&o("div",{className:"f ia jb",style:{marginTop:12,gap:8},children:[t("span",{style:{fontSize:11,color:c.tm,lineHeight:1.4},children:reconDoneNow?"✓ Already marked reconciled for this period.":ok?"Everything lines up.":"You can still mark it reconciled, with the differences noted."}),t("button",{onClick:()=>onReconcile({id:"rc_"+uid(),at:Date.now(),from:Math.min(...recon.map(r=>r.tx.date)),to:Math.max(...recon.map(r=>r.tx.date)),stmtTotal:Math.round(stmtTot*100)/100,appTotal:Math.round(appTot*100)/100,verified:logged.length,missing:unlogged.length,extra:extras.length}),disabled:reconDoneNow,className:"act95 trt",style:{padding:"8px 14px",borderRadius:10,border:"none",background:reconDoneNow?c.sf2:c.ac,color:reconDoneNow?c.tm:"#0a0a0a",fontSize:12.5,fontWeight:600,flexShrink:0},children:reconDoneNow?"Reconciled":"Mark reconciled"})]})]})})(),
+          onReconcile&&cmpCardId&&o("div",{className:"f ia jb",style:{marginTop:12,gap:8},children:[t("span",{style:{fontSize:11,color:c.tm,lineHeight:1.4},children:reconDoneNow?"✓ Already marked reconciled for this period.":ok?"Everything lines up.":"You can still mark it reconciled, with the differences noted."}),t("button",{onClick:()=>onReconcile({id:"rc_"+uid(),histId:histSig,at:Date.now(),from:Math.min(...recon.map(r=>r.tx.date)),to:Math.max(...recon.map(r=>r.tx.date)),stmtTotal:Math.round(stmtTot*100)/100,appTotal:Math.round(appTot*100)/100,verified:logged.length,missing:unlogged.length,extra:extras.length}),disabled:reconDoneNow,className:"act95 trt",style:{padding:"8px 14px",borderRadius:10,border:"none",background:reconDoneNow?c.sf2:c.ac,color:reconDoneNow?c.tm:"#0a0a0a",fontSize:12.5,fontWeight:600,flexShrink:0},children:reconDoneNow?"Reconciled":"Mark reconciled"})]})]})})(),
       o("div",{style:{marginBottom:16},children:t(AiChatBox,{getContext:stmtCtx,label:"ASK ABOUT THIS STATEMENT",intro:"Ask anything about these transactions — e.g. \"What's my biggest unlogged expense?\", \"Group the unlogged ones by merchant\", or \"Any subscriptions I forgot?\"",suggestions:["Biggest unlogged?","Group by merchant","Spot subscriptions"]})}),
       o("div",{className:"g g2",style:{gap:10,marginBottom:14},children:[
         o("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.mt}40`,padding:"12px 14px"},children:[
@@ -8881,11 +8958,35 @@ function ChHistory({data,cur,cardId,onTx,onAddPay}){
     exp&&t(Sht,{onClose:()=>sExp(false),children:o(Fragment,{children:[t("div",{style:{fontFamily:c.hf,fontSize:22,color:c.tx},children:"Export payment history"}),t("div",{style:{fontSize:12.5,color:c.td,margin:"4px 0 14px"},children:rows.length+" payments with the current filters."}),o("div",{className:"f",style:{gap:10},children:[lnBtn("📄 PDF",()=>{chExport("pdf",rows,cur);sExp(false)},true),lnBtn("📊 Excel",()=>{chExport("xlsx",rows,cur);sExp(false)}),lnBtn("CSV",()=>{chExport("csv",rows,cur);sExp(false)})]})]})})]});
 }
 function ChStatements({info,data,onAddExpenses,onMarkChecked,onTx,onUpdateCard,cur}){
-  const card=info.card,list=card.stmtRecon||[];
-  const add=en=>onUpdateCard({id:card.id,stmtRecon:[en,...list]});
+  const card=info.card,rec=card.stmtRecon||[],hist=card.stmtHist||[];
+  const[view,sView]=useState("new"),[reopen,sReopen]=useState(null);
+  const latest=useRef(card);latest.current=card;
+  // Upsert one statement check (auto-saved by the analyzer). Writes only when something really changed.
+  const saveHist=useRef(null);
+  saveHist.current=en=>{
+    const cur2=latest.current.stmtHist||[],old=cur2.find(x=>x.id===en.id);
+    if(old){const same=old.verified===en.verified&&old.missing===en.missing&&old.extra===en.extra&&old.stmtTotal===en.stmtTotal&&old.appTotal===en.appTotal&&JSON.stringify(old.links||{})===JSON.stringify(en.links||{})&&old.rows.length===en.rows.length;if(same)return}
+    const next=old?cur2.map(x=>x.id===en.id?{...en,at:x.at,upd:Date.now(),status:x.status}:x):[{...en,upd:Date.now(),status:"checked"},...cur2].slice(0,30);
+    onUpdateCard({id:card.id,stmtHist:next});
+  };
+  const onRecon=en=>{const nx=hist.map(x=>x.id===en.histId?{...x,status:"reconciled"}:x);onUpdateCard({id:card.id,stmtRecon:[en,...rec],stmtHist:nx})};
+  const del=id=>onUpdateCard({id:card.id,stmtHist:hist.filter(x=>x.id!==id)});
+  const histIds=new Set(hist.map(x=>x.id));
+  const oldRec=rec.filter(r=>!r.histId||!histIds.has(r.histId));
+  const seg=(k,l)=>t("button",{key:k,onClick:()=>sView(k),className:"tr f1",style:{padding:"8px 0",borderRadius:999,border:"none",fontSize:12,fontWeight:600,background:view===k?c.ac:"transparent",color:view===k?"#0a0a0a":c.td},children:l});
   return o(Fragment,{children:[
-    list.length>0&&lnCard([t("div",{key:"h",style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:6},children:"RECONCILED STATEMENTS"}),...list.map((r,i)=>o("div",{key:r.id,className:"f ia jb",style:{padding:"9px 0",borderTop:i?`1px solid ${c.brs}`:"none",gap:8},children:[o("div",{className:"minw0",children:[t("div",{style:{fontSize:13,color:c.tx},children:"✓ "+lnFmtD(r.from)+" – "+lnFmtD(r.to)}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:fm(r.stmtTotal,cur)+" on statement · "+r.verified+" verified"+(r.missing?" · "+r.missing+" not logged":"")+(r.extra?" · "+r.extra+" extra":"")+" · marked "+lnFmtD(r.at)})]}),t("button",{onClick:()=>onUpdateCard({id:card.id,stmtRecon:list.filter(x=>x.id!==r.id)}),"aria-label":"Remove this reconciliation",className:"act90 trt",style:{background:"transparent",border:"none",color:c.tm,fontSize:16,padding:6},children:"×"})]}))],{marginTop:12,marginBottom:0}),
-    t("div",{style:{marginTop:14},children:t(StmtAnalyze,{key:card.id,data,embedded:true,fixedCardId:card.id,onAddExpenses,onMarkChecked,onTx,onReconcile:add,reconDone:list})})]});
+    o("div",{className:"f",style:{gap:4,background:c.sf2,borderRadius:999,padding:4,marginTop:12},children:[seg("new","New check"),seg("hist","History · "+(hist.length+oldRec.length))]}),
+    view==="hist"&&o("div",{style:{marginTop:12},children:[
+      hist.length+oldRec.length===0&&t("div",{style:{padding:"26px 0",textAlign:"center",color:c.tm,fontSize:13,lineHeight:1.5},children:"No statements checked yet. Every statement you compare is saved here automatically, so you can reopen it later without uploading it again."}),
+      ...hist.map(h=>lnCard([
+        o("div",{key:"a",className:"f ia jb",style:{gap:8},children:[o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:14,color:c.tx,fontWeight:600},children:lnFmtD(h.from)+" – "+lnFmtD(h.to)}),t("div",{className:"tru",style:{fontSize:11,color:c.tm,marginTop:2},children:(h.name||"Statement")+" · saved "+lnFmtD(h.at)})]}),t("span",{style:{fontSize:10,fontWeight:700,letterSpacing:.5,color:h.status==="reconciled"?c.mt:h.missing||h.extra?c.gd:c.mt,border:`1px solid ${(h.status==="reconciled"?c.mt:h.missing||h.extra?c.gd:c.mt)}66`,borderRadius:999,padding:"2px 8px",flexShrink:0,fontFamily:'var(--nf)'},children:h.status==="reconciled"?"RECONCILED":h.missing||h.extra?"NEEDS A LOOK":"ALL MATCH"})]}),
+        o("div",{key:"b",className:"f",style:{gap:8,marginTop:10},children:[["STATEMENT",fm(h.stmtTotal,cur),c.tx],["VERIFIED",String(h.verified),c.mt],["NOT LOGGED",String(h.missing),h.missing?c.co:c.tx],["EXTRA",String(h.extra),h.extra?c.gd:c.tx]].map(([k,v,col])=>o("div",{key:k,className:"f1",style:{background:c.sf2,borderRadius:10,padding:"8px 9px",minWidth:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:8,color:c.tm,letterSpacing:.7},children:k}),t("div",{className:"tru",style:{fontFamily:'var(--nf)',fontSize:12.5,color:col,marginTop:2},children:v})]}))}),
+        o("div",{key:"c",className:"f",style:{gap:8,marginTop:10},children:[lnBtn("Reopen",()=>{sReopen(h);sView("new")},true,{fontSize:13,padding:"10px 0"}),t("button",{key:"d",onClick:()=>del(h.id),"aria-label":"Delete from history",className:"act95 trt",style:{padding:"0 14px",borderRadius:12,border:`1px solid ${c.brs}`,background:"transparent",color:c.tm,fontSize:13},children:"Delete"})]})
+      ],{marginTop:0,marginBottom:10})),
+      oldRec.length>0&&lnCard([t("div",{key:"h",style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:6},children:"EARLIER RECONCILED (SUMMARY ONLY)"}),...oldRec.map((r,i)=>o("div",{key:r.id,className:"f ia jb",style:{padding:"9px 0",borderTop:i?`1px solid ${c.brs}`:"none",gap:8},children:[o("div",{className:"minw0",children:[t("div",{style:{fontSize:13,color:c.tx},children:"✓ "+lnFmtD(r.from)+" – "+lnFmtD(r.to)}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:fm(r.stmtTotal,cur)+" · "+r.verified+" verified"+(r.missing?" · "+r.missing+" not logged":"")+(r.extra?" · "+r.extra+" extra":"")})]}),t("button",{onClick:()=>onUpdateCard({id:card.id,stmtRecon:rec.filter(x=>x.id!==r.id)}),"aria-label":"Remove",className:"act90 trt",style:{background:"transparent",border:"none",color:c.tm,fontSize:16,padding:6},children:"×"})]}))],{marginBottom:0})]}),
+    view==="new"&&o("div",{style:{marginTop:14},children:[
+      reopen&&o("div",{className:"f ia jb",style:{gap:8,marginBottom:10,padding:"9px 12px",background:c.ac+"14",border:`1px solid ${c.ac}44`,borderRadius:12},children:[t("span",{style:{fontSize:12,color:c.tx},children:"Reopened from history · "+lnFmtD(reopen.from)+" – "+lnFmtD(reopen.to)}),t("button",{onClick:()=>sReopen(null),className:"act95 trt",style:{background:"transparent",border:"none",color:c.ac,fontSize:12,textDecoration:"underline"},children:"Start a new check"})]}),
+      t(StmtAnalyze,{key:card.id+(reopen?reopen.id:"new"),data,embedded:true,fixedCardId:card.id,onAddExpenses,onMarkChecked,onTx,onReconcile:onRecon,reconDone:rec,onSaveHist:en=>saveHist.current&&saveHist.current(en),initial:reopen||undefined})]})]});
 }
 function CardsHub({data,onClose,onAdd,onSelect,onFlt,onCashback,onPay,onEdit,onUpdateCard,onTx,onAddExpenses,onMarkChecked}){
   const{cards=[],expenses,currency:cur}=data,now=useMemo(()=>Date.now(),[]);
