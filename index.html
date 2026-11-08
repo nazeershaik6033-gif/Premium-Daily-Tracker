@@ -2478,7 +2478,7 @@ function App(){
         v==="billScan"&&t(BillScan,{data:d,onAddExpense:aE,onClose:()=>sV("home")}),
         v==="voiceAdd"&&t(VoiceAdd,{data:d,onAddMany:aEMany,onClose:()=>sV(navFromRef.current||"home")}),
         v==="howToUse"&&t(HelpCenter,{onClose:()=>sV(navFromRef.current||"home"),onView:id=>{navFromRef.current="howToUse";sV(id)},onTour:()=>sShowTour(true)}),
-        v==="stmtAnalyze"&&t(StmtAnalyze,{data:d,onClose:()=>sV(navFromRef.current),onAddExpenses:aEMany,onViewImports:()=>{navFromRef.current="stmtAnalyze";sV("stmtImports")},onMarkChecked:markStmtChecked}),
+        v==="stmtAnalyze"&&t(StmtAnalyze,{data:d,onClose:()=>{_stmtDraft={};sV(navFromRef.current)},onAddExpenses:aEMany,onViewImports:()=>{navFromRef.current="stmtAnalyze";sV("stmtImports")},onMarkChecked:markStmtChecked}),
         v==="stmtImports"&&t(StmtImports,{data:d,onClose:()=>sV(navFromRef.current),onTx:sAtx}),
         v==="aiInsights"&&t(AiInsights,{data:d,onClose:()=>sV(navFromRef.current)}),
         v==="cardPayFix"&&t(CardPayFix,{data:d,onConvert:convertToCardPayment,onIgnore:ignoreCardFix,onClose:()=>sV(navFromRef.current)}),
@@ -4677,32 +4677,34 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked,fix
   const rupeeMode=currency==="₹";
   const mm=useMemo(()=>buildMerchantMemory(expenses,data.merchantRules),[expenses,data.merchantRules]);
   const guessCat=(merchant)=>{const g=mm(merchant);return(g&&g.category)?g.category:"other"};
-  const[cmpCardId,sCmpCardId]=useState((initial&&initial.cardId)||fixedCardId||null),[cardQ,sCardQ]=useState("");
-  const[links,sLinks]=useState(()=>(initial&&initial.links)||{}),[pick,sPick]=useState(null);
+  const draftKey=fixedCardId||"standalone",D0=initial?null:(_stmtDraft[draftKey]||null);
+  const[cmpCardId,sCmpCardId]=useState((initial&&initial.cardId)||(D0&&D0.cmpCardId!==undefined?D0.cmpCardId:fixedCardId)||null),[cardQ,sCardQ]=useState("");
+  const[links,sLinks]=useState(()=>(initial&&initial.links)||(D0&&D0.links)||{}),[pick,sPick]=useState(null);
   const txKey=tx=>tx.date+"|"+tx.amount+"|"+(tx.merchant||"");
   const firstFix=useRef(true);
-  useEffect(()=>{if(fixedCardId)sCmpCardId(fixedCardId);if(firstFix.current){firstFix.current=false;return}sLinks({})},[fixedCardId]);
+  // Only react when the tab's card changes later; on first mount keep the card that was restored or chosen.
+  useEffect(()=>{if(firstFix.current){firstFix.current=false;return}if(fixedCardId)sCmpCardId(fixedCardId);sLinks({})},[fixedCardId]);
   const[man,sMan]=useState(null);
   const[quick,sQuick]=useState(null);
   const[photos,sPhotos]=useState([]);const[photoProgress,sPhotoProgress]=useState(null);
-  const[file,sFile]=useState(()=>initial?{name:(initial.name||"Saved statement")+" · from history"}:null);
-  const[parsed,sParsed]=useState(()=>initial&&initial.rows?initial.rows.map(r=>({date:r.d,amount:r.a,merchant:r.m||"Unknown",category:guessCat(r.m||"Unknown")})):null);
+  const[file,sFile]=useState(()=>initial?{name:(initial.name||"Saved statement")+" · from history"}:(D0?D0.file:null));
+  const[parsed,sParsed]=useState(()=>initial&&initial.rows?initial.rows.map(r=>({date:r.d,amount:r.a,merchant:r.m||"Unknown",category:guessCat(r.m||"Unknown")})):(D0?D0.parsed:null));
   const[analyzing,sAnalyzing]=useState(false);
   const[result,sResult]=useState(null);
   const[err,sErr]=useState(null);
-  const[period,sPeriod]=useState(3);
-  const[useCustom,sUseCustom]=useState(!!(initial&&initial.from&&initial.to));
-  const[fromD,sFromD]=useState(initial&&initial.from?tsToYMD(initial.from):"");
-  const[toD,sToD]=useState(initial&&initial.to?tsToYMD(initial.to):"");
+  const[period,sPeriod]=useState(D0&&D0.period!=null?D0.period:3);
+  const[useCustom,sUseCustom]=useState(!!(initial&&initial.from&&initial.to)||!!(D0&&D0.useCustom));
+  const[fromD,sFromD]=useState(initial&&initial.from?tsToYMD(initial.from):(D0?D0.fromD:""));
+  const[toD,sToD]=useState(initial&&initial.to?tsToYMD(initial.to):(D0?D0.toD:""));
   const win=useMemo(()=>{
     if(useCustom&&fromD&&toD){const s=new Date(fromD+"T00:00:00").getTime(),e=new Date(toD+"T23:59:59").getTime();if(!isNaN(s)&&!isNaN(e)&&s<=e)return{startTs:s,endTs:e,label:fromD+" → "+toD};}
     const st=new Date();st.setMonth(st.getMonth()-period);st.setHours(0,0,0,0);
     return{startTs:st.getTime(),endTs:Infinity,label:period===1?"the last month":"the last "+period+" months"};
   },[useCustom,fromD,toD,period]);
-  const[filter,sFilter]=useState("unlogged");
-  const[sortDir,sSortDir]=useState("desc");
-  const[mode,sMode]=useState("file");
-  const[csvText,sCsvText]=useState("");
+  const[filter,sFilter]=useState(D0&&D0.filter||"unlogged");
+  const[sortDir,sSortDir]=useState(D0&&D0.sortDir||"desc");
+  const[mode,sMode]=useState(D0&&D0.mode||"file");
+  const[csvText,sCsvText]=useState(D0&&D0.csvText||"");
   const[photoPrompt,sPhotoPrompt]=useState("");
   const[note,sNote]=useState(null);
   const fileRef=useRef(null);const photoRef=useRef(null);
@@ -4926,6 +4928,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked,fix
   // Every statement you check is remembered on its card, so it can be reopened later without
   // uploading or re-matching it. The same statement (same rows) always updates the same entry.
   const histSig=useMemo(()=>{if(!parsed||!parsed.length)return null;let h=5381;const str=parsed.map(x=>x.date+":"+x.amount).sort().join("|");for(let i=0;i<str.length;i++)h=((h<<5)+h+str.charCodeAt(i))|0;return"sh_"+(h>>>0).toString(36)+"_"+parsed.length},[parsed]);
+  useEffect(()=>{_stmtDraft[draftKey]={parsed,file,links,cmpCardId,mode,csvText,useCustom,fromD,toD,period,filter,sortDir}},[parsed,file,links,cmpCardId,mode,csvText,useCustom,fromD,toD,period,filter,sortDir]);
   const saveHistRef=useRef(null);saveHistRef.current=onSaveHist;
   useEffect(()=>{
     if(!saveHistRef.current||!cmpCardId||!histSig||!parsed||!parsed.length||!recon.length)return;
@@ -4963,7 +4966,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked,fix
   // stmtChecked marks an expense as matched against a bank/card statement -- distinct from
   // stmtVerified (a human hand-checked the OCR-read amount against the photo). Logging a row
   // straight out of the statement counts as a match by construction, so it's ticked immediately.
-  const mkExp=(tx)=>({type:"expense",amount:tx.amount,currency,accountId:(accounts&&accounts[0]&&accounts[0].id)||null,cardId:cmpCardId||null,category:tx.category||guessCat(tx.merchant),...(tx.subcategory?{subcategory:tx.subcategory}:{}),merchant:tx.merchant||null,note:"From statement",date:tx.date,source:"statement",stmtChecked:true,...(tx.verified?{stmtVerified:true}:{})});
+  const mkExp=(tx)=>{const cid=tx.cardId!==undefined?tx.cardId:(cmpCardId||null);return{type:"expense",amount:tx.amount,currency,accountId:cid?null:(tx.accountId||(accounts&&accounts[0]&&accounts[0].id)||null),cardId:cid||null,category:tx.category||guessCat(tx.merchant),...(tx.subcategory?{subcategory:tx.subcategory}:{}),merchant:tx.merchant||null,note:"From statement",date:tx.date,source:"statement",stmtChecked:true,...(tx.verified?{stmtVerified:true}:{})}};
   const logOne=(tx)=>onAddExpenses&&onAddExpenses([mkExp(tx)]);
   // Replace one row in the parsed list in place — recon recomputes off `parsed`, so a corrected
   // amount immediately re-runs the logged/not-logged match.
@@ -5154,7 +5157,7 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked,fix
             t("div",{style:{fontFamily:'var(--nf)',fontSize:14,color:r.match?c.tx:c.co},children:"−"+fm(r.tx.amount,currency)}),
             r.match?o("div",{children:[t("div",{style:{fontSize:10,color:c.mt,marginTop:3,fontFamily:'var(--nf)',letterSpacing:.3},children:r.manual?"✓ MATCHED BY YOU":"✓ LOGGED"}),o("div",{className:"f ia",style:{gap:6,marginTop:6,justifyContent:"flex-end"},children:[onTx&&t("button",{onClick:()=>onTx(r.match),className:"act95 tr",style:{padding:"4px 9px",background:"transparent",color:c.td,border:`1px solid ${c.brs}`,borderRadius:999,fontSize:10.5},children:"Open"}),t("button",{onClick:()=>sLinks(l=>({...l,[txKey(r.tx)]:"none"})),className:"act95 tr",style:{padding:"4px 9px",background:"transparent",color:c.co,border:`1px solid ${c.co}55`,borderRadius:999,fontSize:10.5},children:"Unmatch"})]})]}):o("div",{className:"f ia",style:{gap:6,marginTop:6,justifyContent:"flex-end"},children:[
               t("button",{onClick:()=>sPick(r.tx),className:"act95 tr",style:{padding:"5px 11px",background:"transparent",color:c.ac,border:`1px solid ${c.ac}66`,borderRadius:999,fontSize:11,fontWeight:600},children:"Match"}),
-              t("button",{onClick:()=>sQuick({...r.tx,category:r.tx.category||guessCat(r.tx.merchant)}),className:"act95 tr",style:{padding:"5px 11px",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:999,fontSize:11,fontWeight:600},children:"+ Quick"}),
+              t("button",{onClick:()=>sQuick({...r.tx,category:r.tx.category||guessCat(r.tx.merchant),amtS:String(r.tx.amount),cardId:cmpCardId||null,accountId:(accounts&&accounts[0]&&accounts[0].id)||null}),className:"act95 tr",style:{padding:"5px 11px",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:999,fontSize:11,fontWeight:600},children:"+ Quick"}),
               t("button",{onClick:()=>openManual(r.tx),className:"act95 tr",style:{padding:"5px 11px",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:999,fontSize:11,fontWeight:600},children:"Edit"})
             ]}),
             ph&&t("button",{onClick:()=>openVerify(r),className:"act95 tr",style:{marginTop:6,marginLeft:"auto",padding:"5px 11px",background:susp?(c.gd||c.ac):c.sf2,color:susp?"#0a0a0a":c.td,border:`1px solid ${susp?(c.gd||c.ac):c.brs}`,borderRadius:999,fontSize:11,fontWeight:600,display:"block"},children:"🔍 Photo"}),
@@ -5185,19 +5188,23 @@ function StmtAnalyze({data,onClose,onAddExpenses,onViewImports,onMarkChecked,fix
       ...((recon.free||[]).filter(e=>e.type==="expense").sort((a,b)=>Math.abs(a.amount-pick.amount)-Math.abs(b.amount-pick.amount)||Math.abs(a.date-pick.date)-Math.abs(b.date-pick.date)).slice(0,12).map((e,i)=>o("button",{key:e.id,onClick:()=>{sLinks(l=>({...l,[txKey(pick)]:e.id}));sPick(null)},className:"w100 f ia jb act98 trt",style:{padding:"11px 0",background:"transparent",border:"none",borderTop:i?`1px solid ${c.brs}`:"none",color:"inherit",textAlign:"left",gap:10},children:[o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:13,color:c.tx},children:co(e.category).emoji+" "+(e.merchant||e.payee||co(e.category).label)}),t("div",{style:{fontSize:10.5,color:c.tm,marginTop:1},children:new Date(e.date).toLocaleDateString("en-GB",{day:"numeric",month:"short"})+(Math.abs(e.amount-pick.amount)<.01?" · same amount":" · "+(e.amount>pick.amount?"+":"−")+fm(Math.abs(e.amount-pick.amount),currency)+" off")})]}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:c.tx},children:fm(e.amount,currency)})]}))),
       !(recon.free||[]).length&&t("div",{style:{fontSize:12.5,color:c.tm,padding:"10px 0"},children:"No unmatched logged expenses nearby. Use Quick or Edit to log this line instead."}),
       o("div",{className:"f",style:{marginTop:14},children:[lnBtn("Cancel",()=>sPick(null))]})]})}),
-    quick&&t(Sht,{onClose:()=>sQuick(null),children:o(Fragment,{children:[
-      t("div",{style:{fontFamily:c.hf,fontSize:22,marginBottom:6},children:"Log this transaction?"}),
-      t("div",{style:{fontSize:13,color:c.td,marginBottom:18,lineHeight:1.5},children:cmpCardId?`Will be added to ${(cards.find(cd=>cd.id===cmpCardId)||{}).name||"the selected card"}.`:"Will be added as an expense."}),
-      o("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,padding:"14px 16px",marginBottom:18},children:[
-        o("div",{className:"f ia jb",style:{marginBottom:8},children:[t("div",{style:{fontSize:15,color:c.tx,fontWeight:600},children:quick.merchant||"Unknown"}),t("div",{style:{fontFamily:'var(--nf)',fontSize:16,color:c.co},children:"−"+fm(quick.amount,currency)})]}),
-        t("div",{style:{fontFamily:'var(--nf)',fontSize:12,color:c.tm},children:new Date(quick.date).toLocaleDateString("en-US",{weekday:"short",day:"numeric",month:"short",year:"numeric"})})
-      ]}),
-      o("div",{style:{marginBottom:18},children:[t("label",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1,display:"block",marginBottom:6},children:"CATEGORY"}),t(CatField,{value:quick.category||"other",sub:quick.subcategory,merchant:quick.merchant,data,onChange:v=>sQuick({...quick,category:v.category,subcategory:v.subcategory||undefined})})]}),
-      o("div",{className:"f",style:{gap:10},children:[
-        t("button",{onClick:()=>sQuick(null),className:"f1 act98 tr",style:{padding:"13px 0",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:12,fontSize:14,fontWeight:500},children:"Cancel"}),
-        t("button",{onClick:()=>{logOne(quick);sQuick(null)},className:"f1 act98 tr",style:{padding:"13px 0",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:12,fontSize:14,fontWeight:600},children:"Add"})
-      ]})
-    ]})}),
+    quick&&t(Sht,{onClose:()=>sQuick(null),children:(()=>{
+      const q=quick,up=p2=>sQuick({...q,...p2}),viaCard=!!q.cardId,amt=parseFloat(q.amtS),okAmt=amt>0;
+      const cd=q.cardId&&cards.find(x=>x.id===q.cardId),ac=!viaCard&&(accounts||[]).find(x=>x.id===q.accountId);
+      const lbl=x=>t("label",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1,display:"block",margin:"12px 0 6px"},children:x});
+      const sel={width:"100%",boxSizing:"border-box",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 12px",color:c.tx,fontSize:14,outline:"none",fontFamily:'var(--tf)'};
+      return o(Fragment,{children:[
+        t("div",{style:{fontFamily:c.hf,fontSize:22,color:c.tx},children:"Log this transaction"}),
+        t("div",{style:{fontSize:12.5,color:c.td,margin:"4px 0 2px",lineHeight:1.5},children:"Will be added to "+(cd?"💳 "+cd.name+(cd.last4?" ··"+cd.last4:""):ac?"🏦 "+ac.name:"your expenses")+". Change anything below first."}),
+        lbl("MERCHANT / DESCRIPTION"),t("input",{value:q.merchant||"",onChange:e=>up({merchant:e.target.value}),style:{...sel,fontSize:15}}),
+        o("div",{className:"f",style:{gap:10},children:[o("div",{className:"f1",children:[lbl("AMOUNT"),t("input",{value:q.amtS,inputMode:"decimal",onChange:e=>up({amtS:e.target.value.replace(/[^\d.]/g,"")}),style:{...sel,fontFamily:'var(--nf)'}})]}),o("div",{className:"f1",children:[lbl("DATE"),t("input",{type:"date",value:tsToYMD(q.date),onChange:e=>{const ts=lnFromYMD(e.target.value);if(ts)up({date:ts+12*36e5})},style:sel})]})]}),
+        lbl("CATEGORY"),t(CatField,{value:q.category||"other",sub:q.subcategory,merchant:q.merchant,data,onChange:v=>up({category:v.category,subcategory:v.subcategory||undefined})}),
+        lbl("PAID WITH"),
+        o("div",{className:"f",style:{gap:6,background:c.sf2,borderRadius:12,padding:4},children:[["card","💳 Card"],["acc","🏦 Account"]].map(([k,l])=>{const on=(k==="card")===viaCard;return t("button",{key:k,onClick:()=>up(k==="card"?{cardId:q.cardId||cmpCardId||(cards[0]&&cards[0].id)||null}:{cardId:null}),disabled:k==="card"&&!cards.length||k==="acc"&&!(accounts||[]).length,className:"f1 act95 trt",style:{padding:"9px 0",borderRadius:9,border:"none",fontSize:13,fontWeight:on?600:400,background:on?c.ac:"transparent",color:on?"#0a0a0a":c.td},children:l})})}),
+        t("select",{value:viaCard?(q.cardId||""):(q.accountId||""),onChange:e=>up(viaCard?{cardId:e.target.value}:{accountId:e.target.value}),"aria-label":viaCard?"Card":"Account",style:{...sel,marginTop:8},children:viaCard?cards.map(x=>t("option",{key:x.id,value:x.id,children:"💳 "+x.name+(x.last4?" ··"+x.last4:"")})):(accounts||[]).map(x=>t("option",{key:x.id,value:x.id,children:"🏦 "+x.name}))}),
+        o("div",{className:"f",style:{gap:10,marginTop:18},children:[
+          t("button",{onClick:()=>sQuick(null),className:"f1 act98 tr",style:{padding:"13px 0",background:c.sf2,color:c.td,border:`1px solid ${c.brs}`,borderRadius:12,fontSize:14,fontWeight:500},children:"Cancel"}),
+          t("button",{disabled:!okAmt,onClick:()=>{logOne({...q,amount:amt,merchant:(q.merchant||"").trim()||"Unknown"});sQuick(null)},className:"f1 act98 tr",style:{padding:"13px 0",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:12,fontSize:14,fontWeight:600,opacity:okAmt?1:.5},children:okAmt?"Add "+fm(amt,currency):"Add"})]})]})})()}),
     man&&t(Sht,{onClose:()=>sMan(null),children:o(Fragment,{children:[
       o("div",{className:"f ia jb",style:{marginBottom:14},children:[
         t("div",{style:{fontFamily:c.hf,fontSize:22},children:"Log transaction"}),
@@ -8847,6 +8854,9 @@ function chRanges(info,now){
   const d=new Date(now),ms=(k)=>new Date(d.getFullYear(),d.getMonth()-k,1).getTime();
   return[{id:"cycle",label:"This cycle",s:info.lastClose,e:Infinity},{id:"last",label:"Last cycle",s:chAddM(info.lastClose,-1),e:info.lastClose},{id:"3m",label:"3 months",s:ms(2),e:Infinity},{id:"12m",label:"12 months",s:ms(11),e:Infinity}];
 }
+// Where you were inside Cards (card, tab, statement check). Kept in memory so opening an entry, editing it and
+// coming back lands you on the same screen; cleared when you leave Cards with the back arrow.
+let _hubState={},_stmtDraft={};
 function ChCardFace({info,cur,active,onClick}){
   const card=info.card,g=gr(card.gradient||"ink"),nw=NW.find(x=>x.id===card.network)||NW[5],cy=info.cy,hasDue=cy&&cy.outstanding>0;
   return o("button",{onClick,"aria-label":"Open "+card.name,className:"act98",style:{flex:"0 0 82%",scrollSnapAlign:"center",border:"none",padding:0,background:"transparent",color:"inherit",textAlign:"left",transform:active?"scale(1)":"scale(.93)",opacity:active?1:.62,transition:"transform .35s cubic-bezier(.2,.9,.2,1),opacity .35s ease",willChange:"transform"},children:
@@ -9014,7 +9024,9 @@ function ChHistory({data,cur,cardId,onTx,onAddPay}){
 }
 function ChStatements({info,data,onAddExpenses,onMarkChecked,onTx,onUpdateCard,cur}){
   const card=info.card,rec=card.stmtRecon||[],hist=card.stmtHist||[];
-  const[view,sView]=useState("new"),[reopen,sReopen]=useState(null);
+  const mem=(_hubState.stm||{})[card.id]||{};
+  const[view,sView]=useState(mem.view||"new"),[reopen,sReopen]=useState(()=>mem.reopenId?((card.stmtHist||[]).find(x=>x.id===mem.reopenId)||null):null);
+  useEffect(()=>{_hubState={..._hubState,stm:{...(_hubState.stm||{}),[card.id]:{view,reopenId:reopen?reopen.id:null}}}},[view,reopen,card.id]);
   const latest=useRef(card),dataRef=useRef(data);latest.current=card;dataRef.current=data;
   const cardOf=id=>(dataRef.current.cards||[]).find(x=>x.id===id)||latest.current;
   // Upsert one statement check (auto-saved by the analyzer). Writes only when something really changed.
@@ -9046,7 +9058,7 @@ function ChStatements({info,data,onAddExpenses,onMarkChecked,onTx,onUpdateCard,c
 }
 function CardsHub({data,onClose,onAdd,onSelect,onFlt,onCashback,onPay,onEdit,onUpdateCard,onTx,onAddExpenses,onMarkChecked}){
   const{cards=[],expenses,currency:cur}=data,now=useMemo(()=>Date.now(),[]);
-  const[idx,sIdx]=useState(0),[tab,sTab]=useState("overview"),[rng,sRng]=useState("cycle"),[payOpen,sPayOpen]=useState(false),[mSel,sMSel]=useState(null);
+  const[idx,sIdx]=useState(()=>{const i=cards.findIndex(x=>x.id===_hubState.cardId);return i>=0?i:0}),[tab,sTab]=useState(_hubState.tab||"overview"),[rng,sRng]=useState(_hubState.rng||"cycle"),[payOpen,sPayOpen]=useState(false),[mSel,sMSel]=useState(null);
   const scRef=useRef(null),tick=useRef(0);
   const infos=useMemo(()=>cards.map(cr=>chCardInfo(cr,expenses,now)),[cards,expenses,now]);
   const safeIdx=Math.min(idx,Math.max(0,infos.length-1)),info=infos[safeIdx];
@@ -9054,7 +9066,10 @@ function CardsHub({data,onClose,onAdd,onSelect,onFlt,onCashback,onPay,onEdit,onU
   const goTo=i=>{const el=scRef.current;if(!el||!el.children[i])return;const k=el.children[i];el.scrollTo({left:k.offsetLeft-(el.clientWidth-k.offsetWidth)/2,behavior:"smooth"})};
   // overall strip
   const tot=useMemo(()=>{let due=0,used=0,lim=0,cb=0,soon=null;for(const x of infos){due+=x.out;if(x.lim>0){used+=x.used;lim+=x.lim}if(x.cy&&x.out>0&&(!soon||x.cy.daysUntilDue<soon.cy.daysUntilDue))soon=x;try{const r=cbRange(x.credit?"cycle":"month",x.card);cb+=cbSummary(x.card,expenses,r.s,r.e).total}catch(e){}}return{due,util:lim>0?used/lim*100:null,cb,soon}},[infos,expenses]);
-  if(!cards.length)return o("div",{style:{padding:`8px ${GUT}px 32px`},className:"st",children:[t(SH,{title:t("em",{children:"Cards"}),onBack:onClose}),t(ES,{title:t("em",{children:"No cards yet"}),subtitle:"Add a card to track dues, spends and cashback.",action:{label:"Add card",onClick:onAdd}})]});
+  useEffect(()=>{_hubState={..._hubState,cardId:(infos[safeIdx]||{card:{}}).card.id,tab,rng}},[safeIdx,tab,rng,infos]);
+  useEffect(()=>{const el=scRef.current;if(!el||idx===0)return;const k=el.children[idx];if(k)el.scrollLeft=k.offsetLeft-(el.clientWidth-k.offsetWidth)/2},[]);
+  const leave=()=>{_hubState={};_stmtDraft={};onClose()};
+  if(!cards.length)return o("div",{style:{padding:`8px ${GUT}px 32px`},className:"st",children:[t(SH,{title:t("em",{children:"Cards"}),onBack:leave}),t(ES,{title:t("em",{children:"No cards yet"}),subtitle:"Add a card to track dues, spends and cashback.",action:{label:"Add card",onClick:onAdd}})]});
   const range=chRanges(info,now).find(r=>r.id===rng)||chRanges(info,now)[0];
   const inRange=info.spends.filter(e=>e.date>=range.s&&e.date<range.e);
   const rangeTot=inRange.reduce((s,e)=>s+e.amount,0);
@@ -9071,7 +9086,7 @@ function CardsHub({data,onClose,onAdd,onSelect,onFlt,onCashback,onPay,onEdit,onU
   const best=infos.filter(x=>x.credit&&x.freeDays!=null).sort((a,b)=>b.freeDays-a.freeDays);
   const cb=(()=>{try{const r=cbRange(info.credit?"cycle":"month",info.card);return{...cbSummary(info.card,expenses,r.s,r.e),r}}catch(e){return null}})();
   return o("div",{style:{padding:`8px ${GUT}px 40px`},className:"st",children:[
-    t(SH,{title:t("em",{children:"Cards"}),onBack:onClose,right:o("div",{className:"f ia",style:{gap:6},children:[onCashback&&t("button",{onClick:onCashback,"aria-label":"Cashback",className:"act90 trt",style:{width:38,height:38,borderRadius:12,background:"transparent",border:"none",fontSize:18},children:"💸"}),t("button",{onClick:onAdd,"aria-label":"Add card",className:"act90 trt",style:{width:38,height:38,borderRadius:12,background:c.sf2,border:`1px solid ${c.brs}`,color:c.tx,fontSize:20},children:"+"})]})}),
+    t(SH,{title:t("em",{children:"Cards"}),onBack:leave,right:o("div",{className:"f ia",style:{gap:6},children:[onCashback&&t("button",{onClick:onCashback,"aria-label":"Cashback",className:"act90 trt",style:{width:38,height:38,borderRadius:12,background:"transparent",border:"none",fontSize:18},children:"💸"}),t("button",{onClick:onAdd,"aria-label":"Add card",className:"act90 trt",style:{width:38,height:38,borderRadius:12,background:c.sf2,border:`1px solid ${c.brs}`,color:c.tx,fontSize:20},children:"+"})]})}),
     o("div",{className:"f",style:{gap:8,padding:"0 2px"},children:[stat("TOTAL DUE",fm(tot.due,cur),tot.soon?tot.soon.card.name+" · "+(tot.soon.cy.overdue?"overdue":tot.soon.cy.daysUntilDue+"d left"):"all clear",tot.due>0?c.co:c.mt),stat("UTILISATION",tot.util==null?"—":Math.round(tot.util)+"%",tot.util==null?"set limits":"across limits",tot.util>=70?c.ro:tot.util>=30?c.gd:c.mt),stat("CASHBACK",fm(tot.cb,cur),"this cycle",c.mt,onCashback)]}),
     t("div",{ref:scRef,onScroll,style:{display:"flex",gap:10,overflowX:"auto",scrollSnapType:"x mandatory",WebkitOverflowScrolling:"touch",padding:"18px 9% 6px",margin:"0 -"+GUT+"px",scrollbarWidth:"none",overscrollBehaviorX:"contain"},children:infos.map((x,i)=>t(ChCardFace,{key:x.card.id,info:x,cur,active:i===safeIdx,onClick:()=>i===safeIdx?onSelect(x.card):goTo(i)}))}),
     t("div",{className:"f jc",style:{gap:6,margin:"8px 0 4px"},children:infos.map((x,i)=>t("button",{key:x.card.id,onClick:()=>goTo(i),"aria-label":"Show "+x.card.name,style:{width:i===safeIdx?20:7,height:7,borderRadius:4,border:"none",padding:0,background:i===safeIdx?c.ac:c.brs,transition:"width .3s cubic-bezier(.2,.9,.2,1),background .3s"}}))}),
