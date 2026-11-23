@@ -121,6 +121,11 @@ body{background:#fff!important;color:#000!important}
   z-index:30;
   display:flex;
   justify-content:center;
+  /* The wrapper stays anchored to the true viewport edge (Nav() measures it
+     against visualViewport); the visible bar is the floating pill inside it.
+     The wrapper itself is click-through so content around the pill stays usable. */
+  padding:0 var(--nav-side) var(--nav-gap);
+  pointer-events:none;
 }
 body.sheet-open .nav-bar,body.kb-open .nav-bar,body.sel-open .nav-bar{display:none!important}
 /* === Motion system ===
@@ -132,6 +137,13 @@ body.sheet-open .nav-bar,body.kb-open .nav-bar,body.sel-open .nav-bar{display:no
   --sp:cubic-bezier(.34,1.56,.64,1);
   --sp-s:cubic-bezier(.22,1,.36,1);
   --ez:cubic-bezier(.4,0,.2,1);
+  /* Floating bottom nav geometry. Screens scroll all the way to the bottom of
+     the display, under the pill; --nav-clear is how much room the end of a
+     scroll view leaves so its last row can come to rest above the pill. */
+  --nav-h:62px;
+  --nav-side:18px;
+  --nav-gap:max(12px,calc(env(safe-area-inset-bottom,0px) - 8px));
+  --nav-clear:calc(var(--nav-h) + var(--nav-gap) + 18px);
   /* Neumorphic shadow tints. Overridden per theme below — these used to be
      hardcoded dark values, which is why light mode looked like grime. */
   --neu-d:rgba(0,0,0,.6);    --neu-l:rgba(255,255,255,.07);
@@ -160,39 +172,48 @@ body[data-theme="snow"] .neu-flat,body[data-theme="snow"] .nb-fab{border-radius:
 .neu-flat.neu-press:active{box-shadow:inset 0 3px 8px rgba(0,0,0,.35);transform:translateY(1px)}
 
 /* === BOTTOM NAV ===
-   Full-width flat bar. Colours come from --nb-* vars, which applyTheme()
-   rewrites on every theme change, so the bar tracks the theme. */
+   Floating glass pill, inset from the screen edges, with the page scrolling
+   underneath it. Colours come from --nb-* vars, which applyTheme() rewrites
+   on every theme change, so the bar tracks the theme. */
 .nb{
-  position:relative;width:100%;
+  position:relative;width:100%;max-width:min(460px,calc(var(--aw) - 2 * var(--nav-side)));
   display:flex;justify-content:center;
-  background:var(--nb-bg);
-  border-top:1px solid var(--nb-br);
-  padding-bottom:calc(env(safe-area-inset-bottom) * 0.0625);
+  border-radius:999px;
+  pointer-events:auto;
+  box-shadow:var(--nb-sh);
+  transition:box-shadow 280ms var(--ez);
+}
+/* The glass lives on a pseudo-element: backdrop-filter on .nb itself would
+   become the containing block for the fixed-position scrim inside it and
+   shrink the scrim to the size of the pill. */
+.nb::before{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:var(--nb-glass);
+  border:1px solid var(--nb-rim);
+  -webkit-backdrop-filter:blur(22px) saturate(1.7);backdrop-filter:blur(22px) saturate(1.7);
   transition:background 280ms var(--ez),border-color 280ms var(--ez);
 }
-.nb-row{width:100%;max-width:var(--aw);display:grid;grid-template-columns:repeat(5,1fr);height:56px}
+.nb-row{position:relative;width:100%;display:grid;grid-template-columns:repeat(5,1fr);height:var(--nav-h);padding:6px}
+/* lighter pill behind the active tab; slides between tabs */
+.nb-hl{
+  position:absolute;top:6px;bottom:6px;left:6px;width:calc((100% - 12px) / 5);
+  border-radius:999px;background:var(--nb-hl);pointer-events:none;
+  transform:translateX(calc(var(--i,0) * 100%));
+  transition:transform 420ms var(--sp-s),opacity 220ms var(--ez),background 280ms var(--ez);
+}
+.nb-hl[data-on="0"]{opacity:0}
 .nb-tab{
   position:relative;background:transparent;border:none;padding:0;height:100%;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  display:flex;align-items:center;justify-content:center;border-radius:999px;
   cursor:pointer;-webkit-tap-highlight-color:transparent;overflow:hidden;
   color:var(--nb-off);
   transition:color 240ms var(--ez);
 }
 .nb-tab[data-on="1"]{color:var(--nb-ac)}
-/* the short bar that sits above the active icon */
-.nb-ind{
-  position:absolute;top:0;left:50%;width:28px;height:3px;border-radius:0 0 3px 3px;
-  background:var(--nb-ac);opacity:0;
-  transform:translateX(-50%) scaleX(.3);
-  transition:transform 380ms var(--sp),opacity 220ms var(--ez);
-}
-.nb-tab[data-on="1"] .nb-ind{opacity:1;transform:translateX(-50%) scaleX(1)}
 .nb-ico{display:flex;transition:transform 200ms var(--ez)}
 .nb-tab:active .nb-ico{transform:scale(.84)}
 .nb-tab[data-on="1"] .nb-ico{animation:nbpop 480ms var(--sp)}
-@keyframes nbpop{0%{transform:scale(1) translateY(0)}36%{transform:scale(1.2) translateY(-3px)}100%{transform:scale(1) translateY(0)}}
-.nb-lb{font-size:10px;letter-spacing:.2px;transition:opacity 240ms var(--ez)}
-.nb-tab[data-on="0"] .nb-lb{opacity:.72}
+@keyframes nbpop{0%{transform:scale(1)}36%{transform:scale(1.16)}100%{transform:scale(1)}}
 /* tap ripple */
 .nb-rip{
   position:absolute;border-radius:999px;background:var(--nb-ac);
@@ -200,22 +221,21 @@ body[data-theme="snow"] .neu-flat,body[data-theme="snow"] .nb-fab{border-radius:
   animation:nbrip 560ms var(--sp-s) forwards;
 }
 @keyframes nbrip{to{transform:scale(1);opacity:0}}
-/* centre FAB — the ring is a box-shadow in the bar colour, so it reads as a
-   notch cut out of the bar without needing an actual mask */
+/* centre add button, sitting inside the pill */
 .nb-fab{
-  position:absolute;left:50%;top:-23px;width:58px;height:58px;border-radius:999px;
+  position:absolute;left:50%;top:50%;width:48px;height:48px;border-radius:999px;
   display:flex;align-items:center;justify-content:center;
   border:none;cursor:pointer;-webkit-tap-highlight-color:transparent;
   background:var(--nb-ac);color:var(--nb-fabfg);
-  box-shadow:0 0 0 6px var(--nb-bg),0 8px 20px var(--nb-glow),0 2px 6px rgba(0,0,0,.16);
-  transform:translateX(-50%);
+  box-shadow:0 6px 16px var(--nb-glow),0 1px 3px rgba(0,0,0,.18);
+  transform:translate(-50%,-50%);
   /* above the popover scrim (49) so it stays crisp and tappable as the close button */
   z-index:51;
   transition:transform 460ms var(--sp),background 280ms var(--ez),box-shadow 280ms var(--ez);
 }
-.nb-fab:active{transform:translateX(-50%) scale(.88)}
-.nb-fab[data-open="1"]{transform:translateX(-50%) rotate(135deg)}
-.nb-fab[data-open="1"]:active{transform:translateX(-50%) rotate(135deg) scale(.88)}
+.nb-fab:active{transform:translate(-50%,-50%) scale(.88)}
+.nb-fab[data-open="1"]{transform:translate(-50%,-50%) rotate(135deg)}
+.nb-fab[data-open="1"]:active{transform:translate(-50%,-50%) rotate(135deg) scale(.88)}
 /* FAB popover */
 @keyframes nbpin{from{opacity:0;transform:translateY(16px) scale(.84)}to{opacity:1;transform:translateY(0) scale(1)}}
 .nb-pop{animation:nbpin 460ms var(--sp) both}
@@ -442,6 +462,12 @@ const paintNavVars=(nc,name)=>{const r=document.documentElement.style;
   r.setProperty("--nb-fabfg",fgOn(nc.cu));
   r.setProperty("--nb-glow",nc.cu+(nc.dk?"66":"4D"));
   r.setProperty("--nb-scrim",nc.dk?"rgba(0,0,0,.45)":"rgba(26,24,20,.28)");
+  // Floating pill: translucent surface colour so the page shows through the blur.
+  const sf=String(nc.sfg||"");
+  r.setProperty("--nb-glass",/^#[0-9a-f]{6}$/i.test(sf)?sf+(nc.dk?"B8":"C4"):sf);
+  r.setProperty("--nb-rim",nc.dk?"rgba(255,255,255,.09)":"rgba(0,0,0,.07)");
+  r.setProperty("--nb-hl",nc.dk?"rgba(255,255,255,.11)":"rgba(0,0,0,.065)");
+  r.setProperty("--nb-sh",nc.dk?"0 12px 32px rgba(0,0,0,.45),0 2px 8px rgba(0,0,0,.25)":"0 12px 30px rgba(92,80,58,.20),0 2px 8px rgba(92,80,58,.10)");
 };
 // === LAYOUT TOKENS ===
 // One content width and one card radius for the whole app. The app previously
@@ -2399,7 +2425,7 @@ function App(){
     notice&&o("div",{onClick:()=>{if(notice.title.includes("Log"))sV("add");sNotice(null)},style:{margin:"10px 16px 0",padding:"13px 14px",background:`linear-gradient(135deg,${c.ac}1f 0%,${c.sfg} 60%)`,border:`1px solid ${c.ac}40`,borderRadius:14,display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer",width:"calc(100% - 32px)",maxWidth:408,boxSizing:"border-box"},children:[o("div",{className:"f1 minw0",children:[t("div",{style:{fontSize:13,fontWeight:600,color:c.tx,marginBottom:2},children:notice.title}),t("div",{style:{fontSize:12,color:c.td,lineHeight:1.45},children:notice.body})]}),t("button",{onClick:e=>{e.stopPropagation();sNotice(null)},style:{background:"transparent",border:"none",color:c.tm,flexShrink:0,padding:2,display:"flex"},children:t(X,{size:15})})]}),
     t(IOSTip,{}),
     o("div",{className:"r w100",style:{maxWidth:AW,flex:1,minHeight:0,background:c.bg,overflow:"hidden",display:"flex",flexDirection:"column"},children:[
-      o("div",{key:"vw-"+v,ref:scrollRef,className:vwCls,style:{paddingBottom:"calc(70px + (env(safe-area-inset-bottom) * 0.0625))",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
+      o("div",{key:"vw-"+v,ref:scrollRef,className:vwCls,style:{paddingBottom:"var(--nav-clear)",flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"},children:[
         v==="home"&&t(Home,{data:dv,persist:pst,onTx:sAtx,onView:sV,onSetBudget:b=>pst({budget:b}),onFlt:sFlt,onUseProfile:p=>sProfToUse(p),onTour:()=>sShowTour(true),onAddExpenses:aEMany}),
         v==="calendar"&&t(Calend,{data:dv,onTx:sAtx,onFlt:sFlt,onDiary:()=>{navFromRef.current="calendar";sV("diary")},presetAdd:(ts,k)=>{window.__pd=ts;window.__pt=k||"expense";sV("add")},onExplore:(y,m)=>{window.__emYr=y;window.__emMo=m;navFromRef.current="calendar";sV("exploreMonth")}}),
         v==="exploreMonth"&&t(MonthTools,{data:dv,yr:window.__emYr??new Date().getFullYear(),mo:window.__emMo??new Date().getMonth(),onTx:sAtx,onFlt:sFlt,onClose:()=>sV(navFromRef.current||"calendar")}),
@@ -2525,7 +2551,7 @@ function useNavAction(label,onClick,opts){
   useEffect(()=>{if(!label)return;const a={label,icon,disabled,run:()=>ref.current&&ref.current()};_navActs.push(a);_navPub();return()=>{_navActs=_navActs.filter(x=>x!==a);_navPub()}},[label,icon,disabled]);
 }
 // === BOTTOM NAV ===
-// Flat, full-width bar. Every colour is a CSS var written by paintNavVars(), so
+// Floating pill over the content. Every colour is a CSS var written by paintNavVars(), so
 // the bar follows the theme instead of carrying baked-in dark shadows.
 const NAV_TABS=[
   {id:"home",icon:Hm,label:"home"},
@@ -2611,28 +2637,29 @@ function Nav({view,setView,onQuickPick,onVoice}){
     open&&t("div",{onClick:()=>sOpen(false),className:"nb-scrim",
       style:{position:"fixed",inset:0,top:"var(--hdr-h)",zIndex:49}}),
 
-    open&&o("div",{style:{position:"absolute",bottom:70,left:"50%",transform:"translateX(-50%)",
+    open&&o("div",{style:{position:"absolute",bottom:"calc(var(--nav-h) + 12px)",left:"50%",transform:"translateX(-50%)",
       display:"flex",gap:10,zIndex:50,padding:4},children:[
       pop(Zap,"quick","profiles",c.cu,()=>{sOpen(false);onQuickPick&&onQuickPick()}),
       pop(Pencil,"add","manual",c.ac,()=>go("add")),
     ]}),
 
-    o("div",{className:"nb-row",children:NAV_TABS.map(tb=>{
+    o("div",{className:"nb-row",children:[
+      (()=>{const i=NAV_TABS.findIndex(tb=>!tb.main&&tb.id===view);
+        return t("div",{key:"hl",className:"nb-hl","data-on":i<0?"0":"1",style:i<0?undefined:{"--i":i}})})(),
+      ...NAV_TABS.map(tb=>{
       if(tb.main)return t("div",{key:"sp"});
       const a=view===tb.id,I=tb.icon;
       return o("button",{key:tb.id,onClick:e=>tap(e,tb.id),"data-on":a?"1":"0",
-        "aria-label":tb.label,"aria-current":a?"page":undefined,className:"nb-tab",children:[
-          t("div",{className:"nb-ind"}),
+        "aria-label":tb.label,title:tb.label,"aria-current":a?"page":undefined,className:"nb-tab",children:[
           rip&&rip.id===tb.id&&t("span",{key:rip.k,className:"nb-rip",
             style:{left:rip.x,top:rip.y,width:rip.d,height:rip.d}}),
-          t("div",{className:"nb-ico",children:t(I,{size:21,strokeWidth:a?2.4:1.8})}),
-          t("span",{className:"nb-lb",style:{fontFamily:'var(--nf)',fontWeight:a?700:500},children:tb.label}),
+          t("div",{className:"nb-ico",children:t(I,{size:23,strokeWidth:a?2.4:1.8})}),
         ]});
-    })}),
+    })]}),
 
     t("button",{onClick:()=>{if(act&&act.disabled)return;buzz();if(act){sOpen(false);act.run()}else sOpen(x=>!x)},"aria-label":act?act.label:(open?"close add menu":"add"),title:act?act.label:undefined,"aria-disabled":act&&act.disabled?"true":undefined,
       "aria-expanded":act?undefined:(open?"true":"false"),"data-open":!act&&open?"1":"0",className:"nb-fab",style:act&&act.disabled?{opacity:.45}:undefined,
-      children:t(act&&act.icon?act.icon:Plus,{size:26,strokeWidth:2.4})}),
+      children:t(act&&act.icon?act.icon:Plus,{size:24,strokeWidth:2.4})}),
   ]})});
 }
 
