@@ -841,12 +841,18 @@ function parseUPIReceipt(raw){
   if(/phonepe/i.test(flat))app="PhonePe";else if(/google pay|\bgpay\b|google transaction id/i.test(flat))app="Google Pay";else if(/\bkiwi\b|@kiwi/i.test(flat))app="Kiwi";else if(/paytm/i.test(flat))app="Paytm";else if(/\bcred\b/i.test(flat))app="CRED";else if(/\bbhim\b/i.test(flat))app="BHIM";
   // ── Amount: prefer ₹/Rs-tagged numbers; else a line that's just a number (the big hero figure).
   let amount=null;
-  const tagged=[...flat.matchAll(/(?:₹|\brs\.?|\binr)\s*([\d,]+(?:\.\d{1,2})?)/gi)].map(m=>_upiNum(m[1])).filter(v=>v>0&&v<1e8);
+  const tagged=[...flat.matchAll(/(?:₹|\brs\.?|\binr)\s*(\d[\dOo,]*(?:\.[\dOo]{1,2})?)(?![\dOoA-Za-z])/gi)].map(m=>_upiNum(m[1].replace(/[Oo]/g,"0"))).filter(v=>v>0&&v<1e8);
   if(tagged.length)amount=tagged[0];
   if(amount==null){for(const l of lines){const m=l.match(/^(?:[₹=*%&$#zZ]|rs\.?|inr)?\s*([\d]{1,3}(?:,\d{2,3})+(?:\.\d{1,2})?|\d{1,7}(?:\.\d{1,2})?)\s*(?:\/-)?$/i);if(m){const v=_upiNum(m[1]);if(v>0&&v<1e8){amount=v;break}}}}
   // Still nothing: the figure sits right above "Send Money" / "Paid" / the status line on every layout.
   if(amount==null){for(let i=1;i<lines.length;i++){if(!/^(send money|paid|payment|completed|successful|success|received|transaction successful)/i.test(lines[i]))continue;const m=lines[i-1].match(/(\d{1,3}(?:,\d{2,3})+(?:\.\d{1,2})?|\d{1,7}(?:\.\d{1,2})?)\s*$/);if(m){const v=_upiNum(m[1]);if(v>0&&v<1e8){amount=v;break}}}}
   if(amount==null){const m=flat.match(/\bpaid\s+([\d,]+(?:\.\d{1,2})?)\b/i);if(m)amount=_upiNum(m[1])}
+  // Big bold "50" is often read as "5O"; a stray symbol can stand in for ₹; or the figure shares a
+  // line with "Send Money". Fix O→0 only inside a token that starts with a digit.
+  const fixO=t2=>t2.replace(/[Oo]/g,"0");
+  if(amount==null){for(const l of lines){const m=l.match(/^(?:[₹=*%&$#zZ€£¥<«~]|rs\.?|inr)?\s*(\d[\dOo]{0,6}(?:\.[\dOo]{1,2})?)\s*$/i);if(m){const v=_upiNum(fixO(m[1]));if(v>0&&v<1e8){amount=v;break}}}}
+  if(amount==null){const m=flat.match(/(?:^|[\s₹=*%&$#zZ€£¥<«~])(\d[\dOo,]{0,9}(?:\.\d{1,2})?)\s+(?:send money|paid\b|payment successful|completed|successful)/im);if(m){const v=_upiNum(fixO(m[1]));if(v>0&&v<1e8)amount=v}}
+  if(amount==null){const m=flat.match(/(?:^|\s)[₹*%&#$€£¥zZ<«~]\s?(\d{1,3}(?:,\d{2,3})+(?:\.\d{1,2})?|\d{1,7}(?:\.\d{1,2})?)(?=\s|$)/m);if(m){const v=_upiNum(m[1]);if(v>0&&v<1e8)amount=v}}
   // ── Payee: inline "Paid to X" / "To X", else the line(s) after a "PAID TO"/"To" label.
   let merchant=null;
   const stop=l=>UPI_CHROME.test(l)||/@[a-z]/i.test(l)||/^[₹\d][\d,.\s]*$/.test(l)||/^(₹|rs\.?)\s*\d/i.test(l)||/\b(am|pm)\b/i.test(l)&&/\d/.test(l)||/^(upi|bank|savings|current|xx)/i.test(l)||/^\d{6,}$/.test(l.replace(/\s/g,""));
@@ -877,28 +883,39 @@ function parseUPIReceipt(raw){
    for(const[k,re]of UPI_BANKS){if(re.test(scan)){bank=k;break}}
    const mm=scan.match(/(?:[xX•*·]{2,}|a\/c\s*(?:no\.?)?\s*)\s*(\d{3,})/i)||scan.match(/\b(?:bank|card)\b[^\n\d]{0,20}(\d{4})\b/i);
    if(mm)last4=mm[1].slice(-4);}
-  const credit=/credit\s*card|rupay\s*credit|\bcc\b/i.test(flat);
+  const acTxt=lines.filter(l=>/bank|savings|current|account|a\/c|credit|debit|xx|[•*·]{2,}|rupay|wallet/i.test(l)).join("\n");
+  const fromBank=/savings|current|a\/c|\baccount\b/i.test(acTxt)||(!!bank&&!/credit/i.test(acTxt)&&/bank/i.test(acTxt));
+  const credit=!fromBank&&/credit\s*card|rupay\s*credit|\bcredit\b|\bcc\b/i.test(acTxt);
   const ref=(flat.match(/(?:upi\s*(?:transaction|txn|ref(?:erence)?)\s*(?:id|no\.?)?|utr(?:\s*(?:no\.?|number))?)\s*:?\s*\n?\s*([A-Z0-9]{9,})/i)||[])[1]||null;
   const status=/\bfailed\b|\bdeclined\b/i.test(flat)?"failed":/\bpending\b|\bprocessing\b/i.test(flat)?"pending":"ok";
   if(amount==null&&!merchant&&!(marked&&vpa))return null;
-  return{amount,merchant,vpa,date,hasTime,bank,last4,credit,ref,app,status,marked};
+  return{amount,merchant,vpa,date,hasTime,bank,last4,credit,fromBank,ref,app,status,marked,raw:txt.trim().slice(0,2000)};
 }
 // Where the payment came from: score cards & accounts on last-4 and bank name. Falls back to
 // what you picked last time for this same bank+last4 (remembered on save).
 const UPI_ACC_K="etp-upi-accmap";
 function upiAccKey(r){return r&&(r.bank||r.last4)?(r.bank||"")+"|"+(r.last4||""):null}
-function upiMatchAccount(r,accounts,cards){
+function upiMatchAccount(r,accounts,cards,expenses){
   if(!r)return null;
+  const noCards=!!r.fromBank;
   const k=upiAccKey(r);
-  if(k){try{const mp=JSON.parse(localStorage.getItem(UPI_ACC_K)||"{}")[k];if(mp){if(mp.cardId&&(cards||[]).some(x=>x.id===mp.cardId))return{cardId:mp.cardId};if(mp.accountId&&(accounts||[]).some(x=>x.id===mp.accountId))return{accountId:mp.accountId}}}catch(e){}}
+  if(k){try{const mp=JSON.parse(localStorage.getItem(UPI_ACC_K)||"{}")[k];if(mp){if(mp.cardId&&!noCards&&(cards||[]).some(x=>x.id===mp.cardId))return{cardId:mp.cardId};if(mp.accountId&&!r.credit&&(accounts||[]).some(x=>x.id===mp.accountId))return{accountId:mp.accountId}}}catch(e){}}
   const bre=r.bank?(UPI_BANKS.find(b=>b[0]===r.bank)||[])[1]:null;
   const sc=(nm,l4)=>{let s=0;const n=String(nm||"");if(r.last4&&(l4===r.last4||n.includes(r.last4)))s+=10;if(bre&&bre.test(n))s+=4;return s};
   let best=null;
-  for(const cd of (cards||[])){let s=sc(cd.name+" "+(cd.bank||""),cd.last4);if(s>0&&r.credit&&cd.type==="credit")s+=3;if(s>0&&!r.credit&&!r.last4&&cd.type==="credit")s-=1;if(s>=4&&(!best||s>best.s))best={s,cardId:cd.id}}
-  for(const ac of (accounts||[])){if(ac.type==="cash")continue;let s=sc(ac.name,ac.last4);if(s>0&&!r.credit)s+=2;if(s>=4&&(!best||s>best.s))best={s,accountId:ac.id}}
-  return best?(best.cardId?{cardId:best.cardId}:{accountId:best.accountId}):null;
+  if(!noCards)for(const cd of (cards||[])){let s=sc(cd.name+" "+(cd.bank||""),cd.last4);if(s>0&&r.credit&&cd.type==="credit")s+=3;if(s>0&&!r.credit&&cd.type==="credit")s-=3;if(s>=4&&(!best||s>best.s))best={s,cardId:cd.id}}
+  const banks=(accounts||[]).filter(ac=>ac.type!=="cash");
+  if(!r.credit)for(const ac of banks){let s=sc(ac.name+" "+(ac.bank||""),ac.last4);if(s>0)s+=2;if(s>=4&&(!best||s>best.s))best={s,accountId:ac.id}}
+  if(best)return best.cardId?{cardId:best.cardId}:{accountId:best.accountId};
+  if(noCards){
+    if(banks.length===1)return{accountId:banks[0].id};
+    let last=null;for(const e of (expenses||[])){if(e.source==="upi"&&e.accountId&&!e.cardId&&banks.some(a=>a.id===e.accountId)&&(!last||e.date>last.date))last=e}
+    if(last)return{accountId:last.accountId};
+    return{accountId:null};
+  }
+  return null;
 }
-function upiRememberAccount(r,sel){const k=upiAccKey(r);if(!k||!sel)return;try{const all=JSON.parse(localStorage.getItem(UPI_ACC_K)||"{}");all[k]=sel;localStorage.setItem(UPI_ACC_K,JSON.stringify(all))}catch(e){}}
+function upiRememberAccount(r,sel){const k=upiAccKey(r);if(!k||!sel)return;if(r.fromBank&&sel.cardId)return;try{const all=JSON.parse(localStorage.getItem(UPI_ACC_K)||"{}");all[k]=sel;localStorage.setItem(UPI_ACC_K,JSON.stringify(all))}catch(e){}}
 // A stable id for "have I logged this receipt already?": the UPI reference if the receipt has
 // one, else amount + payee + minute.
 function upiRefOf(r){if(!r)return null;if(r.ref)return"upi:"+r.ref;if(r.amount&&r.date&&r.hasTime)return"upi:"+r.amount+"|"+String(r.merchant||r.vpa||"").toLowerCase()+"|"+Math.floor(r.date/6e4);return null}
@@ -8291,7 +8308,7 @@ const tSms=s=>{if(s&&s.includes(UPI_MARK)){const u=parseUPIReceipt(s);if(u){sSms
 const[upiR,sUpiR]=useState(null);
 // Fill the form from a parsed UPI receipt. Merchant memory decides category (and maybe the
 // account); the receipt's own bank/last-4 wins for the account because it's what was paid from.
-const applyUPI=r=>{if(!r)return;sUpiR(r);if(r.amount)sAm(String(r.amount));if(r.merchant){sMc(r.merchant);applyMerchantMemory(r.merchant);const g=merchMem(r.merchant);if(!g||!g.category){const s2=sms(`Rs ${r.amount||1} spent at ${r.merchant} on`);if(s2&&s2.category&&s2.category!=="other"&&mp[s2.category]){sCt(s2.category);sCatGrp(catGroupId(s2.category));sNw(catNW(s2.category))}}}if(r.date){sDt(r.date);if(r.hasTime)sTm(tmStr(r.date))}const m=upiMatchAccount(r,accounts,cards);if(m&&m.cardId){sMop("card");sCId(m.cardId);sAId(null)}else if(m&&m.accountId){sMop("account");sAId(m.accountId);sCId(null)}};
+const applyUPI=r=>{if(!r)return;sUpiR(r);if(r.amount)sAm(String(r.amount));if(r.merchant){sMc(r.merchant);applyMerchantMemory(r.merchant);const g=merchMem(r.merchant);if(!g||!g.category){const s2=sms(`Rs ${r.amount||1} spent at ${r.merchant} on`);if(s2&&s2.category&&s2.category!=="other"&&mp[s2.category]){sCt(s2.category);sCatGrp(catGroupId(s2.category));sNw(catNW(s2.category))}}}if(r.date){sDt(r.date);if(r.hasTime)sTm(tmStr(r.date))}const m=upiMatchAccount(r,accounts,cards,data.expenses);if(m&&m.cardId){sMop("card");sCId(m.cardId);sAId(null)}else if(m&&m.accountId){sMop("account");sAId(m.accountId);sCId(null)}else if(m){sMop("account");sCId(null);sAId(a0=>(accounts.find(x=>x.id===a0&&x.type!=="cash")?a0:null))}};
 useEffect(()=>{if(iE)return;const r=window.__upi;window.__upi=null;if(r)applyUPI(r)},[]);
 const pCl=async()=>{try{tSms(await navigator.clipboard.readText())}catch{alert("Clipboard blocked. Paste into the box.")}};
 const op=s=>{if(!am)return;const l=am.slice(-1);if("+-*/×÷".includes(l))sAm(am.slice(0,-1)+s);else sAm(am+s)};
@@ -8323,7 +8340,7 @@ return o(Fragment,{children:[o("div",{className:"fi",style:{paddingTop:48,paddin
   upiR&&!iE&&(()=>{const mAcc=mop==="card"?(cards.find(x=>x.id===cId)):(accounts.find(x=>x.id===aId));const acLbl=(upiR.bank?upiR.bank.toUpperCase()+" ":"")+(upiR.last4?"••"+upiR.last4:"");const warn=upiR.status==="failed"?"This receipt says the payment FAILED. You were probably not charged.":upiR.status==="pending"?"This payment is still pending. Save it only if the money has left your account.":null;return o("div",{style:{margin:"0 24px 16px",padding:"11px 13px",background:warn?"#7f1d1d33":`linear-gradient(135deg,${c.ac}1c 0%,${c.sfg} 65%)`,border:`1px solid ${warn?"#ef4444aa":c.ac+"40"}`,borderRadius:14,fontSize:12,color:c.td,lineHeight:1.5},children:[
     t("div",{style:{fontSize:13,fontWeight:650,color:c.tx,marginBottom:2},children:"📲 From your UPI receipt"+(upiR.app?" · "+upiR.app:"")}),
     warn?t("div",{style:{color:"#fca5a5",fontWeight:600},children:"⚠️ "+warn}):null,
-    t("div",{children:!upiR.amount?"Couldn’t read the amount. Type it in below.":!upiR.date?"No date on the receipt, so it’s set to now.":acLbl?(mAcc?`Paid from ${acLbl}, matched to ${mAcc.name}${mAcc.last4?" ··"+mAcc.last4:""}. Change it below if that’s wrong.`:`Paid from ${acLbl}. Pick that account below and it’ll be remembered next time.`):"Check the details below and tap Save."})]})})(),
+    t("div",{children:!upiR.amount?"Couldn’t read the amount. Type it in below.":!upiR.date?"No date on the receipt, so it’s set to now.":acLbl?(mAcc?`Paid from ${acLbl}, matched to ${mAcc.name}${mAcc.last4?" ··"+mAcc.last4:""}. Change it below if that’s wrong.`:`Paid from ${acLbl}. Pick that account below and it’ll be remembered next time.`):"Check the details below and tap Save."}),upiR.raw?t("details",{style:{marginTop:6},children:[t("summary",{style:{fontSize:11.5,color:c.tm,cursor:"pointer"},children:"What the shortcut copied"}),t("pre",{style:{margin:"6px 0 0",maxHeight:180,overflow:"auto",whiteSpace:"pre-wrap",fontSize:11,lineHeight:1.4,color:c.td,fontFamily:"ui-monospace,Menlo,monospace",background:c.sf2,borderRadius:8,padding:8},children:upiR.raw})]}):null]})})(),
   !iE&&md==="paste"&&o("div",{style:{padding:"0 24px",marginBottom:20},children:[
     o("div",{className:"f ia jb",style:{marginBottom:8},children:[t("label",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1},children:"PASTE BANK SMS / NOTIFICATION"}),o("button",{onClick:pCl,className:"act95 trt f ia",style:{gap:4,fontFamily:'var(--nf)',fontSize:10,color:c.ac,letterSpacing:.5,background:"transparent",border:"none",padding:"4px 8px"},children:[t(Clp,{size:11})," PASTE"]})]}),
     t("textarea",{value:smsT,onChange:e=>tSms(e.target.value),placeholder:"e.g., Rs.1,250.00 spent on HDFC Credit Card xx4321 at SWIGGY on 15-Apr-26",rows:4,style:{width:"100%",background:c.sfg,border:`1px solid ${ex?c.ac:c.brs}`,borderRadius:14,padding:14,color:c.tx,fontSize:14,outline:"none",resize:"none",fontFamily:'var(--tf)'}}),
