@@ -285,16 +285,11 @@ body[data-theme="snow"] .neu-flat,body[data-theme="snow"] .nb-fab{border-radius:
 </div>
 <script>
 (function(){
-  if('serviceWorker' in navigator){
-    if(navigator.serviceWorker.controller){
-      navigator.serviceWorker.getRegistrations().then(function(regs){
-        Promise.all(regs.map(function(r){return r.unregister()})).then(function(){
-          location.reload();
-        });
-      });
-      return;
-    }
-    try{navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(r){r.unregister()})})}catch(e){}
+  /* sw.js makes the app open offline. It always tries the network first for the page itself, so an
+     online open never shows an old build; the cached copy is used only when the network fails.
+     Settings → Force reload app still clears it. */
+  if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
+    try{window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(e){console.warn('SW register failed',e)})})}catch(e){}
   }
   var setStatus=function(s){var el=document.getElementById('splashStatus');if(el)el.textContent=s};
   var setDetail=function(s){var el=document.getElementById('splashDetail');if(el)el.textContent=s};
@@ -305,22 +300,70 @@ body[data-theme="snow"] .neu-flat,body[data-theme="snow"] .nb-fab{border-radius:
     s.onclick=function(){location.reload()};
   };
   setStatus('storage');
-  try{
-    window.storage={
-      get:function(k){return Promise.resolve(localStorage.getItem(k)!=null?{key:k,value:localStorage.getItem(k),shared:false}:null)},
-      set:function(k,v){localStorage.setItem(k,v);return Promise.resolve({key:k,value:v,shared:false})},
-      delete:function(k){localStorage.removeItem(k);return Promise.resolve({key:k,deleted:true,shared:false})},
-      list:function(p){p=p||'';var ks=[];for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf(p)===0)ks.push(k)}return Promise.resolve({keys:ks,prefix:p,shared:false})}
-    };
-  }catch(e){showErr('Storage init failed: '+e.message);return}
-  try{
-    var cur=localStorage.getItem("expense-tracker-pro-v3");
-    var snap=localStorage.getItem("expense-tracker-pro-v3-prebuild-backup");
-    if(cur&&!snap){
-      localStorage.setItem("expense-tracker-pro-v3-prebuild-backup",cur);
-      localStorage.setItem("expense-tracker-pro-v3-prebuild-backup-at",new Date().toISOString());
+  /* App data lives in IndexedDB ("etp-kv"), which has far more room than localStorage (~5 MB).
+     On the first run after this change every data key is copied from localStorage, read back to
+     verify, and only then removed from localStorage. Small settings (theme, tour, AI key…) stay in
+     localStorage. If IndexedDB can't be opened on a device that never migrated, the old
+     localStorage store keeps working. */
+  var KS="expense-tracker-pro-v3",KB=KS+"-prebuild-backup",MIG="etp-idb-v1";
+  var isDataKey=function(k){return k===KS||k===KB||k==="etp-users"||k.indexOf("etp-data-")===0};
+  var lsStore={
+    get:function(k){var v=localStorage.getItem(k);return Promise.resolve(v!=null?{key:k,value:v,shared:false}:null)},
+    set:function(k,v){localStorage.setItem(k,v);return Promise.resolve({key:k,value:v,shared:false})},
+    delete:function(k){localStorage.removeItem(k);return Promise.resolve({key:k,deleted:true,shared:false})},
+    list:function(p){p=p||'';var ks=[];for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf(p)===0)ks.push(k)}return Promise.resolve({keys:ks,prefix:p,shared:false})}
+  };
+  var openKV=function(){return new Promise(function(res,rej){
+    if(!window.indexedDB){rej(new Error('IndexedDB unavailable'));return}
+    var done=false,to=setTimeout(function(){if(!done){done=true;rej(new Error('IndexedDB open timed out'))}},5000);
+    try{var r=indexedDB.open("etp-kv",1);
+      r.onupgradeneeded=function(){if(!r.result.objectStoreNames.contains("kv"))r.result.createObjectStore("kv")};
+      r.onsuccess=function(){clearTimeout(to);if(done){try{r.result.close()}catch(e){}return}done=true;res(r.result)};
+      r.onerror=function(){clearTimeout(to);if(!done){done=true;rej(r.error||new Error('IndexedDB open failed'))}};
+    }catch(e){clearTimeout(to);done=true;rej(e)}
+  })};
+  var req=function(db,mode,fn){return new Promise(function(res,rej){
+    var tx=db.transaction("kv",mode),st=tx.objectStore("kv"),out;var q=fn(st);
+    if(q)q.onsuccess=function(){out=q.result};
+    tx.oncomplete=function(){res(out)};tx.onerror=function(){rej(tx.error)};tx.onabort=function(){rej(tx.error||new Error('IndexedDB write aborted'))};
+  })};
+  var kvStore=function(db){return{
+    get:function(k){return req(db,"readonly",function(s){return s.get(k)}).then(function(v){return v!=null?{key:k,value:v,shared:false}:null})},
+    set:function(k,v){return req(db,"readwrite",function(s){return s.put(v,k)}).then(function(){return{key:k,value:v,shared:false}})},
+    delete:function(k){return req(db,"readwrite",function(s){return s.delete(k)}).then(function(){return{key:k,deleted:true,shared:false}})},
+    list:function(p){p=p||'';return req(db,"readonly",function(s){return s.getAllKeys()}).then(function(ks){return{keys:(ks||[]).filter(function(k){return String(k).indexOf(p)===0}),prefix:p,shared:false}})}
+  }};
+  var migrate=function(db){
+    if(localStorage.getItem(MIG)==="1")return Promise.resolve();
+    var keys=[];for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&isDataKey(k))keys.push(k)}
+    if(!keys.length){localStorage.setItem(MIG,"1");return Promise.resolve()}
+    return req(db,"readwrite",function(s){keys.forEach(function(k){s.put(localStorage.getItem(k),k)})})
+      .then(function(){return Promise.all(keys.map(function(k){return req(db,"readonly",function(s){return s.get(k)})}))})
+      .then(function(vals){
+        for(var j=0;j<keys.length;j++)if(vals[j]!==localStorage.getItem(keys[j]))throw new Error('verify failed for '+keys[j]);
+        // Remove first: a full localStorage could refuse the marker write until space is freed.
+        // If the page dies in between, the next run finds no data keys left and just sets the marker.
+        keys.forEach(function(k){localStorage.removeItem(k)});
+        localStorage.setItem(MIG,"1");
+      });
+  };
+  // One-time "before this build" snapshot of the oldest data key (used by Backup → prebuild restore).
+  var snapshot=function(st){return Promise.all([st.get(KS),st.get(KB)]).then(function(r){
+    if(r[0]&&!r[1])return st.set(KB,r[0].value).then(function(){try{localStorage.setItem(KB+"-at",new Date().toISOString())}catch(e){}});
+  }).catch(function(e){setDetail('backup skipped: '+e.message)})};
+  var ready=openKV().then(function(db){return migrate(db).then(function(){return kvStore(db)})}).catch(function(e){
+    console.warn('IndexedDB storage unavailable, using localStorage:',e);
+    if(localStorage.getItem(MIG)==="1"){
+      // Data was already moved to IndexedDB; an empty localStorage store would show a blank app.
+      try{alert("⚠ Couldn't open the app's database ("+(e&&e.message||e)+"). Your data has not been changed. Close the app completely and open it again.")}catch(e2){}
+      throw e;
     }
-  }catch(e){setDetail('backup skipped: '+e.message)}
+    return lsStore;
+  });
+  ready.then(snapshot).catch(function(){});
+  try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persisted().then(function(p){if(!p)return navigator.storage.persist()}).catch(function(){})}catch(e){}
+  var via=function(m){return function(){var a=arguments;return ready.then(function(st){return st[m].apply(st,a)})}};
+  window.storage={get:via("get"),set:via("set"),delete:via("delete"),list:via("list"),ready:ready};
   setStatus('listening for errors');
   window.addEventListener('error',function(e){
     showErr((e.error&&e.error.message||e.message||'unknown error')+(e.filename?'\n@ '+e.filename.split('/').pop()+':'+e.lineno:''));
@@ -738,6 +781,12 @@ const DA={id:"acc_default",name:"Cash",type:"cash",currency:"₹",emoji:"💵"};
 
 // === UTILS ===
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+/* Money: amounts are JS numbers. Every save rounds entry amounts to 2 decimals (paise), and the
+   common totals add with rounding so 0.1+0.2 style drift can't show up as ₹0.30000000000000004. */
+const _r2=x=>Math.round((+x||0)*100)/100;
+const _ad=(s,v)=>Math.round((s+(+v||0))*100)/100;
+const _rAmt=a=>{let ch=false;const o=a.map(e=>{if(!e||typeof e.amount!=="number"||!isFinite(e.amount))return e;const r=Math.round(e.amount*100)/100;if(r===e.amount)return e;ch=true;return{...e,amount:r}});return ch?o:a};
+const _normMoney=n=>{let out=n;for(const k of ["expenses","recurring","bills","upcomingExpenses"]){const a=n&&n[k];if(Array.isArray(a)){const r=_rAmt(a);if(r!==a){if(out===n)out={...n};out[k]=r}}}return out};
 const fm=(n,cu="₹")=>cu+Number(n||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
 const fs=(n,cu="₹")=>{const i=Math.round(Number(n||0));if(Math.abs(i)>=1e7)return cu+(i/1e7).toFixed(1)+"Cr";if(Math.abs(i)>=1e5)return cu+(i/1e5).toFixed(1)+"L";if(Math.abs(i)>=1e3)return cu+(i/1e3).toFixed(1)+"k";return cu+i};
 const ds=(d=new Date())=>{const x=new Date(d);x.setHours(0,0,0,0);return x.getTime()};
@@ -1059,13 +1108,13 @@ function cc(card,exp,today=Date.now()){
   du.setHours(0,0,0,0);
   const ce=exp.filter(e=>e.cardId===card.id);
   const pc=_addM(new Date(lc),-1,sD);
-  const se=ce.filter(e=>e.type!=="card-payment"&&e.type!=="reimbursement"&&e.date>=pc.getTime()&&e.date<lc.getTime()).reduce((s,e)=>s+e.amount,0);
-  const sp=ce.filter(e=>(e.type==="card-payment"||e.type==="reimbursement")&&e.date>=pc.getTime()&&e.date<lc.getTime()).reduce((s,e)=>s+e.amount,0);
+  const se=ce.filter(e=>e.type!=="card-payment"&&e.type!=="reimbursement"&&e.date>=pc.getTime()&&e.date<lc.getTime()).reduce((s,e)=>_ad(s,e.amount),0);
+  const sp=ce.filter(e=>(e.type==="card-payment"||e.type==="reimbursement")&&e.date>=pc.getTime()&&e.date<lc.getTime()).reduce((s,e)=>_ad(s,e.amount),0);
   const ls=Math.max(0,se-sp);
-  const pa=ce.filter(e=>(e.type==="card-payment"||e.type==="reimbursement")&&e.date>=lc.getTime()).reduce((s,e)=>s+e.amount,0);
+  const pa=ce.filter(e=>(e.type==="card-payment"||e.type==="reimbursement")&&e.date>=lc.getTime()).reduce((s,e)=>_ad(s,e.amount),0);
   const ou=Math.max(0,ls-pa);
   const ip=ls>0&&pa>=ls;
-  const cs=ce.filter(e=>e.type!=="card-payment"&&e.type!=="reimbursement"&&e.date>=lc.getTime()&&e.date<nc.getTime()).reduce((s,e)=>s+e.amount,0);
+  const cs=ce.filter(e=>e.type!=="card-payment"&&e.type!=="reimbursement"&&e.date>=lc.getTime()&&e.date<nc.getTime()).reduce((s,e)=>_ad(s,e.amount),0);
   const du2=Math.ceil((du.getTime()-today)/864e5);
   return{lastClose:lc.getTime(),nextClose:nc.getTime(),dueDate:du.getTime(),lastStmt:ls,paidSinceClose:pa,outstanding:ou,isPaid:ip,currentSpend:cs,daysUntilDue:du2,overdue:!ip&&ou>0&&today>du.getTime()}
 }
@@ -1077,8 +1126,8 @@ function ccPeriod(card,exp,closeTs){
   const c2=new Date(closeTs);c2.setHours(0,0,0,0);
   const p0=new Date(c2);p0.setDate(1);p0.setMonth(p0.getMonth()-1);p0.setDate(Math.min(sD,_dim(p0.getFullYear(),p0.getMonth())));p0.setHours(0,0,0,0);
   const ce=exp.filter(e=>e.cardId===card.id);
-  const spend=ce.filter(e=>e.type!=="card-payment"&&e.type!=="reimbursement"&&e.date>=p0.getTime()&&e.date<c2.getTime()).reduce((s,e)=>s+e.amount,0);
-  const pays=ce.filter(e=>(e.type==="card-payment"||e.type==="reimbursement")&&e.date>=p0.getTime()&&e.date<c2.getTime()).reduce((s,e)=>s+e.amount,0);
+  const spend=ce.filter(e=>e.type!=="card-payment"&&e.type!=="reimbursement"&&e.date>=p0.getTime()&&e.date<c2.getTime()).reduce((s,e)=>_ad(s,e.amount),0);
+  const pays=ce.filter(e=>(e.type==="card-payment"||e.type==="reimbursement")&&e.date>=p0.getTime()&&e.date<c2.getTime()).reduce((s,e)=>_ad(s,e.amount),0);
   return{start:p0.getTime(),end:c2.getTime(),spend,pays,computed:Math.max(0,spend-pays)};
 }
 
@@ -1681,7 +1730,7 @@ function TX({expense:e,accounts,cards,isLast,onClick,ledger,ctx,rp}){const P=row
     return o("div",{className:"trg",children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:15,fontWeight:500,color:col},children:[sg,fm(shown,cu2)]}),P.amount==="both"&&isEx&&Math.abs(nt2-e.amount)>.005&&t("div",{style:{fontFamily:'var(--nf)',fontSize:10.5,color:c.mt,marginTop:2},children:"you bear "+fm(nt2,cu2)})]})})()]})}
 
 // === MARQUEE ===
-function Pulse({data}){const items=useMemo(()=>{const tt=Date.now(),tds=ds(),mst=ps(new Date(),data.monthStartDay||1);const td=data.expenses.filter(e=>e.type==="expense"&&e.date>=tds).reduce((s,e)=>s+netAmt(e),0),me=data.expenses.filter(e=>e.type==="expense"&&e.date>=mst).reduce((s,e)=>s+netAmt(e),0),mi=data.expenses.filter(e=>e.type==="income"&&e.date>=mst).reduce((s,e)=>s+e.amount,0),nw=data.accounts.reduce((s,a)=>s+ab(a,data.expenses),0)-(data.cards||[]).filter(x=>x.type==="credit").reduce((s,cr)=>s+cc(cr,data.expenses).outstanding,0);const cards=data.cards||[];let cd=0;for(const cr of cards){if(cr.type!=="credit")continue;cd+=cc(cr,data.expenses).outstanding}const cu=data.currency||"$";const arr=[["TODAY",fs(td,cu)],["MONTH",fs(me,cu)],["INCOME",fs(mi,cu)],["NET WORTH",fs(nw,cu)]];if(cards.length)arr.push(["CARDS DUE",fs(cd,cu)]);return arr},[data]);const it=(l,v,k)=>o("span",{key:k,style:{display:"inline-flex",alignItems:"baseline",gap:8},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:10,letterSpacing:1.3,color:c.tm},children:l}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:c.tx,fontWeight:500},children:v}),t("span",{style:{color:c.gd,fontSize:14},children:"·"})]});return t("div",{style:{overflow:"hidden",padding:"10px 0",borderTop:`1px solid ${c.brs}`,borderBottom:`1px solid ${c.brs}`,background:`linear-gradient(180deg,${c.sf} 0%,${c.bg} 100%)`},children:t("div",{className:"mqt",children:[...items,...items,...items].map((x,i)=>it(x[0],x[1],i))})})}
+function Pulse({data}){const items=useMemo(()=>{const tt=Date.now(),tds=ds(),mst=ps(new Date(),data.monthStartDay||1);const td=data.expenses.filter(e=>e.type==="expense"&&e.date>=tds).reduce((s,e)=>s+netAmt(e),0),me=data.expenses.filter(e=>e.type==="expense"&&e.date>=mst).reduce((s,e)=>s+netAmt(e),0),mi=data.expenses.filter(e=>e.type==="income"&&e.date>=mst).reduce((s,e)=>_ad(s,e.amount),0),nw=data.accounts.reduce((s,a)=>s+ab(a,data.expenses),0)-(data.cards||[]).filter(x=>x.type==="credit").reduce((s,cr)=>s+cc(cr,data.expenses).outstanding,0);const cards=data.cards||[];let cd=0;for(const cr of cards){if(cr.type!=="credit")continue;cd+=cc(cr,data.expenses).outstanding}const cu=data.currency||"$";const arr=[["TODAY",fs(td,cu)],["MONTH",fs(me,cu)],["INCOME",fs(mi,cu)],["NET WORTH",fs(nw,cu)]];if(cards.length)arr.push(["CARDS DUE",fs(cd,cu)]);return arr},[data]);const it=(l,v,k)=>o("span",{key:k,style:{display:"inline-flex",alignItems:"baseline",gap:8},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:10,letterSpacing:1.3,color:c.tm},children:l}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:c.tx,fontWeight:500},children:v}),t("span",{style:{color:c.gd,fontSize:14},children:"·"})]});return t("div",{style:{overflow:"hidden",padding:"10px 0",borderTop:`1px solid ${c.brs}`,borderBottom:`1px solid ${c.brs}`,background:`linear-gradient(180deg,${c.sf} 0%,${c.bg} 100%)`},children:t("div",{className:"mqt",children:[...items,...items,...items].map((x,i)=>it(x[0],x[1],i))})})}
 
 // === iOS ADD-TO-HOME-SCREEN TIP ===
 function IOSTip(){
@@ -1753,7 +1802,7 @@ function Sidebar({data,onClose,onView,activeUser,onUpdateUser,focusSection}){
   useEffect(()=>{if(!focusSection)return;const el=scRef.current?.querySelector(`[data-hdr="${focusSection}"]`);if(!el)return;requestAnimationFrame(()=>{el.scrollIntoView({block:"start",behavior:"smooth"});el.style.background=c.ac+"22";el.style.borderRadius="8px";setTimeout(()=>{el.style.transition="background .5s";el.style.background="transparent"},900)})},[focusSection]);
   const msd=data.monthStartDay||1;const mst=ps(new Date(),msd);
   const monExp=data.expenses.filter(e=>e.date>=mst&&e.type==="expense");const monInc=data.expenses.filter(e=>e.date>=mst&&e.type==="income");
-  const totExp=monExp.reduce((s,e)=>s+netAmt(e),0);const totInc=monInc.reduce((s,e)=>s+e.amount,0);
+  const totExp=monExp.reduce((s,e)=>s+netAmt(e),0);const totInc=monInc.reduce((s,e)=>_ad(s,e.amount),0);
   const[editing,setEditing]=useState(false);
   const[sbQ,setSbQ]=useState("");
   const[order,setOrder]=useState(()=>{const isH=x=>typeof x==="string"&&x.startsWith("h:");try{const s=localStorage.getItem(SB_ORDER_KEY);if(!s)return DEFAULT_SB;let stored=JSON.parse(s);if(!stored.some(isH))return DEFAULT_SB;
@@ -1950,7 +1999,7 @@ function calcStreaks(expenses){
 }
 function calcBadges(data){
   const ex=data.expenses||[];const st=calcStreaks(ex);const n=ex.length;
-  let underBudget=false;try{if(data.budget){const now=new Date();const s=new Date(now.getFullYear(),now.getMonth()-1,1).getTime(),e2=new Date(now.getFullYear(),now.getMonth(),1).getTime();const sp=ex.filter(x=>x.type==="expense"&&x.date>=s&&x.date<e2).reduce((a,x)=>a+x.amount,0);underBudget=sp>0&&sp<=data.budget}}catch(e){}
+  let underBudget=false;try{if(data.budget){const now=new Date();const s=new Date(now.getFullYear(),now.getMonth()-1,1).getTime(),e2=new Date(now.getFullYear(),now.getMonth(),1).getTime();const sp=ex.filter(x=>x.type==="expense"&&x.date>=s&&x.date<e2).reduce((a,x)=>_ad(a,x.amount),0);underBudget=sp>0&&sp<=data.budget}}catch(e){}
   return[
     {id:"first",emoji:"🌱",title:"First Step",desc:"Log your first transaction",earned:n>=1},
     {id:"ten",emoji:"📒",title:"Getting Serious",desc:"Log 10 transactions",earned:n>=10},
@@ -1993,7 +2042,7 @@ function buildMonthStats(data,y,m){
   const s=new Date(y,m,1).getTime(),e2=new Date(y,m+1,1).getTime();
   const all=data.expenses||[];
   const ex=all.filter(x=>x.type==="expense"&&x.date>=s&&x.date<e2);
-  const income=all.filter(x=>x.type==="income"&&x.date>=s&&x.date<e2).reduce((a,x)=>a+x.amount,0);
+  const income=all.filter(x=>x.type==="income"&&x.date>=s&&x.date<e2).reduce((a,x)=>_ad(a,x.amount),0);
   const total=ex.reduce((a,x)=>a+netAmt(x),0);
   const byCat={};for(const x of ex){const l=(co(x.category)||{}).label||x.category;byCat[l]=(byCat[l]||0)+netAmt(x)}
   const p0=new Date(y,m-3,1).getTime();
@@ -2001,9 +2050,9 @@ function buildMonthStats(data,y,m){
   const anomalies=Object.entries(byCat).map(([k,v])=>({cat:k,now:v,avg:(priorBy[k]||0)/3})).filter(a=>a.avg>0&&a.now>a.avg*1.3&&(a.now-a.avg)>=100).sort((a,b)=>(b.now-b.avg)-(a.now-a.avg));
   const byMerch={};for(const x of ex){if(x.merchant)byMerch[x.merchant]=(byMerch[x.merchant]||0)+x.amount}
   const topMerch=Object.entries(byMerch).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  const needs=ex.filter(x=>{try{return nwOf(x)==="need"}catch(e){return false}}).reduce((a,x)=>a+x.amount,0);
+  const needs=ex.filter(x=>{try{return nwOf(x)==="need"}catch(e){return false}}).reduce((a,x)=>_ad(a,x.amount),0);
   const subs=(data.recurring||[]).filter(r=>!r.stopped).map(r=>({name:r.merchant||((co(r.category)||{}).label)||"sub",amt:r.amount,freq:r.frequency}));
-  const cardSpend=ex.filter(x=>x.cardId).reduce((a,x)=>a+x.amount,0);
+  const cardSpend=ex.filter(x=>x.cardId).reduce((a,x)=>_ad(a,x.amount),0);
   return{y,m,total,income,count:ex.length,byCat,anomalies,topMerch,needs,wants:Math.max(0,total-needs),subs,cardSpend,budget:data.budget||null};
 }
 
@@ -2246,13 +2295,14 @@ function App(){
       i.ledger=out;
     }
   }catch(e){}
+  i=_normMoney(i);
   sD({...i,loading:false});
   try{await window.storage.set(dk,JSON.stringify(strip(i)))}catch{}
 })()},[]);
 
   const strip=x=>({expenses:x.expenses,recurring:x.recurring,accounts:x.accounts,profiles:x.profiles,cards:x.cards||[],cardStatements:x.cardStatements||[],bills:x.bills||[],goals:x.goals||[],budgetLoans:x.budgetLoans||[],ledger:x.ledger||[],categoryBudgets:x.categoryBudgets||{},monthlyRestrictionLogs:x.monthlyRestrictionLogs||[],openingBalances:x.openingBalances||[],customExpenseCategories:x.customExpenseCategories||[],customIncomeCategories:x.customIncomeCategories||[],categoryOverrides:x.categoryOverrides||{},categoryOrder:x.categoryOrder||{expense:[],income:[]},financeProfile:x.financeProfile||null,budget:x.budget,budgetPeriod:x.budgetPeriod,currency:x.currency,monthStartDay:x.monthStartDay,fontSize:x.fontSize||"medium",fontPrefs:x.fontPrefs||null,upcomingExpenses:x.upcomingExpenses||[],alertThreshold:x.alertThreshold??null,thresholdRules:x.thresholdRules||[],expensePlans:x.expensePlans||[],investmentPlans:x.investmentPlans||[],investments:x.investments||[],planThreshold:x.planThreshold??null,reminderEnabled:x.reminderEnabled||false,reminderTime:x.reminderTime||"21:00",morningEnabled:x.morningEnabled||false,morningTime:x.morningTime||"08:00",eveningEnabled:x.eveningEnabled||false,eveningTime:x.eveningTime||"21:00",backupFreq:x.backupFreq||"off",backupGDrive:x.backupGDrive||false,lastBackupAt:x.lastBackupAt||0,merchantRules:x.merchantRules||{},debtPlan:x.debtPlan||null,las:x.las||null,threads:x.threads||[],loanTracker:x.loanTracker||[],varExpensePlans:x.varExpensePlans||{},varIncomePlans:x.varIncomePlans||{},varSavingsPlans:x.varSavingsPlans||{},advStats:x.advStats||{},calculators:x.calculators||{},incomeTracker:x.incomeTracker||{},groceryCategories:x.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:x.grocerySubDefaults||{},groceryStores:x.groceryStores||[],groceryDefaultStore:x.groceryDefaultStore||"",priceWatch:x.priceWatch||PW_DEFAULT,netWorthSnapshots:x.netWorthSnapshots||[],savingsPots:x.savingsPots||[],savingsTarget:x.savingsTarget??null,myQuotes:x.myQuotes||[],favLessons:x.favLessons||[]});
 
-  const pst=async(p)=>{const n={...d,...p};_recCut=planCut(n);_custCE=n.customExpenseCategories||[];_custCI=n.customIncomeCategories||[];_catOv=n.categoryOverrides||{};_rowPrefs=(n.calculators||{}).rowPrefs||null;_catOrder=n.categoryOrder||{expense:[],income:[]};_grocCats=n.groceryCategories||GROC_CATS_DEFAULT;sD(n);const dk=activeUser?"etp-data-"+activeUser.id:KS;try{await window.storage.set(dk,JSON.stringify(strip(n)))}catch(e){console.error(e);try{if(!window.__pstErrWarned){window.__pstErrWarned=true;alert("⚠ Could not save your data — device storage looks full. Recent changes may disappear when the app closes. Free up space, then make any small edit to retry saving.")}}catch(e2){}}};
+  const pst=async(p)=>{const n=_normMoney({...d,...p});_recCut=planCut(n);_custCE=n.customExpenseCategories||[];_custCI=n.customIncomeCategories||[];_catOv=n.categoryOverrides||{};_rowPrefs=(n.calculators||{}).rowPrefs||null;_catOrder=n.categoryOrder||{expense:[],income:[]};_grocCats=n.groceryCategories||GROC_CATS_DEFAULT;sD(n);const dk=activeUser?"etp-data-"+activeUser.id:KS;try{await window.storage.set(dk,JSON.stringify(strip(n)))}catch(e){console.error(e);try{if(!window.__pstErrWarned){window.__pstErrWarned=true;alert("⚠ Could not save your data — device storage looks full. Recent changes may disappear when the app closes. Free up space, then make any small edit to retry saving.")}}catch(e2){}}};
   const pstRef=useRef(null);pstRef.current=pst;
   // Recurring rules are only caught up once, in the initial load effect above,
   // which runs on a full page load. A PWA that's merely resumed from the
@@ -2498,7 +2548,7 @@ function App(){
   const uInv=(inv)=>pst({investments:(d.investments||[]).map(x=>x.id===inv.id?{...x,...inv}:x)});
   const dInv=(id)=>pst({investments:(d.investments||[]).filter(x=>x.id!==id)});
 
-  const switchUser=async(u)=>{localStorage.setItem(KAU,u.id);setActiveUser(u);sD(prev=>({...prev,loading:true}));const dk="etp-data-"+u.id;let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],bills:[],goals:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,thresholdRules:[],expensePlans:[],investmentPlans:[],reminderEnabled:false,reminderTime:"21:00",backupFreq:"off",backupGDrive:false,lastBackupAt:0};try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,...p,accounts:p.accounts&&p.accounts.length?p.accounts:[DA],categoryOverrides:p.categoryOverrides||{},upcomingExpenses:p.upcomingExpenses||[]};_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[];_grocCats=i.groceryCategories||GROC_CATS_DEFAULT}}catch{}i.expenses=(i.expenses||[]).map(e=>e.source==="statement"&&!e.stmtChecked?{...e,stmtChecked:true}:e);_recCut=planCut(i);if(i.recurring.length>0){const{newExpenses,updatedRecurring}=pr(i.recurring,i.expenses);if(newExpenses.length>0){i.expenses=[...newExpenses,...i.expenses].sort((a,b)=>b.date-a.date);i.recurring=updatedRecurring}}sD({...i,loading:false})};
+  const switchUser=async(u)=>{localStorage.setItem(KAU,u.id);setActiveUser(u);sD(prev=>({...prev,loading:true}));const dk="etp-data-"+u.id;let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],bills:[],goals:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,thresholdRules:[],expensePlans:[],investmentPlans:[],reminderEnabled:false,reminderTime:"21:00",backupFreq:"off",backupGDrive:false,lastBackupAt:0};try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,...p,accounts:p.accounts&&p.accounts.length?p.accounts:[DA],categoryOverrides:p.categoryOverrides||{},upcomingExpenses:p.upcomingExpenses||[]};_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[];_grocCats=i.groceryCategories||GROC_CATS_DEFAULT}}catch{}i.expenses=(i.expenses||[]).map(e=>e.source==="statement"&&!e.stmtChecked?{...e,stmtChecked:true}:e);_recCut=planCut(i);if(i.recurring.length>0){const{newExpenses,updatedRecurring}=pr(i.recurring,i.expenses);if(newExpenses.length>0){i.expenses=[...newExpenses,...i.expenses].sort((a,b)=>b.date-a.date);i.recurring=updatedRecurring}}sD({..._normMoney(i),loading:false})};
   const addUserFn=async(u)=>{const nu=[...users,{...u,id:"u_"+uid(),createdAt:Date.now()}];setUsers(nu);await window.storage.set(KU,JSON.stringify(nu))};
   const updateUserFn=async(u)=>{const nu=users.map(x=>x.id===u.id?u:x);setUsers(nu);await window.storage.set(KU,JSON.stringify(nu));if(activeUser?.id===u.id)setActiveUser(u)};
   const delUserFn=async(id)=>{if(users.length<=1){alert("Cannot delete the only user.");return}const nu=users.filter(u=>u.id!==id);setUsers(nu);await window.storage.set(KU,JSON.stringify(nu));await window.storage.delete("etp-data-"+id);if(activeUser?.id===id)await switchUser(nu[0])};
@@ -2938,14 +2988,14 @@ function Home({data,persist,onTx,onView,onFlt,onUseProfile,onTour,onAddExpenses}
 const periodRange=useMemo(()=>{const n=new Date(),y=n.getFullYear(),m=n.getMonth();if(pr==="quarter"){const sm=Math.floor(m/3)*3;return{start:mss(y,sm,msd),end:mss(y,sm+3,msd)}}if(pr==="half"){const sm=m<6?0:6;return{start:mss(y,sm,msd),end:mss(y,sm+6,msd)}}if(pr==="year")return{start:mss(y,0,msd),end:mss(y+1,0,msd)};return{start:ps(n,msd),end:mse(y,m,msd)}},[pr,msd]);
 const periodStart=periodRange.start,periodEnd=periodRange.end;
 const periodLabel=useMemo(()=>{const n=new Date();if(pr==="quarter"){const q=Math.floor(n.getMonth()/3)+1;return `Q${q} ${n.getFullYear()}`}if(pr==="half")return (n.getMonth()<6?"H1":"H2")+" "+n.getFullYear();if(pr==="year")return String(n.getFullYear());return n.toLocaleDateString("en-US",{month:"long",year:"numeric"})},[pr]);
-const monExp=useMemo(()=>expenses.filter(e=>e.date>=periodStart&&e.date<periodEnd&&e.type==="expense"),[expenses,periodStart,periodEnd]);const monInc=useMemo(()=>expenses.filter(e=>e.date>=periodStart&&e.date<periodEnd&&e.type==="income"),[expenses,periodStart,periodEnd]);const totExp=monExp.reduce((s,e)=>s+e.amount-lentAmt(e),0);const lentItems=monExp.filter(e=>lentAmt(e)>0);const lentPeriod=lentItems.reduce((s,e)=>s+lentAmt(e),0);const totInc=monInc.reduce((s,e)=>s+e.amount,0);const periodReimb=monExp.filter(e=>e.reimbursedBy).reduce((s,e)=>s+(e.reimbursedAmount??e.amount),0);const netExp=Math.max(0,totExp-periodReimb);const netCF=totInc-totExp;const pendReimbItems=pr==="month"?monExp.filter(e=>e.reimbursable&&!e.reimbursedBy):[];const pendReimbMonth=pendReimbItems.reduce((s,e)=>s+(e.amount||0),0);const netIfReimbursed=netCF+pendReimbMonth;
+const monExp=useMemo(()=>expenses.filter(e=>e.date>=periodStart&&e.date<periodEnd&&e.type==="expense"),[expenses,periodStart,periodEnd]);const monInc=useMemo(()=>expenses.filter(e=>e.date>=periodStart&&e.date<periodEnd&&e.type==="income"),[expenses,periodStart,periodEnd]);const totExp=monExp.reduce((s,e)=>s+e.amount-lentAmt(e),0);const lentItems=monExp.filter(e=>lentAmt(e)>0);const lentPeriod=lentItems.reduce((s,e)=>s+lentAmt(e),0);const totInc=monInc.reduce((s,e)=>_ad(s,e.amount),0);const periodReimb=monExp.filter(e=>e.reimbursedBy).reduce((s,e)=>s+(e.reimbursedAmount??e.amount),0);const netExp=Math.max(0,totExp-periodReimb);const netCF=totInc-totExp;const pendReimbItems=pr==="month"?monExp.filter(e=>e.reimbursable&&!e.reimbursedBy):[];const pendReimbMonth=pendReimbItems.reduce((s,e)=>s+(e.amount||0),0);const netIfReimbursed=netCF+pendReimbMonth;
 // Credit card bill payments are their own transaction type (not "expense"), so they never
 // entered totExp/netCF above — this is deliberate for anyone who logs each card swipe as
 // its own expense (double-counting risk otherwise), but leaves the summary blind to card
 // spending for someone who *only* logs the lump-sum bill payment. Always scoped to the
 // current calendar month regardless of the Mo/Qtr/6M/Yr toggle above, since a bill payment
 // is a point-in-time event, not something that naturally rolls up across a wider period.
-const cardPayMonth=useMemo(()=>{const now=new Date(),y=now.getFullYear(),m=now.getMonth();return expenses.filter(e=>{if(e.type!=="card-payment")return false;const d=new Date(e.date);return d.getFullYear()===y&&d.getMonth()===m}).reduce((s,e)=>s+e.amount,0)},[expenses]);
+const cardPayMonth=useMemo(()=>{const now=new Date(),y=now.getFullYear(),m=now.getMonth();return expenses.filter(e=>{if(e.type!=="card-payment")return false;const d=new Date(e.date);return d.getFullYear()===y&&d.getMonth()===m}).reduce((s,e)=>_ad(s,e.amount),0)},[expenses]);
 const netCFInclCardpay=netCF-cardPayMonth;
 // Savings pot deposits/withdrawals are transfer-out/transfer-in legs (moving the user's own
 // money between their own buckets), never "expense" or "income", so they never touched
@@ -2961,7 +3011,7 @@ const totRec=recurring.reduce((s,r)=>s+r.amount*(MX[r.frequency]||1),0);const sp
 const invList=data.investments||[];
 const fdSoon=useMemo(()=>invList.filter(iv=>{const dl=fdDaysLeft(iv);return dl!=null&&dl>=0&&dl<=30}).sort((a,b)=>fdDaysLeft(a)-fdDaysLeft(b)),[invList]);
 const sipDue=useMemo(()=>{const dom=new Date().getDate(),wkEnd=dom+7;return invList.filter(iv=>iv.sip&&iv.sip.enabled&&iv.sip.day&&iv.sip.day>=dom&&iv.sip.day<=wkEnd)},[invList]);
-const safeToday=useMemo(()=>{const DAY=864e5,now=Date.now();const periodDays=Math.max(1,Math.round((periodEnd-periodStart)/DAY));const daysLeft=Math.max(1,Math.ceil((periodEnd-now)/DAY));const daysElapsed=Math.max(1,periodDays-daysLeft);const nd=new Date();const dim=new Date(nd.getFullYear(),nd.getMonth()+1,0).getDate();const income=expenses.filter(e=>e.type==="income"&&e.date>=periodStart&&e.date<periodEnd).reduce((s,e)=>s+e.amount,0);const special=spInPeriod((data.calculators||{}).specialIncome,periodStart,periodEnd),incomeAll=income+special;const inP=expenses.filter(e=>e.type==="expense"&&e.date>=periodStart&&e.date<periodEnd);const grossSpent=inP.reduce((s,e)=>s+e.amount-lentAmt(e),0);const reimb=inP.filter(e=>e.reimbursedBy).reduce((s,e)=>s+(e.reimbursedAmount??e.amount),0);const spent=Math.max(0,grossSpent-reimb);const recurringSpent=inP.filter(e=>e.source==="recurring").reduce((s,e)=>s+Math.max(0,e.amount-(e.reimbursedBy?(e.reimbursedAmount??e.amount):0)),0);const variableSpent=Math.max(0,spent-recurringSpent);const monthlyRecurring=recurring.reduce((s,r)=>s+r.amount*(MX[r.frequency]||1),0);const fixedPerDay=monthlyRecurring/dim;const fixedForPeriod=fixedPerDay*periodDays;
+const safeToday=useMemo(()=>{const DAY=864e5,now=Date.now();const periodDays=Math.max(1,Math.round((periodEnd-periodStart)/DAY));const daysLeft=Math.max(1,Math.ceil((periodEnd-now)/DAY));const daysElapsed=Math.max(1,periodDays-daysLeft);const nd=new Date();const dim=new Date(nd.getFullYear(),nd.getMonth()+1,0).getDate();const income=expenses.filter(e=>e.type==="income"&&e.date>=periodStart&&e.date<periodEnd).reduce((s,e)=>_ad(s,e.amount),0);const special=spInPeriod((data.calculators||{}).specialIncome,periodStart,periodEnd),incomeAll=income+special;const inP=expenses.filter(e=>e.type==="expense"&&e.date>=periodStart&&e.date<periodEnd);const grossSpent=inP.reduce((s,e)=>s+e.amount-lentAmt(e),0);const reimb=inP.filter(e=>e.reimbursedBy).reduce((s,e)=>s+(e.reimbursedAmount??e.amount),0);const spent=Math.max(0,grossSpent-reimb);const recurringSpent=inP.filter(e=>e.source==="recurring").reduce((s,e)=>s+Math.max(0,e.amount-(e.reimbursedBy?(e.reimbursedAmount??e.amount):0)),0);const variableSpent=Math.max(0,spent-recurringSpent);const monthlyRecurring=recurring.reduce((s,r)=>s+r.amount*(MX[r.frequency]||1),0);const fixedPerDay=monthlyRecurring/dim;const fixedForPeriod=fixedPerDay*periodDays;
 // Card bill payments and net savings movement are pinned to the current calendar month
 // (cardPayMonth/savingsMonth, computed above) rather than the selected Mo/Qtr/6M/Yr period,
 // same as their rows on the summary card. To fold a calendar-month figure into a
@@ -2980,7 +3030,7 @@ const spendForecast=useMemo(()=>{if(!safeToday||!safeToday.income||safeToday.var
 const[safeOpen,sSafeOpen]=useState(()=>gSec("safe",false));
 const toggleSafe=()=>{sSafeOpen(v=>{const nv=!v;sSec("safe",nv);return nv})};
 useEffect(()=>{if(spendFlt.from||spendFlt.to){try{localStorage.setItem("etp-spend-flt",JSON.stringify(spendFlt))}catch{}}else{try{localStorage.removeItem("etp-spend-flt")}catch{}}},[spendFlt]);
-useEffect(()=>{return;const k="etp-nudge-"+new Date().toISOString().slice(0,10);if(nudge||nudgeLoading)return;const eList=expenses.filter(x=>x.type==="expense"&&x.date>=periodStart);const tot=eList.reduce((s,e)=>s+e.amount,0);const byCat={};for(const e of eList){const lbl=co(e.category)?.label||e.category;byCat[lbl]=(byCat[lbl]||0)+e.amount}const ranked=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);const top=ranked.slice(0,5).map(([l,v])=>`${l}: ${v.toFixed(0)}`).join(", ");const cur=data.currency;const fb=()=>{if(!ranked.length)return`No spending logged this ${periodLabel} yet — a clean slate. Keep logging as you go to stay on track.`;const[tl,tv]=ranked[0];const pct=tot>0?Math.round((tv/tot)*100):0;const vs=[`${tl} is your biggest ${periodLabel} spend so far — ${fs(tv,cur)} (${pct}% of ${fs(tot,cur)}).`,`You've spent ${fs(tot,cur)} this ${periodLabel}; ${tl} leads at ${fs(tv,cur)}. Worth a second look.`,`Top category this ${periodLabel}: ${tl} at ${pct}% of total. Small trims here add up fast.`];return vs[new Date().getDate()%vs.length]};const fbText=fb();const cache=(txt)=>{try{localStorage.setItem(k,JSON.stringify(txt))}catch{}};if(!gAK()){setNudge(fbText);cache(fbText);return}
+useEffect(()=>{return;const k="etp-nudge-"+new Date().toISOString().slice(0,10);if(nudge||nudgeLoading)return;const eList=expenses.filter(x=>x.type==="expense"&&x.date>=periodStart);const tot=eList.reduce((s,e)=>_ad(s,e.amount),0);const byCat={};for(const e of eList){const lbl=co(e.category)?.label||e.category;byCat[lbl]=(byCat[lbl]||0)+e.amount}const ranked=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);const top=ranked.slice(0,5).map(([l,v])=>`${l}: ${v.toFixed(0)}`).join(", ");const cur=data.currency;const fb=()=>{if(!ranked.length)return`No spending logged this ${periodLabel} yet — a clean slate. Keep logging as you go to stay on track.`;const[tl,tv]=ranked[0];const pct=tot>0?Math.round((tv/tot)*100):0;const vs=[`${tl} is your biggest ${periodLabel} spend so far — ${fs(tv,cur)} (${pct}% of ${fs(tot,cur)}).`,`You've spent ${fs(tot,cur)} this ${periodLabel}; ${tl} leads at ${fs(tv,cur)}. Worth a second look.`,`Top category this ${periodLabel}: ${tl} at ${pct}% of total. Small trims here add up fast.`];return vs[new Date().getDate()%vs.length]};const fbText=fb();const cache=(txt)=>{try{localStorage.setItem(k,JSON.stringify(txt))}catch{}};if(!gAK()){setNudge(fbText);cache(fbText);return}
 // Show the local insight instantly, then silently upgrade with the AI one if/when it arrives.
 setNudge(fbText);const timeout=new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),8000));Promise.race([cAPI({max_tokens:80,system:"Reply with ONE short spending insight or encouragement (under 20 words). Be specific, friendly, no emoji.",messages:[{role:"user",content:`Currency: ${cur}. Total spent: ${tot.toFixed(0)}. Top categories: ${top||"none"}. Period: ${periodLabel}.`}]}),timeout]).then(r=>{const txt=(r.content?.map(x=>x.text||"").join("")||"").trim();if(txt){setNudge(txt);cache(txt)}else cache(fbText)}).catch(()=>cache(fbText))},[]);
 const snapPhotos=async(files,prompt)=>{const arr=Array.from(files||[]).filter(Boolean);if(!arr.length)return;if(!gAK()){setSnapErr("Add an AI API key in Settings first.");return}const pv=AI_PROVIDERS[gProv()]||AI_PROVIDERS.anthropic;if(!pv.vision){setSnapErr(`${pv.name} doesn't support photo scanning — switch to Anthropic, DeepSeek, OpenAI, or Gemini in Settings.`);return}setSnapBusy(true);setSnapErr(null);setSnapItems(null);setSnapMonthOk(false);setSnapBulkPay("");setSnapProgress(arr.length>1?{done:0,total:arr.length}:null);const multi=snapMulti;const thisYear=new Date().getFullYear();const sys=multi?`You are a multi-date expense extractor. The image may be a handwritten diary page, a note, a ledger, a spreadsheet screenshot, or a receipt, and it MAY contain expenses belonging to SEVERAL DIFFERENT DATES.\nRules:\n1. Read every date written on the page — headings, column values, row prefixes, receipt timestamps.\n2. Attach each expense line to the date it sits under or beside. Do NOT merge everything onto one date.\n3. Emit one item per expense line. Never sum lines together and never invent lines.\n4. Normalise dates to YYYY-MM-DD. Day-first formats (12/03, 12-03-2026) are day/month. If the year is missing assume ${thisYear}.\n5. If a line genuinely has no date anywhere above or beside it, set "date":null. Never guess a date and never fall back to today.\n6. TIME: only if a clock time is actually printed or written for that line (receipt/transaction timestamp, a time column, "7:45pm" beside the entry), return it as 24-hour "HH:MM". If no time is visible set "time":null — never guess or invent a time.\nReturn JSON only:\n{"items":[{"merchant":"store or payee","amount":0.00,"date":"YYYY-MM-DD","time":"HH:MM or null","category":"food|shopping|transport|utilities|health|entertainment|other","note":"item or empty"}]}\nIf nothing is readable: {"items":[],"error":"reason"}.`:`You are a receipt scanner. Extract ALL expense line items. Return JSON only:\n{"items":[{"merchant":"store name","amount":0.00,"date":"YYYY-MM-DD","time":"HH:MM 24-hour as printed on the receipt, or null if no time is printed (never guess)","category":"food|shopping|transport|utilities|health|entertainment|other","note":"item or empty"}]}\nFor grocery/restaurant, one entry per distinct item, all sharing the merchant. If unreadable: {"items":[],"error":"reason"}.`;const userText=prompt||(multi?"Extract every expense from this image and keep each one on the date written next to it.":"Extract all expense items from this receipt.");let allItems=[];let globalErr=null;for(let pi=0;pi<arr.length;pi++){const f=arr[pi];try{const isPdf=/pdf/i.test(f.type||"")||/\.pdf$/i.test(f.name||"");const ds=isPdf?null:await grocDownscale(f,2000,0.85);const b64=ds?ds.dataUrl:await new Promise(r=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.readAsDataURL(f)});const mt=ds?ds.media:(f.type||"image/jpeg");const r=await cAPI({max_tokens:multi?8000:1500,system:sys,messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:mt,data:b64.split(",")[1]}},{type:"text",text:userText}]}]});const txt=r.content?.map(x=>x.text||"").join("")||"";let parsed=extractJSON(txt);if(!parsed||!Array.isArray(parsed.items))parsed=salvageJSONItems(txt);if(parsed&&Array.isArray(parsed.items)&&parsed.items.length){allItems=[...allItems,...parsed.items.map(it=>({...it,_photoIdx:arr.length>1?pi+1:null,_photoTotal:arr.length}))]}else if(parsed?.error&&!allItems.length){globalErr=parsed.error}}catch(e){if(!allItems.length)globalErr=friendlyAPIError(e)}if(arr.length>1)setSnapProgress({done:pi+1,total:arr.length})}if(!allItems.length){setSnapErr(globalErr||"No items found — try clearer photos.");setSnapBusy(false);return}const merchMem=buildMerchantMemory(data.expenses,data.merchantRules);const items=allItems.map((it,i)=>{const guess=it.merchant?merchMem(it.merchant):null;const cat=(guess?.category||(it.category!=null?String(it.category):"other")).toLowerCase();const grp=(CE_GROUPS.slice(1).find(g=>g.ids?.includes(cat))||{}).id||"all";const mop=guess?.cardId?"card":"account";const dt=SNAP_ISO(it.date);return{...it,date:dt,time:SNAP_TIME(it.time),amount:parseFloat(it.amount)||0,category:cat,mop,accountId:guess?.cardId?null:(guess?.accountId||null),cardId:guess?.cardId||null,needWant:guess?.needWant||catNW(cat),_catGrp:grp,_catQ:"",_id:i}});setSnapItems(items);setSnapEdit(null);const s2={};items.forEach((_,i)=>{s2[i]=true});setSnapSel(s2);setSnapBusy(false);setSnapProgress(null)};
@@ -3970,7 +4020,7 @@ function LASView({data,persist,onClose}){
   const investedNow=usage.filter(u=>u.invested).reduce((s,u)=>s+(Number(u.currentValue)||0),0);
   const investGain=investedNow-investedCost;
   const pledgeFees=scripFee*holdings.length;
-  const interestPaid=txns.filter(x=>x.type==="interest").reduce((s,x)=>s+x.amount,0);
+  const interestPaid=txns.filter(x=>x.type==="interest").reduce((s,x)=>_ad(s,x.amount),0);
   const gstAmt=(procFee+pledgeFees)*gstPct/100;
   const totalCharges=procFee+pledgeFees+gstAmt+interestPaid;
   const daysSinceLoan=loanDate!=null?Math.max(0,Math.floor((Date.now()-loanDate)/864e5)):null;
@@ -4315,14 +4365,14 @@ return o("div",{style:{background:c.sfg,borderRadius:16,border:`1px solid ${ov?c
 function Breakdown({data,persist,onClose,onTx}){const{expenses,currency,monthStartDay=1,financeProfile}=data;
   const st=ps(new Date(),monthStartDay),en=mse(new Date().getFullYear(),new Date().getMonth(),monthStartDay);
   const mE=useMemo(()=>expenses.filter(e=>e.type==="expense"&&e.date>=st&&e.date<en),[expenses,st,en]);
-  const incTx=useMemo(()=>expenses.filter(e=>e.type==="income"&&e.date>=st&&e.date<en).reduce((s,e)=>s+e.amount,0),[expenses,st,en]);
+  const incTx=useMemo(()=>expenses.filter(e=>e.type==="income"&&e.date>=st&&e.date<en).reduce((s,e)=>_ad(s,e.amount),0),[expenses,st,en]);
   const income=incTx>0?incTx:((financeProfile&&financeProfile.monthlyIncome)||0);
   const needsItems=useMemo(()=>mE.filter(e=>nwOf(e)==="need").sort((a,b)=>b.date-a.date),[mE]);
   const wantsItems=useMemo(()=>mE.filter(e=>nwOf(e)==="want").sort((a,b)=>b.date-a.date),[mE]);
   const savingsItems=useMemo(()=>expenses.filter(e=>e.type==="income"&&e.category==="savings_deposit"&&e.date>=st&&e.date<en).sort((a,b)=>b.date-a.date),[expenses,st,en]);
   const needs=needsItems.reduce((s,e)=>s+netAmt(e),0);
   const wants=wantsItems.reduce((s,e)=>s+netAmt(e),0);
-  const savings=savingsItems.reduce((s,e)=>s+e.amount,0),spent=needs+wants,pctOf=v=>income>0?Math.round(v/income*100):0;
+  const savings=savingsItems.reduce((s,e)=>_ad(s,e.amount),0),spent=needs+wants,pctOf=v=>income>0?Math.round(v/income*100):0;
   const monLbl=new Date(st).toLocaleDateString("en-US",{month:"long",year:"numeric"});
   const[sub,sSub]=useState(null);
   const toggleNW=e=>{const next=nwOf(e)==="need"?"want":"need";persist({expenses:data.expenses.map(x=>x.id===e.id?{...x,needWant:next}:x)});};
@@ -5577,7 +5627,7 @@ function buildFullFinanceCtx(d){
   const crs=(d.cards||[]).filter(x=>x.type==="credit");
   if(crs.length){L.push("Credit cards: "+crs.map(x=>{const y=cc(x,exps);return `${x.name} outstanding ${cu}${N(y.outstanding)}${y.outstanding>0?`, due ${new Date(y.dueDate).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}`:""}, spent this cycle ${cu}${N(y.currentSpend)}`}).join("; "))}
   const mSp=exps.filter(e=>e.type==="expense"&&e.date>=mst).reduce((s,e)=>s+netAmt(e),0);
-  const mInc=exps.filter(e=>e.type==="income"&&e.date>=mst).reduce((s,e)=>s+e.amount,0);
+  const mInc=exps.filter(e=>e.type==="income"&&e.date>=mst).reduce((s,e)=>_ad(s,e.amount),0);
   const byCat={};for(const e of exps){if(e.type!=="expense"||e.date<mst)continue;const l2=(co(e.category)||{}).label||e.category;byCat[l2]=(byCat[l2]||0)+netAmt(e)}
   const topC=Object.entries(byCat).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([k,v])=>`${k} ${cu}${N(v)}`).join(", ");
   L.push(`This month (from ${new Date(mst).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}): spent ${cu}${N(mSp)}, income ${cu}${N(mInc)}${topC?". Top categories: "+topC:""}`);
@@ -5594,7 +5644,7 @@ function buildFullFinanceCtx(d){
   const gl=(d.goals||[]);
   if(gl.length)L.push("Savings goals: "+gl.map(g=>`${g.name} ${cu}${N(g.currentBalance||0)}/${cu}${N(g.target||0)}`).join(", "));
   const bl=(d.budgetLoans||[]).filter(l2=>l2.status!=="paid");
-  if(bl.length)L.push("Budget loans to repay: "+bl.map(l2=>{const paid=(l2.payments||[]).reduce((s,p)=>s+p.amount,0);return `${l2.name||"loan"} remaining ${cu}${N(Math.max(0,(l2.principal||0)-paid))}`}).join(", "));
+  if(bl.length)L.push("Budget loans to repay: "+bl.map(l2=>{const paid=(l2.payments||[]).reduce((s,p)=>_ad(s,p.amount),0);return `${l2.name||"loan"} remaining ${cu}${N(Math.max(0,(l2.principal||0)-paid))}`}).join(", "));
   const led=(d.ledger||[]);
   if(led.length){const ppl=led.map(p=>{let oy=0,yo=0;for(const en of(p.entries||[])){if(en.kind==="gave")oy+=en.amount;else if(en.kind==="received")oy-=en.amount;else if(en.kind==="borrow")yo+=en.amount;else if(en.kind==="repaid")yo-=en.amount}return{n:p.name,net:oy-yo}}).filter(x=>Math.abs(x.net)>0.5);
     if(ppl.length){const owedYou=ppl.filter(x=>x.net>0),youOwe=ppl.filter(x=>x.net<0);L.push("Lending diary: "+[...owedYou.map(x=>`${x.n} owes you ${cu}${N(x.net)}`),...youOwe.map(x=>`you owe ${x.n} ${cu}${N(-x.net)}`)].join(", "))}}
@@ -7851,7 +7901,7 @@ function Calend({data,onTx,onFlt,presetAdd,onExplore,onDiary}){const{expenses,cu
   useEffect(()=>{_calState={yr,mo,sel,cf,cSub}},[yr,mo,sel,cf,cSub]);
   const days=useMemo(()=>{const fd=new Date(yr,mo,1).getDay(),la=new Date(yr,mo+1,0).getDate(),x=[];for(let i=fd-1;i>=0;i--)x.push({date:new Date(yr,mo,-i),other:true});for(let d=1;d<=la;d++)x.push({date:new Date(yr,mo,d),other:false});while(x.length<42){const l=x[x.length-1].date,n=new Date(l);n.setDate(l.getDate()+1);x.push({date:n,other:true})}return x},[yr,mo]);
   const byD=useMemo(()=>{const pairs=txPairs(expenses);const m={};for(const e of expenses){if(e.type==="transfer-in")continue;const k=new Date(e.date).toDateString();if(!m[k])m[k]={total:0,income:0,items:[]};if(e.type==="expense"||e.type==="card-payment")m[k].total+=netAmt(e);else if(e.type==="income")m[k].income+=e.amount;m[k].items.push(enrichTx(e,pairs))}return m},[expenses]);
-  const fByD=useMemo(()=>{const thrFn0=cThr.length?(e=>cThr.includes(e.threadId||"none")):null,catFn=cCat.length?(e=>cCat.includes(e.category)):null,thrFn=thrFn0&&catFn?(e=>thrFn0(e)&&catFn(e)):(thrFn0||catFn);if(cf==="all"&&!thrFn)return byD;const fn0=cf==="all"?(()=>true):cf==="income"?e=>e.type==="income":cf==="expense"?e=>e.type==="expense":cf==="cards"?(cSub?e=>e.cardId===cSub&&e.type!=="card-payment":e=>!!e.cardId&&e.type!=="card-payment"):cf==="reimbursable"?(cSub==="pending"?e=>!!(e.reimbursable)&&!e.reimbursedBy&&e.type==="expense":cSub==="done"?e=>!!(e.reimbursable)&&!!e.reimbursedBy&&e.type==="expense":e=>!!(e.reimbursable)&&e.type==="expense"):cf==="savings"?e=>savIsLeg(e):cf==="cardpay"?e=>e.type==="card-payment":cf==="stmt"?e=>e.source==="statement":(cSub?e=>e.accountId===cSub&&e.type==="expense"&&!e.cardId:e=>e.type==="expense"&&!e.cardId);const fn=thrFn?(e=>fn0(e)&&thrFn(e)):fn0;const m={};for(const[k,v]of Object.entries(byD)){const fi=v.items.filter(fn);if(fi.length>0){const ft=fi.filter(e=>e.type==="expense"||e.type==="card-payment").reduce((s,e)=>s+netAmt(e),0),fin=fi.filter(e=>e.type==="income").reduce((s,e)=>s+e.amount,0);m[k]={total:ft,income:fin,items:fi}}}return m},[byD,cf,cSub,cThr,cCat]);
+  const fByD=useMemo(()=>{const thrFn0=cThr.length?(e=>cThr.includes(e.threadId||"none")):null,catFn=cCat.length?(e=>cCat.includes(e.category)):null,thrFn=thrFn0&&catFn?(e=>thrFn0(e)&&catFn(e)):(thrFn0||catFn);if(cf==="all"&&!thrFn)return byD;const fn0=cf==="all"?(()=>true):cf==="income"?e=>e.type==="income":cf==="expense"?e=>e.type==="expense":cf==="cards"?(cSub?e=>e.cardId===cSub&&e.type!=="card-payment":e=>!!e.cardId&&e.type!=="card-payment"):cf==="reimbursable"?(cSub==="pending"?e=>!!(e.reimbursable)&&!e.reimbursedBy&&e.type==="expense":cSub==="done"?e=>!!(e.reimbursable)&&!!e.reimbursedBy&&e.type==="expense":e=>!!(e.reimbursable)&&e.type==="expense"):cf==="savings"?e=>savIsLeg(e):cf==="cardpay"?e=>e.type==="card-payment":cf==="stmt"?e=>e.source==="statement":(cSub?e=>e.accountId===cSub&&e.type==="expense"&&!e.cardId:e=>e.type==="expense"&&!e.cardId);const fn=thrFn?(e=>fn0(e)&&thrFn(e)):fn0;const m={};for(const[k,v]of Object.entries(byD)){const fi=v.items.filter(fn);if(fi.length>0){const ft=fi.filter(e=>e.type==="expense"||e.type==="card-payment").reduce((s,e)=>s+netAmt(e),0),fin=fi.filter(e=>e.type==="income").reduce((s,e)=>_ad(s,e.amount),0);m[k]={total:ft,income:fin,items:fi}}}return m},[byD,cf,cSub,cThr,cCat]);
   const savByD=useMemo(()=>{const m={};for(const e of savMoves(expenses)){const k=new Date(e.date).toDateString();m[k]=(m[k]||0)+savSigned(e)}return m},[expenses]);
   const monthSaved=useMemo(()=>{let v=0;for(const cl of days){if(cl.other)continue;v+=savByD[cl.date.toDateString()]||0}return v},[days,savByD]);
   const mst=useMemo(()=>{let to=0,ic=0,co2=0,mx=0;for(const cl of days){if(cl.other)continue;const x=fByD[cl.date.toDateString()];if(x){to+=x.total;ic+=x.income;co2+=x.items.length;if(x.total>mx)mx=x.total}}return{total:to,income:ic,max:mx,count:co2}},[days,fByD]);
@@ -8006,7 +8056,7 @@ const trend12=useMemo(()=>{const a=[];const td=new Date();for(let i=11;i>=0;i--)
 const byQuarter=useMemo(()=>{const a=[];const yr=new Date().getFullYear(),now2=Date.now();for(let q=0;q<4;q++){const s=new Date(yr,q*3,1).getTime(),e=new Date(yr,q*3+3,1).getTime(),v=expenses.filter(x=>x.date>=s&&x.date<e&&x.type==="expense").reduce((ac,x)=>ac+netAmt(x),0),isCur=s<=now2&&now2<e;a.push({label:"Q"+(q+1),value:Math.round(v*100)/100,isCurrent:isCur,rangeStart:s,rangeEnd:e,dayLabel:"Q"+(q+1)+" "+yr+" Expenses"})}return a},[expenses]);
 useEffect(()=>{sSelBar(null);sSelBar7(null)},[range]);
 const yr2=new Date().getFullYear();
-const yearMonths=useMemo(()=>{const a=[];for(let m=0;m<12;m++){const s=new Date(yr2,m,1).getTime(),e=new Date(yr2,m+1,1).getTime();if(s>Date.now())break;const ex=expenses.filter(x=>x.date>=s&&x.date<e&&x.type==="expense"),ic=expenses.filter(x=>x.date>=s&&x.date<e&&x.type==="income"),spend=ex.reduce((a,x)=>a+netAmt(x),0),income=ic.reduce((a,x)=>a+x.amount,0),byC={};for(const e2 of ex)byC[e2.category]=(byC[e2.category]||0)+netAmt(e2);a.push({mo:new Date(s).toLocaleDateString("en-US",{month:"short"}),m,s,e,spend,income,net:income-spend,byC})}return a},[expenses,yr2]);
+const yearMonths=useMemo(()=>{const a=[];for(let m=0;m<12;m++){const s=new Date(yr2,m,1).getTime(),e=new Date(yr2,m+1,1).getTime();if(s>Date.now())break;const ex=expenses.filter(x=>x.date>=s&&x.date<e&&x.type==="expense"),ic=expenses.filter(x=>x.date>=s&&x.date<e&&x.type==="income"),spend=ex.reduce((a,x)=>a+netAmt(x),0),income=ic.reduce((a,x)=>_ad(a,x.amount),0),byC={};for(const e2 of ex)byC[e2.category]=(byC[e2.category]||0)+netAmt(e2);a.push({mo:new Date(s).toLocaleDateString("en-US",{month:"short"}),m,s,e,spend,income,net:income-spend,byC})}return a},[expenses,yr2]);
 const spendR=useMemo(()=>{if(!yearMonths.length||!yearMonths[yearMonths.length-1].spend)return null;const last=yearMonths[yearMonths.length-1],srData=yearMonths.map(m=>({mo:m.mo,rate:m.income>0?(m.net/m.income)*100:0,spend:m.spend,income:m.income})),validR=srData.filter(r=>r.income>0),avgRate=validR.length?validR.reduce((s,r)=>s+r.rate,0)/validR.length:null,lastRate=last.income>0?(last.net/last.income)*100:null,prev=yearMonths.length>=2?yearMonths[yearMonths.length-2]:null,momChange=prev&&prev.spend>0?((last.spend-prev.spend)/prev.spend)*100:0,allCats={};for(const m of yearMonths)for(const[cid,v] of Object.entries(m.byC)){if(!allCats[cid])allCats[cid]={total:0,cnt:0};allCats[cid].total+=v;allCats[cid].cnt++}const mult=rLevel==="aggressive"?0.80:rLevel==="maintain"?1.0:0.90,threshold=thresh,cats=Object.entries(last.byC).sort((a,b)=>b[1]-a[1]).filter(([,amt])=>amt>=threshold).slice(0,7).map(([cid,lastAmt])=>{const cd=allCats[cid],yrAvg=cd&&cd.cnt?cd.total/cd.cnt:lastAmt,prev3=yearMonths.slice(-4,-1).map(m=>m.byC[cid]||0),prev3Avg=prev3.length?prev3.reduce((s,v)=>s+v,0)/prev3.length:0,lastBased=Math.max(0,Math.round(lastAmt*mult)),avgBased=Math.max(0,Math.round((prev3Avg>0?prev3Avg:yrAvg)*mult)),hasTwoOpts=prev3Avg>0&&Math.abs(lastBased-avgBased)>=Math.max(50,lastAmt*0.05),momChg=prev3Avg>0?((lastAmt-prev3Avg)/prev3Avg)*100:null,existing=categoryBudgets[cid]?.limit||0;return{cid,lastAmt,yrAvg,prev3Avg,lastBased,avgBased,hasTwoOpts,momChg,existing,...co(cid)}});return{cats,avgRate,lastRate,momChange,lastSpend:last.spend,lastMo:last.mo,srData,threshold}},[yearMonths,rLevel,categoryBudgets,appBudget,thresh]);
 const getEffCap=cat=>{if(capCustom[cat.cid]!=null)return capCustom[cat.cid];const ch=capChoice[cat.cid]||"last";return ch==="avg"?cat.avgBased:cat.lastBased};
 const now3=new Date(),nextMo3=new Date(now3.getFullYear(),now3.getMonth()+1,1),nextMoLbl=nextMo3.toLocaleDateString("en-US",{month:"long",year:"numeric"}),nextMoYr=nextMo3.getFullYear(),nextMoIdx=nextMo3.getMonth();
@@ -8022,9 +8072,9 @@ const catTot=byCat.reduce((s,x)=>s+x.value,0);
 const top10=useMemo(()=>{const arr=[...monExp];if(t10Sort==="amtD")arr.sort((a,b)=>b.amount-a.amount);else if(t10Sort==="amtA")arr.sort((a,b)=>a.amount-b.amount);else if(t10Sort==="dateD")arr.sort((a,b)=>b.date-a.date);else arr.sort((a,b)=>(co(a.category).label||"").localeCompare(co(b.category).label||""));return arr.slice(0,10)},[monExp,t10Sort]);
 const top10Cat=useMemo(()=>{const m={};for(const e of monExp){if(!m[e.category])m[e.category]={id:e.category,...co(e.category),total:0,cnt:0};m[e.category].total+=netAmt(e);m[e.category].cnt++;}return Object.values(m).sort((a,b)=>b.total-a.total).slice(0,10)},[monExp]);
 const monInc=useMemo(()=>expenses.filter(e=>e.date>=st&&e.type==="income"),[expenses,st]);
-const incTot=monInc.reduce((s,e)=>s+e.amount,0);
+const incTot=monInc.reduce((s,e)=>_ad(s,e.amount),0);
 const byInc=useMemo(()=>{const m={};for(const e of monInc)m[e.category]=(m[e.category]||0)+netAmt(e);return Object.entries(m).map(([id,v])=>({id,value:v,...co(id)})).sort((a,b)=>b.value-a.value)},[monInc]);
-const byNWS=useMemo(()=>{const nd=monExp.filter(e=>nwOf(e)==="need").reduce((s,e)=>s+netAmt(e),0);const wt=monExp.filter(e=>nwOf(e)==="want").reduce((s,e)=>s+netAmt(e),0);const sv=monInc.filter(e=>e.category==="savings_deposit").reduce((s,e)=>s+e.amount,0);const r=[];if(nd>0)r.push({id:"need",label:"Need",emoji:"🧷",value:nd,color:NW_META.need.color});if(wt>0)r.push({id:"want",label:"Want",emoji:"✨",value:wt,color:NW_META.want.color});if(sv>0)r.push({id:"save",label:"Savings",emoji:"🐖",value:sv,color:c.mt});return r},[monExp,monInc]);
+const byNWS=useMemo(()=>{const nd=monExp.filter(e=>nwOf(e)==="need").reduce((s,e)=>s+netAmt(e),0);const wt=monExp.filter(e=>nwOf(e)==="want").reduce((s,e)=>s+netAmt(e),0);const sv=monInc.filter(e=>e.category==="savings_deposit").reduce((s,e)=>_ad(s,e.amount),0);const r=[];if(nd>0)r.push({id:"need",label:"Need",emoji:"🧷",value:nd,color:NW_META.need.color});if(wt>0)r.push({id:"want",label:"Want",emoji:"✨",value:wt,color:NW_META.want.color});if(sv>0)r.push({id:"save",label:"Savings",emoji:"🐖",value:sv,color:c.mt});return r},[monExp,monInc]);
 const todSpend=useMemo(()=>{const B={morning:{l:"Morning",r:"5am – 12pm",e:"🌅",v:0,n:0},afternoon:{l:"Afternoon",r:"12pm – 5pm",e:"☀️",v:0,n:0},evening:{l:"Evening",r:"5pm – 9pm",e:"🌆",v:0,n:0},night:{l:"Night",r:"9pm – 5am",e:"🌙",v:0,n:0}};let cnt=0;for(const e of monExp){if(!e.hasTime)continue;const b=B[todBucket(e.date)];b.v+=netAmt(e);b.n++;cnt++}const tot=Object.values(B).reduce((a,b)=>a+b.v,0);return{rows:Object.values(B),cnt,tot,of:monExp.length}},[monExp]);
 const nwsTot=byNWS.reduce((s,x)=>s+x.value,0);
 const pendReimb=useMemo(()=>expenses.filter(e=>e.reimbursable&&!e.reimbursedBy&&e.type==="expense").sort((a,b)=>b.date-a.date),[expenses]);
@@ -8053,7 +8103,7 @@ return o("div",{style:{padding:`8px ${GUT}px 0`},className:"st",children:[
     secMatches.length>0&&t("div",{style:{marginTop:6,background:c.sf2,border:`1px solid ${c.ac}55`,borderRadius:12,overflow:"hidden"},children:secMatches.map(([id,name],i)=>t("button",{key:id,onClick:()=>goSec(id),className:"act98 trt",style:{display:"block",width:"100%",textAlign:"left",padding:"12px 14px",background:"transparent",border:"none",borderBottom:i===secMatches.length-1?"none":`1px solid ${c.brs}`,color:c.tx,fontSize:13,cursor:"pointer"},children:["🔻  ",name]}))}),
     q2&&secMatches.length===0&&t("div",{style:{marginTop:6,background:c.sf2,border:`1px solid ${c.brs}`,borderRadius:12,padding:"11px 14px",color:c.tm,fontSize:12},children:"No matching section"}),
   ]}),
-  (pendReimb.length>0||doneReimb.length>0)&&(()=>{const activeList=reimbTab==="done"?doneReimb:pendReimb;const headTotal=activeList.reduce((s,e)=>s+e.amount,0);return o("div",{id:"stsec-reimb",style:{marginTop:20,background:c.sfg,borderRadius:R,border:`1px solid ${c.ac}30`,padding:18},children:[
+  (pendReimb.length>0||doneReimb.length>0)&&(()=>{const activeList=reimbTab==="done"?doneReimb:pendReimb;const headTotal=activeList.reduce((s,e)=>_ad(s,e.amount),0);return o("div",{id:"stsec-reimb",style:{marginTop:20,background:c.sfg,borderRadius:R,border:`1px solid ${c.ac}30`,padding:18},children:[
     o("div",{className:"f ib jb",style:{marginBottom:reimbCollapsed?0:12,cursor:"pointer"},onClick:()=>{const nv=!reimbCollapsed;sReimbCollapsed(nv);sSec("statsReimb",!nv)},children:[
       o("div",{className:"f ia",style:{gap:6},children:[t("span",{style:{width:8,height:8,borderRadius:999,background:c.co,display:"inline-block"}}),t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5},children:"REIMBURSEMENT EXPENSES"}),t("span",{style:{fontFamily:'var(--nf)',fontSize:11,color:c.tm,marginLeft:4},children:reimbCollapsed?"▶":"▼"})]}),
       t("span",{style:{fontFamily:'var(--nf)',fontSize:13,fontWeight:600,color:c.ac},children:fm(headTotal,currency)})
@@ -8080,7 +8130,7 @@ return o("div",{style:{padding:`8px ${GUT}px 0`},className:"st",children:[
   ]}),
   onView&&t(NetWorthStatsCard,{data,onView}),
   o("div",{id:"stsec-top10",style:{marginTop:20,background:c.sfg,borderRadius:R,boxShadow:cardSh(),padding:18},children:[
-    o("div",{className:"f ib jb",style:{marginBottom:8},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5},children:"TOP 10 EXPENSES"}),tot>0&&t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.td},children:`${((top10.reduce((s,x)=>s+x.amount,0)/tot)*100).toFixed(0)}% OF TOTAL`})]}),
+    o("div",{className:"f ib jb",style:{marginBottom:8},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5},children:"TOP 10 EXPENSES"}),tot>0&&t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.td},children:`${((top10.reduce((s,x)=>_ad(s,x.amount),0)/tot)*100).toFixed(0)}% OF TOTAL`})]}),
     t("div",{className:"f",style:{gap:4,marginBottom:12,flexWrap:"wrap"},children:[["amtD","amtA","dateD","catA"].map((k,ki)=>{const lbl=["High→Low","Low→High","Newest","Category"][ki];const on=t10Sort===k;return t("button",{key:k,onClick:()=>sT10Sort(k),className:"act95 tr",style:{padding:"4px 10px",background:on?c.sf3:c.sf,border:`1px solid ${on?c.ac:c.brs}`,borderRadius:999,fontSize:9,fontFamily:'var(--nf)',color:on?c.tx:c.td,letterSpacing:.3},children:lbl})})]}),
     t10Sort==="catA"
       ?(top10Cat.length===0?t("div",{style:{padding:"24px 0",textAlign:"center",color:c.tm,fontSize:13},children:"No expenses this range"}):o("div",{children:top10Cat.map((cx,i)=>{const pct=catTot>0?(cx.total/catTot)*100:0;return o("div",{key:cx.id,className:"f ia",style:{gap:12,padding:"6px 0",borderBottom:i<top10Cat.length-1?`1px solid ${c.brs}`:"none"},children:[t("div",{style:{width:22,height:22,borderRadius:7,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:c.tm,fontFamily:'var(--nf)',flexShrink:0},children:i+1}),t("div",{style:{fontSize:18,flexShrink:0},children:cx.emoji}),o("div",{className:"f1 minw0 tl",children:[t("div",{className:"tru",style:{fontSize:13,fontWeight:500},children:cx.label}),t("div",{style:{fontSize:11,color:c.tm,marginTop:1},children:cx.cnt+" expense"+(cx.cnt===1?"":"s")})]}),o("div",{className:"trg",style:{flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:13,fontWeight:500},children:fm(cx.total,currency)}),o("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,marginTop:1},children:[pct.toFixed(1),"%"]})]})]})})}))
@@ -8103,7 +8153,7 @@ return o("div",{style:{padding:`8px ${GUT}px 0`},className:"st",children:[
       ]}),
     ]});
   })(),
-  byCat.length>0&&(()=>{const byAcct=data.accounts.map(a=>{const sp=monExp.filter(e=>e.accountId===a.id).reduce((s,e)=>s+e.amount,0);return{id:a.id,label:a.name,emoji:a.emoji,value:sp}}).filter(x=>x.value>0).sort((a,b)=>b.value-a.value);return byAcct.length>1?o("div",{id:"stsec-byacct",style:{marginTop:20,background:c.sfg,borderRadius:R,boxShadow:cardSh(),padding:18},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:12},children:"BY ACCOUNT · TAP TO DRILL DOWN"}),byAcct.map(a=>{const pct=tot>0?(a.value/tot)*100:0;return o("button",{key:a.id,onClick:()=>{const items=monExp.filter(e=>e.accountId===a.id);onFlt({title:a.emoji+" "+a.label+" Expenses",items})},className:"w100 act99 trt f ia",style:{gap:12,marginBottom:8,padding:"6px 4px",background:"transparent",border:"none",color:"inherit",textAlign:"left"},children:[t("span",{style:{fontSize:14},children:a.emoji}),o("div",{className:"f1 minw0",children:[o("div",{className:"f jb",style:{fontSize:12,marginBottom:4},children:[t("span",{children:a.label}),o("span",{style:{fontFamily:'var(--nf)',color:c.td},children:[fm(a.value,currency)," · ",pct.toFixed(1),"%"]})]}),t("div",{style:{height:3,background:c.sf2,borderRadius:999},children:t("div",{style:{width:pct+"%",height:"100%",background:c.ac,borderRadius:999}})})]})]})})]}):null})(),
+  byCat.length>0&&(()=>{const byAcct=data.accounts.map(a=>{const sp=monExp.filter(e=>e.accountId===a.id).reduce((s,e)=>_ad(s,e.amount),0);return{id:a.id,label:a.name,emoji:a.emoji,value:sp}}).filter(x=>x.value>0).sort((a,b)=>b.value-a.value);return byAcct.length>1?o("div",{id:"stsec-byacct",style:{marginTop:20,background:c.sfg,borderRadius:R,boxShadow:cardSh(),padding:18},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:12},children:"BY ACCOUNT · TAP TO DRILL DOWN"}),byAcct.map(a=>{const pct=tot>0?(a.value/tot)*100:0;return o("button",{key:a.id,onClick:()=>{const items=monExp.filter(e=>e.accountId===a.id);onFlt({title:a.emoji+" "+a.label+" Expenses",items})},className:"w100 act99 trt f ia",style:{gap:12,marginBottom:8,padding:"6px 4px",background:"transparent",border:"none",color:"inherit",textAlign:"left"},children:[t("span",{style:{fontSize:14},children:a.emoji}),o("div",{className:"f1 minw0",children:[o("div",{className:"f jb",style:{fontSize:12,marginBottom:4},children:[t("span",{children:a.label}),o("span",{style:{fontFamily:'var(--nf)',color:c.td},children:[fm(a.value,currency)," · ",pct.toFixed(1),"%"]})]}),t("div",{style:{height:3,background:c.sf2,borderRadius:999},children:t("div",{style:{width:pct+"%",height:"100%",background:c.ac,borderRadius:999}})})]})]})})]}):null})(),
   byCat.length>0&&o("div",{id:"stsec-bycat",style:{marginTop:20,background:c.sfg,borderRadius:R,boxShadow:cardSh(),padding:18},children:[
     t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5,marginBottom:8},children:"BY CATEGORY · TAP TO DRILL DOWN"}),
     o("div",{style:{height:200,position:"relative"},children:[
@@ -8781,8 +8831,8 @@ function MonthAcctDetail({data,mk,accountId,onBack}){
   const opening=useMemo(()=>acc?abAsOf(acc,data.expenses,data.openingBalances,start-1):0,[acc,data.expenses,data.openingBalances,start]);
   const closing=useMemo(()=>acc?abAsOf(acc,data.expenses,data.openingBalances,end-1):0,[acc,data.expenses,data.openingBalances,end]);
   const monthTx=useMemo(()=>acc?(data.expenses||[]).filter(e=>e.accountId===accountId&&e.date>=start&&e.date<end):[],[data.expenses,accountId,start,end,acc]);
-  const totalIncome=useMemo(()=>monthTx.filter(isCredit).reduce((s,e)=>s+e.amount,0),[monthTx]);
-  const totalExpense=useMemo(()=>monthTx.filter(e=>!isCredit(e)).reduce((s,e)=>s+e.amount,0),[monthTx]);
+  const totalIncome=useMemo(()=>monthTx.filter(isCredit).reduce((s,e)=>_ad(s,e.amount),0),[monthTx]);
+  const totalExpense=useMemo(()=>monthTx.filter(e=>!isCredit(e)).reduce((s,e)=>_ad(s,e.amount),0),[monthTx]);
   const pairs=useMemo(()=>txPairs(data.expenses),[data.expenses]);
   const[sort,sSort]=useState("dateD");
   const SORTS=[["dateD","Date ↓"],["dateA","Date ↑"],["amtD","Amount ↓"],["amtA","Amount ↑"],["income","Income"],["expense","Expenses"]];
@@ -9008,8 +9058,8 @@ function AcctDet({data,acctId,onClose,onEdit,onTx,onDelete,onRevertReconcile}){c
   const latestOb=(data.openingBalances||[]).filter(ob=>ob.accountId===acctId).sort((a,b)=>b.date-a.date)[0]||null;
   const openingAmt=latestOb?latestOb.amount:(acc.opening||0);
   const openingLabel=latestOb?"RECONCILED":"OPENING";
-  const credits=chrono.filter(e=>e.type==="income"||e.type==="transfer-in"||e.type==="reimbursement").reduce((s,e)=>s+e.amount,0);
-  const debits=chrono.filter(e=>!(e.type==="income"||e.type==="transfer-in"||e.type==="reimbursement")).reduce((s,e)=>s+e.amount,0);
+  const credits=chrono.filter(e=>e.type==="income"||e.type==="transfer-in"||e.type==="reimbursement").reduce((s,e)=>_ad(s,e.amount),0);
+  const debits=chrono.filter(e=>!(e.type==="income"||e.type==="transfer-in"||e.type==="reimbursement")).reduce((s,e)=>_ad(s,e.amount),0);
   return o("div",{style:{padding:`8px ${GUT}px 32px`},className:"st",children:[
     t(SH,{title:t("em",{children:acc.name}),onBack:onClose,right:t("button",{onClick:onEdit,className:"act90 trt",style:{width:38,height:38,borderRadius:12,background:c.sfg,border:`1px solid ${c.brs}`,display:"flex",alignItems:"center",justifyContent:"center"},children:t(Pencil,{size:16,color:c.ac})})}),
     o("div",{style:{background:c.sfg,borderRadius:18,border:`1px solid ${c.brs}`,padding:18,marginBottom:16},children:[
@@ -9063,7 +9113,7 @@ function chCardInfo(card,expenses,now){
   const nextClose=cy?cy.nextClose:chAddM(lastClose,1);
   const mine=expenses.filter(e=>e.cardId===card.id&&!e.archived);
   const spends=mine.filter(chIsSpend),pays=mine.filter(e=>e.type==="card-payment"||e.type==="reimbursement");
-  const cycSpend=spends.filter(e=>e.date>=lastClose).reduce((s,e)=>s+e.amount,0);
+  const cycSpend=spends.filter(e=>e.date>=lastClose).reduce((s,e)=>_ad(s,e.amount),0);
   const out=cy?cy.outstanding:0,used=out+(cy?cy.currentSpend:0),lim=Number(card.limit)||0;
   const util=lim>0?Math.min(999,used/lim*100):null;
   const freeDays=cy?Math.ceil((nextClose+(cy.dueDate-lastClose)-now)/864e5):null;   // days until the bill for spends made today falls due
@@ -9290,7 +9340,7 @@ function CardsHub({data,onClose,onAdd,onSelect,onFlt,onCashback,onPay,onEdit,onU
   if(!cards.length)return o("div",{style:{padding:`8px ${GUT}px 32px`},className:"st",children:[t(SH,{title:t("em",{children:"Cards"}),onBack:leave}),t(ES,{title:t("em",{children:"No cards yet"}),subtitle:"Add a card to track dues, spends and cashback.",action:{label:"Add card",onClick:onAdd}})]});
   const range=chRanges(info,now).find(r=>r.id===rng)||chRanges(info,now)[0];
   const inRange=info.spends.filter(e=>e.date>=range.s&&e.date<range.e);
-  const rangeTot=inRange.reduce((s,e)=>s+e.amount,0);
+  const rangeTot=inRange.reduce((s,e)=>_ad(s,e.amount),0);
   const byCat=Object.entries(inRange.reduce((m,e)=>{m[e.category]=(m[e.category]||0)+e.amount;return m},{})).map(([id,v])=>({id,v})).sort((a,b)=>b.v-a.v).slice(0,8);
   const stat=(k,v,sub,col,onClick)=>o(onClick?"button":"div",{key:k,onClick,className:onClick?"act98 trt":"",style:{flex:1,minWidth:0,background:c.sf2,border:"none",borderRadius:12,padding:"10px 11px",textAlign:"left",color:"inherit"},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:8.5,color:c.tm,letterSpacing:.8},children:k}),t("div",{className:"tru",style:{fontFamily:'var(--nf)',fontSize:14,color:col||c.tx,marginTop:3},children:v}),t("div",{className:"tru",style:{fontSize:10,color:c.tm,marginTop:1},children:sub})]});
   const section=(title,right,kids)=>lnCard([o("div",{key:"h",className:"f ia jb",style:{marginBottom:10},children:[t("span",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.5},children:title}),right||null]}),...kids],{marginTop:12,marginBottom:0});
@@ -9298,7 +9348,7 @@ function CardsHub({data,onClose,onAdd,onSelect,onFlt,onCashback,onPay,onEdit,onU
   const cy=info.cy,hasDue=cy&&cy.outstanding>0;
   const utilCol=info.util==null?c.tm:info.util>=70?c.ro:info.util>=30?c.gd:c.mt;
   // six statement cycles of spend
-  const trend=[5,4,3,2,1,0].map(k=>{const s=chAddM(info.lastClose,-k),e=k===0?Infinity:chAddM(info.lastClose,-k+1);const items=info.spends.filter(x=>x.date>=s&&x.date<e);return{k,s,e,items,v:items.reduce((a,x)=>a+x.amount,0),label:new Date(s).toLocaleDateString("en-GB",{month:"short"})}});
+  const trend=[5,4,3,2,1,0].map(k=>{const s=chAddM(info.lastClose,-k),e=k===0?Infinity:chAddM(info.lastClose,-k+1);const items=info.spends.filter(x=>x.date>=s&&x.date<e);return{k,s,e,items,v:items.reduce((a,x)=>_ad(a,x.amount),0),label:new Date(s).toLocaleDateString("en-GB",{month:"short"})}});
   const tmax=Math.max(1,...trend.map(x=>x.v)),tavg=trend.filter(x=>x.v>0).reduce((a,x,_,l)=>a+x.v/l.length,0);
   const merch=(()=>{const m={};inRange.forEach(e=>{const k=(e.merchant||e.payee||co(e.category).label||"Other").trim();m[k]=(m[k]||{v:0,n:0});m[k].v+=e.amount;m[k].n++});return Object.entries(m).sort((a,b)=>b[1].v-a[1].v).slice(0,5)})();
   const best=infos.filter(x=>x.credit&&x.freeDays!=null).sort((a,b)=>b.freeDays-a.freeDays);
@@ -9330,7 +9380,7 @@ function CardsHub({data,onClose,onAdd,onSelect,onFlt,onCashback,onPay,onEdit,onU
       section("SPEND BY CATEGORY",t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:c.tx},children:fm(rangeTot,cur)}),byCat.length?byCat.map(x=>o("button",{key:x.id,onClick:()=>onFlt&&onFlt({title:info.card.name+" · "+co(x.id).label,items:inRange.filter(e=>e.category===x.id)}),className:"w100 act98 trt",style:{display:"block",padding:"7px 0",background:"transparent",border:"none",color:"inherit",textAlign:"left"},children:[o("div",{className:"f jb",style:{fontSize:12.5,color:c.tx},children:[t("span",{children:co(x.id).emoji+" "+co(x.id).label}),t("span",{style:{fontFamily:'var(--nf)'},children:fm(x.v,cur)+" · "+Math.round(x.v/Math.max(1,rangeTot)*100)+"%"})]}),t("div",{style:{height:5,borderRadius:3,background:c.sf2,overflow:"hidden",marginTop:5},children:t("div",{style:{width:x.v/byCat[0].v*100+"%",height:"100%",background:c.ac,borderRadius:3,transition:"width .5s cubic-bezier(.2,.9,.2,1)"}})})]})):[t("div",{key:"e",style:{fontSize:12,color:c.tm},children:"No spends in this range."})]),
       section("LAST 6 CYCLES",t("span",{style:{fontSize:11,color:c.tm},children:tavg>0?"avg "+fm(tavg,cur):""}),[o("div",{key:"b",className:"f",style:{gap:8,alignItems:"flex-end",height:110},children:trend.map(x=>o("button",{key:x.k,onClick:()=>sMSel(mSel===x.k?null:x.k),className:"f1 act95",style:{display:"flex",flexDirection:"column",justifyContent:"flex-end",alignItems:"center",height:"100%",gap:4,background:"transparent",border:"none",padding:0,color:"inherit"},children:[t("span",{style:{fontSize:9,color:c.tm,fontFamily:'var(--nf)'},children:x.v>0?fs(x.v,""):""}),t("div",{style:{width:"100%",height:Math.max(3,x.v/tmax*80),borderRadius:6,background:mSel===x.k?c.ac:x.k===0?c.ac+"cc":c.ac+"40",border:`1px solid ${mSel===x.k||x.k===0?c.ac:c.ac+"55"}`,transition:"height .5s cubic-bezier(.2,.9,.2,1),background .2s"}}),t("span",{style:{fontSize:10,color:c.td},children:x.label})]}))}),mSel!=null&&(()=>{const x=trend.find(z=>z.k===mSel);return o("div",{key:"s",className:"f ia jb",style:{marginTop:12,padding:"10px 12px",background:c.sf2,borderRadius:12,gap:8},children:[o("div",{children:[t("div",{style:{fontSize:13,color:c.tx,fontWeight:600},children:fm(x.v,cur)}),t("div",{style:{fontSize:10.5,color:c.tm},children:x.items.length+" spends · from "+lnFmtD(x.s)})]}),t("button",{onClick:()=>onFlt&&onFlt({title:info.card.name+" · "+x.label,items:x.items}),className:"act95 trt",style:{padding:"7px 14px",borderRadius:10,border:`1px solid ${c.brs}`,background:"transparent",color:c.ac,fontSize:12},children:"View"})]})})()]),
       section("TOP MERCHANTS",null,merch.length?merch.map(([k,v],i)=>o("div",{key:k,className:"f ia jb",style:{padding:"8px 0",borderTop:i?`1px solid ${c.brs}`:"none"},children:[o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:13,color:c.tx},children:k}),t("div",{style:{fontSize:10.5,color:c.tm},children:v.n+" spend"+(v.n===1?"":"s")})]}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:c.tx},children:fm(v.v,cur)})]})):[t("div",{key:"e",style:{fontSize:12,color:c.tm},children:"No spends in this range."})]),
-      section("AT A GLANCE",null,[o("div",{key:"g",className:"f",style:{gap:8},children:[stat("BIGGEST",inRange.length?fm(Math.max(...inRange.map(e=>e.amount)),cur):"—","single spend"),stat("AVERAGE",inRange.length?fm(rangeTot/inRange.length,cur):"—",inRange.length+" spends"),stat("PAYMENTS",fm(info.pays.filter(e=>e.date>=range.s&&e.date<range.e).reduce((s,e)=>s+e.amount,0),cur),"made")]})])
+      section("AT A GLANCE",null,[o("div",{key:"g",className:"f",style:{gap:8},children:[stat("BIGGEST",inRange.length?fm(Math.max(...inRange.map(e=>e.amount)),cur):"—","single spend"),stat("AVERAGE",inRange.length?fm(rangeTot/inRange.length,cur):"—",inRange.length+" spends"),stat("PAYMENTS",fm(info.pays.filter(e=>e.date>=range.s&&e.date<range.e).reduce((s,e)=>_ad(s,e.amount),0),cur),"made")]})])
     ]})]}),
     payOpen&&t(ChPaySheet,{info,data,cur,onClose:()=>sPayOpen(false),onPay})
   ]});
@@ -9873,7 +9923,7 @@ return o("div",{style:{padding:"8px 0 32px"},className:"st",children:[
 ]})}
 
 // === BILLS ===
-function Bills({data,onClose,onAdd,onEdit,onDelete,onMarkPaid}){const{bills=[],expenses,currency}=data;const due=bdue(bills,expenses,365);const upcoming=due.filter(b=>b.daysLeft>=0).sort((a,b)=>a.daysLeft-b.daysLeft);const overdue=due.filter(b=>b.daysLeft<0);const monthTotal=bills.reduce((s,b)=>s+b.amount,0);const[delId,sDelId]=useState(null);
+function Bills({data,onClose,onAdd,onEdit,onDelete,onMarkPaid}){const{bills=[],expenses,currency}=data;const due=bdue(bills,expenses,365);const upcoming=due.filter(b=>b.daysLeft>=0).sort((a,b)=>a.daysLeft-b.daysLeft);const overdue=due.filter(b=>b.daysLeft<0);const monthTotal=bills.reduce((s,b)=>_ad(s,b.amount),0);const[delId,sDelId]=useState(null);
 return o("div",{style:{padding:`8px ${GUT}px 32px`},className:"st",children:[
   t(SH,{title:t("em",{children:"Bills"}),onBack:onClose,right:t("button",{onClick:onAdd,className:"act90 trt",style:{width:38,height:38,borderRadius:12,background:c.ac,color:"#0a0a0a",display:"flex",alignItems:"center",justifyContent:"center",border:"none"},children:t(Plus,{size:20,strokeWidth:2.5})})}),
   bills.length===0?t(ES,{title:t("em",{children:"no bills tracked"}),subtitle:"Add rent, utilities, subscriptions — get reminded before they're due",cta:"+ Add first bill",onCta:onAdd}):o(Fragment,{children:[
@@ -10014,7 +10064,7 @@ function SavingsView({data,onClose,onMove,onAddPot,onUpdatePot,onDeletePot,onSet
   const total=useMemo(()=>savTotal(pots,expenses),[pots,expenses]);
   const mStart=ps(new Date(),msd);
   const thisMonth=useMemo(()=>savNetIn(expenses,mStart),[expenses,mStart]);
-  const monInc=useMemo(()=>expenses.filter(e=>e.type==="income"&&e.category!=="savings_deposit"&&e.date>=mStart).reduce((s,e)=>s+e.amount,0),[expenses,mStart]);
+  const monInc=useMemo(()=>expenses.filter(e=>e.type==="income"&&e.category!=="savings_deposit"&&e.date>=mStart).reduce((s,e)=>_ad(s,e.amount),0),[expenses,mStart]);
   const legacy=useMemo(()=>savLegacy(expenses),[expenses]);
   const due=useMemo(()=>pots.map(p=>({pot:p,due:savDue(p,expenses,msd)})).filter(x=>x.due),[pots,expenses,msd]);
 
@@ -10029,7 +10079,7 @@ function SavingsView({data,onClose,onMove,onAddPot,onUpdatePot,onDeletePot,onSet
       const s=ps(new Date(now.getFullYear(),now.getMonth()-i,Math.min(msd,28)),msd);
       const e=ps(new Date(now.getFullYear(),now.getMonth()-i+1,Math.min(msd,28)),msd);
       const closing=(pots||[]).reduce((a,p)=>a+(p.opening||0),0)+moves.filter(m=>m.date<e).reduce((a,m)=>a+savSigned(m),0);
-      const dep=moves.filter(m=>m.date>=s&&m.date<e&&m.savingsKind==="deposit").reduce((a,m)=>a+m.amount,0);
+      const dep=moves.filter(m=>m.date>=s&&m.date<e&&m.savingsKind==="deposit").reduce((a,m)=>_ad(a,m.amount),0);
       out.push({label:new Date(s).toLocaleDateString("en-US",{month:"short"}),value:Math.round(closing),dep:Math.round(dep)});
     }
     return out;
@@ -10195,8 +10245,8 @@ function SavPotDetail({data,pot,onClose,onTx,onDeposit,onWithdraw}){
   const{expenses=[],accounts=[],goals=[],savingsPots=[],currency}=data;
   const mv=savMoves(expenses,pot.id);
   const bal=savPotBal(pot,expenses);
-  const dep=mv.filter(e=>e.savingsKind==="deposit").reduce((s,e)=>s+e.amount,0);
-  const wd=mv.filter(e=>e.savingsKind==="withdraw").reduce((s,e)=>s+e.amount,0);
+  const dep=mv.filter(e=>e.savingsKind==="deposit").reduce((s,e)=>_ad(s,e.amount),0);
+  const wd=mv.filter(e=>e.savingsKind==="withdraw").reduce((s,e)=>_ad(s,e.amount),0);
   const linked=accounts.find(a=>a.id===pot.accountId)||null;
   const goal=(goals||[]).find(g=>g.id===pot.goalId)||null;
   const kv=(k,v,col)=>o("div",{style:{flex:"1 1 40%",minWidth:110},children:[
@@ -10382,7 +10432,7 @@ function SavMoveSht({data,pot,kind,preAmount,editing,onClose,onSave}){
 function SavTargetSht({data,onClose,onSave}){
   const{savingsTarget=null,currency,expenses=[],monthStartDay}=data;
   const mStart=ps(new Date(),monthStartDay||1);
-  const monInc=expenses.filter(e=>e.type==="income"&&e.category!=="savings_deposit"&&e.date>=mStart).reduce((s,e)=>s+e.amount,0);
+  const monInc=expenses.filter(e=>e.type==="income"&&e.category!=="savings_deposit"&&e.date>=mStart).reduce((s,e)=>_ad(s,e.amount),0);
   const[mode,sMode]=useState(savingsTarget?savingsTarget.mode:"amount");
   const[val,sVal]=useState(savingsTarget?String(savingsTarget.value):"");
   const v=parseFloat(val);
@@ -10520,7 +10570,7 @@ function buildMonthSnapshot(d,y,m){
   const all=d.expenses||[],inMon=all.filter(e=>e.date>=start&&e.date<end&&!e.archived);
   const spentList=inMon.filter(e=>e.type==="expense");
   const spent=spentList.reduce((s,e)=>s+netAmt(e),0);
-  const income=inMon.filter(e=>e.type==="income").reduce((s,e)=>s+e.amount,0);
+  const income=inMon.filter(e=>e.type==="income").reduce((s,e)=>_ad(s,e.amount),0);
   const catMap={};for(const e of spentList)catMap[e.category]=(catMap[e.category]||0)+netAmt(e);
   const cats=Object.entries(catMap).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([id,amt])=>{const k=co(id)||{};return{id,label:k.label||id,emoji:k.emoji||"•",amt}});
   const upto=all.filter(e=>e.date<end);
@@ -10663,7 +10713,7 @@ const THREAD_F0={cats:[],range:"all",from:"",to:"",acct:"",q:"",amin:"",amax:"",
 function thrStats(entries){
   const exp=[],inc=[];
   for(const e of entries||[]){if(e.type==="expense")exp.push(e);else if(e.type==="income")inc.push(e)}
-  const spent=exp.reduce((a,e)=>a+netAmt(e),0),earned=inc.reduce((a,e)=>a+e.amount,0);
+  const spent=exp.reduce((a,e)=>a+netAmt(e),0),earned=inc.reduce((a,e)=>_ad(a,e.amount),0);
   // gross = what the entries add up to; back = the part reimbursed or lent out (spent = gross - back);
   // other = transfers, savings moves etc. that are tagged here but are not spending or income.
   const gross=exp.reduce((a,e)=>a+(e.amount||0),0),other=(entries||[]).length-exp.length-inc.length;
@@ -11461,7 +11511,7 @@ return o("div",{style:{padding:`8px ${GUT}px 32px`},className:"st",children:[
 ]})}
 
 // === MONTHLY REPORT ===
-function MReport({data,onClose}){const[mo,sMo]=useState(new Date().getMonth()),[yr,sYr]=useState(new Date().getFullYear());const{expenses,currency,monthStartDay=1}=data;const s=mss(yr,mo,monthStartDay),e=mse(yr,mo,monthStartDay);const monExp=expenses.filter(x=>x.date>=s&&x.date<e&&x.type==="expense"),monInc=expenses.filter(x=>x.date>=s&&x.date<e&&x.type==="income");const tExp=monExp.reduce((s,x)=>s+x.amount,0),tInc=monInc.reduce((s,x)=>s+x.amount,0),net=tInc-tExp;const cats={};for(const e2 of monExp){if(!cats[e2.category])cats[e2.category]={total:0,count:0};cats[e2.category].total+=e2.amount;cats[e2.category].count++}const catList=Object.entries(cats).map(([id,v])=>({id,...v,...co(id)})).sort((a,b)=>b.total-a.total);const top5=[...monExp].sort((a,b)=>b.amount-a.amount).slice(0,5);const monName=new Date(yr,mo).toLocaleDateString("en-US",{month:"long",year:"numeric"});
+function MReport({data,onClose}){const[mo,sMo]=useState(new Date().getMonth()),[yr,sYr]=useState(new Date().getFullYear());const{expenses,currency,monthStartDay=1}=data;const s=mss(yr,mo,monthStartDay),e=mse(yr,mo,monthStartDay);const monExp=expenses.filter(x=>x.date>=s&&x.date<e&&x.type==="expense"),monInc=expenses.filter(x=>x.date>=s&&x.date<e&&x.type==="income");const tExp=monExp.reduce((s,x)=>_ad(s,x.amount),0),tInc=monInc.reduce((s,x)=>_ad(s,x.amount),0),net=tInc-tExp;const cats={};for(const e2 of monExp){if(!cats[e2.category])cats[e2.category]={total:0,count:0};cats[e2.category].total+=e2.amount;cats[e2.category].count++}const catList=Object.entries(cats).map(([id,v])=>({id,...v,...co(id)})).sort((a,b)=>b.total-a.total);const top5=[...monExp].sort((a,b)=>b.amount-a.amount).slice(0,5);const monName=new Date(yr,mo).toLocaleDateString("en-US",{month:"long",year:"numeric"});
 const doPrint=()=>{window.print()};const doShare=async()=>{const text=`${monName} — Spending Report\n\nIncome: ${fm(tInc,currency)}\nExpenses: ${fm(tExp,currency)}\nNet: ${fm(net,currency)}\n\nTop categories:\n${catList.slice(0,5).map(c2=>`${c2.emoji} ${c2.label}: ${fm(c2.total,currency)}`).join("\n")}`;try{if(navigator.share)await navigator.share({title:`${monName} Report`,text});else{await navigator.clipboard.writeText(text);alert("Copied to clipboard")}}catch{}};
 return o("div",{style:{padding:`8px ${GUT}px 32px`},className:"prpg",children:[
   o("div",{className:"noprint",children:[t(SH,{title:t("em",{children:"Monthly Report"}),onBack:onClose}),o("div",{className:"f",style:{gap:8,marginBottom:16},children:[t(IB,{onClick:()=>{if(mo===0){sMo(11);sYr(yr-1)}else sMo(mo-1)},children:t(CL,{size:18,color:c.tx})}),t("div",{style:{flex:1,textAlign:"center",padding:"8px 0",background:c.sfg,borderRadius:11,border:`1px solid ${c.brs}`,fontSize:14,fontWeight:500},children:monName}),t(IB,{onClick:()=>{if(mo===11){sMo(0);sYr(yr+1)}else sMo(mo+1)},children:t(CR,{size:18,color:c.tx})})]}),o("div",{className:"g g2",style:{gap:8,marginBottom:24},children:[o("button",{onClick:doShare,className:"f ia jc act98 tr",style:{gap:6,padding:"12px 0",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,color:c.tx,fontSize:13},children:[t(Share2,{size:14})," Share text"]}),o("button",{onClick:doPrint,className:"f ia jc act98 tr",style:{gap:6,padding:"12px 0",background:c.ac,color:"#0a0a0a",borderRadius:12,fontWeight:600,fontSize:13,border:"none"},children:[t(Printer,{size:14})," Print / PDF"]})]})]}),
@@ -11506,7 +11556,7 @@ function CatBud({data,persist,onClose}){
       if(any)months++;
     }
     const n2=Math.max(1,months);
-    const inc=expenses.filter(e=>e.type==="income"&&e.date>=mss(d2.getFullYear(),d2.getMonth()-3,monthStartDay)&&e.date<monStart).reduce((s,e)=>s+e.amount,0)/n2;
+    const inc=expenses.filter(e=>e.type==="income"&&e.date>=mss(d2.getFullYear(),d2.getMonth()-3,monthStartDay)&&e.date<monStart).reduce((s,e)=>_ad(s,e.amount),0)/n2;
     return{avg:Object.fromEntries(Object.entries(m).map(([k,v])=>[k,v/n2])),months,incomeAvg:inc};
   };
   const localProposal=(h)=>{
@@ -11626,8 +11676,8 @@ function YearPlanner({data,persist,year,cur,onFlt}){
   const aSavT=aInAll.filter(e=>e.category==="savings_deposit");
   const aIncT=aInAll.filter(e=>e.category!=="savings_deposit");
   const actExp=aExpT.reduce((s,e)=>s+netAmt(e),0);
-  const actInc=aIncT.reduce((s,e)=>s+e.amount,0);
-  const actSav=aSavT.reduce((s,e)=>s+e.amount,0);
+  const actInc=aIncT.reduce((s,e)=>_ad(s,e.amount),0);
+  const actSav=aSavT.reduce((s,e)=>_ad(s,e.amount),0);
   const secCol={income:c.mt,expense:c.co,savings:c.sk};
   const inpS={padding:"9px 11px",borderRadius:9,border:`1px solid ${c.brs}`,background:c.sf2,color:c.tx,fontSize:13,fontFamily:'var(--nf)',outline:"none",boxSizing:"border-box"};
   const catOpts=(k)=>k==="income"?ciAll().filter(x=>x.id!=="savings_deposit"):k==="savings"?YP_SAV_CATS:ceAll();
@@ -12109,7 +12159,7 @@ function ExpPlanner({data,onSave,onDelete,onClose}){
   const msd=monthStartDay;
   const TENURES=[{v:0,l:"Full payment"},{v:3,l:"3 months"},{v:6,l:"6 months"},{v:12,l:"12 months"},{v:24,l:"24 months"}];
   const monthlyRecurring=useMemo(()=>recurring.reduce((s,r)=>s+r.amount*(MX[r.frequency]||1),0),[recurring]);
-  const monthlyIncome=useMemo(()=>{const fp=financeProfile||{};if(fp.monthlyIncome)return fp.monthlyIncome;const mst=ps(new Date(),msd);return expenses.filter(e=>e.type==="income"&&e.date>=mst).reduce((s,e)=>s+e.amount,0)||0},[financeProfile,expenses,msd]);
+  const monthlyIncome=useMemo(()=>{const fp=financeProfile||{};if(fp.monthlyIncome)return fp.monthlyIncome;const mst=ps(new Date(),msd);return expenses.filter(e=>e.type==="income"&&e.date>=mst).reduce((s,e)=>_ad(s,e.amount),0)||0},[financeProfile,expenses,msd]);
   const effIncome=manIncome!=""?parseFloat(manIncome)||0:monthlyIncome;
   const effRecurring=manRec!=""?parseFloat(manRec)||0:monthlyRecurring;
   const calcEMI=(principal,months,annualRate)=>{if(months===0)return 0;const r=annualRate/12/100;if(r===0)return principal/months;return principal*r*Math.pow(1+r,months)/(Math.pow(1+r,months)-1)};
@@ -12800,7 +12850,7 @@ function TxSht({expense:e,accounts,cards,threads,ledger,onClose,onDelete,onEdit,
 
 
 // === FIX CARD BILL PAYMENTS ===
-function CardPayFix({data,onConvert,onIgnore,onClose}){const cards=(data.cards||[]).filter(x=>x.type==="credit");const items=(data.expenses||[]).filter(e=>isCardBillPayment(e,data.cards)).sort((a,b)=>b.date-a.date);const total=items.reduce((s,e)=>s+e.amount,0);return o("div",{style:{padding:`8px ${GUT}px 32px`},children:[
+function CardPayFix({data,onConvert,onIgnore,onClose}){const cards=(data.cards||[]).filter(x=>x.type==="credit");const items=(data.expenses||[]).filter(e=>isCardBillPayment(e,data.cards)).sort((a,b)=>b.date-a.date);const total=items.reduce((s,e)=>_ad(s,e.amount),0);return o("div",{style:{padding:`8px ${GUT}px 32px`},children:[
   t(SH,{title:t("em",{children:"Fix card bill payments"}),onBack:onClose}),
   t("div",{style:{marginTop:8,padding:"14px 16px",background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,fontSize:12.5,color:c.td,lineHeight:1.5},children:"A credit-card bill payment isn't a new expense — the purchases were already counted when you swiped. Converting these moves them off your spending totals and onto the card's balance. Your bank balance won't change."}),
   cards.length===0
@@ -13175,7 +13225,7 @@ function BudgetPlanner({data,persist,cur,income,baseStart,onClose,onOpenLoan}){
   const emi=plEmiMonth(data,from,to),emiLn=e=>bm.lineSec[e.line]?e.line:"__other",fixedBy={};
   rec.filter(x=>x.state!=="skipped").forEach(x=>{const k=(x.r&&x.r.category)||(x.e&&x.e.category);if(k){const lk=plLineKey(bm,k);fixedBy[lk]=(fixedBy[lk]||0)+(x.amount||0)}});
   emi.forEach(e=>{const lk=emiLn(e);fixedBy[lk]=(fixedBy[lk]||0)+e.amount});
-  const fixedRec=rec.filter(x=>x.state!=="skipped").reduce((a,x)=>a+(x.amount||0),0),fixedEmi=emi.reduce((a,e)=>a+e.amount,0),fixedTot=fixedRec+fixedEmi;
+  const fixedRec=rec.filter(x=>x.state!=="skipped").reduce((a,x)=>a+(x.amount||0),0),fixedEmi=emi.reduce((a,e)=>_ad(a,e.amount),0),fixedTot=fixedRec+fixedEmi;
   const flexPlan=Object.keys(cats).reduce((a,l)=>a+Math.max(0,(cats[l]||0)-(fixedBy[l]||0)),0),shortfall=Object.keys(fixedBy).reduce((a,l)=>a+Math.max(0,(fixedBy[l]||0)-(cats[l]||0)),0);
   // ---- income & what is left ----
   const incHist=plIncomeAvg(exps,from),incNow=plIncomeSum(exps,from,to),incAuto=off===0&&income>0?income:incHist.avg,incSet=mo.income>0,inc=incSet?mo.income:incAuto;
@@ -13882,8 +13932,8 @@ function loanState(L,now){
   }
   const rows=loanSchedule(L),pays=new Map((L.payments||[]).map(p=>[p.n,p]));
   const unpaid=rows.filter(r=>!pays.has(r.n)),paidRows=rows.filter(r=>pays.has(r.n));
-  const preAmt=(L.prepayments||[]).reduce((a,p)=>a+p.amount,0);
-  const paidAmt=lnR2((L.payments||[]).reduce((a,p)=>a+p.amount,0)+preAmt);
+  const preAmt=(L.prepayments||[]).reduce((a,p)=>_ad(a,p.amount),0);
+  const paidAmt=lnR2((L.payments||[]).reduce((a,p)=>_ad(a,p.amount),0)+preAmt);
   const outstanding=Math.max(0,lnR2(L.principal-paidRows.reduce((a,r)=>a+r.principal,0)-preAmt));
   const closed=!!L.closedAt||(!unpaid.length&&outstanding<=0.5);
   const remaining=closed?0:lnR2(unpaid.reduce((a,r)=>a+r.emi,0));
@@ -14326,7 +14376,7 @@ function riTradeCalc(data,Tin){
   const loanIds=new Set((data.loanTracker||[]).filter(L=>L.direction!=="lent").map(L=>L.id)),byLoan=new Map();let pool=0,total=0;
   const months=[...keys].sort().reverse().map(mk=>{
     const g=by.get(mk)||{inc:[],loss:[]},mo=(T.months||{})[mk]||{};
-    const incSum=lnR2(g.inc.filter(e=>!skip.has(e.id)).reduce((a,e)=>a+e.amount,0)),lossSum=lnR2(g.loss.filter(e=>!skip.has(e.id)).reduce((a,e)=>a+e.amount,0));
+    const incSum=lnR2(g.inc.filter(e=>!skip.has(e.id)).reduce((a,e)=>_ad(a,e.amount),0)),lossSum=lnR2(g.loss.filter(e=>!skip.has(e.id)).reduce((a,e)=>_ad(a,e.amount),0));
     const auto=lnR2(incSum-lossSum),hasOv=mo.override!=null&&mo.override!==""&&isFinite(Number(mo.override));
     const base=hasOv?Number(mo.override):auto,adjs=(T.adj||[]).filter(a=>a.month===mk),adjSum=lnR2(adjs.reduce((a,x)=>a+(Number(x.amount)||0),0));
     const before=!!T.start&&mk<T.start,on=mo.on!==false,counted=on&&!before,target=loanIds.has(mo.loanId)?mo.loanId:null;
@@ -15205,7 +15255,7 @@ function ffSummary(data,pool,rows,tm){
   for(const r of mine){by.set(r.type,lnR2((by.get(r.type)||0)+r.amount));used=lnR2(used+r.amount)}
   by.forEach((v,k)=>{const gk=ffTy(tm,k).g;g[gk]=lnR2((g[gk]||0)+v)});
   const base=pool.base,idle=Math.max(0,lnR2(base-used)),over=Math.max(0,lnR2(used-base)),now=Date.now();
-  const ir=mine.filter(r=>ffIntType(r.type)),intAmt=lnR2(ir.reduce((a,r)=>a+r.amount,0));
+  const ir=mine.filter(r=>ffIntType(r.type)),intAmt=lnR2(ir.reduce((a,r)=>_ad(a,r.amount),0));
   return{pool,rows:mine,by,g,used,base,idle,over,n:mine.length,intAmt,
     carryYr:lnR2(intAmt*pool.rate/100),carrySoFar:lnR2(ir.reduce((a,r)=>a+r.amount*pool.rate/100*Math.max(0,(now-r.date)/RI_YR),0)),idleYr:lnR2(idle*pool.rate/100)};
 }
@@ -16422,8 +16472,8 @@ function AdvancedStats({data,persist,onClose,onTx,onFlt,initialBasis}){
   const incNoSave=incomeTxns.filter(e=>e.category!=="savings_deposit");
   const saveTxns=incomeTxns.filter(e=>e.category==="savings_deposit");
   const totalSpend=spendTxns.reduce((s,e)=>s+netAmt(e),0);
-  const savingsDep=saveTxns.reduce((s,e)=>s+e.amount,0);
-  const txIncome=incNoSave.reduce((s,e)=>s+e.amount,0);
+  const savingsDep=saveTxns.reduce((s,e)=>_ad(s,e.amount),0);
+  const txIncome=incNoSave.reduce((s,e)=>_ad(s,e.amount),0);
   const mi=pdata.manualItems||[];
   const miSum=(k)=>mi.filter(x=>x.kind===k).reduce((s,x)=>s+(+x.value||0),0);
   const grossIncome=txIncome+miSum("income");
@@ -16433,8 +16483,8 @@ function AdvancedStats({data,persist,onClose,onTx,onFlt,initialBasis}){
   const investTotal=savingsDep+miSum("savings");
   const headMap=AS.headMap||{};
   const headOfTxn=e=>asHeadOf({id:e.category,label:(co(e.category)||{}).label},headMap);
-  const excludedItems=incNoSave.filter(e=>headOfTxn(e)===AS_HEAD_EXCLUDED);const excludedTotal=excludedItems.reduce((s,e)=>s+e.amount,0);
-  const heads=AS_ITR_HEADS.map(h=>{const items=incNoSave.filter(e=>headOfTxn(e)===h.id);const total=items.reduce((s,e)=>s+e.amount,0);return{...h,total,count:items.length,items};});
+  const excludedItems=incNoSave.filter(e=>headOfTxn(e)===AS_HEAD_EXCLUDED);const excludedTotal=excludedItems.reduce((s,e)=>_ad(s,e.amount),0);
+  const heads=AS_ITR_HEADS.map(h=>{const items=incNoSave.filter(e=>headOfTxn(e)===h.id);const total=items.reduce((s,e)=>_ad(s,e.amount),0);return{...h,total,count:items.length,items};});
   const headTotal=heads.reduce((s,h)=>s+h.total,0);
   const byCat={};for(const e of spendTxns)byCat[e.category]=(byCat[e.category]||0)+netAmt(e);
   const catRows=Object.entries(byCat).map(([cid,amt])=>{const annualized=Math.round(amt/monthsElapsed*12);const projBase=Math.round(annualized*(1+inflationPct/100));const plan=catPlan[cid]!=null?catPlan[cid]:projBase;return{cid,amt,annualized,projBase,plan,...co(cid)};}).sort((a,b)=>b.amt-a.amt);
@@ -16442,7 +16492,7 @@ function AdvancedStats({data,persist,onClose,onTx,onFlt,initialBasis}){
   const annualizedSpend=Math.round(totalSpend/monthsElapsed*12);
   const incByCat=useMemo(()=>{const m={};for(const e of incNoSave)m[e.category]=(m[e.category]||0)+e.amount;return Object.entries(m).map(([cid,amt])=>({cid,amt,...co(cid)})).sort((a,b)=>b.amt-a.amt);},[inPeriod]);
   const nwSplit=useMemo(()=>{const need=spendTxns.filter(e=>nwOf(e)==="need");const want=spendTxns.filter(e=>nwOf(e)==="want");return{need:{total:need.reduce((s,e)=>s+netAmt(e),0),items:need},want:{total:want.reduce((s,e)=>s+netAmt(e),0),items:want}};},[inPeriod]);
-  const months=useMemo(()=>{const arr=[];let s=ps;while(s<pe){const dd=new Date(s);const e=new Date(dd.getFullYear(),dd.getMonth()+1,1).getTime();const mItems=inPeriod.filter(x=>x.date>=s&&x.date<e);const income=mItems.filter(x=>x.type==="income"&&x.category!=="savings_deposit").reduce((a,x)=>a+x.amount,0);const expense=mItems.filter(x=>x.type==="expense").reduce((a,x)=>a+netAmt(x),0);arr.push({label:dd.toLocaleDateString("en-US",{month:"short",year:"2-digit"}),s,e,income,expense,net:income-expense,items:mItems,hasData:mItems.length>0});s=e;}return arr;},[inPeriod,ps,pe]);
+  const months=useMemo(()=>{const arr=[];let s=ps;while(s<pe){const dd=new Date(s);const e=new Date(dd.getFullYear(),dd.getMonth()+1,1).getTime();const mItems=inPeriod.filter(x=>x.date>=s&&x.date<e);const income=mItems.filter(x=>x.type==="income"&&x.category!=="savings_deposit").reduce((a,x)=>_ad(a,x.amount),0);const expense=mItems.filter(x=>x.type==="expense").reduce((a,x)=>a+netAmt(x),0);arr.push({label:dd.toLocaleDateString("en-US",{month:"short",year:"2-digit"}),s,e,income,expense,net:income-expense,items:mItems,hasData:mItems.length>0});s=e;}return arr;},[inPeriod,ps,pe]);
   const maxMo=Math.max(1,...months.map(m=>Math.max(m.income,m.expense)));
   const deds=pdata.deductions||[];
   const dedTotal=deds.reduce((s,d)=>s+(+d.amount||0),0);
@@ -17281,7 +17331,7 @@ function Tips({data,onClose}){
   const monExp=useMemo(()=>expenses.filter(e=>e.date>=mst&&e.type==="expense"),[expenses,mst]);
   const monInc=useMemo(()=>expenses.filter(e=>e.date>=mst&&e.type==="income"),[expenses,mst]);
   const tExp=monExp.reduce((s,e)=>s+netAmt(e),0);
-  const tInc=monInc.reduce((s,e)=>s+e.amount,0)||fp.monthlyIncome||1;
+  const tInc=monInc.reduce((s,e)=>_ad(s,e.amount),0)||fp.monthlyIncome||1;
   const net=tInc-tExp;
   const savingsRate=tInc>0?((net/tInc)*100):0;
   const essentialIds=["food","groceries","milk_curd","eggs","transport","bills","health","household_sam"];
