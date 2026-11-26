@@ -24,7 +24,7 @@
 <title>Expense Tracker Pro</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Instrument+Serif&family=JetBrains+Mono:wght@400;500;600&family=Geist:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=Roboto:wght@400;500;700&family=Playfair+Display:wght@400;500;600&family=DM+Serif+Display&family=Lato:wght@400;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Instrument+Serif&family=JetBrains+Mono:wght@400;500;600&family=Geist:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js" crossorigin></script>
@@ -552,6 +552,10 @@ const FONT_OPT=[
   {id:'courier',l:'Courier',f:"'Courier New',Courier,monospace"},
 ];
 const NUM_SZ=[14,16,18,20,24,28,32];
+/* Fonts that only appear as choices in Settings → Text load on demand instead of on every open. */
+const _FONT_LAZY={roboto:"Roboto:wght@400;500;700",lato:"Lato:wght@400;700",playfair:"Playfair+Display:wght@400;500;600",dm:"DM+Serif+Display"};
+const _fontsAdded=new Set();
+const _ensureFonts=ids=>{try{const fam=[...new Set(ids||[])].filter(id=>_FONT_LAZY[id]&&!_fontsAdded.has(id));if(!fam.length)return;fam.forEach(id=>_fontsAdded.add(id));const l=document.createElement("link");l.rel="stylesheet";l.href="https://fonts.googleapis.com/css2?"+fam.map(id=>"family="+_FONT_LAZY[id]).join("&")+"&display=swap";document.head.appendChild(l)}catch(e){}};
 // Default matches what every number rendered with the old hardcoded F.mo constant
 // looked like (JetBrains Mono, loaded app-wide via Google Fonts) -- so making the
 // Number Font setting actually apply everywhere doesn't silently change anyone's
@@ -2578,7 +2582,7 @@ function App(){
 
   useEffect(()=>{document.documentElement.style.zoom="1"},[]);
   useEffect(()=>{if(scrollRef.current)scrollRef.current.scrollTop=0},[v]);
-  useEffect(()=>{const de=document.documentElement,s=de.style;s.setProperty('--nf',gNF(d));s.setProperty('--tf',gTF(d));s.setProperty('--lf',gLF(d));s.setProperty('--ns',gNS(d)+'px');s.setProperty('--nsc',gNSC(d).toFixed(4));
+  useEffect(()=>{const de=document.documentElement,s=de.style;_ensureFonts([d?.fontPrefs?.numFont,d?.fontPrefs?.txtFont]);s.setProperty('--nf',gNF(d));s.setProperty('--tf',gTF(d));s.setProperty('--lf',gLF(d));s.setProperty('--ns',gNS(d)+'px');s.setProperty('--nsc',gNSC(d).toFixed(4));
     de.dataset.fxNf=(d.fontPrefs&&d.fontPrefs.numFont&&d.fontPrefs.numFont!=='mono')?"1":"0";de.dataset.fxNs=gNS(d)!==14?"1":"0";
     fxReset();fxTree(document.body)},[d.fontPrefs,d.loading]);
   useEffect(()=>{document.documentElement.style.setProperty('--fz',String(gFZ(d)))},[d.fontSize]);
@@ -12552,7 +12556,7 @@ return o(Fragment,{children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:10,
   t("div",{style:{fontSize:13,color:c.td,marginBottom:10,lineHeight:1.45},children:"In Stats → Month-end report, list a category when it changed by at least both of these (vs last month or vs its budget):"}),
   o("div",{className:"f",style:{gap:8},children:[inp(pct,sPct,"%"),inp(amt,sAmt,data.currency||"₹")]}),
   t("div",{style:{fontSize:11,color:c.tm,marginTop:8},children:"Default: 10% and "+(data.currency||"₹")+"500."})]})]})}
-function Settings({data,persist,onClose,onBackup,onCategories,onView,theme,onSetTheme}){const{budget,budgetPeriod,currency,monthStartDay,financeProfile}=data;const fp=financeProfile||{};const[b,sB]=useState(budget==null?"":String(budget));const[bp,sBp]=useState(budgetPeriod||"monthly");const[cu,sCu]=useState(currency||"₹");const[ms,sMs]=useState(monthStartDay||1);const[ak,sAk]=useState(gAK()||"");const[show,sShow]=useState(false);const[prov,sPr]=useState(gProv());const[mdl2,sMdl2]=useState(gMdl()||"");const[aiMode,sAiMode]=useState(gAIMode());const[fz,sFz]=useState(fzPct(data.fontSize));const[at,sAt]=useState(data.alertThreshold!=null?String(data.alertThreshold):"");const[secSt,sSecSt]=useState(()=>Object.fromEntries(SEC_META.map(s=>[s.id,gSec(s.id,SEC_DEFAULTS[s.id]||false)])));
+function Settings({data,persist,onClose,onBackup,onCategories,onView,theme,onSetTheme}){useEffect(()=>{_ensureFonts(FONT_OPT.map(f=>f.id))},[]);const{budget,budgetPeriod,currency,monthStartDay,financeProfile}=data;const fp=financeProfile||{};const[b,sB]=useState(budget==null?"":String(budget));const[bp,sBp]=useState(budgetPeriod||"monthly");const[cu,sCu]=useState(currency||"₹");const[ms,sMs]=useState(monthStartDay||1);const[ak,sAk]=useState(gAK()||"");const[show,sShow]=useState(false);const[prov,sPr]=useState(gProv());const[mdl2,sMdl2]=useState(gMdl()||"");const[aiMode,sAiMode]=useState(gAIMode());const[fz,sFz]=useState(fzPct(data.fontSize));const[at,sAt]=useState(data.alertThreshold!=null?String(data.alertThreshold):"");const[secSt,sSecSt]=useState(()=>Object.fromEntries(SEC_META.map(s=>[s.id,gSec(s.id,SEC_DEFAULTS[s.id]||false)])));
 const[showResetCur,sShowResetCur]=useState(false);
 const[stgQ,sStgQ]=useState("");
 const[mEn,sMEn]=useState(data.morningEnabled||false);const[mTime,sMTime]=useState(data.morningTime||"08:00");const[eEn,sEEn]=useState(data.eveningEnabled??(data.reminderEnabled||false));const[eTime,sETime]=useState(data.eveningTime||data.reminderTime||"21:00");const[notifPerm,sNotifPerm]=useState(typeof Notification!=='undefined'?Notification.permission:'unsupported');
@@ -17191,6 +17195,7 @@ function _vFold(s){
   flush();return out.join(" ");
 }
 function parseVoiceAmount(s){
+  s=String(s||"").replace(/(\d),(?=\d)/g,"$1"); // "1,200" / "1,00,000" → digits only
   let m=s.match(/(?:₹|rs\.?|rupees?|inr|\$|usd|dollars?|€|£)\s*(\d+(?:\.\d+)?)\s*(k\b)?/i);
   if(!m)m=s.match(/(\d+(?:\.\d+)?)\s*(k)?\s*(?:₹|rs\.?|rupees?|inr|bucks|dollars?)/i);
   if(m)return parseFloat(m[1])*(m[2]?1000:1);

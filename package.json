@@ -1,0 +1,11 @@
+{
+  "name": "premium-daily-tracker",
+  "private": true,
+  "description": "Tests for the single-file expense tracker PWA (index.html).",
+  "scripts": {
+    "test": "node tests/run.js"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}
