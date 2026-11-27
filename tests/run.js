@@ -457,8 +457,15 @@ test('Home header: pie chart opens Wealth Tracker (loans, reinvest, Zerodha); se
   const p = await newPage({ seed: {} });
   assert.equal(await p.locator('button[aria-label="Search"]').count(), 0, 'no search on Home');
   await p.locator('button[aria-label="Wealth Tracker"]').click(); await p.waitForTimeout(400);
-  const txt = await p.locator('#root').innerText();
-  for (const k of ['Wealth Tracker', 'Zerodha Portfolio', 'Loan Tracker', 'Reinvestments']) assert.match(txt, new RegExp(k));
+  let txt = await p.locator('#root').innerText();
+  for (const k of ['Wealth Tracker', 'Assets', 'Liabilities', 'Stats', 'Zerodha Portfolio', 'Reinvestments']) assert.match(txt, new RegExp(k));
+  assert.doesNotMatch(txt, /Loan Tracker/, 'loans are under Liabilities');
+  await p.getByRole('button', { name: 'Liabilities', exact: true }).click(); await p.waitForTimeout(200);
+  txt = await p.locator('#root').innerText();
+  assert.match(txt, /Loan Tracker/); assert.match(txt, /Loan Against Securities/);
+  await p.getByRole('button', { name: 'Stats', exact: true }).click(); await p.waitForTimeout(200);
+  txt = await p.locator('#root').innerText();
+  for (const k of ['How am I doing', 'NET WORTH', 'EMIs as % of income', 'Interest cost per year', 'ASSETS VS WHAT THE LOANS COST', 'Where loan money went', 'HOW TO READ THIS']) assert.match(txt, new RegExp(k), k);
   assert.equal(await p.locator('button[aria-label="Search"]').count(), 0, 'pie, not search, on Wealth Tracker too');
   await p.locator('button[aria-label="calendar"]').click(); await p.waitForTimeout(300);
   assert.equal(await p.locator('button[aria-label="Search"]').count(), 1, 'search only on Calendar');
@@ -466,7 +473,9 @@ test('Home header: pie chart opens Wealth Tracker (loans, reinvest, Zerodha); se
   await p.locator('button[aria-label="calc"]').click(); await p.waitForTimeout(300);
   assert.equal(await p.locator('button[aria-label="Search"]').count(), 0, 'pie on Calculators');
   const calc = await p.locator('#root').innerText();
-  assert.doesNotMatch(calc, /Zerodha Portfolio|Loan Tracker/, 'moved out of Calculators');
+  assert.doesNotMatch(calc, /Zerodha Portfolio|Loan Tracker|Where loan money went/, 'moved out of Calculators');
+  await p.locator('button').first().click(); await p.waitForTimeout(400);
+  assert.doesNotMatch(await p.locator('body').innerText(), /Loan Against Securities/, 'LAS left the side menu');
   assert.match(calc, /Bank Statement/);
   assert.deepEqual(p.errors, []);
 });

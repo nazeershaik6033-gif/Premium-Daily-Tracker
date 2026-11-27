@@ -1840,7 +1840,7 @@ function AppHeader({onMenu,onSearch,onToggleTheme,isDark,theme,onHome,onAI,onDia
   ]})})
 }
 const SB_ORDER_KEY="etp-sidebar-order";
-const DEFAULT_SB=["h:Money","accounts","savings","groceries","monthHist","cards","cashback","transfer","investments","wealth","netWorth","budgetTrack","annualExp","budgetLoans","autopilot","debtPlan","las","h:Plan & Track","bills","goals","diary","recurring","upcomingExp","categoryBudgets","h:Insights","breakdown","monthlyReport","tips","dailyLesson","wrapped","rules","h:Tools","expPlanner","investCalc","cardPayFix","profiles","upiShortcut","h:AI","moneyChat","subAudit","docScan","stmtAnalyze","stmtImports","aiInsights","h:Settings & Data","categories","merchantRules","backup","userMgr","settings"];
+const DEFAULT_SB=["h:Money","accounts","savings","groceries","monthHist","cards","cashback","transfer","investments","wealth","netWorth","budgetTrack","annualExp","budgetLoans","autopilot","debtPlan","h:Plan & Track","bills","goals","diary","recurring","upcomingExp","categoryBudgets","h:Insights","breakdown","monthlyReport","tips","dailyLesson","wrapped","rules","h:Tools","expPlanner","investCalc","cardPayFix","profiles","upiShortcut","h:AI","moneyChat","subAudit","docScan","stmtAnalyze","stmtImports","aiInsights","h:Settings & Data","categories","merchantRules","backup","userMgr","settings"];
 const SB_META={upiShortcut:{e:"📲",l:"UPI Share Shortcut",s:"Share a Kiwi / PhonePe / GPay receipt → expense"},cashback:{e:"💸",l:"Cashback",s:"Card rewards by cycle or date range"},moneyChat:{e:"🧞",l:"Ask Your Money",s:"AI that sees your whole picture"},subAudit:{e:"🔍",l:"Subscription Auditor",s:"Recurring charges, hikes & cancels"},docScan:{e:"🪪",l:"Scan Payslip / Statement",s:"Log income & investments from a photo"},stmtAnalyze:{e:"📥",l:"Statement Analyzer",s:"Find missing transactions & discrepancies"},stmtImports:{e:"📊",l:"Statement Imports",s:"Review transactions logged from statements"},aiInsights:{e:"💡",l:"AI Insights",s:"Spending patterns & AI suggestions"},userMgr:{e:"👥",l:"Switch User",s:"Manage profiles"},rules:{e:"📋",l:"Rules & Learnings",s:"Track your financial rules"},upcomingExp:{e:"📅",l:"Upcoming Expenses",s:"Plan & get alerts"},expPlanner:{e:"🧮",l:"Expense Planner",s:"Can I afford this EMI?"},investCalc:{e:"📈",l:"Investment Calculator",s:"Compound growth & SIP planner"},cards:{e:"💳",l:"Cards",acc:true},groceries:{e:"🛒",l:"Groceries",s:"Trips, items & live price watch",acc:true},cardPayFix:{e:"🪙",l:"Fix card bill payments",s:"Remove double-counted bills",acc:true},bills:{e:"🔔",l:"Bills & Reminders",acc:true},goals:{e:"🎯",l:"Goals & Debt",acc:true},diary:{e:"📖",l:"Lending Diary",s:"Who owes you & you owe"},investments:{e:"💼",l:"My Investments",s:"NPS, Funds, FDs",acc:true},wealth:{e:"📊",l:"Net Worth & Wealth",s:"Track over time",acc:true},netWorth:{e:"📈",l:"Quarterly Net Worth",s:"Assets minus liabilities, by quarter",acc:true},monthlyReport:{e:"📰",l:"Monthly Report",s:"Print or share PDF"},budgetTrack:{e:"📉",l:"Budget Tracker",s:"Monthly over/under record"},budgetLoans:{e:"🧾",l:"Budget Loans",s:"Repay past overspends"},breakdown:{e:"⚖️",l:"Spending Breakdown",s:"Needs/Wants · 50-30-20"},savings:{e:"🐖",l:"Savings",s:"Pots, targets & what you set aside",acc:true},accounts:{e:"🏦",l:"Accounts",acc:true},monthHist:{e:"🗓️",l:"Monthly History",s:"Reset & activity by month",acc:true},transfer:{e:"↔️",l:"Transfer",s:"Move funds",acc:true},recurring:{e:"🔁",l:"Recurring"},profiles:{e:"⚡",l:"Quick profiles"},categoryBudgets:{e:"📏",l:"Category budgets",s:"Set spending limits"},annualExp:{e:"📆",l:"Year Plan",s:"Income, expenses & savings for the year"},categories:{e:"🏷️",l:"Categories",s:"Manage expense types"},backup:{e:"💾",l:"Backup & Restore",s:"Export or import data"},tips:{e:"💡",l:"Financial Health",s:"Tips & scores"},dailyLesson:{e:"📖",l:"Daily Money Lesson",s:"One finance lesson a day"},autopilot:{e:"🔮",l:"Autopilot Forecast",s:"30-day cash-flow projection",acc:true},debtPlan:{e:"⚔️",l:"Debt Destroyer",s:"Avalanche vs snowball payoff plan",acc:true},las:{e:"🏛️",l:"Loan Against Securities",s:"Zerodha LAS · LTV, pledge & unpledge"},wrapped:{e:"🎁",l:"Year in Review",s:"Wrapped, heatmap, badges"},merchantRules:{e:"🧠",l:"Merchant Memory",s:"Auto-fill rules per merchant"},settings:{e:"⚙️",l:"Settings",s:"Currency, budget, backup"}};
 function Sidebar({data,onClose,onView,activeUser,onUpdateUser,focusSection}){
   // Hides the bottom nav (and its raised FAB) while open, same as every other
@@ -1855,9 +1855,9 @@ function Sidebar({data,onClose,onView,activeUser,onUpdateUser,focusSection}){
   const totExp=monExp.reduce((s,e)=>s+netAmt(e),0);const totInc=monInc.reduce((s,e)=>_ad(s,e.amount),0);
   const[editing,setEditing]=useState(false);
   const[sbQ,setSbQ]=useState("");
-  const[order,setOrder]=useState(()=>{const isH=x=>typeof x==="string"&&x.startsWith("h:");try{const s=localStorage.getItem(SB_ORDER_KEY);if(!s)return DEFAULT_SB;let stored=JSON.parse(s);if(!stored.some(isH))return DEFAULT_SB;
+  const[order,setOrder]=useState(()=>(o3=>o3.filter(x=>x!=="las"))((()=>{const isH=x=>typeof x==="string"&&x.startsWith("h:");try{const s=localStorage.getItem(SB_ORDER_KEY);if(!s)return DEFAULT_SB;let stored=JSON.parse(s);if(!stored.some(isH))return DEFAULT_SB;
     if(!localStorage.getItem("etp-sb-money-migrated-v1")){const moveIds=["budgetTrack","budgetLoans"];if(moveIds.some(id=>stored.includes(id))){const rest=stored.filter(x=>!moveIds.includes(x));const cut=rest.indexOf("h:Plan & Track");const at=cut===-1?rest.length:cut;stored=[...rest.slice(0,at),...moveIds.filter(id=>stored.includes(id)),...rest.slice(at)];try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(stored))}catch{}}try{localStorage.setItem("etp-sb-money-migrated-v1","1")}catch{}}
-    const known=new Set(stored.filter(x=>x!=="sep"&&!isH(x)));const newItems=DEFAULT_SB.filter(x=>x!=="sep"&&!isH(x)&&!known.has(x));if(!newItems.length)return stored;const merged=[...stored];for(const item of newItems){const di=DEFAULT_SB.indexOf(item);let ins=false;for(let i=di-1;i>=0;i--){if(DEFAULT_SB[i]==="sep"||isH(DEFAULT_SB[i]))continue;const p=merged.indexOf(DEFAULT_SB[i]);if(p!==-1){merged.splice(p+1,0,item);ins=true;break}}if(!ins)merged.unshift(item)}return merged}catch{return DEFAULT_SB}});
+    const known=new Set(stored.filter(x=>x!=="sep"&&!isH(x)));const newItems=DEFAULT_SB.filter(x=>x!=="sep"&&!isH(x)&&!known.has(x));if(!newItems.length)return stored;const merged=[...stored];for(const item of newItems){const di=DEFAULT_SB.indexOf(item);let ins=false;for(let i=di-1;i>=0;i--){if(DEFAULT_SB[i]==="sep"||isH(DEFAULT_SB[i]))continue;const p=merged.indexOf(DEFAULT_SB[i]);if(p!==-1){merged.splice(p+1,0,item);ins=true;break}}if(!ins)merged.unshift(item)}return merged}catch{return DEFAULT_SB}})()));
   const saveOrder=(o2)=>{setOrder(o2);try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2))}catch{}};
   const move=(idx,dir)=>{const o2=[...order];const ni=idx+dir;if(ni<0||ni>=o2.length)return;[o2[idx],o2[ni]]=[o2[ni],o2[idx]];saveOrder(o2)};
   const[dragIdx,setDragIdx]=useState(null);
@@ -2726,7 +2726,7 @@ function App(){
         v==="bankStmt"&&t(BankStmt,{data:d,persist:pst,onTx:sAtx,onView:(id)=>{navFromRef.current="bankStmt";sV(id)},onClose:()=>sV(navFromRef.current&&navFromRef.current!=="bankStmt"?navFromRef.current:"calculators")}),
         v==="goalInvest"&&t(GoalInvest,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"calculators")}),
         v==="loanTracker"&&t(LoanTracker,{data:d,persist:pst,onClose:()=>sV(navFromRef.current&&navFromRef.current!=="loanTracker"?navFromRef.current:"wealthTracker"),onView:(id)=>{navFromRef.current="loanTracker";sV(id)}}),
-        v==="loanFlow"&&t(FlowDash,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"calculators"),onView:(id)=>{navFromRef.current="loanFlow";sV(id)}}),
+        v==="loanFlow"&&t(FlowDash,{data:d,persist:pst,onClose:()=>sV(navFromRef.current&&navFromRef.current!=="loanFlow"?navFromRef.current:"wealthTracker"),onView:(id)=>{navFromRef.current="loanFlow";sV(id)}}),
         v==="categoryBudgets"&&t(CatBud,{data:d,persist:pst,onClose:()=>sV(navFromRef.current)}),
         v==="rowSettings"&&t(RowSettings,{data:d,persist:pst,onClose:()=>sV("settings")}),
         v==="settings"&&t(Settings,{data:d,persist:pst,onClose:()=>sV("home"),onBackup:()=>sV("backup"),onCategories:()=>{navFromRef.current="settings";sV("categories")},onView:sV,theme,onSetTheme:applyTheme}),
@@ -2736,7 +2736,7 @@ function App(){
         v==="autopilot"&&t(Autopilot,{data:d,onClose:()=>sV(navFromRef.current||"home")}),
         v==="wrapped"&&t(Wrapped,{data:d,onClose:()=>sV(navFromRef.current||"home")}),
         v==="debtPlan"&&t(DebtPlan,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"home")}),
-        v==="las"&&t(LASView,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"home")}),
+        v==="las"&&t(LASView,{data:d,persist:pst,onClose:()=>sV(navFromRef.current&&navFromRef.current!=="las"?navFromRef.current:"wealthTracker")}),
         v==="merchantRules"&&t(MerchantRulesView,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"home")}),
         v==="breakdown"&&t(Breakdown,{data:d,persist:pst,onClose:()=>sV(navFromRef.current),onTx:sAtx}),
         v==="budgetTrack"&&t(BudgetTrack,{data:d,onClose:()=>sV(navFromRef.current),onRepay:repayMonth,onOpenLoans:()=>{navFromRef.current="budgetTrack";sV("budgetLoans")},onCardPay:aCP}),
@@ -17315,15 +17315,121 @@ function ZjLoanCard({data,loanId,onOpen}){
 function zjResetAll(data){
   return{zjournal:null,bankStmts:(data.bankStmts||[]).map(s2=>s2.rows.some(r=>r.how==="zfund")?{...s2,rows:s2.rows.map(r=>r.how==="zfund"?{...r,st:"open",how:null,ext:null}:r)}:s2)};
 }
-// === WEALTH TRACKER (Home header → pie chart) ===
-function WealthTracker({data,onClose,onView}){
+// === WEALTH TRACKER (Header → pie chart): Assets · Liabilities · Stats ===
+let _wtTab=null;
+// Everything the Stats tab and the AI check-up read, computed once.
+function wtStats(data){
   const cur=data.currency,ln=LnSummary(data),pf=riPortfolio(data),zj=zjOf(data),zs=(zj.fills.length||zj.funds.length||zj.mf.length)?zjSummary(zj):null;
+  const las=data.las||{},lasLoan=Math.max(0,+las.loan||0),lasRate=+las.rate||0,lasPledged=(las.holdings||[]).reduce((a,h)=>a+(+h.value||0),0);
+  const loans=ln.owe.map(({L,st})=>{const rate=lnCurRate(L)||0,emi=st.next?st.next.emi:(st.monthlyInt||0),last=st.unpaid&&st.unpaid.length?st.unpaid[st.unpaid.length-1].due:null;
+    return{id:L.id,name:(L.lender||"Loan")+(L.purpose?" · "+L.purpose:""),kind:L.kind,out:st.outstanding||0,rate,emi:_r2(emi),progress:st.progress||0,paid:st.paidAmt||0,intLeft:st.interestLeft||0,monthsLeft:st.remainingN||0,end:last,overdue:(st.overdue||[]).length}});
+  if(lasLoan>0)loans.push({id:"las",name:"Loan against securities",kind:"las",out:lasLoan,rate:lasRate,emi:_r2(lasLoan*lasRate/1200),progress:0,paid:0,intLeft:0,monthsLeft:0,end:null,overdue:0,ltv:lasPledged>0?lasLoan/lasPledged*100:null,maxLtv:+las.ltv||45});
+  const liab=_r2(loans.reduce((a,x)=>a+x.out,0));
+  const zVal=zs?_r2(zs.value+zs.mfVal+Math.max(0,zs.cash)):0,rVal=_r2(pf.value||0),assets=_r2(zVal+rVal);
+  const wRate=liab>0?loans.reduce((a,x)=>a+x.out*x.rate,0)/liab:0,yrCost=_r2(loans.reduce((a,x)=>a+x.out*x.rate/100,0)),emiMo=_r2(loans.reduce((a,x)=>a+x.emi,0));
+  const since=Date.now()-90*864e5,exp=(data.expenses||[]).filter(e=>!e.archived&&e.date>=since);
+  const incMo=_r2(exp.filter(e=>e.type==="income").reduce((a,e)=>a+(+e.amount||0),0)/3),spendMo=_r2(exp.filter(e=>e.type==="expense").reduce((a,e)=>a+(+e.amount||0),0)/3);
+  const debtFree=loans.filter(x=>x.end).reduce((m,x)=>Math.max(m,x.end),0)||null;
+  const shares=zjLoanShares(data),perLoan=loans.map(x=>{const g=(pf.groups||[]).find(g2=>g2.L&&g2.L.id===x.id),zsh=shares.get(x.id);const v=(g?(g.sm.value||0):0)+(zsh?zsh.value:0),inv=(g?(g.sm.P||0):0)+(zsh?zsh.invested:0);return{...x,assetVal:_r2(v),assetInv:_r2(inv),assetGain:_r2(v-inv),yrCost:_r2(x.out*x.rate/100)}});
+  const zRet=zs&&zs.roc!=null?zs.roc:null,rRet=pf.P>0?(pf.ret||0)/pf.P*100:null;
+  const flow=ffAll(data);
+  return{cur,assets,zVal,rVal,liab,net:_r2(assets-liab),debtRatio:assets>0?liab/assets*100:null,wRate,yrCost,emiMo,incMo,spendMo,emiInc:incMo>0?emiMo/incMo*100:null,debtFree,loans:perLoan,zs,pf,zRet,rRet,toReceive:ln.toReceive||0,overdue:ln.overdueN||0,flow,
+    intLeft:_r2(loans.reduce((a,x)=>a+x.intLeft,0)),paid:_r2(loans.reduce((a,x)=>a+x.paid,0))};
+}
+function LasCard({data,onView}){
+  const cur=data.currency,L=data.las||{},loan=+L.loan||0,pledged=(L.holdings||[]).reduce((a,h)=>a+(+h.value||0),0),ltv=pledged>0?loan/pledged*100:null,max=+L.ltv||45;
+  return t("button",{onClick:()=>onView&&onView("las"),className:"w100 act98 trt",style:{display:"block",textAlign:"left",marginTop:14,padding:18,background:c.sfg,border:`1px solid ${ltv!=null&&ltv>=max?c.co+"88":c.brs}`,borderRadius:18,color:"inherit"},children:[
+    o("div",{className:"f ia jb",children:[o("div",{className:"f ia",style:{gap:12},children:[t("span",{style:{width:42,height:42,borderRadius:12,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:21},children:"🏛️"}),o("div",{className:"tl",children:[t("div",{style:{fontFamily:c.hf,fontSize:17,fontWeight:600,color:c.tx},children:"Loan Against Securities"}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:2},children:"Zerodha LAS · LTV, pledge & unpledge"})]})]}),t("span",{style:{color:c.tm,fontSize:20},children:"›"})]}),
+    (loan>0||pledged>0)&&o("div",{className:"f",style:{gap:10,marginTop:14,paddingTop:12,borderTop:`1px solid ${c.brs}`},children:[giStat("LOAN",giM(loan,cur),loan>0?c.co:null),giStat("PLEDGED",giM(pledged,cur)),giStat("LTV",ltv==null?"—":ltv.toFixed(1)+"%",ltv!=null&&ltv>=max?c.co:ltv!=null&&ltv>=max*0.85?c.gd:c.mt)]})]});
+}
+function WealthTracker({data,onClose,onView}){
+  const[tab,sTab]=useState(()=>{const j=_wtTab;return j||"assets"});
+  useEffect(()=>{_wtTab=tab},[tab]);
+  const[ai,sAi]=useState(false);
+  const W=useMemo(()=>wtStats(data),[data]),cur=W.cur;
+  const tabBtn=(k,l)=>t("button",{key:k,onClick:()=>sTab(k),className:"act95 tr",style:{flex:1,padding:"9px 0",borderRadius:10,fontSize:13,fontWeight:600,border:"none",background:tab===k?c.sf3:"transparent",color:tab===k?c.tx:c.td},children:l});
+  const card=(ch,extra)=>t("div",{style:{padding:16,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,marginTop:12,...extra},children:ch});
+  const lbl=x=>t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.2,marginBottom:8},children:x});
+  const kv=(k,v,col,hint)=>o("div",{style:{padding:"7px 0",borderTop:`1px solid ${c.brs}`},children:[o("div",{className:"f ia jb",style:{fontSize:13},children:[t("span",{style:{color:c.td},children:k}),t("span",{style:{fontFamily:'var(--nf)',color:col||c.tx},children:v})]}),hint&&t("div",{style:{fontSize:11,color:c.tm,marginTop:2,lineHeight:1.4},children:hint})]});
+  const pc=x=>x==null?"—":x.toFixed(1)+"%";
+  const verdictCol=(v,good,bad)=>v==null?c.tx:v<=good?c.mt:v>=bad?c.co:c.gd;
+  const stats=()=>{const beat=W.wRate>0?[W.zRet,W.rRet].filter(x=>x!=null):[];
+    return o(Fragment,{children:[
+      t("button",{onClick:()=>sAi(true),className:"w100 act98 tr",style:{marginTop:12,padding:"14px 16px",background:`linear-gradient(135deg,${c.ac}26 0%,${c.sfg} 70%)`,border:`1px solid ${c.ac}55`,borderRadius:16,textAlign:"left",color:"inherit"},children:o("div",{className:"f ia jb",children:[o("div",{children:[t("div",{style:{fontSize:15,fontWeight:700,color:c.tx},children:"✨ How am I doing?"}),t("div",{style:{fontSize:12,color:c.td,marginTop:3,lineHeight:1.4},children:"AI check-up of your assets, loans and cash flow: a score, what's going well, risks and what to do next."})]}),t("span",{style:{color:c.tm,fontSize:20},children:"›"})]})}),
+      card([lbl("NET WORTH (THESE SECTIONS)"),t("div",{style:{fontFamily:c.hf,fontSize:28,fontWeight:700,color:zjCol(W.net)},children:zjSign(W.net,cur)}),
+        t("div",{style:{fontSize:11.5,color:c.tm,margin:"2px 0 10px"},children:"Assets (Zerodha + reinvestments) minus all loans you owe, LAS included"}),
+        t("div",{className:"f",style:{height:10,borderRadius:999,overflow:"hidden",background:c.sf2,marginBottom:8},children:[W.assets>0&&t("div",{key:"a",style:{width:W.assets/(W.assets+W.liab||1)*100+"%",background:c.mt}}),W.liab>0&&t("div",{key:"l",style:{width:W.liab/(W.assets+W.liab||1)*100+"%",background:c.co}})]}),
+        o("div",{className:"f",style:{gap:10},children:[giStat("ASSETS",giM(W.assets,cur),c.mt),giStat("LIABILITIES",giM(W.liab,cur),W.liab?c.co:null),giStat("DEBT / ASSETS",pc(W.debtRatio),verdictCol(W.debtRatio,50,100))]})]),
+      card([lbl("LOANS"),
+        kv("Monthly EMIs & interest",giM(W.emiMo,cur)),
+        kv("EMIs as % of income",pc(W.emiInc),verdictCol(W.emiInc,30,45),W.incMo>0?"Income averages "+giM(W.incMo,cur)+"/month over the last 3 months. Under 30% is comfortable; over 45% is stretched.":"Log your income to see this."),
+        kv("Average interest rate",W.wRate?W.wRate.toFixed(2)+"%":"—",null,"Weighted by what you still owe on each loan."),
+        kv("Interest cost per year",giM(W.yrCost,cur),W.yrCost?c.gd:null,"About "+giM(_r2(W.yrCost/12),cur)+" a month at today's balances."),
+        kv("Interest still to pay",giM(W.intLeft,cur),null,"On EMI loans if paid as scheduled."),
+        kv("Paid so far",giM(W.paid,cur)),
+        kv("Debt-free by",W.debtFree?lnFmtD(W.debtFree):"—",null,W.debtFree?"Last scheduled EMI across your loans.":null),
+        W.overdue>0&&kv("Overdue EMIs",String(W.overdue),c.co),
+        W.toReceive>0&&kv("Owed to you (lent)",giM(W.toReceive,cur),c.mt)]),
+      card([lbl("ASSETS VS WHAT THE LOANS COST"),
+        kv("Zerodha return on capital",pc(W.zRet),W.zRet==null?null:W.zRet>=W.wRate?c.mt:c.co,W.zs&&W.zs.capital<=0?"Add money you put in under Zerodha → Funds to see this.":null),
+        kv("Reinvestments return",pc(W.rRet),W.rRet==null?null:W.rRet>=W.wRate?c.mt:c.co),
+        kv("Loans cost",W.wRate?W.wRate.toFixed(2)+"% a year":"—"),
+        beat.length>0&&t("div",{style:{fontSize:12,lineHeight:1.5,marginTop:8,color:beat.every(x=>x>=W.wRate)?c.mt:c.gd},children:beat.every(x=>x>=W.wRate)?"✓ Your investments are earning more than your loans cost.":"Some of your investments earn less than the loans cost. Returns here are total, not yearly, so compare over time."})]),
+      W.loans.length>0&&card([lbl("EACH LOAN"),...W.loans.map(x=>o("div",{key:x.id,style:{padding:"9px 0",borderTop:`1px solid ${c.brs}`},children:[
+        o("div",{className:"f ia jb",style:{gap:8},children:[t("span",{className:"tru",style:{fontSize:13.5,fontWeight:600,color:c.tx},children:x.name}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13.5,color:c.co},children:giM(x.out,cur)})]}),
+        t("div",{style:{fontSize:11.5,color:c.td,marginTop:3},children:[x.rate?x.rate+"%":"",x.emi?"EMI "+giM(x.emi,cur):"",x.monthsLeft?x.monthsLeft+" EMIs left":"",x.ltv!=null?"LTV "+x.ltv.toFixed(1)+"% of "+x.maxLtv+"%":""].filter(Boolean).join(" · ")}),
+        x.kind!=="las"&&t("div",{style:{height:4,borderRadius:999,background:c.sf2,marginTop:6,overflow:"hidden"},children:t("div",{style:{width:Math.min(100,x.progress)+"%",height:"100%",background:c.mt}})}),
+        x.assetVal>0&&t("div",{style:{fontSize:11.5,color:x.assetGain>=x.yrCost?c.mt:c.td,marginTop:5},children:"Invested from it: "+giM(x.assetInv,cur)+" → "+giM(x.assetVal,cur)+" ("+zjSign(x.assetGain,cur)+") · loan costs "+giM(x.yrCost,cur)+"/yr"})]}))]),
+      t("div",{style:{marginTop:12},children:t(FlowCard,{data,onView})}),
+      card([lbl("HOW TO READ THIS"),t("div",{style:{fontSize:12,color:c.td,lineHeight:1.6},children:["Debt / assets under 50% means your investments comfortably cover your loans.","EMIs under 30% of income leave room for savings and emergencies.","Borrowing to invest only pays when investments earn more than the loan's rate after tax. Watch “Assets vs what the loans cost”.","Keep LAS LTV well below the limit; a market fall can trigger a margin call."].map((x,i)=>t("div",{key:i,style:{marginBottom:4},children:"• "+x}))})])
+    ]})};
   return o("div",{style:{padding:`8px ${GUT}px 120px`},children:[
     o("div",{className:"f ia jb",style:{marginBottom:6},children:[t(BB,{onClick:onClose}),t("div",{style:{fontFamily:c.hf,fontSize:24},children:t("em",{children:"Wealth Tracker"})}),t("div",{style:{width:38}})]}),
-    o("div",{className:"f",style:{gap:10,padding:16,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,marginTop:10},children:[
-      giStat("LOANS OWED",giM(ln.outstanding||0,cur),(ln.outstanding||0)>0?c.co:null),giStat("REINVESTED",giM(pf.value||0,cur)),giStat("ZERODHA",zs?giM(zs.value+zs.mfVal+Math.max(0,zs.cash),cur):"—")]}),
-    t(ZerodhaCard,{data,onView}),t(LoanTrackerCard,{data,onView}),t(ReinvestCard,{data,onView})
+    o("div",{className:"f",style:{gap:10,padding:16,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,marginTop:10},children:[giStat("ASSETS",giM(Math.round(W.assets),cur),c.mt),giStat("LIABILITIES",giM(Math.round(W.liab),cur),W.liab?c.co:null),giStat("NET",zjSign(Math.round(W.net),cur),zjCol(W.net))]}),
+    o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,marginTop:12},children:[tabBtn("assets","Assets"),tabBtn("liab","Liabilities"),tabBtn("stats","Stats")]}),
+    tab==="assets"&&o(Fragment,{children:[t(ZerodhaCard,{data,onView}),t(ReinvestCard,{data,onView})]}),
+    tab==="liab"&&o(Fragment,{children:[t(LoanTrackerCard,{data,onView}),t(LasCard,{data,onView})]}),
+    tab==="stats"&&stats(),
+    ai&&t(WtAiSheet,{data,W,onClose:()=>sAi(false)})
   ]});
+}
+// AI wealth check-up: a score, what's going well, risks, next steps — then follow-up questions.
+function WtAiSheet({data,W,onClose}){
+  const cur=W.cur;
+  const[rep,sRep]=useState(()=>{try{return JSON.parse(localStorage.getItem("etp-wealth-ai")||"null")}catch(e){return null}});
+  const[busy,sBusy]=useState(false),[err,sErr]=useState(""),[q,sQ]=useState(""),[chat,sChat]=useState([]);
+  const ctx=()=>({today:lnYMD(Date.now()),currency:cur,netWorth:W.net,assets:{total:W.assets,zerodha:W.zVal,reinvestments:W.rVal},liabilities:W.liab,debtToAssetsPct:W.debtRatio==null?null:+W.debtRatio.toFixed(1),
+    monthly:{income:W.incMo,spending:W.spendMo,emisAndInterest:W.emiMo,emiToIncomePct:W.emiInc==null?null:+W.emiInc.toFixed(1)},avgLoanRatePct:+W.wRate.toFixed(2),interestCostPerYear:W.yrCost,interestStillToPay:W.intLeft,debtFreeBy:W.debtFree?lnYMD(W.debtFree):null,overdueEmis:W.overdue,
+    loans:W.loans.map(x=>({name:x.name,outstanding:x.out,ratePct:x.rate,emi:x.emi,emisLeft:x.monthsLeft,progressPct:+x.progress.toFixed(0),investedFromIt:x.assetInv,worthNow:x.assetVal,ltvPct:x.ltv==null?undefined:+x.ltv.toFixed(1),maxLtvPct:x.maxLtv})),
+    zerodha:W.zs?{capital:W.zs.capital,investedNow:_r2(W.zs.cost+W.zs.mfInv),valueNow:_r2(W.zs.value+W.zs.mfVal),bookedNet:W.zs.netRealized,unrealised:W.zs.unreal,freeCash:W.zs.cash,returnOnCapitalPct:W.zRet==null?null:+W.zRet.toFixed(1),closed:zjStats(W.zs.closed)}:null,
+    reinvestments:{invested:W.pf.P||0,value:W.rVal,returnPct:W.rRet==null?null:+W.rRet.toFixed(1),vsLoanCost:W.pf.net||0},
+    loanMoney:{borrowed:W.flow.base,working:W.flow.g&&W.flow.g.earn,toInterest:W.flow.intAmt,unused:W.flow.idle}});
+  const run=async()=>{if(!gAK()){sErr("Add an AI API key in Settings first.");return}sBusy(true);sErr("");
+    try{const r=await cAPI({max_tokens:3000,system:"You are a careful personal-finance coach for an Indian retail investor who has borrowed money and invests some of it (stocks, mutual funds, reinvestments). Judge only from the numbers given; say when data is missing. Be specific, use ₹ amounts and percentages from the data, and keep each point to one or two short sentences. This is guidance, not regulated investment advice.",
+      messages:[{role:"user",content:"DATA:\n"+JSON.stringify(ctx())+'\n\nReply with ONLY a JSON object: {"score":0-100,"verdict":"one sentence","good":["what is going well"],"risks":["biggest risks, most serious first"],"actions":[{"title":"short action","why":"reason with numbers","impact":"high|medium|low"}],"howToAnalyze":["how to read and track these numbers each month"],"missing":["data that would sharpen this"]}'}]});
+      const txt=(r.content||[]).map(x=>x.text||"").join("");const m=txt.match(/\{[\s\S]*\}/);const j=m?JSON.parse(m[0]):null;if(!j)throw new Error("The AI didn't return a usable report.");
+      j.at=Date.now();sRep(j);sChat([]);try{localStorage.setItem("etp-wealth-ai",JSON.stringify(j))}catch(e){}}catch(e){sErr(describeErr?describeErr(e):String(e&&e.message||e))}sBusy(false)};
+  const ask=async()=>{const qq=q.trim();if(!qq||busy)return;if(!gAK()){sErr("Add an AI API key in Settings first.");return}sQ("");const hist=[...chat,{role:"user",content:qq}];sChat(hist);sBusy(true);sErr("");
+    try{const r=await cAPI({max_tokens:1200,system:"You are a careful personal-finance coach for an Indian retail investor. Answer briefly (under 120 words) from the data given; use ₹ figures; say when data is missing. Guidance, not regulated advice.",messages:[{role:"user",content:"DATA:\n"+JSON.stringify(ctx())+(rep?"\n\nEARLIER CHECK-UP:\n"+JSON.stringify({score:rep.score,verdict:rep.verdict,risks:rep.risks,actions:rep.actions}):"")},{role:"assistant",content:"Understood. Ask me anything about these numbers."},...hist]});
+      const txt=(r.content||[]).map(x=>x.text||"").join("").trim();sChat([...hist,{role:"assistant",content:txt||"(no answer)"}])}catch(e){sErr(describeErr?describeErr(e):String(e&&e.message||e))}sBusy(false)};
+  const list=(title,arr,col)=>arr&&arr.length?o("div",{style:{marginTop:12},children:[lnLbl(title),...arr.map((x,i)=>t("div",{key:i,style:{fontSize:13,color:col||c.tx,lineHeight:1.5,marginBottom:5},children:"• "+x}))]}):null;
+  const sc=rep&&+rep.score,scCol=sc>=70?c.mt:sc>=45?c.gd:c.co;
+  return t(Sht,{onClose,children:o(Fragment,{children:[lnSheetTitle("✨ How am I doing?","Reads your Wealth Tracker numbers, income and spending. Sent to your AI provider."),
+    !rep&&!busy&&lnBtn("Run my check-up",run,true,{flex:"none",width:"100%"}),
+    busy&&!chat.length&&t("div",{style:{fontSize:13,color:c.td,padding:"10px 0"},children:"⏳ Looking at your numbers…"}),
+    err&&t("div",{style:{marginTop:10,fontSize:12.5,color:c.co},children:err}),
+    rep&&o(Fragment,{children:[
+      o("div",{className:"f ia",style:{gap:14,padding:14,background:c.sf2,borderRadius:14},children:[o("div",{style:{width:64,height:64,borderRadius:32,border:`4px solid ${scCol}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0},children:t("span",{style:{fontFamily:c.hf,fontSize:22,fontWeight:700,color:scCol},children:isFinite(sc)?Math.round(sc):"—"})}),
+        o("div",{className:"minw0",children:[t("div",{style:{fontSize:14,fontWeight:600,color:c.tx,lineHeight:1.4},children:rep.verdict||""}),t("div",{style:{fontSize:11,color:c.tm,marginTop:4},children:"Checked "+lnFmtD(rep.at||Date.now())})]})]}),
+      list("WHAT'S GOING WELL",rep.good,c.mt),list("RISKS",rep.risks,c.co),
+      rep.actions&&rep.actions.length>0&&o("div",{style:{marginTop:12},children:[lnLbl("WHAT TO DO NEXT"),...rep.actions.map((a2,i)=>o("div",{key:i,style:{padding:"9px 11px",background:c.sf2,borderRadius:11,marginBottom:6},children:[o("div",{className:"f ia jb",style:{gap:8},children:[t("span",{style:{fontSize:13.5,fontWeight:600,color:c.tx},children:a2.title}),t("span",{style:{fontSize:10,padding:"2px 7px",borderRadius:999,background:(a2.impact==="high"?c.co:a2.impact==="medium"?c.gd:c.tm)+"26",color:a2.impact==="high"?c.co:a2.impact==="medium"?c.gd:c.td,flexShrink:0},children:a2.impact||""})]}),t("div",{style:{fontSize:12,color:c.td,marginTop:3,lineHeight:1.45},children:a2.why})]}))]}),
+      list("HOW TO TRACK THIS",rep.howToAnalyze,c.td),list("WOULD HELP TO ADD",rep.missing,c.tm),
+      o("div",{style:{marginTop:14},children:[lnLbl("ASK A FOLLOW-UP"),...chat.map((m2,i)=>t("div",{key:i,style:{margin:"6px 0",padding:"9px 11px",borderRadius:12,fontSize:13,lineHeight:1.5,whiteSpace:"pre-wrap",background:m2.role==="user"?c.ac+"1f":c.sf2,color:c.tx,marginLeft:m2.role==="user"?40:0,marginRight:m2.role==="user"?0:40},children:m2.content})),
+        busy&&chat.length>0&&t("div",{style:{fontSize:12,color:c.tm},children:"⏳ Thinking…"}),
+        t("div",{className:"f fw",style:{gap:6,margin:"8px 0"},children:["Should I prepay a loan or keep investing?","Which loan should I close first?","Is my LAS safe if markets fall 20%?","How much can I safely invest each month?"].map(h=>riChip(false,h,()=>sQ(h),h))}),
+        o("div",{className:"f ia",style:{gap:8},children:[t("input",{value:q,onChange:e=>sQ(e.target.value),onKeyDown:e=>{if(e.key==="Enter")ask()},placeholder:"Ask about your money…",style:{...lnInp(),flex:1}}),lnBtn("Ask",ask,true,{flex:"0 0 70px"})]})]}),
+      o("div",{className:"f",style:{marginTop:14},children:lnBtn(busy?"…":"↻ Run a fresh check-up",()=>!busy&&run())})]})
+  ]})});
 }
 // --- Zerodha Portfolio screens ---
 const zjMoney=(n,cu)=>giM(n,cu);
@@ -17333,7 +17439,7 @@ function ZerodhaCard({data,onView}){
   const zj=zjOf(data),cur=data.currency,has=zj.fills.length||zj.funds.length||zj.mf.length,S=has?zjSummary(zj):null;
   return t("button",{onClick:()=>onView&&onView("zerodha"),className:"w100 act98 trt",style:{display:"block",textAlign:"left",marginTop:14,padding:18,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:18,color:"inherit"},children:[
     o("div",{className:"f ia jb",children:[o("div",{className:"f ia",style:{gap:12},children:[t("span",{style:{width:42,height:42,borderRadius:12,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:21},children:"💹"}),o("div",{className:"tl",children:[t("div",{style:{fontFamily:c.hf,fontSize:17,fontWeight:600,color:c.tx},children:"Zerodha Portfolio"}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:2},children:S?`${S.open.length} holding${S.open.length===1?"":"s"} · ${S.closed.length} closed trade${S.closed.length===1?"":"s"}`:"Funds added, investments and positional trades"})]})]}),t("span",{style:{color:c.tm,fontSize:20},children:"›"})]}),
-    S&&o("div",{className:"f",style:{gap:10,marginTop:14,paddingTop:12,borderTop:`1px solid ${c.brs}`},children:[giStat("CAPITAL",zjMoney(S.capital,cur)),giStat("INVESTED",zjMoney(S.cost+S.mfInv,cur)),giStat("RETURN",S.roc!=null?zjSign(S.total,cur):"—",zjCol(S.total))]})
+    S&&o("div",{className:"f",style:{gap:10,marginTop:14,paddingTop:12,borderTop:`1px solid ${c.brs}`},children:[giStat("CAPITAL",zjMoney(S.capital,cur)),giStat("INVESTED",zjMoney(S.cost+S.mfInv,cur)),giStat("RETURN",S.roc!=null?zjSign(S.total,cur):"Add funds",S.roc!=null?zjCol(S.total):c.tm)]})
   ]});
 }
 // --- Zerodha Portfolio: filters, sort, group, saved views, bulk actions, export, AI (per tab) ---
@@ -17864,7 +17970,7 @@ function GoalInvest({data,persist,onClose}){
     sheet
   ]});
 }
-const CALCULATORS=[{id:"flow",label:"Where loan money went",emoji:"🧭",component:FlowCard},{id:"budget",label:"Monthly Budget",emoji:"🧮",component:BudgetCalculator},{id:"goalInvest",label:"Goal Investing",emoji:"🎯",component:GoalInvestCard},{id:"bankStmt",label:"Bank Statement",emoji:"🧾",component:BankStmtCard}];
+const CALCULATORS=[{id:"budget",label:"Monthly Budget",emoji:"🧮",component:BudgetCalculator},{id:"goalInvest",label:"Goal Investing",emoji:"🎯",component:GoalInvestCard},{id:"bankStmt",label:"Bank Statement",emoji:"🧾",component:BankStmtCard}];
 function CalculatorsScreen({data,persist,onView}){
   const[edit,sEdit]=useState(false);
   // Saved order (data.calcOrder) first; calculators added later fall in at the end.
