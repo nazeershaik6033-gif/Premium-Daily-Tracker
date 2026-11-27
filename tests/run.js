@@ -546,6 +546,58 @@ test('Studio theme: white page, flat bordered cards, upright headings', async ()
   assert.deepEqual(p.errors, []);
 });
 
+test('Zerodha filters: search, alerts, saved view, bulk + undo, grouping with subtotals', async () => {
+  const now = Date.now(), d = n => now - n * 864e5;
+  const F = (id, sym, ts, side, qty, price) => ({ id, sym, ts, exch: 'NSE', side, qty, price, oid: id, src: 'tradebook' });
+  const zj = { fills: [F('1', 'TCS', d(90), 'buy', 10, 3000), F('2', 'INFY', d(60), 'buy', 10, 1500), F('3', 'ITC', d(40), 'buy', 100, 400),
+      F('4', 'ZOMATO', d(50), 'buy', 100, 200), F('5', 'ZOMATO', d(30), 'sell', 100, 180), F('6', 'IRCTC', d(45), 'buy', 10, 800), F('7', 'IRCTC', d(20), 'sell', 10, 900)],
+    funds: [{ id: 'f1', kind: 'in', amount: 100000, date: d(100) }, { id: 'f2', kind: 'out', amount: 5000, date: d(5), src: 'r1', stmt: 's1' }],
+    mf: [{ id: 'm1', name: 'Parag Parikh Flexi Cap', invested: 20000, current: 23000, date: d(200) }],
+    meta: { INFY: { type: 'swing', sl: 1400, target: 1800 }, ITC: { type: 'swing' } }, prices: { TCS: { ltp: 3300, at: now }, INFY: { ltp: 1420, at: now }, ITC: { ltp: 380, at: now } },
+    notes: { [`ZOMATO|${d(50)}`]: { tags: ['Breakout'], mistakes: ['FOMO'] }, [`IRCTC|${d(45)}`]: { tags: ['Breakout'], mistakes: [] } } };
+  const p = await newPage({ seed: { zjournal: zj } });
+  await p.locator('button[aria-label="Wealth Tracker"]').click(); await p.waitForTimeout(300);
+  await p.locator('button:has-text("Zerodha Portfolio")').click(); await p.waitForTimeout(300);
+  await p.locator('button:has-text("Holdings")').first().click(); await p.waitForTimeout(300);
+  const root = () => p.locator('#root').innerText();
+  assert.match(await root(), /4 of 4 shown/);
+  await p.locator('input[placeholder="Search stock, tag, note"]').fill('inf'); await p.waitForTimeout(200);
+  assert.match(await root(), /1 of 4 shown/); await p.locator('input[placeholder="Search stock, tag, note"]').fill('');
+  // Near stop-loss: INFY at 1420 is within 5% of SL 1400. ITC has no SL.
+  await p.locator('button[aria-label="Filters and sort"]').click();
+  await p.getByRole('button', { name: 'Near stop-loss', exact: true }).click(); await p.getByRole('button', { name: 'No stop-loss set', exact: true }).click();
+  await p.locator('button:has-text("Save view")').click();
+  await p.locator('input[placeholder="e.g. Positional in loss"]').fill('Watch'); await p.locator('button:has-text("Save")').last().click(); await p.waitForTimeout(300);
+  let txt = await root();
+  assert.match(txt, /2 of 4 shown/); assert.match(txt, /INFY/); assert.match(txt, /ITC/); assert.doesNotMatch(txt, /TCS/); assert.match(txt, /⚙ Filters · 1/); assert.match(txt, /★ Watch/);
+  await p.locator('button:has-text("Clear filters")').click(); await p.waitForTimeout(200);
+  assert.match(await root(), /4 of 4 shown/);
+  await p.locator('button:has-text("★ Watch")').click(); await p.waitForTimeout(200);
+  assert.match(await root(), /2 of 4 shown/);
+  // Bulk: select both, make them Investments, then undo.
+  await p.locator('button:has-text("Select")').click();
+  await p.locator('button:has-text("All 2")').click();
+  await p.locator('button:has-text("Investment")').last().click(); await p.waitForTimeout(300);
+  assert.equal((await stored(p)).zjournal.meta.INFY.type, 'invest');
+  await p.locator('button:has-text("Undo")').click(); await p.waitForTimeout(300);
+  assert.equal((await stored(p)).zjournal.meta.INFY.type, 'swing', 'undo restores');
+  // Closed: group by tag with subtotals; Breakout = -2,000 + 1,000 before charges.
+  await p.locator('button:has-text("Closed")').click(); await p.waitForTimeout(200);
+  await p.locator('button[aria-label="Filters and sort"]').click();
+  await p.getByRole('button', { name: 'Tag / mistake', exact: true }).click(); await p.locator('button:has-text("Done")').last().click(); await p.waitForTimeout(200);
+  txt = await root();
+  assert.match(txt, /🏷 Breakout · 2/); assert.match(txt, /⚠ FOMO · 1/);
+  await p.locator('button[aria-label="Filters and sort"]').click();
+  await p.getByRole('button', { name: 'Winners', exact: true }).click(); await p.getByRole('button', { name: 'Worst P&L', exact: true }).click(); await p.locator('button:has-text("Done")').last().click(); await p.waitForTimeout(200);
+  txt = await root(); assert.match(txt, /IRCTC/); assert.doesNotMatch(txt, /ZOMATO/);
+  // Funds: filter by source.
+  await p.locator('button:has-text("Funds")').first().click(); await p.waitForTimeout(200);
+  await p.locator('button[aria-label="Filters and sort"]').click();
+  await p.getByRole('button', { name: '🧾 From bank statement', exact: true }).click(); await p.locator('button:has-text("Done")').last().click(); await p.waitForTimeout(200);
+  txt = await root(); assert.match(txt, /1 of 2 shown/); assert.match(txt, /Withdrawn to bank/);
+  assert.deepEqual(p.errors, []);
+});
+
 test('fonts: optional Settings fonts load only when needed', async () => {
   const p = await newPage();
   const links = () => p.evaluate(() => [...document.querySelectorAll('link[href*="fonts.googleapis.com/css2"]')].map(l => l.href).join(' '));

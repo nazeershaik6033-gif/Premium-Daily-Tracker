@@ -17336,11 +17336,191 @@ function ZerodhaCard({data,onView}){
     S&&o("div",{className:"f",style:{gap:10,marginTop:14,paddingTop:12,borderTop:`1px solid ${c.brs}`},children:[giStat("CAPITAL",zjMoney(S.capital,cur)),giStat("INVESTED",zjMoney(S.cost+S.mfInv,cur)),giStat("RETURN",S.roc!=null?zjSign(S.total,cur):"—",zjCol(S.total))]})
   ]});
 }
+// --- Zerodha Portfolio: filters, sort, group, saved views, bulk actions, export, AI (per tab) ---
+const ZJ_FD={
+  holdings:{q:"",types:[],loans:[],pnl:"all",retMin:"",retMax:"",alerts:[],near:"5",daysMin:"",daysMax:"",per:"all",from:"",to:"",invMin:"",invMax:"",src:[],sort:"value",group:"none"},
+  trades:{q:"",pnl:"all",retMin:"",retMax:"",amtMin:"",amtMax:"",daysMin:"",daysMax:"",per:"all",from:"",to:"",tags:[],mistakes:[],untagged:false,loans:[],src:[],sort:"new",group:"none"},
+  funds:{q:"",kind:"all",src:[],loans:[],per:"all",from:"",to:"",amtMin:"",amtMax:"",sort:"new",group:"none"}};
+const zjFActive=(tab,f)=>{const d=ZJ_FD[tab];let n=0;for(const k in d){if(k==="sort"||k==="group"||k==="near"||k==="from"||k==="to")continue;const a=f[k],b=d[k];if(Array.isArray(b)?(a||[]).length:a!==b)n++}return n};
+const ZJ_PER=[["all","All time"],["m","This month"],["fy","This FY"],["lfy","Last FY"],["12m","Last 12 months"],["custom","Custom"]];
+const zjFyStart=d=>new Date(d.getMonth()>=3?d.getFullYear():d.getFullYear()-1,3,1).getTime();
+function zjPeriod(k,from,to){const n=new Date();
+  if(k==="fy")return[zjFyStart(n),Infinity];
+  if(k==="lfy"){const s=zjFyStart(n);return[new Date(new Date(s).getFullYear()-1,3,1).getTime(),s-1]}
+  if(k==="m")return[new Date(n.getFullYear(),n.getMonth(),1).getTime(),Infinity];
+  if(k==="12m"){const d=new Date(n);d.setFullYear(d.getFullYear()-1);return[d.getTime(),Infinity]}
+  if(k==="custom")return[from?lnFromYMD(from):-Infinity,to?lnFromYMD(to)+864e5-1:Infinity];
+  return[-Infinity,Infinity]}
+const zjFyLabel=ts=>{const s=new Date(zjFyStart(new Date(ts))).getFullYear();return"FY "+s+"–"+String(s+1).slice(2)};
+const ZJ_ALERTS=[["slhit","🛑 Stop-loss hit"],["tghit","🎯 Target hit"],["nearsl","Near stop-loss"],["neartg","Near target"],["nosl","No stop-loss set"],["stale","Price not updated 7+ days"]];
+// One flat row per item, whichever tab, so filter/sort/group/export work the same way.
+function zjRows(tab,zj,S,near){
+  if(tab==="holdings"){const nr=(+near||5)/100,out=[];
+    for(const t2 of S.open){const m=zj.meta[t2.sym]||{},pr=zj.prices[t2.sym],p=pr&&pr.ltp>0?+pr.ltp:null,val=p!=null?p*t2.qty:t2.cost,pnl=p!=null?val-t2.cost:0,sw=m.type==="swing",al=[];
+      if(sw&&m.sl>0&&p!=null){if(p<=m.sl)al.push("slhit");else if(p<=m.sl*(1+nr))al.push("nearsl")}
+      if(sw&&m.target>0&&p!=null){if(p>=m.target)al.push("tghit");else if(p>=m.target*(1-nr))al.push("neartg")}
+      if(sw&&!(m.sl>0))al.push("nosl");if(!pr||Date.now()-(pr.at||0)>7*864e5)al.push("stale");
+      out.push({id:t2.id,kind:"stock",name:t2.sym,type:sw?"swing":"invest",loanId:m.loanId||null,inv:t2.cost,val:_r2(val),pnl:_r2(pnl),pct:t2.cost?pnl/t2.cost*100:0,days:zjDays(t2.openTs),ts:t2.openTs,src:t2.src,alerts:al,slDist:sw&&m.sl>0&&p!=null?(p-m.sl)/m.sl:null,priced:p!=null,ref:t2})}
+    for(const m of zj.mf){const cv=m.current!=null&&m.current!==""?+m.current:null,v=cv!=null?cv:+m.invested||0,g=v-(+m.invested||0);
+      out.push({id:m.id,kind:"mf",name:m.name,type:"mf",loanId:m.loanId||null,inv:+m.invested||0,val:v,pnl:_r2(g),pct:m.invested?g/m.invested*100:0,days:zjDays(m.date||Date.now()),ts:m.date||0,src:"manual",alerts:cv==null?["stale"]:[],slDist:null,priced:cv!=null,ref:m})}
+    return out}
+  if(tab==="trades")return S.closed.map(t2=>{const n=zj.notes[t2.id]||{};return{id:t2.id,name:t2.sym,net:t2.net,pct:t2.cost?t2.net/t2.cost*100:0,days:zjDays(t2.openTs,t2.closeTs),ts:t2.closeTs,openTs:t2.openTs,tags:n.tags||[],mistakes:n.mistakes||[],note:n.note||"",loanId:(zj.meta[t2.sym]||{}).loanId||null,src:t2.src,inv:t2.cost,ref:t2}});
+  return zj.funds.map(f=>({id:f.id,name:f.note||"",note:f.note||"",kind:f.kind==="out"?"out":"in",amount:+f.amount||0,ts:f.date,src:f.src?"bank":"manual",loanId:f.loanId||null,ref:f}));
+}
+function zjMatch(tab,r,f){
+  const q=(f.q||"").trim().toLowerCase();
+  if(q&&!(r.name+" "+(r.note||"")+" "+(r.tags||[]).join(" ")+" "+(r.mistakes||[]).join(" ")).toLowerCase().includes(q))return false;
+  const[a,b]=zjPeriod(f.per,f.from,f.to);if(r.ts<a||r.ts>b)return false;
+  const rng=(v,mn,mx)=>!((mn!==""&&mn!=null&&!(v>=+mn))||(mx!==""&&mx!=null&&!(v<=+mx)));
+  if((f.loans||[]).length&&!f.loans.includes(r.loanId||"own"))return false;
+  if((f.src||[]).length&&!f.src.includes(r.src))return false;
+  if(tab==="holdings"){if(f.types.length&&!f.types.includes(r.type))return false;if(f.pnl==="profit"&&!(r.pnl>0))return false;if(f.pnl==="loss"&&!(r.pnl<0))return false;
+    if(!rng(r.pct,f.retMin,f.retMax)||!rng(r.days,f.daysMin,f.daysMax)||!rng(r.inv,f.invMin,f.invMax))return false;if(f.alerts.length&&!f.alerts.some(x=>r.alerts.includes(x)))return false}
+  if(tab==="trades"){if(f.pnl==="profit"&&!(r.net>0))return false;if(f.pnl==="loss"&&!(r.net<0))return false;
+    if(!rng(r.pct,f.retMin,f.retMax)||!rng(r.net,f.amtMin,f.amtMax)||!rng(r.days,f.daysMin,f.daysMax))return false;
+    if(f.tags.length&&!f.tags.some(x=>r.tags.includes(x)))return false;if(f.mistakes.length&&!f.mistakes.some(x=>r.mistakes.includes(x)))return false;if(f.untagged&&(r.tags.length||r.mistakes.length))return false}
+  if(tab==="funds"){if(f.kind!=="all"&&r.kind!==f.kind)return false;if(!rng(r.amount,f.amtMin,f.amtMax))return false}
+  return true}
+const ZJ_SORTS={
+  holdings:{value:["Value",(a,b)=>b.val-a.val],pnl:["P&L ₹",(a,b)=>b.pnl-a.pnl],pct:["Return %",(a,b)=>b.pct-a.pct],worst:["Worst first",(a,b)=>a.pct-b.pct],nearsl:["Closest to SL",(a,b)=>(a.slDist==null?9e9:a.slDist)-(b.slDist==null?9e9:b.slDist)],days:["Held longest",(a,b)=>b.days-a.days],newest:["Newest",(a,b)=>b.ts-a.ts],inv:["Invested",(a,b)=>b.inv-a.inv],name:["Name",(a,b)=>a.name.localeCompare(b.name)]},
+  trades:{new:["Newest",(a,b)=>b.ts-a.ts],old:["Oldest",(a,b)=>a.ts-b.ts],net:["Best P&L",(a,b)=>b.net-a.net],worst:["Worst P&L",(a,b)=>a.net-b.net],pct:["Return %",(a,b)=>b.pct-a.pct],days:["Held longest",(a,b)=>b.days-a.days],name:["Stock",(a,b)=>a.name.localeCompare(b.name)]},
+  funds:{new:["Newest",(a,b)=>b.ts-a.ts],old:["Oldest",(a,b)=>a.ts-b.ts],amt:["Largest",(a,b)=>b.amount-a.amount],small:["Smallest",(a,b)=>a.amount-b.amount]}};
+const ZJ_GROUPS={holdings:[["none","None"],["type","Type"],["loan","Loan / own"]],trades:[["none","None"],["month","Month"],["fy","FY"],["stock","Stock"],["tag","Tag / mistake"],["loan","Loan / own"]],funds:[["none","None"],["month","Month"],["fy","FY"],["loan","Loan / own"],["src","Source"]]};
+function zjGroupKeys(r,g,loanName){
+  if(g==="type")return[[r.type,r.type==="swing"?"Positional":r.type==="mf"?"Mutual funds":"Investments"]];
+  if(g==="loan")return r.loanId?[[r.loanId,"🏦 "+loanName(r.loanId)]]:[["own","💰 Own money"]];
+  if(g==="month")return[[riMk(r.ts),riMonthLabel(riMk(r.ts))]];
+  if(g==="fy")return[[zjFyLabel(r.ts),zjFyLabel(r.ts)]];
+  if(g==="stock")return[[r.name,r.name]];
+  if(g==="src")return[[r.src,r.src==="bank"?"🧾 From bank statement":"✍️ Typed in"]];
+  if(g==="tag"){const k=[...(r.tags||[]).map(x=>["t:"+x,"🏷 "+x]),...(r.mistakes||[]).map(x=>["m:"+x,"⚠ "+x])];return k.length?k:[["none","No tag"]]}
+  return[["all",""]];
+}
+function zjGroup(rows,g,loanName,sortKey){
+  if(g==="none")return[{key:"all",label:"",rows}];
+  const m=new Map();for(const r of rows)for(const[k,l]of zjGroupKeys(r,g,loanName)){(m.get(k)||m.set(k,{key:k,label:l,rows:[]}).get(k)).rows.push(r)}
+  const gs=[...m.values()];
+  if(g==="month"||g==="fy")gs.sort((a,b)=>b.key.localeCompare(a.key));
+  else gs.sort((a,b)=>zjGTotal(b.rows)-zjGTotal(a.rows));
+  return gs}
+const zjGTotal=rows=>_r2(rows.reduce((a,r)=>a+(r.net!=null?r.net:r.kind==="in"?r.amount:r.kind==="out"?-r.amount:r.pnl||0),0));
+// Bulk changes on selected rows. Returns the new zjournal (and bankStmts when funds are removed).
+function zjBulk(data,tab,op,ids,value){
+  const zj=zjOf(data),S=zjSummary(zj),rows=zjRows(tab,zj,S,5),sel=rows.filter(r=>ids.includes(r.id));let out={...zj},bank=null;
+  const metaSet=(sym,patch)=>{out.meta={...out.meta,[sym]:{...(out.meta[sym]||{type:"invest"}),...patch}}};
+  if(op==="type"){for(const r of sel)if(r.kind==="stock")metaSet(r.name,{type:value})}
+  else if(op==="loan"){const lid=value==="own"?null:value;
+    if(tab==="funds")out.funds=zj.funds.map(f=>ids.includes(f.id)?{...f,loanId:lid}:f);
+    else{for(const r of sel){if(r.kind==="mf")out.mf=(out.mf||zj.mf).map(m=>m.id===r.id?{...m,loanId:lid}:m);else metaSet(r.name,{loanId:lid})}}}
+  else if(op==="tag"||op==="mistake"){const k=op==="tag"?"tags":"mistakes";out.notes={...zj.notes};for(const r of sel){const n=out.notes[r.id]||{tags:[],mistakes:[],note:""};const L=n[k]||[];out.notes[r.id]={...n,[k]:L.includes(value)?L:[...L,value]}}}
+  else if(op==="remove"){
+    if(tab==="funds"){let d2=data;for(const r of sel)if(r.ref.src){d2={...d2,...zjUnlinkBank(d2,r.id,r.ref.src)}}bank=d2.bankStmts;out.funds=zj.funds.filter(f=>!ids.includes(f.id))}
+    else{const drop=new Set();for(const r of sel){if(r.kind==="mf"){out.mf=(out.mf||zj.mf).filter(m=>m.id!==r.id);continue}const t2=r.ref;for(const f of zj.fills)if(f.sym===t2.sym&&f.ts>=t2.openTs&&(t2.closeTs==null||f.ts<=t2.closeTs))drop.add(f.id)}out.fills=zj.fills.filter(f=>!drop.has(f.id))}}
+  return bank?{zjournal:out,bankStmts:bank}:{zjournal:out};
+}
+function zjExport(tab,fmt,groups,cur,title){
+  const H={holdings:["Name","Type","Loan","Invested","Value","P&L","Return %","Days held","Alerts"],trades:["Stock","Bought","Sold","Days","Invested","Net P&L","Return %","Tags","Mistakes","Notes"],funds:["Date","Added / withdrawn","Amount","Loan","Source","Note"]}[tab];
+  const row=r=>tab==="holdings"?[r.name,r.type==="swing"?"Positional":r.type==="mf"?"Mutual fund":"Investment",r._loan||"",_r2(r.inv),_r2(r.val),_r2(r.pnl),+r.pct.toFixed(2),r.days,r.alerts.map(a=>(ZJ_ALERTS.find(x=>x[0]===a)||[0,a])[1]).join(", ")]
+    :tab==="trades"?[r.name,lnFmtD(r.openTs),lnFmtD(r.ts),r.days,_r2(r.inv),_r2(r.net),+r.pct.toFixed(2),r.tags.join(", "),r.mistakes.join(", "),r.note]
+    :[lnFmtD(r.ts),r.kind==="out"?"Withdrawn":"Added",_r2(r.amount),r._loan||"",r.src==="bank"?"Bank statement":"Typed",r.note];
+  const aoa=[H];for(const g of groups){if(g.label)aoa.push([g.label,"","","","",zjGTotal(g.rows)]);for(const r of g.rows)aoa.push(row(r))}
+  const all=groups.flatMap(g=>g.rows),uniq=[...new Map(all.map(r=>[r.id,r])).values()];
+  aoa.push([]);aoa.push(tab==="holdings"?["Total","","",_r2(uniq.reduce((a,r)=>a+r.inv,0)),_r2(uniq.reduce((a,r)=>a+r.val,0)),_r2(uniq.reduce((a,r)=>a+r.pnl,0))]:tab==="trades"?["Total","","","",_r2(uniq.reduce((a,r)=>a+r.inv,0)),_r2(uniq.reduce((a,r)=>a+r.net,0))]:["Net added","",_r2(uniq.reduce((a,r)=>a+(r.kind==="out"?-r.amount:r.amount),0))]);
+  if(fmt==="xlsx"){const X=window.XLSX;if(!X){alert("Excel library isn't loaded — check your connection and reload.");return}const wb=X.utils.book_new();X.utils.book_append_sheet(wb,X.utils.aoa_to_sheet(aoa),"Zerodha");X.writeFile(wb,_safeName(title)+".xlsx");return}
+  const esc=_htmlEsc;_printHTML(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#111;margin:24px}h1{font-size:18px}table{border-collapse:collapse;width:100%;font-size:11px}td,th{border-bottom:1px solid #ddd;padding:5px 6px;text-align:left}th{background:#f3f3f3}tr.g td{font-weight:700;background:#fafafa}</style></head><body><h1>${esc(title)}</h1><p style="font-size:11px;color:#666">${new Date().toLocaleDateString("en-IN")} · amounts in ${esc(cur)}</p><table>${aoa.map((r,i)=>"<tr"+(i&&r.length===6&&r[1]===""&&r[2]===""&&r[0]?' class="g"':"")+">"+r.map(x=>(i?"<td>":"<th>")+esc(x)+(i?"</td>":"</th>")).join("")+"</tr>").join("")}</table></body></html>`);
+}
+// Filter sheet built from the tab's schema.
+function ZjFilterSheet({tab,f,setF,data,zj,onClose,onSave}){
+  const tog=(k,v)=>setF(p=>({...p,[k]:(p[k]||[]).includes(v)?p[k].filter(x=>x!==v):[...(p[k]||[]),v]}));
+  const one=(k,v)=>setF(p=>({...p,[k]:v}));
+  const inp={...lnInp(),padding:"10px 12px",fontSize:13.5};
+  const sec=(l,ch,key)=>o("div",{key:key||l,children:[lnLbl(l),ch]});
+  const chips=(list,isOn,onT)=>o("div",{className:"f fw",style:{gap:6},children:list.map(([v,l])=>riChip(isOn(v),l,()=>onT(v),String(v)))});
+  const range=(l,a,b,ph)=>sec(l,o("div",{className:"f ia",style:{gap:8},children:[t("input",{value:f[a],inputMode:"decimal",placeholder:ph?ph[0]:"Min",onChange:e=>one(a,e.target.value.replace(/[^\d.\-]/g,"")),style:inp}),t("span",{style:{color:c.tm},children:"–"}),t("input",{value:f[b],inputMode:"decimal",placeholder:ph?ph[1]:"Max",onChange:e=>one(b,e.target.value.replace(/[^\d.\-]/g,"")),style:inp})]}));
+  const loans=(data.loanTracker||[]).filter(L=>L.direction!=="lent").map(L=>[L.id,"🏦 "+(L.lender||"Loan")]);
+  const per=sec(tab==="holdings"?"BOUGHT":tab==="trades"?"SOLD":"DATE",o(Fragment,{children:[chips(ZJ_PER,v=>f.per===v,v=>one("per",v)),f.per==="custom"&&o("div",{className:"f ia",style:{gap:8,marginTop:8},children:[t("input",{type:"date",value:f.from,onChange:e=>one("from",e.target.value),style:riDateInp()}),t("input",{type:"date",value:f.to,onChange:e=>one("to",e.target.value),style:riDateInp()})]})]}));
+  const loanSec=sec("WHOSE MONEY",chips([["own","💰 Own money"],...loans],v=>(f.loans||[]).includes(v),v=>tog("loans",v)));
+  const body=tab==="holdings"?[
+      sec("TYPE",chips([["invest","Investments"],["swing","Positional"],["mf","Mutual funds"]],v=>f.types.includes(v),v=>tog("types",v))),
+      sec("PROFIT / LOSS",chips([["all","All"],["profit","In profit"],["loss","In loss"]],v=>f.pnl===v,v=>one("pnl",v))),
+      range("RETURN %","retMin","retMax",["e.g. -10","e.g. 20"]),
+      sec("POSITIONAL ALERTS",o(Fragment,{children:[chips(ZJ_ALERTS,v=>f.alerts.includes(v),v=>tog("alerts",v)),o("div",{className:"f ia",style:{gap:8,marginTop:8,fontSize:12,color:c.td},children:["“Near” means within",t("input",{value:f.near,inputMode:"decimal",onChange:e=>one("near",e.target.value.replace(/[^\d.]/g,"")),style:{...inp,width:64,flex:"none"}}),"%"]})]})),
+      range("DAYS HELD","daysMin","daysMax"),per,range("INVESTED ("+data.currency+")","invMin","invMax"),loanSec,
+      sec("SOURCE",chips([["tradebook","📄 Tradebook"],["manual","✍️ Typed in"]],v=>f.src.includes(v),v=>tog("src",v)))]
+    :tab==="trades"?[
+      sec("PROFIT / LOSS",chips([["all","All"],["profit","Winners"],["loss","Losers"]],v=>f.pnl===v,v=>one("pnl",v))),
+      range("RETURN %","retMin","retMax"),range("NET P&L ("+data.currency+")","amtMin","amtMax"),range("DAYS HELD","daysMin","daysMax"),per,
+      sec("TAGS",chips(ZJ_TAGS.map(x=>[x,x]),v=>f.tags.includes(v),v=>tog("tags",v))),
+      sec("MISTAKES",chips(ZJ_MISTAKES.map(x=>[x,"⚠ "+x]),v=>f.mistakes.includes(v),v=>tog("mistakes",v))),
+      sec("",chips([[1,"Only trades with no tags yet"]],()=>f.untagged,()=>one("untagged",!f.untagged)),"untag"),loanSec,
+      sec("SOURCE",chips([["tradebook","📄 Tradebook"],["manual","✍️ Typed in"]],v=>f.src.includes(v),v=>tog("src",v)))]
+    :[sec("KIND",chips([["all","All"],["in","Added"],["out","Withdrawn"]],v=>f.kind===v,v=>one("kind",v))),per,range("AMOUNT ("+data.currency+")","amtMin","amtMax"),loanSec,
+      sec("SOURCE",chips([["bank","🧾 From bank statement"],["manual","✍️ Typed in"]],v=>f.src.includes(v),v=>tog("src",v)))];
+  return t(Sht,{onClose,children:o(Fragment,{children:[lnSheetTitle("Filters & sort"),...body,
+    sec("SORT BY",chips(Object.entries(ZJ_SORTS[tab]).map(([k,v])=>[k,v[0]]),v=>f.sort===v,v=>one("sort",v))),
+    sec("GROUP BY",chips(ZJ_GROUPS[tab],v=>f.group===v,v=>one("group",v))),
+    o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Clear",()=>setF(p=>({...ZJ_FD[tab],sort:p.sort,group:p.group}))),lnBtn("★ Save view",onSave),lnBtn("Done",onClose,true)]})]})});
+}
+// AI: ask about the rows on this tab, or ask it to change them. It returns a filter and/or a list of
+// changes; nothing is applied until you tick and confirm.
+function ZjAiSheet({data,tab,rows,loanName,onClose,onFilter,onSelect,onApply}){
+  const[q,sQ]=useState(""),[busy,sBusy]=useState(false),[err,sErr]=useState(""),[res,sRes]=useState(null),[chk,sChk]=useState({});
+  const hints={holdings:["Which positional trades are below stop-loss?","Show holdings in loss bought with my loan","Mark all mutual funds as bought with my home loan"],trades:["Which mistake cost me the most?","Tag all INFY trades as Breakout","Show losing trades held under 10 days"],funds:["How much did I add this FY?","Show withdrawals above 20,000","Tag funds added in October to my personal loan"]}[tab];
+  const run=async()=>{if(!q.trim()||busy)return;if(!gAK()){sErr("Add an AI API key in Settings first.");return}sBusy(true);sErr("");sRes(null);
+    const loans=(data.loanTracker||[]).filter(L=>L.direction!=="lent").map(L=>({id:L.id,name:L.lender||"Loan"}));
+    const slim=rows.slice(0,250).map(r=>tab==="holdings"?{id:r.id,name:r.name,type:r.type,loan:r.loanId?loanName(r.loanId):"own",invested:Math.round(r.inv),value:Math.round(r.val),pnl:Math.round(r.pnl),pct:+r.pct.toFixed(1),days:r.days,alerts:r.alerts}
+      :tab==="trades"?{id:r.id,stock:r.name,sold:lnYMD(r.ts),days:r.days,net:Math.round(r.net),pct:+r.pct.toFixed(1),tags:r.tags,mistakes:r.mistakes,loan:r.loanId?loanName(r.loanId):"own"}
+      :{id:r.id,date:lnYMD(r.ts),kind:r.kind,amount:r.amount,loan:r.loanId?loanName(r.loanId):"own",source:r.src,note:r.note});
+    const ctx={today:lnYMD(Date.now()),tab,currency:data.currency,loans,tags:ZJ_TAGS,mistakes:ZJ_MISTAKES,filterKeys:Object.keys(ZJ_FD[tab]),rows:slim};
+    try{const r=await cAPI({max_tokens:2500,system:"You help a retail investor in India review their Zerodha portfolio journal. Answer briefly and only from the data given.",messages:[{role:"user",content:"DATA:\n"+JSON.stringify(ctx)+"\n\nQUESTION OR REQUEST: "+q.trim()+'\n\nReply with ONLY a JSON object: {"answer":"one or two short sentences","show":["ids of rows that answer the question"],"ops":[{"op":"type|loan|tag|mistake","ids":["row ids"],"value":"invest|swing for type; a loan id or \\"own\\" for loan; one of the tags or mistakes listed","why":"short reason"}]}. Use ops only when asked to change something. Never invent ids.'}]});
+      const txt=(r.content||[]).map(x=>x.text||"").join("");const m=txt.match(/\{[\s\S]*\}/);const j=m?JSON.parse(m[0]):null;if(!j)throw new Error("The AI didn't return a usable answer.");
+      const ok=new Set(rows.map(x=>x.id));j.show=(j.show||[]).filter(id=>ok.has(id));j.ops=(j.ops||[]).filter(o2=>["type","loan","tag","mistake"].includes(o2.op)).map(o2=>({...o2,ids:(o2.ids||[]).filter(id=>ok.has(id))})).filter(o2=>o2.ids.length);
+      sRes(j);sChk(Object.fromEntries(j.ops.map((_,i)=>[i,true])))}catch(e){sErr(describeErr?describeErr(e):String(e&&e.message||e))}sBusy(false)};
+  const opText=o2=>(o2.op==="type"?"Set "+(o2.value==="swing"?"Positional":"Investment"):o2.op==="loan"?"Tag "+(o2.value==="own"?"own money":loanName(o2.value)):o2.op==="tag"?"Add tag “"+o2.value+"”":"Add mistake “"+o2.value+"”")+" · "+o2.ids.length+" item"+(o2.ids.length===1?"":"s")+(o2.why?" — "+o2.why:"");
+  return t(Sht,{onClose,children:o(Fragment,{children:[lnSheetTitle("✨ Ask about this tab","It can find rows or suggest changes. Nothing changes until you confirm."),
+    t("textarea",{value:q,rows:2,autoFocus:true,onChange:e=>sQ(e.target.value),placeholder:hints[0],style:{...lnInp(),resize:"none",fontFamily:"var(--tf)"}}),
+    t("div",{className:"f fw",style:{gap:6,marginTop:8},children:hints.map(h=>riChip(false,h,()=>sQ(h),h))}),
+    o("div",{className:"f",style:{marginTop:12},children:lnBtn(busy?"Thinking…":"Ask",run,true,busy||!q.trim()?{opacity:.5}:undefined)}),
+    err&&t("div",{style:{marginTop:10,fontSize:12.5,color:c.co},children:err}),
+    res&&o("div",{style:{marginTop:14,padding:12,background:c.sf2,borderRadius:12},children:[t("div",{style:{fontSize:13.5,color:c.tx,lineHeight:1.5},children:res.answer||""}),
+      res.show&&res.show.length>0&&t("button",{onClick:()=>{onSelect(res.show);onClose()},className:"w100 act98 tr",style:{marginTop:10,padding:"9px 0",borderRadius:10,border:`1px solid ${c.ac}`,background:"transparent",color:c.ac,fontSize:13},children:"Show these "+res.show.length}),
+      res.ops&&res.ops.length>0&&o(Fragment,{children:[lnLbl("SUGGESTED CHANGES"),...res.ops.map((o2,i)=>lnToggle(!!chk[i],()=>sChk(p=>({...p,[i]:!p[i]})),opText(o2),null)),
+        o("div",{className:"f",style:{marginTop:10},children:lnBtn("Apply ticked changes",()=>{onApply(res.ops.filter((_,i)=>chk[i]));onClose()},true)})]})]})]})});
+}
+function ZjNameSheet({onClose,onSave}){const[n,sN]=useState("");const ok=n.trim().length>0;
+  return t(Sht,{onClose,children:o(Fragment,{children:[lnSheetTitle("Save this view","Your current filters, sort and grouping, one tap away"),t("input",{value:n,autoFocus:true,maxLength:30,placeholder:"e.g. Positional in loss",onChange:e=>sN(e.target.value),onKeyDown:e=>{if(e.key==="Enter"&&ok)onSave(n.trim())},style:lnInp()}),
+    o("div",{className:"f",style:{gap:10,marginTop:16},children:[lnBtn("Cancel",onClose),lnBtn("Save",()=>ok&&onSave(n.trim()),true,ok?undefined:{opacity:.45})]})]})});}
 function Zerodha({data,persist,onClose,onView}){
   const cur=data.currency,zj=zjOf(data),S=zjSummary(zj);
-  const[tab,sTab]=useState(()=>{const j=_zjJump;_zjJump=null;return j||"overview"}),[sh,sSh]=useState(null),[msg,sMsg]=useState(null),[hf,sHf]=useState("all");const fileRef=useRef(null);
+  const[tab,sTab]=useState(()=>{const j=_zjJump;_zjJump=null;return j||"overview"}),[sh,sSh]=useState(null),[msg,sMsg]=useState(null);const fileRef=useRef(null);
+  // Filters per tab, remembered on this device.
+  const[fs,sFs]=useState(()=>{let s0={};try{s0=JSON.parse(localStorage.getItem("etp-zj-f")||"{}")}catch(e){}return{holdings:{...ZJ_FD.holdings,...(s0.holdings||{})},trades:{...ZJ_FD.trades,...(s0.trades||{})},funds:{...ZJ_FD.funds,...(s0.funds||{})}}});
+  useEffect(()=>{try{localStorage.setItem("etp-zj-f",JSON.stringify(fs))}catch(e){}},[fs]);
+  const[ovPer,sOvPer]=useState("all"),[sel,sSel]=useState(()=>new Set()),[selMode,sSelMode]=useState(false),[undo,sUndo]=useState(null);const undoT=useRef(0),lpT=useRef({t:0,fired:false});
+  useEffect(()=>{sSel(new Set());sSelMode(false)},[tab]);
+  useEffect(()=>()=>clearTimeout(undoT.current),[]);
+  const loanName=id=>(((data.loanTracker||[]).find(L=>L.id===id)||{}).lender)||"Loan";
   useNavAction(tab==="funds"?"Add funds":tab==="trades"?null:"Add buy / sell",()=>tab==="funds"?sSh({k:"fund"}):sSh({k:"fill",side:"buy"}));
   const put=patch=>persist({zjournal:{...zj,...patch}});
+  const ft=fs[tab]||ZJ_FD.funds,setFt=fn=>sFs(p=>({...p,[tab]:typeof fn==="function"?fn(p[tab]):fn}));
+  const views=(zj.views||{})[tab]||[];
+  const bulk=(op,value,ids,label)=>{const snap={zjournal:data.zjournal||null,bankStmts:data.bankStmts||[]};persist(zjBulk(data,tab,op,ids||[...sel],value));sSel(new Set());sSelMode(false);sSh(null);sUndo({label,snap});clearTimeout(undoT.current);undoT.current=setTimeout(()=>sUndo(null),8000)};
+  // Filtered + sorted + grouped rows for a list tab.
+  const view=tb=>{const f=fs[tb],all=zjRows(tb,zj,S,f.near).map(r=>({...r,_loan:r.loanId?loanName(r.loanId):""}));const rows=all.filter(r=>zjMatch(tb,r,f)).sort((ZJ_SORTS[tb][f.sort]||Object.values(ZJ_SORTS[tb])[0])[1]);return{all,rows,groups:zjGroup(rows,f.group,loanName)}};
+  const pressRow=(id,open)=>({onPointerDown:()=>{lpT.current.fired=false;clearTimeout(lpT.current.t);lpT.current.t=setTimeout(()=>{lpT.current.fired=true;try{navigator.vibrate&&navigator.vibrate(12)}catch(e){}sSelMode(true);sSel(p=>new Set([...p,id]))},450)},onPointerUp:()=>clearTimeout(lpT.current.t),onPointerLeave:()=>clearTimeout(lpT.current.t),
+    onClick:()=>{if(lpT.current.fired){lpT.current.fired=false;return}if(selMode){sSel(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n})}else open()}});
+  const tick=id=>selMode&&t("span",{style:{width:20,height:20,borderRadius:6,flexShrink:0,display:"inline-flex",alignItems:"center",justifyContent:"center",border:`1.5px solid ${sel.has(id)?c.ac:c.tm}`,background:sel.has(id)?c.ac:"transparent",color:"#fff",fontSize:12,marginRight:10},children:sel.has(id)?"✓":""});
+  // Search, filters, AI, select, export, saved views.
+  const toolbar=(tb,v)=>{const n=zjFActive(tb,fs[tb]);return o(Fragment,{children:[
+    o("div",{className:"f ia",style:{gap:6,marginBottom:8},children:[
+      o("div",{className:"f ia f1",style:{gap:6,padding:"0 10px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:12,minWidth:0},children:[t(Srch,{size:14,color:c.tm}),t("input",{value:fs[tb].q,onChange:e=>{const q=e.target.value;setFt(p=>({...p,q}))},placeholder:tb==="funds"?"Search notes":"Search stock, tag, note",style:{flex:1,minWidth:0,background:"transparent",border:"none",outline:"none",color:c.tx,fontSize:13.5,padding:"10px 0"}})]}),
+      t("button",{onClick:()=>sSh({k:"filters"}),"aria-label":"Filters and sort",className:"act95 tr",style:{padding:"9px 12px",borderRadius:12,fontSize:12.5,fontWeight:600,border:`1px solid ${n?c.ac:c.brs}`,background:n?c.ac+"1f":c.sfg,color:n?c.ac:c.tx,whiteSpace:"nowrap"},children:"⚙ Filters"+(n?" · "+n:"")}),
+      t("button",{onClick:()=>sSh({k:"ai"}),"aria-label":"Ask AI",className:"act95 tr",style:{padding:"9px 11px",borderRadius:12,fontSize:13,border:`1px solid ${c.brs}`,background:c.sfg,color:c.tx},children:"✨"})]}),
+    (views.length>0||n>0)&&o("div",{className:"f",style:{gap:6,overflowX:"auto",paddingBottom:6,marginBottom:4},children:[...views.map(vw=>o("span",{key:vw.id,className:"f ia",style:{flexShrink:0,borderRadius:999,border:`1px solid ${c.brs}`,background:c.sf2},children:[t("button",{onClick:()=>setFt({...ZJ_FD[tb],...vw.f}),className:"act95",style:{background:"transparent",border:"none",padding:"6px 4px 6px 12px",fontSize:12,color:c.tx},children:"★ "+vw.name}),t("button",{onClick:()=>put({views:{...(zj.views||{}),[tb]:views.filter(x=>x.id!==vw.id)}}),"aria-label":"Delete view "+vw.name,className:"act90",style:{background:"transparent",border:"none",padding:"6px 10px 6px 4px",fontSize:12,color:c.tm},children:"✕"})]})),
+      n>0&&t("button",{onClick:()=>setFt(p=>({...ZJ_FD[tb],sort:p.sort,group:p.group})),className:"act95",style:{flexShrink:0,padding:"6px 12px",borderRadius:999,fontSize:12,border:`1px dashed ${c.brs}`,background:"transparent",color:c.td},children:"Clear filters"})]}),
+    o("div",{className:"f ia jb",style:{marginBottom:8,fontSize:11.5,color:c.tm},children:[t("span",{children:v.rows.length+" of "+v.all.length+" shown · "+ZJ_SORTS[tb][fs[tb].sort][0]+(fs[tb].group!=="none"?" · grouped by "+(ZJ_GROUPS[tb].find(g=>g[0]===fs[tb].group)||[0,""])[1].toLowerCase():"")}),
+      o("span",{className:"f ia",style:{gap:12},children:[t("button",{onClick:()=>{sSelMode(!selMode);sSel(new Set())},className:"act95",style:{background:"transparent",border:"none",color:c.ac,fontSize:12,padding:0},children:selMode?"Cancel":"Select"}),v.rows.length>0&&t("button",{onClick:()=>sSh({k:"export",v}),className:"act95",style:{background:"transparent",border:"none",color:c.ac,fontSize:12,padding:0},children:"⤓ Export"})]})]})]})};
+  const ghead=(g,tb)=>g.label?o("div",{key:"g"+g.key,className:"f ia jb",style:{padding:"9px 12px",marginTop:10,marginBottom:6,background:c.sf2,borderRadius:10,fontSize:12.5,fontWeight:700},children:[t("span",{className:"tru",children:g.label+" · "+g.rows.length}),t("span",{style:{fontFamily:'var(--nf)',color:zjCol(zjGTotal(g.rows))},children:tb==="holdings"?zjSign(zjGTotal(g.rows),cur)+" P&L":zjSign(zjGTotal(g.rows),cur)})]}):null;
   const flash=m=>{sMsg(m);setTimeout(()=>sMsg(null),3500)};
   const onImport=async e=>{const f=e.target.files&&e.target.files[0];e.target.value="";if(!f)return;
     try{const X=window.XLSX;if(!X)throw new Error("Spreadsheet reader didn't load");const buf=await f.arrayBuffer();
@@ -17360,8 +17540,14 @@ function Zerodha({data,persist,onClose,onView}){
     const parts=[["Investments",S.invVal,"#7FDBFF"],["Positional",S.swVal,c.ac],["Mutual funds",S.mfVal,"#C8B6FF"],["Free cash",Math.max(0,S.cash),c.mt]],tot=parts.reduce((a,p)=>a+p[1],0);
     const months={};for(const t2 of S.closed){const k=riMk(t2.closeTs);(months[k]=months[k]||{pnl:0,in:0,out:0}).pnl+=t2.net}
     for(const f of zj.funds){const k=riMk(f.date);const m=(months[k]=months[k]||{pnl:0,in:0,out:0});if(f.kind==="out")m.out+=+f.amount;else m.in+=+f.amount}
-    const mk=Object.keys(months).sort().reverse().slice(0,12),mx=Math.max(1,...mk.map(k=>Math.abs(months[k].pnl)));
+    const[pa,pb]=zjPeriod(ovPer),inP=ts=>ts>=pa&&ts<=pb;
+    const mk=Object.keys(months).filter(k=>{const p2=k.split("-");const ts=new Date(+p2[0],+p2[1]-1,15).getTime();return ovPer==="all"||inP(ts)}).sort().reverse().slice(0,ovPer==="all"?12:24),mx=Math.max(1,...mk.map(k=>Math.abs(months[k].pnl)));
+    const pc=S.closed.filter(t2=>inP(t2.closeTs)),pst=zjStats(pc),pIn=zj.funds.filter(f=>f.kind!=="out"&&inP(f.date)).reduce((a,f)=>a+(+f.amount||0),0),pOut=zj.funds.filter(f=>f.kind==="out"&&inP(f.date)).reduce((a,f)=>a+(+f.amount||0),0);
     return o(Fragment,{children:[
+      t("div",{className:"f",style:{gap:6,overflowX:"auto",paddingBottom:8,marginBottom:4},children:ZJ_PER.filter(p2=>p2[0]!=="custom").map(([k,l])=>riChip(ovPer===k,l,()=>sOvPer(k),k))}),
+      ovPer!=="all"&&card([lbl("IN THIS PERIOD · "+(ZJ_PER.find(p2=>p2[0]===ovPer)||[0,""])[1].toUpperCase()),
+        o("div",{className:"f",style:{gap:10,marginBottom:10},children:[giStat("ADDED",zjMoney(_r2(pIn),cur),c.mt),giStat("WITHDRAWN",zjMoney(_r2(pOut),cur),pOut?c.co:null),giStat("BOOKED (NET)",zjSign(pst.net,cur),zjCol(pst.net))]}),
+        o("div",{className:"f",style:{gap:10},children:[giStat("TRADES CLOSED",String(pst.n)),giStat("WIN RATE",pst.n?Math.round(pst.winRate)+"%":"—"),giStat("CHARGES",zjMoney(_r2(pc.reduce((a,t2)=>a+t2.charges,0)),cur))]})]),
       card([lbl("YOUR ZERODHA MONEY"),
         o("div",{className:"f ia jb",style:{marginBottom:4},children:[t("span",{style:{fontFamily:c.hf,fontSize:28,fontWeight:700,color:zjCol(S.total)},children:zjSign(S.total,cur)}),S.roc!=null&&t("span",{style:{fontSize:13,color:zjCol(S.total)},children:(S.roc>=0?"+":"")+S.roc.toFixed(1)+"% on capital"})]}),
         t("div",{style:{fontSize:11.5,color:c.tm,marginBottom:12},children:"Booked profit after charges + unrealised on holdings + mutual funds"}),
@@ -17379,38 +17565,41 @@ function Zerodha({data,persist,onClose,onView}){
         t("div",{style:{fontSize:12.5,color:c.td,lineHeight:1.6},children:"1. Funds: log each time you add money to Zerodha (or tap it on a ZERODHA line in Bank Statement).\n2. Holdings: import Console → Reports → Tradebook (Equity) CSV, or add a buy by hand.\n3. Mutual funds: add what you've invested.".split("\n").map((x,i)=>t("div",{key:i,children:x}))})])
     ]})};
   // ---- holdings ----
-  const holdings=()=>{
-    const list=S.open.filter(t2=>{const ty=(zj.meta[t2.sym]||{}).type||"invest";return hf==="all"||hf===ty});
+  const stockCard=(r,key)=>{const t2=r.ref,m=zj.meta[t2.sym]||{},p=px(t2.sym),val=p!=null?p*t2.qty:null,un=val!=null?val-t2.cost:null,sw=m.type==="swing";
+    const tgt=sw&&m.target>0&&p!=null?(p-t2.avg)/(m.target-t2.avg):null,slHit=r.alerts.includes("slhit"),tgHit=r.alerts.includes("tghit");
+    return t("button",{key,...pressRow(r.id,()=>sSh({k:"pos",sym:t2.sym})),className:"w100 act98 trt",style:{display:"flex",alignItems:"flex-start",textAlign:"left",marginBottom:10,padding:14,background:sel.has(r.id)?c.ac+"14":c.sfg,border:`1px solid ${sel.has(r.id)?c.ac:slHit?c.co+"aa":tgHit?c.mt+"aa":c.brs}`,borderRadius:14,color:"inherit"},children:[tick(r.id),o("div",{className:"f1 minw0",children:[
+      o("div",{className:"f ia jb",style:{gap:8},children:[o("div",{className:"minw0",children:[o("div",{className:"f ia",style:{gap:6},children:[t("span",{style:{fontSize:15,fontWeight:700,color:c.tx},children:t2.sym}),t("span",{style:{fontSize:10,padding:"2px 7px",borderRadius:999,background:sw?c.ac+"26":c.sf2,color:sw?c.ac:c.td},children:sw?"Positional":"Investment"}),m.loanId&&t("span",{style:{fontSize:10,color:c.tm},children:"🏦"})]}),
+        t("div",{style:{fontSize:11.5,color:c.tm,marginTop:3},children:`${t2.qty} @ ${zjMoney(_r2(t2.avg),cur)} · ${zjDays(t2.openTs)}d held`})]}),
+        o("div",{style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:14.5,color:c.tx},children:zjMoney(val!=null?val:t2.cost,cur)}),t("div",{style:{fontSize:11.5,color:un!=null?zjCol(un):c.tm,marginTop:2},children:un!=null?zjSign(_r2(un),cur)+" ("+(un/t2.cost*100).toFixed(1)+"%)":"tap to add price"})]})]}),
+      sw&&(m.target||m.sl)?o("div",{style:{marginTop:8,fontSize:11.5,color:c.td},children:[(slHit?"🛑 Stop-loss hit · ":tgHit?"🎯 Target reached · ":r.alerts.includes("nearsl")?"⚠ Near stop-loss · ":r.alerts.includes("neartg")?"Near target · ":"")+(m.sl?"SL "+zjMoney(m.sl,cur):"")+(m.sl&&m.target?" · ":"")+(m.target?"Target "+zjMoney(m.target,cur):""),
+        tgt!=null&&!slHit&&t("div",{style:{height:4,borderRadius:999,background:c.sf2,marginTop:6,overflow:"hidden"},children:t("div",{style:{width:Math.max(0,Math.min(100,tgt*100))+"%",height:"100%",background:c.mt}})})]}):null,
+      t2.booked!==0&&t("div",{style:{fontSize:11,color:c.tm,marginTop:6},children:"Booked on partial sells: "+zjSign(t2.booked,cur)})]})]})};
+  const mfCard=(r,key)=>{const m=r.ref,cv=m.current!=null&&m.current!==""?+m.current:null,g=cv!=null?cv-m.invested:null;return t("button",{key,...pressRow(r.id,()=>sSh({k:"mf",mf:m})),className:"w100 act98 trt f ia",style:{gap:10,marginBottom:10,padding:14,background:sel.has(r.id)?c.ac+"14":c.sfg,border:`1px solid ${sel.has(r.id)?c.ac:c.brs}`,borderRadius:14,color:"inherit",textAlign:"left"},children:[tick(r.id),
+    o("div",{className:"f1 minw0",children:[o("div",{className:"f ia",style:{gap:6},children:[t("span",{className:"tru",style:{fontSize:14,fontWeight:600,color:c.tx},children:m.name}),t("span",{style:{fontSize:10,padding:"2px 7px",borderRadius:999,background:c.sf2,color:c.td,flexShrink:0},children:"MF"})]}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:3},children:"Invested "+zjMoney(m.invested,cur)+(m.viaZ===false?" · paid from bank":"")+(m.loanId?" · 🏦 "+loanName(m.loanId):"")})]}),
+    o("div",{style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:14.5},children:zjMoney(cv!=null?cv:m.invested,cur)}),t("div",{style:{fontSize:11.5,color:g!=null?zjCol(g):c.tm},children:g!=null?zjSign(_r2(g),cur)+" ("+(m.invested?(g/m.invested*100).toFixed(1):"0")+"%)":"add current value"})]})]})};
+  const holdings=()=>{const v=view("holdings");
+    const tot={inv:v.rows.reduce((a,r)=>a+r.inv,0),val:v.rows.reduce((a,r)=>a+r.val,0)};
     return o(Fragment,{children:[
-      o("div",{className:"f",style:{gap:6,marginBottom:10,flexWrap:"wrap"},children:[["all","All"],["invest","Investments"],["swing","Positional"],["mf","Mutual funds"]].map(([k,l])=>t("button",{key:k,onClick:()=>sHf(k),className:"act95 tr",style:{padding:"6px 12px",borderRadius:999,fontSize:12,background:hf===k?c.sf3:"transparent",border:`1px solid ${hf===k?c.ac:c.brs}`,color:hf===k?c.tx:c.td},children:l}))}),
-      hf!=="mf"&&o(Fragment,{children:[
-        o("div",{className:"f",style:{gap:8,marginBottom:10},children:[lnBtn("📄 Import tradebook",()=>fileRef.current&&fileRef.current.click(),false,{fontSize:12.5,padding:"10px 0"}),lnBtn("＋ Buy / sell",()=>sSh({k:"fill",side:"buy"}),true,{fontSize:12.5,padding:"10px 0"}),S.open.length>0&&lnBtn("₹ Prices",()=>sSh({k:"prices"}),false,{fontSize:12.5,padding:"10px 0",flex:"0 0 84px"})]}),
-        list.length===0?t("div",{style:{padding:"20px 0",textAlign:"center",color:c.tm,fontSize:13},children:"No stocks held here."}):
-        list.map(t2=>{const m=zj.meta[t2.sym]||{},p=px(t2.sym),val=p!=null?p*t2.qty:null,un=val!=null?val-t2.cost:null,sw=m.type==="swing";
-          const tgt=sw&&m.target>0&&p!=null?(p-t2.avg)/(m.target-t2.avg):null,slHit=sw&&m.sl>0&&p!=null&&p<=m.sl,tgHit=sw&&m.target>0&&p!=null&&p>=m.target;
-          return t("button",{key:t2.id,onClick:()=>sSh({k:"pos",sym:t2.sym}),className:"w100 act98 trt",style:{display:"block",textAlign:"left",marginBottom:10,padding:14,background:c.sfg,border:`1px solid ${slHit?c.co+"aa":tgHit?c.mt+"aa":c.brs}`,borderRadius:14,color:"inherit"},children:[
-            o("div",{className:"f ia jb",style:{gap:8},children:[o("div",{className:"minw0",children:[o("div",{className:"f ia",style:{gap:6},children:[t("span",{style:{fontSize:15,fontWeight:700,color:c.tx},children:t2.sym}),t("span",{style:{fontSize:10,padding:"2px 7px",borderRadius:999,background:sw?c.ac+"26":c.sf2,color:sw?c.ac:c.td},children:sw?"Positional":"Investment"})]}),
-              t("div",{style:{fontSize:11.5,color:c.tm,marginTop:3},children:`${t2.qty} @ ${zjMoney(_r2(t2.avg),cur)} · ${zjDays(t2.openTs)}d held`})]}),
-              o("div",{style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:14.5,color:c.tx},children:zjMoney(val!=null?val:t2.cost,cur)}),t("div",{style:{fontSize:11.5,color:un!=null?zjCol(un):c.tm,marginTop:2},children:un!=null?zjSign(_r2(un),cur)+" ("+(un/t2.cost*100).toFixed(1)+"%)":"tap to add price"})]})]}),
-            sw&&(m.target||m.sl)?o("div",{style:{marginTop:8,fontSize:11.5,color:c.td},children:[(slHit?"🛑 Stop-loss hit · ":tgHit?"🎯 Target reached · ":"")+(m.sl?"SL "+zjMoney(m.sl,cur):"")+(m.sl&&m.target?" · ":"")+(m.target?"Target "+zjMoney(m.target,cur):""),
-              tgt!=null&&!slHit&&t("div",{style:{height:4,borderRadius:999,background:c.sf2,marginTop:6,overflow:"hidden"},children:t("div",{style:{width:Math.max(0,Math.min(100,tgt*100))+"%",height:"100%",background:c.mt}})})]}):null,
-            t2.booked!==0&&t("div",{style:{fontSize:11,color:c.tm,marginTop:6},children:"Booked on partial sells: "+zjSign(t2.booked,cur)})]})})]}),
-      hf==="mf"&&o(Fragment,{children:[lnBtn("＋ Add mutual fund",()=>sSh({k:"mf"}),true,{flex:"none",width:"100%",marginBottom:10}),
-        zj.mf.length===0?t("div",{style:{padding:"20px 0",textAlign:"center",color:c.tm,fontSize:13},children:"No mutual funds yet."}):zj.mf.map(m=>{const cv=m.current!=null&&m.current!==""?+m.current:null,g=cv!=null?cv-m.invested:null;return t("button",{key:m.id,onClick:()=>sSh({k:"mf",mf:m}),className:"w100 act98 trt f ia jb",style:{gap:10,marginBottom:10,padding:14,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,color:"inherit",textAlign:"left"},children:[
-          o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:14,fontWeight:600,color:c.tx},children:m.name}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:3},children:"Invested "+zjMoney(m.invested,cur)+(m.viaZ===false?" · paid from bank":"")})]}),
-          o("div",{style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:14.5},children:zjMoney(cv!=null?cv:m.invested,cur)}),t("div",{style:{fontSize:11.5,color:g!=null?zjCol(g):c.tm},children:g!=null?zjSign(_r2(g),cur)+" ("+(m.invested?(g/m.invested*100).toFixed(1):"0")+"%)":"add current value"})]})]})})]})
+      o("div",{className:"f",style:{gap:8,marginBottom:10},children:[lnBtn("📄 Import",()=>fileRef.current&&fileRef.current.click(),false,{fontSize:12.5,padding:"10px 0"}),lnBtn("＋ Buy / sell",()=>sSh({k:"fill",side:"buy"}),true,{fontSize:12.5,padding:"10px 0"}),lnBtn("＋ MF",()=>sSh({k:"mf"}),false,{fontSize:12.5,padding:"10px 0",flex:"0 0 64px"}),S.open.length>0&&lnBtn("₹ Prices",()=>sSh({k:"prices"}),false,{fontSize:12.5,padding:"10px 0",flex:"0 0 84px"})]}),
+      v.all.length>0&&toolbar("holdings",v),
+      v.rows.length>0&&card(o("div",{className:"f",style:{gap:10},children:[giStat("INVESTED",zjMoney(_r2(tot.inv),cur)),giStat("VALUE",zjMoney(_r2(tot.val),cur)),giStat("P&L",zjSign(_r2(tot.val-tot.inv),cur)+(tot.inv?" ("+((tot.val-tot.inv)/tot.inv*100).toFixed(1)+"%)":""),zjCol(tot.val-tot.inv))]}),{padding:12}),
+      v.all.length===0?t("div",{style:{padding:"20px 0",textAlign:"center",color:c.tm,fontSize:13},children:"Nothing held yet. Import your tradebook or add a buy."}):
+      v.rows.length===0?t("div",{style:{padding:"20px 0",textAlign:"center",color:c.tm,fontSize:13},children:"Nothing matches these filters."}):
+      o(Fragment,{children:v.groups.flatMap(g=>[ghead(g,"holdings"),...g.rows.map(r=>r.kind==="mf"?mfCard(r,g.key+r.id):stockCard(r,g.key+r.id))])})
     ]})};
   // ---- closed trades ----
-  const trades=()=>{const st=zjStats(S.closed);return o(Fragment,{children:[
-    S.closed.length>0&&card([o("div",{className:"f",style:{gap:10,marginBottom:10},children:[giStat("NET BOOKED",zjSign(st.net,cur),zjCol(st.net)),giStat("WIN RATE",Math.round(st.winRate)+"%"),giStat("AVG HOLD",Math.round(st.avgDays)+" days")]}),
+  const trades=()=>{const v=view("trades"),uniq=[...new Map(v.rows.map(r=>[r.id,r.ref])).values()],st=zjStats(uniq);return o(Fragment,{children:[
+    v.all.length>0&&toolbar("trades",v),
+    v.rows.length>0&&card([o("div",{className:"f",style:{gap:10,marginBottom:10},children:[giStat("NET BOOKED",zjSign(st.net,cur),zjCol(st.net)),giStat("WIN RATE",Math.round(st.winRate)+"%"),giStat("AVG HOLD",Math.round(st.avgDays)+" days")]}),
       o("div",{className:"f",style:{gap:10},children:[giStat("AVG WIN",zjMoney(_r2(st.avgWin),cur),c.mt),giStat("AVG LOSS",zjSign(_r2(st.avgLoss),cur),st.avgLoss?c.co:null),giStat("PROFIT FACTOR",st.pf==null?"—":st.pf.toFixed(2))]})]),
-    S.closed.length===0?t("div",{style:{padding:"24px 0",textAlign:"center",color:c.tm,fontSize:13,lineHeight:1.5},children:"Closed trades show here once you've sold a whole position."}):
-    t("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,overflow:"hidden"},children:S.closed.map((t2,i)=>{const n=zj.notes[t2.id]||{};return t("button",{key:t2.id,onClick:()=>sSh({k:"trip",id:t2.id}),className:"w100 act98 trt",style:{display:"block",textAlign:"left",padding:"12px 14px",background:"transparent",border:"none",borderBottom:i<S.closed.length-1?`1px solid ${c.brs}`:"none",color:"inherit"},children:[
-      o("div",{className:"f ia jb",style:{gap:8},children:[t("span",{style:{fontSize:14,fontWeight:600,color:c.tx},children:t2.sym}),t("span",{style:{fontFamily:'var(--nf)',fontSize:14,color:zjCol(t2.net)},children:zjSign(t2.net,cur)})]}),
-      t("div",{style:{fontSize:11.5,color:c.tm,marginTop:3},children:`${lnFmtD(t2.openTs)} → ${lnFmtD(t2.closeTs)} · ${zjDays(t2.openTs,t2.closeTs)}d · ${t2.cost?(t2.net/t2.cost*100).toFixed(1):"0"}%`}),
-      ((n.tags||[]).length||(n.mistakes||[]).length)?t("div",{style:{fontSize:11,color:c.td,marginTop:4},children:[...(n.tags||[]),...(n.mistakes||[]).map(x=>"⚠ "+x)].join(" · ")}):null]})})})]})};
+    v.all.length===0?t("div",{style:{padding:"24px 0",textAlign:"center",color:c.tm,fontSize:13,lineHeight:1.5},children:"Closed trades show here once you've sold a whole position."}):
+    v.rows.length===0?t("div",{style:{padding:"20px 0",textAlign:"center",color:c.tm,fontSize:13},children:"Nothing matches these filters."}):
+    o(Fragment,{children:v.groups.flatMap(g=>[ghead(g,"trades"),t("div",{key:"l"+g.key,style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,overflow:"hidden"},children:g.rows.map((r,i)=>{const t2=r.ref;return t("button",{key:g.key+r.id,...pressRow(r.id,()=>sSh({k:"trip",id:t2.id})),className:"w100 act98 trt",style:{display:"flex",alignItems:"flex-start",textAlign:"left",padding:"12px 14px",background:sel.has(r.id)?c.ac+"14":"transparent",border:"none",borderBottom:i<g.rows.length-1?`1px solid ${c.brs}`:"none",color:"inherit"},children:[tick(r.id),o("div",{className:"f1 minw0",children:[
+      o("div",{className:"f ia jb",style:{gap:8},children:[t("span",{style:{fontSize:14,fontWeight:600,color:c.tx},children:t2.sym+(r.loanId?" 🏦":"")}),t("span",{style:{fontFamily:'var(--nf)',fontSize:14,color:zjCol(t2.net)},children:zjSign(t2.net,cur)})]}),
+      t("div",{style:{fontSize:11.5,color:c.tm,marginTop:3},children:`${lnFmtD(t2.openTs)} → ${lnFmtD(t2.closeTs)} · ${r.days}d · ${r.pct.toFixed(1)}%`}),
+      (r.tags.length||r.mistakes.length)?t("div",{style:{fontSize:11,color:c.td,marginTop:4},children:[...r.tags,...r.mistakes.map(x=>"⚠ "+x)].join(" · ")}):null]})]})})})])})]})};
   // ---- funds ----
-  const funds=()=>{const list=[...zj.funds].sort((a,b)=>b.date-a.date);
+  const funds=()=>{const v=view("funds");
     const lines=zjBankLines(data),pend=lines.filter(x=>x.r.st==="open"),acN=id=>((data.accounts||[]).find(a=>a.id===id)||{}).name||"Bank";
     const stOf=id=>(data.bankStmts||[]).find(s2=>s2.id===id);
     const goRow=f=>{_bsJump={id:f.stmt,row:f.src};onView&&onView("bankStmt")};
@@ -17430,13 +17619,25 @@ function Zerodha({data,persist,onClose,onView}){
       o("div",{style:{fontSize:12.5,lineHeight:1.7,color:c.td},children:[o("div",{className:"f jb",children:[t("span",{children:"Added per bank"}),t("span",{style:{fontFamily:'var(--nf)',color:c.tx},children:giM(bIn,cur)})]}),o("div",{className:"f jb",children:[t("span",{children:"Added per your log"}),t("span",{style:{fontFamily:'var(--nf)',color:Math.abs(bIn-lIn)<0.01?c.tx:c.co},children:giM(lIn,cur)})]}),
         o("div",{className:"f jb",children:[t("span",{children:"Withdrawn per bank"}),t("span",{style:{fontFamily:'var(--nf)',color:c.tx},children:giM(bOut,cur)})]}),o("div",{className:"f jb",children:[t("span",{children:"Withdrawn per your log"}),t("span",{style:{fontFamily:'var(--nf)',color:Math.abs(bOut-lOut)<0.01?c.tx:c.co},children:giM(lOut,cur)})]})]}),
       t("div",{style:{fontSize:12,marginTop:8,lineHeight:1.45,color:okAll?c.mt:c.td},children:okAll?"✓ Your funds log matches your bank statements.":(pend.length?pend.length+" bank line(s) above aren't in the log yet. ":"")+(noSrc?noSrc+" log entr"+(noSrc===1?"y isn't":"ies aren't")+" on any imported statement (maybe from a bank you haven't imported).":"")})]),
-    list.length===0?t("div",{style:{padding:"20px 0",textAlign:"center",color:c.tm,fontSize:13},children:"Nothing logged yet."}):
-    t("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,overflow:"hidden"},children:list.map((f,i)=>t("button",{key:f.id,onClick:()=>sSh({k:"fund",f}),className:"w100 f ia jb act98 trt",style:{gap:10,padding:"12px 14px",background:"transparent",border:"none",borderBottom:i<list.length-1?`1px solid ${c.brs}`:"none",color:"inherit",textAlign:"left"},children:[
-      o("div",{className:"minw0",children:[t("div",{style:{fontSize:13.5,color:c.tx},children:f.kind==="out"?"Withdrawn to bank":"Added to Zerodha"}),t("div",{className:"tru",style:{fontSize:11,color:c.tm,marginTop:2},children:lnFmtD(f.date)+(f.loanId?" · 🏦 "+(((data.loanTracker||[]).find(L=>L.id===f.loanId)||{}).lender||"loan"):"")+(f.note?" · "+f.note:"")}),
+    v.all.length>0&&toolbar("funds",v),
+    v.all.length===0?t("div",{style:{padding:"20px 0",textAlign:"center",color:c.tm,fontSize:13},children:"Nothing logged yet."}):
+    v.rows.length===0?t("div",{style:{padding:"20px 0",textAlign:"center",color:c.tm,fontSize:13},children:"Nothing matches these filters."}):
+    o(Fragment,{children:v.groups.flatMap(g=>[ghead(g,"funds"),t("div",{key:"l"+g.key,style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,overflow:"hidden"},children:g.rows.map((r,i)=>{const f=r.ref;return t("button",{key:g.key+f.id,...pressRow(f.id,()=>sSh({k:"fund",f})),className:"w100 f ia jb act98 trt",style:{gap:10,padding:"12px 14px",background:sel.has(f.id)?c.ac+"14":"transparent",border:"none",borderBottom:i<g.rows.length-1?`1px solid ${c.brs}`:"none",color:"inherit",textAlign:"left"},children:[tick(f.id),
+      o("div",{className:"minw0 f1",children:[t("div",{style:{fontSize:13.5,color:c.tx},children:f.kind==="out"?"Withdrawn to bank":"Added to Zerodha"}),t("div",{className:"tru",style:{fontSize:11,color:c.tm,marginTop:2},children:lnFmtD(f.date)+(f.loanId?" · 🏦 "+(((data.loanTracker||[]).find(L=>L.id===f.loanId)||{}).lender||"loan"):"")+(f.note?" · "+f.note:"")}),
         f.src&&stOf(f.stmt)&&t("span",{role:"link",onClick:e=>{e.stopPropagation();goRow(f)},style:{display:"inline-block",marginTop:4,fontSize:11,padding:"2px 8px",borderRadius:999,background:c.sf2,color:c.ac},children:"🧾 "+acN(stOf(f.stmt).accountId)+" statement ›"})]}),
-      t("span",{style:{fontFamily:'var(--nf)',fontSize:14,color:f.kind==="out"?c.co:c.mt},children:(f.kind==="out"?"− ":"+ ")+zjMoney(f.amount,cur)})]}))})]})};
+      t("span",{style:{fontFamily:'var(--nf)',fontSize:14,color:f.kind==="out"?c.co:c.mt},children:(f.kind==="out"?"− ":"+ ")+zjMoney(f.amount,cur)})]})})})])})]})};
   // ---- sheets ----
-  const sheet=sh&&(sh.k==="reset"?t(CSht,{title:"Reset Zerodha Portfolio?",subtitle:`This clears everything here: ${zj.fills.length} trade${zj.fills.length===1?"":"s"}, ${zj.funds.length} funds entr${zj.funds.length===1?"y":"ies"}, ${zj.mf.length} mutual fund${zj.mf.length===1?"":"s"}, prices, targets and notes. Bank statement lines linked to the funds log go back to “To review”. Your accounts and expenses are not touched. This can't be undone.`,confirmLabel:"Reset everything",onClose:()=>sSh(null),onConfirm:()=>{persist(zjResetAll(data));sSh(null);sTab("overview");flash("✓ Zerodha Portfolio reset. Import your new file from Holdings.")}})
+  const loanOpts=[["own","💰 Own money"],...(data.loanTracker||[]).filter(L=>L.direction!=="lent").map(L=>[L.id,"🏦 "+(L.lender||"Loan")+(L.purpose?" · "+L.purpose:"")])];
+  const pickSheet=(title,opts,onPick)=>t(Sht,{onClose:()=>sSh(null),children:o(Fragment,{children:[lnSheetTitle(title,sel.size+" selected"),t("div",{className:"f fw",style:{gap:6},children:opts.map(([v2,l])=>riChip(false,l,()=>onPick(v2),v2))})]})});
+  const sheet=sh&&(sh.k==="filters"?t(ZjFilterSheet,{tab,f:ft,setF:setFt,data,zj,onClose:()=>sSh(null),onSave:()=>sSh({k:"saveView"})})
+    :sh.k==="saveView"?t(ZjNameSheet,{onClose:()=>sSh(null),onSave:name=>{const{q,...rest}=ft;put({views:{...(zj.views||{}),[tab]:[...views,{id:"zv_"+uid(),name,f:{...rest,q}}]}});sSh(null);flash("✓ Saved view “"+name+"”")}})
+    :sh.k==="export"?t(Sht,{onClose:()=>sSh(null),children:o(Fragment,{children:[lnSheetTitle("Export what's shown",sh.v.rows.length+" rows, with your filters, sorting and groups"),o("div",{className:"f",style:{gap:10},children:[lnBtn("📊 Excel",()=>{zjExport(tab,"xlsx",sh.v.groups,cur,"Zerodha "+({holdings:"holdings",trades:"closed trades",funds:"funds"})[tab]);sSh(null)},true),lnBtn("📄 PDF",()=>{zjExport(tab,"pdf",sh.v.groups,cur,"Zerodha "+({holdings:"holdings",trades:"closed trades",funds:"funds"})[tab]);sSh(null)})]})]})})
+    :sh.k==="ai"?t(ZjAiSheet,{data,tab,rows:view(tab).rows,loanName,onClose:()=>sSh(null),onSelect:ids=>{sSelMode(true);sSel(new Set(ids));flash("✨ "+ids.length+" selected — use the bar below, or tap Cancel")},onApply:ops=>{if(!ops.length)return;const snap={zjournal:data.zjournal||null,bankStmts:data.bankStmts||[]};let d2=data;for(const o2 of ops){d2={...d2,...zjBulk(d2,tab,o2.op,o2.ids,o2.value)}}persist({zjournal:d2.zjournal,bankStmts:d2.bankStmts});sUndo({label:ops.length+" AI change"+(ops.length===1?"":"s")+" applied",snap});clearTimeout(undoT.current);undoT.current=setTimeout(()=>sUndo(null),8000)}})
+    :sh.k==="bLoan"?pickSheet("Whose money?",loanOpts,v2=>bulk("loan",v2,null,"Loan set on "+sel.size))
+    :sh.k==="bTag"?pickSheet("Add a tag",ZJ_TAGS.map(x=>[x,x]),v2=>bulk("tag",v2,null,"Tag added"))
+    :sh.k==="bMistake"?pickSheet("Add a mistake",ZJ_MISTAKES.map(x=>[x,"⚠ "+x]),v2=>bulk("mistake",v2,null,"Mistake added"))
+    :sh.k==="bRemove"?t(CSht,{title:"Remove "+sel.size+" item"+(sel.size===1?"":"s")+"?",subtitle:tab==="funds"?"Funds entries are removed; any linked bank lines go back to “To review”.":"Their trades (or mutual funds) are removed from Zerodha Portfolio. You can undo right after.",confirmLabel:"Remove",onClose:()=>sSh(null),onConfirm:()=>bulk("remove",null,null,sel.size+" removed")})
+    :sh.k==="reset"?t(CSht,{title:"Reset Zerodha Portfolio?",subtitle:`This clears everything here: ${zj.fills.length} trade${zj.fills.length===1?"":"s"}, ${zj.funds.length} funds entr${zj.funds.length===1?"y":"ies"}, ${zj.mf.length} mutual fund${zj.mf.length===1?"":"s"}, prices, targets and notes. Bank statement lines linked to the funds log go back to “To review”. Your accounts and expenses are not touched. This can't be undone.`,confirmLabel:"Reset everything",onClose:()=>sSh(null),onConfirm:()=>{persist(zjResetAll(data));sSh(null);sTab("overview");flash("✓ Zerodha Portfolio reset. Import your new file from Holdings.")}})
     :t(ZjSheet,{data,zj,S,sh,put,putAll:persist,onClose:()=>sSh(null),onOpen:x=>sSh(x)}));
   return o("div",{style:{padding:"8px 20px 150px"},children:[
     o("div",{className:"f ia jb",style:{marginBottom:14},children:[t(BB,{onClick:onClose}),t("div",{style:{fontFamily:c.hf,fontSize:23},children:t("em",{children:"Zerodha Portfolio"})}),t("button",{onClick:()=>sSh({k:"reset"}),"aria-label":"Reset Zerodha Portfolio",title:"Reset",className:"act90 trt",style:{width:38,height:38,borderRadius:19,background:c.sf2,border:`1px solid ${c.brs}`,color:c.tx,fontSize:16},children:"↺"})]}),
@@ -17444,6 +17645,15 @@ function Zerodha({data,persist,onClose,onView}){
     t("input",{ref:fileRef,type:"file",accept:".csv,.xlsx,.xls",style:{display:"none"},onChange:onImport}),
     msg&&t("div",{style:{marginBottom:12,padding:"10px 12px",background:c.sf2,borderRadius:12,fontSize:12.5,color:c.tx,lineHeight:1.45},children:msg}),
     tab==="overview"&&overview(),tab==="holdings"&&holdings(),tab==="trades"&&trades(),tab==="funds"&&funds(),
+    selMode&&tab!=="overview"&&(()=>{const v=view(tab),ids=v.rows.map(r=>r.id),allOn=ids.length>0&&ids.every(id=>sel.has(id)),n=sel.size,dis=!n;
+      const b=(l,fn,red)=>t("button",{onClick:()=>!dis&&fn(),disabled:dis,className:"act95 tr",style:{flexShrink:0,padding:"8px 12px",borderRadius:999,fontSize:12.5,fontWeight:600,border:`1px solid ${red?c.ro+"88":c.brs}`,background:"transparent",color:red?c.ro:c.tx,opacity:dis?.4:1},children:l});
+      const acts=tab==="holdings"?[b("Investment",()=>bulk("type","invest",null,"Set to Investment")),b("Positional",()=>bulk("type","swing",null,"Set to Positional")),b("🏦 Loan…",()=>sSh({k:"bLoan"})),b("₹ Prices",()=>{const syms=v.rows.filter(r=>sel.has(r.id)&&r.kind==="stock").map(r=>r.name);sSh({k:"prices",only:syms})}),b("Remove",()=>sSh({k:"bRemove"}),true)]
+        :tab==="trades"?[b("🏷 Tag…",()=>sSh({k:"bTag"})),b("⚠ Mistake…",()=>sSh({k:"bMistake"})),b("🏦 Loan…",()=>sSh({k:"bLoan"})),b("Remove",()=>sSh({k:"bRemove"}),true)]
+        :[b("🏦 Loan…",()=>sSh({k:"bLoan"})),b("Remove",()=>sSh({k:"bRemove"}),true)];
+      return o("div",{style:{position:"fixed",left:"50%",transform:"translateX(-50%)",bottom:"calc(var(--nav-clear) + 4px)",zIndex:60,width:"calc(100% - 24px)",maxWidth:540,padding:10,background:c.sfg,border:`1px solid ${c.ac}66`,borderRadius:16,boxShadow:"0 10px 30px rgba(0,0,0,.35)"},children:[
+        o("div",{className:"f ia jb",style:{marginBottom:8,fontSize:12.5},children:[t("span",{style:{color:c.tx,fontWeight:600},children:n+" selected"}),o("span",{className:"f ia",style:{gap:14},children:[t("button",{onClick:()=>sSel(allOn?new Set():new Set(ids)),className:"act95",style:{background:"transparent",border:"none",color:c.ac,fontSize:12.5,padding:0},children:allOn?"None":"All "+ids.length}),t("button",{onClick:()=>{sSelMode(false);sSel(new Set())},className:"act95",style:{background:"transparent",border:"none",color:c.td,fontSize:12.5,padding:0},children:"Done"})]})]}),
+        t("div",{className:"f",style:{gap:6,overflowX:"auto"},children:acts})]})})(),
+    undo&&!selMode&&o("div",{className:"f ia",style:{position:"fixed",left:"50%",transform:"translateX(-50%)",bottom:"calc(var(--nav-clear) + 10px)",zIndex:60,gap:12,background:c.sfg,border:`1px solid ${c.ac}66`,borderRadius:999,padding:"8px 8px 8px 16px",boxShadow:"0 8px 24px rgba(0,0,0,.3)",fontSize:13,color:c.tx,maxWidth:"calc(100% - 32px)"},children:[t("span",{className:"tru",children:"✓ "+undo.label}),t("button",{onClick:()=>{persist(undo.snap);sUndo(null);clearTimeout(undoT.current)},className:"act95",style:{padding:"6px 14px",borderRadius:999,border:"none",background:c.ac,color:"#0a0a0a",fontWeight:700,fontSize:12.5},children:"Undo"})]}),
     sheet
   ]});
 }
@@ -17455,7 +17665,7 @@ function ZjSheet({data,zj,S,sh,put,putAll,onClose,onOpen}){
     if(sh.k==="pos"){const m=zj.meta[sh.sym]||{};return{loanId:m.loanId||null,type:m.type||"invest",target:m.target?String(m.target):"",sl:m.sl?String(m.sl):"",plan:m.plan||"",ltp:zj.prices[sh.sym]?String(zj.prices[sh.sym].ltp):""}}
     if(sh.k==="trip"){const n=zj.notes[sh.id]||{};return{tags:n.tags||[],mistakes:n.mistakes||[],note:n.note||""}}
     if(sh.k==="mf"){const m=sh.mf;return{name:m?m.name:"",invested:m?String(m.invested):"",current:m&&m.current!=null?String(m.current):"",viaZ:m?m.viaZ!==false:true,add:"",loanId:m?m.loanId||null:null}}
-    if(sh.k==="prices")return Object.fromEntries(S.open.map(t2=>[t2.sym,zj.prices[t2.sym]?String(zj.prices[t2.sym].ltp):""]));
+    if(sh.k==="prices")return Object.fromEntries(S.open.filter(t2=>!sh.only||sh.only.includes(t2.sym)).map(t2=>[t2.sym,zj.prices[t2.sym]?String(zj.prices[t2.sym].ltp):""]));
     return{};
   });
   const set=(k,v)=>sF(p=>({...p,[k]:v}));
@@ -17515,7 +17725,7 @@ function ZjSheet({data,zj,S,sh,put,putAll,onClose,onOpen}){
       foot("Save",ok,save,m?()=>{put({mf:zj.mf.filter(y=>y.id!==m.id)});onClose()}:null)]})})}
   if(sh.k==="prices"){const save=()=>{const pr={...zj.prices};for(const k in f){const v=parseFloat(f[k]);if(v>0)pr[k]={ltp:v,at:Date.now()}}put({prices:pr});onClose()};
     return t(Sht,{onClose,children:o(Fragment,{children:[lnSheetTitle("Today's prices","Copy them from Kite. Used for value and unrealised P&L."),
-      ...S.open.map(t2=>o("div",{key:t2.sym,className:"f ia",style:{gap:10,marginTop:8},children:[o("div",{style:{flex:"0 0 42%",minWidth:0},children:[t("div",{className:"tru",style:{fontSize:13.5,fontWeight:600,color:c.tx},children:t2.sym}),t("div",{style:{fontSize:11,color:c.tm},children:"avg "+zjMoney(_r2(t2.avg),cur)+(zj.prices[t2.sym]?" · "+lnFmtD(zj.prices[t2.sym].at):"")})]}),t("input",{value:f[t2.sym]||"",inputMode:"decimal",placeholder:"Price",onChange:e=>set(t2.sym,e.target.value.replace(/[^\d.]/g,"")),style:{...lnInp(),flex:1}})]})),
+      ...S.open.filter(t2=>!sh.only||sh.only.includes(t2.sym)).map(t2=>o("div",{key:t2.sym,className:"f ia",style:{gap:10,marginTop:8},children:[o("div",{style:{flex:"0 0 42%",minWidth:0},children:[t("div",{className:"tru",style:{fontSize:13.5,fontWeight:600,color:c.tx},children:t2.sym}),t("div",{style:{fontSize:11,color:c.tm},children:"avg "+zjMoney(_r2(t2.avg),cur)+(zj.prices[t2.sym]?" · "+lnFmtD(zj.prices[t2.sym].at):"")})]}),t("input",{value:f[t2.sym]||"",inputMode:"decimal",placeholder:"Price",onChange:e=>set(t2.sym,e.target.value.replace(/[^\d.]/g,"")),style:{...lnInp(),flex:1}})]})),
       foot("Save prices",true,save)]})})}
   return null;
 }
