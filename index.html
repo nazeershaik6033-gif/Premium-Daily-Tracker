@@ -162,6 +162,13 @@ body[data-theme="snow"]{--neu-d:rgba(0,0,0,.55);--neu-l:rgba(255,255,255,.03);--
 body[data-theme="snow"] .neu,body[data-theme="snow"] .neu-circ{box-shadow:0 0 0 1px #2A2A2C}
 body[data-theme="snow"] .neu-flat{box-shadow:0 4px 14px rgba(58,125,254,.35)}
 body[data-theme="snow"] .neu-flat,body[data-theme="snow"] .nb-fab{border-radius:999px}
+/* === Studio theme: flat white, hairline borders, bold upright headings, blue actions === */
+body[data-theme="studio"]{--neu-d:rgba(0,0,0,0);--neu-l:rgba(255,255,255,0);--neu-dc:rgba(0,0,0,0);--neu-lc:rgba(255,255,255,0);--neu-pd:rgba(0,0,0,.06);--neu-pl:rgba(255,255,255,0);--neu-ad:rgba(0,0,0,.08);--neu-al:rgba(255,255,255,0);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body[data-theme="studio"] .neu,body[data-theme="studio"] .neu-circ{box-shadow:0 0 0 1px #D2D2D7}
+body[data-theme="studio"] .neu-flat{box-shadow:none}
+body[data-theme="studio"] .neu-flat,body[data-theme="studio"] .nb-fab{border-radius:999px}
+body[data-theme="studio"] em{font-style:normal;font-weight:700;letter-spacing:-.02em}
+body[data-theme="studio"] input,body[data-theme="studio"] select,body[data-theme="studio"] textarea{border-color:#D2D2D7}
 /* === Synth-style neumorphic utilities === */
 .neu{box-shadow:6px 6px 14px var(--neu-d),-5px -5px 12px var(--neu-l)}
 .neu-circ{box-shadow:6px 6px 14px var(--neu-dc),-5px -5px 12px var(--neu-lc)}
@@ -486,7 +493,10 @@ const snowC={bg:"#0B0A0C",bgg:"#0B0A0C",sf:"#191919",sfg:"#191919",sf2:"#222222"
 const parchmentC={bg:"#E8DFC8",bgg:"#E8DFC8",sf:"#F7F1E1",sfg:"#F7F1E1",sf2:"#EFE6D0",sf3:"#E4D8BC",br:"#C9B98F",brs:"#DCCEA9",tx:"#2B2113",td:"#5C4E33",tm:"#8A7A57",ac:"#8B5E1F",gd:"#A47C1B",cr:"#7A4A20",co:"#A83A1C",ro:"#8F2A1A",mt:"#3F6B3A",sk:"#3E6E8E",lv:"#6B4E8E",cu:"#8A5A2E",hf:"'Georgia','Times New Roman',serif",dk:false};
 // Cool charcoal-grey dark theme -- distinct from "dark" (near-black) and "navy" (blue-black).
 const slateC={bg:"#1E2328",bgg:"#1E2328",sf:"#262C33",sfg:"#262C33",sf2:"#2E353D",sf3:"#383F48",br:"#454D57",brs:"#3A414A",tx:"#F2F4F6",td:"#A7AFB8",tm:"#737C86",ac:"#38BDF8",gd:"#F0B429",cr:"#FB923C",co:"#F87171",ro:"#EF4444",mt:"#34D399",sk:"#38BDF8",lv:"#A78BFA",cu:"#94A3B8",hf:"'Space Grotesk','Geist',-apple-system,system-ui,sans-serif",dk:true};
-const THEMES={dark:darkC,navy:navyC,slate:slateC,light:lightC,snow:snowC,parchment:parchmentC};
+// Studio — bright retail-catalogue look: pure white page, flat white cards with a hairline grey
+// border, #F5F5F7 info panels, near-black text, grey secondary text, blue links, system SF font.
+const studioC={bg:"#FFFFFF",bgg:"#FFFFFF",sf:"#FFFFFF",sfg:"#FFFFFF",sf2:"#F5F5F7",sf3:"#E8E8ED",br:"#D2D2D7",brs:"#D2D2D7",tx:"#1D1D1F",td:"#6E6E73",tm:"#86868B",ac:"#0071E3",gd:"#B25000",cr:"#BF4800",co:"#E30000",ro:"#D70015",mt:"#248A3D",sk:"#0066CC",lv:"#8944AB",cu:"#1D1D1F",hf:"-apple-system,BlinkMacSystemFont,'SF Pro Display','Inter',system-ui,sans-serif",dk:false,flat:true};
+const THEMES={dark:darkC,navy:navyC,slate:slateC,light:lightC,snow:snowC,parchment:parchmentC,studio:studioC};
 let c={...darkC};
 
 // Pick black or white text for whatever sits on top of `hex`, by WCAG relative
@@ -531,7 +541,7 @@ const R=18;            // card radius
 const GUT=12;          // side gutter: cards inset this much from the screen edge
 // One card recipe: no border, a single soft elevation. Cards are figure, the
 // page is ground -- that separation is what the reference gets from white-on-grey.
-const cardSh=()=>c.dk
+const cardSh=()=>c.flat?"0 0 0 1px #D2D2D7":c.dk
   ? "0 1px 2px rgba(0,0,0,.30),0 8px 22px rgba(0,0,0,.24)"
   : "0 1px 2px rgba(92,80,58,.08),0 8px 22px rgba(92,80,58,.07)";
 const cardSt=(extra)=>Object.assign({background:c.sfg,borderRadius:R,boxShadow:cardSh()},extra||{});
@@ -1807,7 +1817,7 @@ const Logo=()=>ce("svg",{width:36,height:36,viewBox:"0 0 36 36",fill:"none",styl
   ce("ellipse",{cx:9.5,cy:29,rx:7,ry:2,fill:"#F59E0B",stroke:"#1a1a1a",strokeWidth:1}),
   ce("text",{x:"9.5",y:"30.5",textAnchor:"middle",fontSize:"5",fontWeight:"bold",fill:"#78350f",fontFamily:"sans-serif"},"₹")
 );
-function AppHeader({onMenu,onSearch,onToggleTheme,isDark,theme,onHome,onAI,onDiary,isHome,onWealth}){
+function AppHeader({onMenu,onSearch,onToggleTheme,isDark,theme,onHome,onAI,onDiary,showPie,onWealth}){
   const btnStyle={width:34,height:34,borderRadius:10,background:isDark?"rgba(255,255,255,0.07)":"rgba(0,0,0,0.06)",border:`1px solid ${isDark?"rgba(255,255,255,0.10)":"rgba(0,0,0,0.10)"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0};
   const now=new Date();
   const dayStr=now.toLocaleDateString("en-US",{weekday:"short"}).toUpperCase();
@@ -1823,7 +1833,7 @@ function AppHeader({onMenu,onSearch,onToggleTheme,isDark,theme,onHome,onAI,onDia
     ]}),
     o("div",{className:"f ia",style:{gap:6},children:[
       t("button",{onClick:onAI,className:"act90 trt",style:btnStyle,title:"AI tools",children:t("span",{style:{fontSize:15,lineHeight:1},children:"✨"})}),
-      isHome&&onWealth?t("button",{onClick:onWealth,className:"act90 trt",style:btnStyle,title:"Wealth Tracker","aria-label":"Wealth Tracker",children:o("svg",{width:17,height:17,viewBox:"0 0 24 24","aria-hidden":"true",children:[t("path",{d:"M11 2.05A10 10 0 1 0 21.95 13H11z",fill:c.tx}),t("path",{d:"M13 2.05V11h8.95A10 10 0 0 0 13 2.05z",fill:c.ac})]})})
+      showPie&&onWealth?t("button",{onClick:onWealth,className:"act90 trt",style:btnStyle,title:"Wealth Tracker","aria-label":"Wealth Tracker",children:o("svg",{width:17,height:17,viewBox:"0 0 24 24","aria-hidden":"true",children:[t("path",{d:"M11 2.05A10 10 0 1 0 21.95 13H11z",fill:c.tx}),t("path",{d:"M13 2.05V11h8.95A10 10 0 0 0 13 2.05z",fill:c.ac})]})})
       :t("button",{onClick:onSearch,className:"act90 trt",style:btnStyle,"aria-label":"Search",children:t(Srch,{size:16,color:c.tx})}),
       t("button",{onClick:onDiary,className:"act90 trt",style:btnStyle,title:"Lending diary — who owes you",children:t(Book,{size:16,color:c.tx})})
     ]})
@@ -2259,8 +2269,8 @@ function App(){
   const[users,setUsers]=useState([]);
   const[activeUser,setActiveUser]=useState(null);
   Object.assign(c,themeC);
-  const THEME_CYCLE={dark:"navy",navy:"slate",slate:"light",light:"snow",snow:"parchment",parchment:"dark"};
-  const THEME_BG={dark:"#1B1B1D",navy:"#0F1117",slate:"#1E2328",light:"#EDEAE2",snow:"#0B0A0C",parchment:"#E8DFC8"};
+  const THEME_CYCLE={dark:"navy",navy:"slate",slate:"light",light:"snow",snow:"parchment",parchment:"studio",studio:"dark"};
+  const THEME_BG={dark:"#1B1B1D",navy:"#0F1117",slate:"#1E2328",light:"#EDEAE2",snow:"#0B0A0C",parchment:"#E8DFC8",studio:"#FFFFFF"};
   const applyTheme=(next)=>{setTheme(next);const nc=THEMES[next]||darkC;Object.assign(c,nc);localStorage.setItem("etp-theme",next);document.documentElement.style.background=THEME_BG[next];document.body.style.background=THEME_BG[next];document.body.style.color=nc.tx;document.body.dataset.theme=next;paintNavVars(nc,next);document.querySelector('meta[name="theme-color"]')?.setAttribute("content",THEME_BG[next])};
   const toggleTheme=()=>applyTheme(THEME_CYCLE[theme]);
   // Covers first paint and any theme change (including restore from storage),
@@ -2652,7 +2662,7 @@ function App(){
   const dv={...d,expenses:(d.expenses||[]).filter(e=>!e.archived),openingBalances:d.openingBalances||[]};
   return o("div",{id:"app-shell",style:{background:c.bgg,color:c.tx,fontFamily:'var(--tf)',height:fzH,maxHeight:fzH,width:fzW,overflow:"hidden",display:"flex",flexDirection:"column",alignItems:"center",transform:fzScale!==1?`scale(${fzScale})`:undefined,transformOrigin:"top left",boxSizing:"border-box",paddingTop:"calc(52px + max(env(safe-area-inset-top),var(--sat-fb,0px)))"},className:"",children:[
     t(Gr,{}),
-    t(AppHeader,{isHome:v==="home",onWealth:()=>{navFromRef.current="home";sV("wealthTracker")},onMenu:()=>{sSbFocus(null);sSbar(true)},onSearch:()=>sV("search"),onToggleTheme:toggleTheme,isDark,theme,onHome:()=>{sFlt(null);sAtx(null);if(scrollRef.current)scrollRef.current.scrollTop=0;sV("home")},onAI:()=>{sSbFocus("AI");sSbar(true)},onDiary:()=>{navFromRef.current=v;sV("diary")}}),
+    t(AppHeader,{showPie:v!=="calendar",onWealth:()=>{if(v==="wealthTracker")return;_wtFrom=v;sV("wealthTracker")},onMenu:()=>{sSbFocus(null);sSbar(true)},onSearch:()=>sV("search"),onToggleTheme:toggleTheme,isDark,theme,onHome:()=>{sFlt(null);sAtx(null);if(scrollRef.current)scrollRef.current.scrollTop=0;sV("home")},onAI:()=>{sSbFocus("AI");sSbar(true)},onDiary:()=>{navFromRef.current=v;sV("diary")}}),
     d.expenses.some(e=>e.archived)&&(d.openingBalances||[]).length>0&&o("div",{style:{margin:"10px 16px 0",padding:"14px 16px",background:"#7f1d1d",border:"1px solid #ef4444",borderRadius:14,display:"flex",alignItems:"flex-start",gap:12,width:"calc(100% - 32px)",maxWidth:408,boxSizing:"border-box"},children:[t("span",{style:{fontSize:22,flexShrink:0},children:"⚠️"}),o("div",{className:"f1",children:[t("div",{style:{fontSize:14,fontWeight:700,color:"#fef2f2",marginBottom:4},children:"Reconcile archived your transactions"}),t("div",{style:{fontSize:12,color:"#fca5a5",lineHeight:1.5,marginBottom:10},children:d.expenses.filter(e=>e.archived).length+" transactions were archived. Tap below to restore all of them immediately."}),t("button",{onClick:doRevertAllReconcile,className:"act98 tr",style:{padding:"10px 20px",background:"#ef4444",border:"none",borderRadius:10,color:"#fff",fontWeight:700,fontSize:14},children:"Restore all transactions now"})]})]})  ,
     notice&&o("div",{onClick:()=>{if(notice.title.includes("Log"))sV("add");sNotice(null)},style:{margin:"10px 16px 0",padding:"13px 14px",background:`linear-gradient(135deg,${c.ac}1f 0%,${c.sfg} 60%)`,border:`1px solid ${c.ac}40`,borderRadius:14,display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer",width:"calc(100% - 32px)",maxWidth:408,boxSizing:"border-box"},children:[o("div",{className:"f1 minw0",children:[t("div",{style:{fontSize:13,fontWeight:600,color:c.tx,marginBottom:2},children:notice.title}),t("div",{style:{fontSize:12,color:c.td,lineHeight:1.45},children:notice.body})]}),t("button",{onClick:e=>{e.stopPropagation();sNotice(null)},style:{background:"transparent",border:"none",color:c.tm,flexShrink:0,padding:2,display:"flex"},children:t(X,{size:15})})]}),
     t(IOSTip,{}),
@@ -2711,7 +2721,7 @@ function App(){
         v==="monthlyReport"&&t(MReport,{data:d,onClose:()=>sV(navFromRef.current)}),
         v==="budgetCalc"&&t(BudgetPage,{data:d,persist:pst,onClose:()=>sV("calculators"),onView:sV}),
         v==="reinvest"&&t(ReinvestDash,{data:d,persist:pst,onTx:sAtx,getFrom:()=>navFromRef.current,onClose:()=>sV(_rvOrigin||"wealthTracker"),onView:(id)=>{navFromRef.current="reinvest";sV(id)}}),
-        v==="wealthTracker"&&t(WealthTracker,{data:d,onClose:()=>sV("home"),onView:(id)=>{navFromRef.current="wealthTracker";sV(id)}}),
+        v==="wealthTracker"&&t(WealthTracker,{data:d,onClose:()=>{const b=_wtFrom;_wtFrom=null;sV(b&&b!=="wealthTracker"?b:"home")},onView:(id)=>{navFromRef.current="wealthTracker";sV(id)}}),
         v==="zerodha"&&t(Zerodha,{data:d,persist:pst,onClose:()=>sV("wealthTracker"),onView:(id)=>{navFromRef.current="zerodha";sV(id)}}),
         v==="bankStmt"&&t(BankStmt,{data:d,persist:pst,onTx:sAtx,onView:(id)=>{navFromRef.current="bankStmt";sV(id)},onClose:()=>sV(navFromRef.current&&navFromRef.current!=="bankStmt"?navFromRef.current:"calculators")}),
         v==="goalInvest"&&t(GoalInvest,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"calculators")}),
@@ -12611,7 +12621,7 @@ const showThresholdRules=stgHit("threshold rules","spending alert","card alert",
 const showMonthEnd=stgHit("month-end report","month end","variance","stats threshold");
 const showTextSize=stgHit("text size","slider","small","medium","large","font size","zoom");
 const showSections=stgHit("sections","minimise","maximise","minimize","maximize","collapse","expand","home","stats","lending diary","las tracker","reimbursement");
-const showTheme=stgHit("theme","luxe","navy","light","ipo","dark","mode","color","colour","slate","snow","parchment");
+const showTheme=stgHit("theme","luxe","navy","light","ipo","dark","mode","color","colour","slate","snow","parchment","studio","white");
 const showFonts=stgHit("number font","number size","text font","amounts","labels","sf mono");
 const showMonthStart=stgHit("month starts on day","pay cycle","calendar month");
 const showNotif=stgHit("notifications","reminder","morning quote","evening log","push","alerts");
@@ -12685,6 +12695,7 @@ return o("div",{style:{padding:`8px ${GUT}px 110px`},className:"st",children:[
       {id:"light",label:"Light",emoji:"☀️",desc:"Clean white"},
       {id:"snow",label:"IPO",emoji:"📈",desc:"Black, blue & orange"},
       {id:"parchment",label:"Parchment",emoji:"📜",desc:"Warm paper"},
+      {id:"studio",label:"Studio",emoji:"🤍",desc:"White, flat & blue"},
     ].map(th=>o("button",{key:th.id,onClick:()=>theme!==th.id&&onSetTheme&&onSetTheme(th.id),style:{padding:"12px 8px",background:theme===th.id?c.sf3:c.sf2,border:`1px solid ${theme===th.id?c.ac:c.brs}`,borderRadius:11,display:"flex",flexDirection:"column",alignItems:"center",gap:4},children:[
       t("span",{style:{fontSize:20},children:th.emoji}),
       t("div",{style:{fontFamily:'var(--nf)',fontSize:11,fontWeight:600,color:theme===th.id?c.ac:c.tx,letterSpacing:.3},children:th.label}),
@@ -14896,6 +14907,7 @@ function LnDetail({L,data,persist,onBack,initTab}){
       o("div",{className:"tr",style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:14,color:c.tx},children:fm(s.value,cur)}),t("div",{style:{fontSize:10.5,color:c.tm},children:s.payouts>0?"+ "+fm(s.payouts,cur)+" paid out":s.closed?"exit value":"value"})]})]}),
     o("div",{className:"f ia fw",style:{gap:6,marginTop:8},children:[riMarket(inv.type)?t(LnPill,{col:s.ret>=0?c.mt:c.co,children:`${s.closed?"Realised":"Unrealised"} ${riSigned(s.ret,cur)}${s.pnlPct!=null?" · "+(s.pnlPct>=0?"+":"−")+Math.abs(s.pnlPct).toFixed(1)+"%":""}`}):t(LnPill,{col:s.annual==null?c.tm:s.annual>=lnCurRate(L)?c.mt:c.co,children:s.annual==null?"Too early for a yearly %":`${riPct(s.annual)} vs ${riPct(L.rate||0)} / yr`}),t(LnPill,{col:good?c.mt:c.co,children:(good?"Ahead ":"Behind ")+fm(Math.abs(s.net),cur)})]})]})};
   const riTab=o(Fragment,{children:[
+    t(ZjLoanCard,{data,loanId:L.id}),
     (ri.items.length>0||ri.trade!==0)&&riSummaryCard(ri,cur,null,()=>sTab("flow")),
     lnCard([
       o("div",{key:"h",className:"f ia jb",style:{marginBottom:6},children:[t("span",{style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx},children:"Reinvestments"}),t("button",{onClick:()=>sSheet({k:"riAdd"}),"aria-label":"Add reinvestment",className:"act90 trt",style:{width:30,height:30,borderRadius:15,border:"none",background:c.ac,color:"#0a0a0a",fontSize:18,lineHeight:1},children:"+"})]}),
@@ -16533,6 +16545,7 @@ function ReinvestDash({data,persist,onClose,onView,getFrom,onTx}){
     act>0&&t("button",{onClick:()=>sF(p=>({...RI_F0,group:p.group,sort:p.sort})),className:"w100 act95 trt",style:{marginTop:6,padding:"10px 0",background:"transparent",border:"none",color:c.ac,fontSize:13},children:"Clear filters"})]});
   const overview=o(Fragment,{children:[
     t(FfOverviewCard,{data,onOpen:()=>onView("loanFlow")}),
+    t(ZjLoanCard,{data,onOpen:()=>{_zjJump="holdings";onView("zerodha")}}),
     t(RiTradingCard,{tr:pf.tr,loans:pf.loans,cur,onManage:()=>sSh({k:"trade"}),onDays:()=>sTab("trading")}),
     pts.length>1&&lnCard([t("div",{key:"t",style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx,marginBottom:10},children:"Invested vs worth"}),t(RiChart,{key:"c",pts,cur})],{animation:RI_ANIM,animationDelay:"60ms"}),
     lnCard([
@@ -17250,7 +17263,7 @@ function zjParseTradebook(rows){
 // A bank line mentioning ZERODHA either links to a funds entry you already logged (same amount and
 // direction, within 4 days) or adds a new one; both sides remember each other (fund.src/stmt ↔ row.ext.fid).
 const ZJ_BANK_RE=/ZERODHA/i;
-let _zjJump=null,_bsJump=null;
+let _zjJump=null,_bsJump=null,_wtFrom=null;
 function zjBankLines(data){const out=[];for(const s2 of data.bankStmts||[])for(const r of s2.rows||[])if(ZJ_BANK_RE.test(r.nar||"")||ZJ_BANK_RE.test(r.payee||""))out.push({s:s2,r});return out}
 function zjFundCand(zj,r,skip){const k=r.dir==="dr"?"in":"out",W=4*864e5;return zj.funds.filter(f=>!f.src&&f.kind===k&&Math.abs((+f.amount||0)-r.amount)<0.011&&Math.abs(f.date-r.date)<=W&&!(skip&&skip.has(f.id))).sort((a,b)=>Math.abs(a.date-r.date)-Math.abs(b.date-r.date))[0]||null}
 function zjApplyBank(data,items){
@@ -17268,6 +17281,39 @@ function zjUnlinkBank(data,fid,rowId){
   const zj=zjOf(data),f=zj.funds.find(x=>x.id===fid);let funds=zj.funds;
   if(f){const added=!!f.auto;funds=added?zj.funds.filter(x=>x.id!==fid):zj.funds.map(x=>x.id===fid?{...x,src:null,stmt:null}:x)}
   return{zjournal:{...zj,funds},bankStmts:(data.bankStmts||[]).map(s2=>s2.rows.some(r=>r.id===rowId)?{...s2,rows:s2.rows.map(r=>r.id===rowId?{...r,st:"open",how:null,ext:null}:r)}:s2)};
+}
+// --- Zerodha ↔ loans (Reinvestments) ---
+// Borrowed money can be tagged two ways: on money added to Zerodha (fund.loanId) and on a stock or
+// mutual fund bought with it (meta[SYM].loanId, mf.loanId). Tagged holdings count exactly for their
+// loan; loan money not tied to a holding takes its share of the rest of the account (untagged
+// holdings, MF and free cash) in proportion to what was put in.
+function zjLoanShares(data){
+  const zj=zjOf(data);if(!zj.fills.length&&!zj.funds.length&&!zj.mf.length)return new Map();
+  const S=zjSummary(zj),px=sym=>zj.prices[sym]&&zj.prices[sym].ltp>0?+zj.prices[sym].ltp:null,by=new Map();
+  const slot=id=>by.get(id)||by.set(id,{funds:0,dInv:0,dVal:0,booked:0,items:[]}).get(id);
+  for(const f of zj.funds)if(f.loanId){const x=slot(f.loanId);x.funds+=(f.kind==="out"?-1:1)*(+f.amount||0)}
+  let tInv=0,tVal=0;
+  for(const t2 of S.trips){const lid=(zj.meta[t2.sym]||{}).loanId;if(!lid)continue;const x=slot(lid);
+    if(t2.open){const p=px(t2.sym),v=p!=null?p*t2.qty:t2.cost;x.dInv+=t2.cost;x.dVal+=v;tInv+=t2.cost;tVal+=v;x.items.push({name:t2.sym,inv:t2.cost,val:v})}
+    x.booked+=t2.net}
+  for(const m of zj.mf)if(m.loanId){const x=slot(m.loanId),v=m.current!=null&&m.current!==""?+m.current:+m.invested||0;x.dInv+=+m.invested||0;x.dVal+=v;tInv+=+m.invested||0;tVal+=v;x.items.push({name:m.name,inv:+m.invested||0,val:v})}
+  const poolCap=S.capital-tInv,poolVal=S.value+S.mfVal+S.cash-tVal,ratio=poolCap>0?poolVal/poolCap:1;
+  for(const[id,x]of by){const rest=Math.max(0,x.funds-x.dInv);x.rest=_r2(rest);x.restVal=_r2(rest*ratio);x.invested=_r2(x.dInv+rest);x.value=_r2(x.dVal+rest*ratio+x.booked);x.gain=_r2(x.value-x.invested);x.pct=x.invested>0?x.gain/x.invested*100:0}
+  return by;
+}
+function ZjLoanCard({data,loanId,onOpen}){
+  const cur=data.currency,sh=zjLoanShares(data),loans=(data.loanTracker||[]).filter(L=>sh.has(L.id)&&(!loanId||L.id===loanId));
+  if(!loans.length)return null;
+  return o("div",{style:{padding:16,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,marginBottom:12},children:[
+    o("div",{className:"f ia jb",style:{marginBottom:8},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.2},children:"💹 IN ZERODHA (FROM LOANS)"}),onOpen&&t("button",{onClick:onOpen,className:"act95",style:{background:"transparent",border:"none",color:c.ac,fontSize:12},children:"Open ›"})]}),
+    ...loans.map(L=>{const x=sh.get(L.id),rate=lnCurRate(L);return o("div",{key:L.id,style:{padding:"8px 0",borderTop:`1px solid ${c.brs}`},children:[
+      o("div",{className:"f ia jb",style:{gap:8},children:[t("span",{className:"tru",style:{fontSize:13.5,fontWeight:600,color:c.tx},children:loanId?"Zerodha":(L.lender||"Loan")+(L.purpose?" · "+L.purpose:"")}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13.5,color:zjCol(x.gain)},children:zjSign(x.gain,cur)+" ("+x.pct.toFixed(1)+"%)"})]}),
+      t("div",{style:{fontSize:11.5,color:c.td,marginTop:3},children:"Put in "+giM(x.invested,cur)+" · worth "+giM(x.value,cur)+(rate?" · loan costs "+rate+"% a year":"")}),
+      x.items.length>0&&t("div",{style:{fontSize:11,color:c.tm,marginTop:3},children:x.items.map(i=>i.name).join(", ")+(x.rest>0?" + "+giM(x.rest,cur)+" share of the rest":"")})]})})]});
+}
+// Start Zerodha Portfolio from scratch; bank lines linked to its funds go back to "To review".
+function zjResetAll(data){
+  return{zjournal:null,bankStmts:(data.bankStmts||[]).map(s2=>s2.rows.some(r=>r.how==="zfund")?{...s2,rows:s2.rows.map(r=>r.how==="zfund"?{...r,st:"open",how:null,ext:null}:r)}:s2)};
 }
 // === WEALTH TRACKER (Home header → pie chart) ===
 function WealthTracker({data,onClose,onView}){
@@ -17386,13 +17432,14 @@ function Zerodha({data,persist,onClose,onView}){
       t("div",{style:{fontSize:12,marginTop:8,lineHeight:1.45,color:okAll?c.mt:c.td},children:okAll?"✓ Your funds log matches your bank statements.":(pend.length?pend.length+" bank line(s) above aren't in the log yet. ":"")+(noSrc?noSrc+" log entr"+(noSrc===1?"y isn't":"ies aren't")+" on any imported statement (maybe from a bank you haven't imported).":"")})]),
     list.length===0?t("div",{style:{padding:"20px 0",textAlign:"center",color:c.tm,fontSize:13},children:"Nothing logged yet."}):
     t("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,overflow:"hidden"},children:list.map((f,i)=>t("button",{key:f.id,onClick:()=>sSh({k:"fund",f}),className:"w100 f ia jb act98 trt",style:{gap:10,padding:"12px 14px",background:"transparent",border:"none",borderBottom:i<list.length-1?`1px solid ${c.brs}`:"none",color:"inherit",textAlign:"left"},children:[
-      o("div",{className:"minw0",children:[t("div",{style:{fontSize:13.5,color:c.tx},children:f.kind==="out"?"Withdrawn to bank":"Added to Zerodha"}),t("div",{className:"tru",style:{fontSize:11,color:c.tm,marginTop:2},children:lnFmtD(f.date)+(f.note?" · "+f.note:"")}),
+      o("div",{className:"minw0",children:[t("div",{style:{fontSize:13.5,color:c.tx},children:f.kind==="out"?"Withdrawn to bank":"Added to Zerodha"}),t("div",{className:"tru",style:{fontSize:11,color:c.tm,marginTop:2},children:lnFmtD(f.date)+(f.loanId?" · 🏦 "+(((data.loanTracker||[]).find(L=>L.id===f.loanId)||{}).lender||"loan"):"")+(f.note?" · "+f.note:"")}),
         f.src&&stOf(f.stmt)&&t("span",{role:"link",onClick:e=>{e.stopPropagation();goRow(f)},style:{display:"inline-block",marginTop:4,fontSize:11,padding:"2px 8px",borderRadius:999,background:c.sf2,color:c.ac},children:"🧾 "+acN(stOf(f.stmt).accountId)+" statement ›"})]}),
       t("span",{style:{fontFamily:'var(--nf)',fontSize:14,color:f.kind==="out"?c.co:c.mt},children:(f.kind==="out"?"− ":"+ ")+zjMoney(f.amount,cur)})]}))})]})};
   // ---- sheets ----
-  const sheet=sh&&t(ZjSheet,{data,zj,S,sh,put,putAll:persist,onClose:()=>sSh(null),onOpen:x=>sSh(x)});
+  const sheet=sh&&(sh.k==="reset"?t(CSht,{title:"Reset Zerodha Portfolio?",subtitle:`This clears everything here: ${zj.fills.length} trade${zj.fills.length===1?"":"s"}, ${zj.funds.length} funds entr${zj.funds.length===1?"y":"ies"}, ${zj.mf.length} mutual fund${zj.mf.length===1?"":"s"}, prices, targets and notes. Bank statement lines linked to the funds log go back to “To review”. Your accounts and expenses are not touched. This can't be undone.`,confirmLabel:"Reset everything",onClose:()=>sSh(null),onConfirm:()=>{persist(zjResetAll(data));sSh(null);sTab("overview");flash("✓ Zerodha Portfolio reset. Import your new file from Holdings.")}})
+    :t(ZjSheet,{data,zj,S,sh,put,putAll:persist,onClose:()=>sSh(null),onOpen:x=>sSh(x)}));
   return o("div",{style:{padding:"8px 20px 150px"},children:[
-    o("div",{className:"f ia jb",style:{marginBottom:14},children:[t(BB,{onClick:onClose}),t("div",{style:{fontFamily:c.hf,fontSize:23},children:t("em",{children:"Zerodha Portfolio"})}),t("div",{style:{width:38}})]}),
+    o("div",{className:"f ia jb",style:{marginBottom:14},children:[t(BB,{onClick:onClose}),t("div",{style:{fontFamily:c.hf,fontSize:23},children:t("em",{children:"Zerodha Portfolio"})}),t("button",{onClick:()=>sSh({k:"reset"}),"aria-label":"Reset Zerodha Portfolio",title:"Reset",className:"act90 trt",style:{width:38,height:38,borderRadius:19,background:c.sf2,border:`1px solid ${c.brs}`,color:c.tx,fontSize:16},children:"↺"})]}),
     o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,marginBottom:14},children:[tabBtn("overview","Overview"),tabBtn("holdings","Holdings"),tabBtn("trades","Closed"),tabBtn("funds","Funds")]}),
     t("input",{ref:fileRef,type:"file",accept:".csv,.xlsx,.xls",style:{display:"none"},onChange:onImport}),
     msg&&t("div",{style:{marginBottom:12,padding:"10px 12px",background:c.sf2,borderRadius:12,fontSize:12.5,color:c.tx,lineHeight:1.45},children:msg}),
@@ -17403,24 +17450,27 @@ function Zerodha({data,persist,onClose,onView}){
 function ZjSheet({data,zj,S,sh,put,putAll,onClose,onOpen}){
   const cur=data.currency;
   const[f,sF]=useState(()=>{
-    if(sh.k==="fund"){const x=sh.f;return{kind:x?x.kind:"in",amount:x?String(x.amount):"",date:lnYMD(x?x.date:Date.now()),note:x?x.note||"":""}}
+    if(sh.k==="fund"){const x=sh.f;return{kind:x?x.kind:"in",amount:x?String(x.amount):"",date:lnYMD(x?x.date:Date.now()),note:x?x.note||"":"",loanId:x?x.loanId||null:null}}
     if(sh.k==="fill")return{sym:sh.sym||"",side:sh.side||"buy",qty:"",price:"",date:lnYMD(Date.now())};
-    if(sh.k==="pos"){const m=zj.meta[sh.sym]||{};return{type:m.type||"invest",target:m.target?String(m.target):"",sl:m.sl?String(m.sl):"",plan:m.plan||"",ltp:zj.prices[sh.sym]?String(zj.prices[sh.sym].ltp):""}}
+    if(sh.k==="pos"){const m=zj.meta[sh.sym]||{};return{loanId:m.loanId||null,type:m.type||"invest",target:m.target?String(m.target):"",sl:m.sl?String(m.sl):"",plan:m.plan||"",ltp:zj.prices[sh.sym]?String(zj.prices[sh.sym].ltp):""}}
     if(sh.k==="trip"){const n=zj.notes[sh.id]||{};return{tags:n.tags||[],mistakes:n.mistakes||[],note:n.note||""}}
-    if(sh.k==="mf"){const m=sh.mf;return{name:m?m.name:"",invested:m?String(m.invested):"",current:m&&m.current!=null?String(m.current):"",viaZ:m?m.viaZ!==false:true,add:""}}
+    if(sh.k==="mf"){const m=sh.mf;return{name:m?m.name:"",invested:m?String(m.invested):"",current:m&&m.current!=null?String(m.current):"",viaZ:m?m.viaZ!==false:true,add:"",loanId:m?m.loanId||null:null}}
     if(sh.k==="prices")return Object.fromEntries(S.open.map(t2=>[t2.sym,zj.prices[t2.sym]?String(zj.prices[t2.sym].ltp):""]));
     return{};
   });
   const set=(k,v)=>sF(p=>({...p,[k]:v}));
+  const loans=(data.loanTracker||[]).filter(L=>L.direction!=="lent");
+  const loanPick=(label,hint)=>loans.length?o(Fragment,{children:[lnLbl(label),t("div",{className:"f fw",style:{gap:6},children:[["","Own money"],...loans.map(L=>[L.id,"🏦 "+(L.lender||"Loan")+(L.purpose?" · "+L.purpose:"")])].map(([id,l])=>t("button",{key:id||"own",onClick:()=>set("loanId",id||null),className:"act95 tr",style:{padding:"7px 11px",borderRadius:999,fontSize:12,background:(f.loanId||"")===id?c.sf3:"transparent",border:`1px solid ${(f.loanId||"")===id?c.ac:c.brs}`,color:(f.loanId||"")===id?c.tx:c.td},children:l}))}),hint&&t("div",{style:{fontSize:11,color:c.tm,marginTop:5,lineHeight:1.4},children:hint})]}):null;
   const num=(k,ph,auto)=>t("input",{value:f[k],inputMode:"decimal",autoFocus:auto,placeholder:ph||"0",onChange:e=>set(k,e.target.value.replace(/[^\d.]/g,"")),style:lnInp()});
   const foot=(lbl,ok,fn,del)=>o(Fragment,{children:[o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn(lbl,()=>ok&&fn(),true,ok?undefined:{opacity:.45})]}),del&&t("button",{onClick:del,className:"w100 act98 tr",style:{marginTop:10,padding:"11px 0",background:"transparent",border:`1px solid ${c.ro}55`,borderRadius:12,color:c.ro,fontSize:13},children:"Delete"})]});
   const seg=(k,opts)=>t("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`},children:opts.map(([v,l])=>t("button",{key:v,onClick:()=>set(k,v),className:"act95 tr",style:{flex:1,padding:"9px 0",borderRadius:9,fontSize:13,fontWeight:600,border:"none",background:f[k]===v?c.ac:"transparent",color:f[k]===v?"#0a0a0a":c.td},children:l}))});
   const chips=(k,list)=>t("div",{className:"f fw",style:{gap:6},children:list.map(x=>{const on=f[k].includes(x);return t("button",{key:x,onClick:()=>set(k,on?f[k].filter(y=>y!==x):[...f[k],x]),className:"act95 tr",style:{padding:"6px 11px",borderRadius:999,fontSize:12,background:on?c.sf3:"transparent",border:`1px solid ${on?c.ac:c.brs}`,color:on?c.tx:c.td},children:x})})});
   if(sh.k==="fund"){const x=sh.f,ok=parseFloat(f.amount)>0&&!!lnFromYMD(f.date);
-    const save=()=>{const rec={id:x?x.id:"zf_"+uid(),kind:f.kind,amount:_r2(parseFloat(f.amount)),date:lnFromYMD(f.date),note:f.note.trim(),src:x?x.src:null};put({funds:x?zj.funds.map(y=>y.id===x.id?{...y,...rec}:y):[...zj.funds,rec]});onClose()};
+    const save=()=>{const rec={id:x?x.id:"zf_"+uid(),kind:f.kind,amount:_r2(parseFloat(f.amount)),date:lnFromYMD(f.date),note:f.note.trim(),src:x?x.src:null,loanId:f.loanId||null};put({funds:x?zj.funds.map(y=>y.id===x.id?{...y,...rec}:y):[...zj.funds,rec]});onClose()};
     return t(Sht,{onClose,children:o(Fragment,{children:[lnSheetTitle(x?"Edit funds entry":"Funds","Money moved between your bank and Zerodha"),seg("kind",[["in","＋ Added"],["out","− Withdrawn"]]),
       lnLbl("AMOUNT ("+cur+")"),num("amount","0",!x),lnLbl("DATE"),t("input",{type:"date",value:f.date,onChange:e=>set("date",e.target.value),style:riDateInp()}),
       lnLbl("NOTE (OPTIONAL)"),t("input",{value:f.note,placeholder:"e.g. from HDFC savings",onChange:e=>set("note",e.target.value),style:lnInp()}),
+      f.kind==="in"&&loanPick("WHOSE MONEY WAS IT?","Borrowed money shows up under that loan in Reinvestments."),
       foot("Save",ok,save,x?()=>{if(x.src){const r=zjUnlinkBank(data,x.id,x.src);putAll({...r,zjournal:{...r.zjournal,funds:zj.funds.filter(y=>y.id!==x.id)}})}else put({funds:zj.funds.filter(y=>y.id!==x.id)});onClose()}:null)]})})}
   if(sh.k==="fill"){const ok=f.sym.trim()&&parseFloat(f.qty)>0&&parseFloat(f.price)>0&&!!lnFromYMD(f.date);
     const syms=[...new Set(zj.fills.map(x=>x.sym))].sort();
@@ -17434,7 +17484,7 @@ function ZjSheet({data,zj,S,sh,put,putAll,onClose,onOpen}){
   if(sh.k==="pos"){const t2=S.open.find(x=>x.sym===sh.sym);if(!t2)return null;const p=parseFloat(f.ltp)||null,val=p?p*t2.qty:null,un=val!=null?val-t2.cost:null;
     const fills=zj.fills.filter(x=>x.sym===sh.sym&&x.ts>=t2.openTs).sort((a,b)=>b.ts-a.ts);
     const tg=parseFloat(f.target)||null,sl=parseFloat(f.sl)||null,rr=tg&&sl&&t2.avg>sl?(tg-t2.avg)/(t2.avg-sl):null;
-    const save=()=>{put({meta:{...zj.meta,[sh.sym]:{type:f.type,target:tg,sl,plan:f.plan.trim()}},prices:p?{...zj.prices,[sh.sym]:{ltp:p,at:Date.now()}}:zj.prices});onClose()};
+    const save=()=>{put({meta:{...zj.meta,[sh.sym]:{type:f.type,target:tg,sl,plan:f.plan.trim(),...(f.loanId?{loanId:f.loanId}:{})}},prices:p?{...zj.prices,[sh.sym]:{ltp:p,at:Date.now()}}:zj.prices});onClose()};
     return t(Sht,{onClose,children:o(Fragment,{children:[lnSheetTitle(sh.sym,`${t2.qty} shares @ ${zjMoney(_r2(t2.avg),cur)} · invested ${zjMoney(t2.cost,cur)} · ${zjDays(t2.openTs)} days`),
       seg("type",[["invest","Investment"],["swing","Positional"]]),
       lnLbl("TODAY'S PRICE ("+cur+")"),num("ltp","Price from Kite"),
@@ -17442,6 +17492,7 @@ function ZjSheet({data,zj,S,sh,put,putAll,onClose,onOpen}){
       f.type==="swing"&&o(Fragment,{children:[o("div",{className:"g g2",style:{gap:10},children:[o("div",{children:[lnLbl("STOP-LOSS"),num("sl","0")]}),o("div",{children:[lnLbl("TARGET"),num("target","0")]})]}),
         rr!=null&&t("div",{style:{fontSize:12,color:c.td,marginTop:6},children:`Risk ${zjMoney(_r2((t2.avg-sl)*t2.qty),cur)} · reward ${zjMoney(_r2((tg-t2.avg)*t2.qty),cur)} · R:R 1:${rr.toFixed(1)}`})]}),
       lnLbl(f.type==="swing"?"TRADE PLAN":"WHY YOU OWN IT"),t("textarea",{value:f.plan,rows:2,onChange:e=>set("plan",e.target.value),placeholder:f.type==="swing"?"Entry reason, exit rule…":"Thesis, review date…",style:{...lnInp(),resize:"none",fontFamily:"var(--tf)"}}),
+      loanPick("BOUGHT WITH","Pick the loan if borrowed money paid for this stock."),
       o("div",{className:"f",style:{gap:10,marginTop:12},children:[lnBtn("＋ Buy more",()=>onOpen({k:"fill",side:"buy",sym:sh.sym})),lnBtn("Sell",()=>onOpen({k:"fill",side:"sell",sym:sh.sym}))]}),
       lnLbl("TRADES IN THIS POSITION"),t("div",{style:{border:`1px solid ${c.brs}`,borderRadius:12,overflow:"hidden"},children:fills.map((x,i)=>o("div",{key:x.id,className:"f ia jb",style:{gap:8,padding:"8px 12px",borderBottom:i<fills.length-1?`1px solid ${c.brs}`:"none",fontSize:12.5},children:[t("span",{style:{color:x.side==="buy"?c.mt:c.co},children:(x.side==="buy"?"Buy ":"Sell ")+x.qty+" @ "+zjMoney(x.price,cur)}),o("span",{className:"f ia",style:{gap:8,color:c.tm},children:[lnFmtD(x.ts),x.src==="manual"&&t("button",{onClick:()=>{put({fills:zj.fills.filter(y=>y.id!==x.id)})},"aria-label":"Delete trade",className:"act90",style:{background:"transparent",border:"none",color:c.ro,fontSize:14,padding:0},children:"✕"})]})]}))}),
       foot("Save",true,save)]})})}
@@ -17454,12 +17505,13 @@ function ZjSheet({data,zj,S,sh,put,putAll,onClose,onOpen}){
       lnLbl("NOTES"),t("textarea",{value:f.note,rows:3,onChange:e=>set("note",e.target.value),placeholder:"What went right or wrong, what you'd do next time",style:{...lnInp(),resize:"none",fontFamily:"var(--tf)"}}),
       foot("Save",true,save)]})})}
   if(sh.k==="mf"){const m=sh.mf,ok=f.name.trim()&&parseFloat(f.invested)>0;
-    const save=()=>{const add=parseFloat(f.add)||0,inv=_r2((parseFloat(f.invested)||0)+add);const rec={id:m?m.id:"zm_"+uid(),name:f.name.trim(),invested:inv,current:f.current!==""?_r2(parseFloat(f.current)):null,viaZ:f.viaZ,date:m?m.date:Date.now(),log:[...((m&&m.log)||(m?[]:[{id:"zl_"+uid(),date:Date.now(),amount:inv}])),...(add>0?[{id:"zl_"+uid(),date:Date.now(),amount:add}]:[])]};put({mf:m?zj.mf.map(y=>y.id===m.id?rec:y):[...zj.mf,rec]});onClose()};
+    const save=()=>{const add=parseFloat(f.add)||0,inv=_r2((parseFloat(f.invested)||0)+add);const rec={id:m?m.id:"zm_"+uid(),name:f.name.trim(),invested:inv,current:f.current!==""?_r2(parseFloat(f.current)):null,viaZ:f.viaZ,loanId:f.loanId||null,date:m?m.date:Date.now(),log:[...((m&&m.log)||(m?[]:[{id:"zl_"+uid(),date:Date.now(),amount:inv}])),...(add>0?[{id:"zl_"+uid(),date:Date.now(),amount:add}]:[])]};put({mf:m?zj.mf.map(y=>y.id===m.id?rec:y):[...zj.mf,rec]});onClose()};
     return t(Sht,{onClose,children:o(Fragment,{children:[lnSheetTitle(m?m.name:"Add mutual fund","Amounts you enter yourself"),
       lnLbl("FUND NAME"),t("input",{value:f.name,autoFocus:!m,placeholder:"e.g. Parag Parikh Flexi Cap",onChange:e=>set("name",e.target.value),style:lnInp()}),
       lnLbl("TOTAL INVESTED ("+cur+")"),num("invested"),m&&o(Fragment,{children:[lnLbl("ADD A NEW SIP / PURCHASE (OPTIONAL)"),num("add","Added to the total invested")]}),
       lnLbl("CURRENT VALUE (OPTIONAL)"),num("current","From Coin"),
       lnToggle(f.viaZ,()=>set("viaZ",!f.viaZ),"Paid from Zerodha funds","Off if the SIP is debited straight from your bank"),
+      loanPick("BOUGHT WITH","Pick the loan if borrowed money paid for this fund."),
       foot("Save",ok,save,m?()=>{put({mf:zj.mf.filter(y=>y.id!==m.id)});onClose()}:null)]})})}
   if(sh.k==="prices"){const save=()=>{const pr={...zj.prices};for(const k in f){const v=parseFloat(f[k]);if(v>0)pr[k]={ltp:v,at:Date.now()}}put({prices:pr});onClose()};
     return t(Sht,{onClose,children:o(Fragment,{children:[lnSheetTitle("Today's prices","Copy them from Kite. Used for value and unrealised P&L."),

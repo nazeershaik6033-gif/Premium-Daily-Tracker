@@ -459,8 +459,12 @@ test('Home header: pie chart opens Wealth Tracker (loans, reinvest, Zerodha); se
   await p.locator('button[aria-label="Wealth Tracker"]').click(); await p.waitForTimeout(400);
   const txt = await p.locator('#root').innerText();
   for (const k of ['Wealth Tracker', 'Zerodha Portfolio', 'Loan Tracker', 'Reinvestments']) assert.match(txt, new RegExp(k));
-  assert.equal(await p.locator('button[aria-label="Search"]').count(), 1, 'search back off Home');
+  assert.equal(await p.locator('button[aria-label="Search"]').count(), 0, 'pie, not search, on Wealth Tracker too');
+  await p.locator('button[aria-label="calendar"]').click(); await p.waitForTimeout(300);
+  assert.equal(await p.locator('button[aria-label="Search"]').count(), 1, 'search only on Calendar');
+  assert.equal(await p.locator('button[aria-label="Wealth Tracker"]').count(), 0);
   await p.locator('button[aria-label="calc"]').click(); await p.waitForTimeout(300);
+  assert.equal(await p.locator('button[aria-label="Search"]').count(), 0, 'pie on Calculators');
   const calc = await p.locator('#root').innerText();
   assert.doesNotMatch(calc, /Zerodha Portfolio|Loan Tracker/, 'moved out of Calculators');
   assert.match(calc, /Bank Statement/);
@@ -505,6 +509,40 @@ test('Bank Statement ↔ Zerodha funds: link instead of duplicate, pull the rest
   const d = await stored(p);
   assert.equal(d.zjournal.funds.length, 2);
   assert.equal(d.bankStmts[0].rows.find(r => r.dir === 'cr').st, 'open');
+  assert.deepEqual(p.errors, []);
+});
+
+test('Zerodha ↔ loans: tagged holdings count exactly, tagged funds share the rest; reset clears all', async () => {
+  const now = Date.now();
+  const zj = { fills: [{ id: 'a', sym: 'TCS', ts: now - 9e8, exch: 'NSE', side: 'buy', qty: 10, price: 3000, oid: 'o1' }, { id: 'b', sym: 'INFY', ts: now - 8e8, exch: 'NSE', side: 'buy', qty: 20, price: 1000, oid: 'o2' }],
+    funds: [{ id: 'f1', kind: 'in', amount: 50000, date: now - 1e9, loanId: 'L1', src: 'row1', stmt: 'st1', auto: true }, { id: 'f2', kind: 'in', amount: 50000, date: now - 1e9 }],
+    mf: [], meta: { TCS: { type: 'invest', loanId: 'L1' } }, prices: { TCS: { ltp: 3300 }, INFY: { ltp: 1100 } }, notes: {} };
+  const p = await newPage({ seed: { zjournal: zj, loanTracker: [], bankStmts: [{ id: 'st1', accountId: 'acc_bank', name: 'x', rows: [{ id: 'row1', date: now - 1e9, amount: 50000, dir: 'dr', nar: 'ZERODHA', payee: 'Zerodha', kind: 'invest', st: 'done', how: 'zfund', ext: { fid: 'f1' } }] }] } });
+  const sh = await p.evaluate(async () => { const d = JSON.parse((await window.storage.get('etp-data-u_t')).value); const x = zjLoanShares(d).get('L1'); return [x.invested, x.value, x.gain]; });
+  // TCS (30,000 → 33,000) is L1's exactly; the other 20,000 of L1's money shares the rest of the
+  // account: capital 100,000 − 30,000 tagged = 70,000 worth INFY 22,000 + cash 50,000 = 72,000.
+  // (Free cash is a little lower after the buy-side STT and stamp duty.)
+  const ideal = 33000 + 20000 * 72000 / 70000;
+  assert.equal(sh[0], 50000);
+  assert.ok(sh[1] < ideal && sh[1] > ideal - 80, 'value ' + sh[1]);
+  assert.equal(sh[2], Math.round((sh[1] - 50000) * 100) / 100);
+  await p.locator('button[aria-label="Wealth Tracker"]').click(); await p.waitForTimeout(300);
+  await p.locator('button:has-text("Zerodha Portfolio")').click(); await p.waitForTimeout(300);
+  await p.locator('button[aria-label="Reset Zerodha Portfolio"]').click();
+  await p.locator('button:has-text("Reset everything")').click(); await p.waitForTimeout(400);
+  const d = await stored(p);
+  assert.equal(d.zjournal, null);
+  assert.equal(d.bankStmts[0].rows[0].st, 'open', 'linked bank line back to review');
+  assert.deepEqual(p.errors, []);
+});
+
+test('Studio theme: white page, flat bordered cards, upright headings', async () => {
+  const p = await newPage({ seed: {} });
+  await p.evaluate(() => localStorage.setItem('etp-theme', 'studio')); await p.reload(); await mounted(p);
+  const r = await p.evaluate(() => ({ theme: document.body.dataset.theme, bg: getComputedStyle(document.body).backgroundColor }));
+  assert.deepEqual(r, { theme: 'studio', bg: 'rgb(255, 255, 255)' });
+  await p.locator('button[aria-label="Wealth Tracker"]').click(); await p.waitForTimeout(300);
+  assert.equal(await p.locator('em:has-text("Wealth Tracker")').evaluate(e => getComputedStyle(e).fontStyle), 'normal');
   assert.deepEqual(p.errors, []);
 });
 
