@@ -303,6 +303,110 @@ test('Goal Investing: manual target and log, % done / left, saved', async () => 
   assert.deepEqual(p.errors, []);
 });
 
+// ---------- bank statement ----------
+// Five transactions laid out the way each bank prints them; opening balance 50,000.
+const BS_TX = [
+  [1, 'UPI/DR/412345678901/SWIGGY/YESB/swiggy@yesbank/Payment from Phone', 450, 0, 49550],
+  [2, 'NEFT CR-HDFC0000123-ACME TECHNOLOGIES PVT LTD-SALARY NOV 2026', 0, 80000, 129550],
+  [5, 'ACH D- BAJAJ FINANCE LTD-P400ABC123456', 12345, 0, 117205],
+  [7, 'NACH-DR-ZERODHA BROKING LTD-SIP MANDATE 77821', 5000, 0, 112205],
+  [10, 'INT.PD:01-08-2026 TO 31-10-2026', 0, 312.5, 112517.5],
+];
+const inr = n => n ? n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const BS_BANK_LAYOUTS = {
+  SBI: { title: 'State Bank of India', head: ['Txn Date', 'Value Date', 'Description', 'Ref No./Cheque No.', 'Debit', 'Credit', 'Balance'], date: d => `${d} Nov 2026`, row: (t, D) => [D, D, t[1], '', inr(t[2]), inr(t[3]), inr(t[4])], newestFirst: true },
+  HDFC: { title: 'HDFC BANK Ltd.', head: ['Date', 'Narration', 'Chq./Ref.No.', 'Value Dt', 'Withdrawal Amt.', 'Deposit Amt.', 'Closing Balance'], date: d => `${String(d).padStart(2, '0')}/11/26`, row: (t, D) => [D, t[1], '0000412345', D, inr(t[2]), inr(t[3]), inr(t[4])] },
+  ICICI: { title: 'ICICI Bank Limited', head: ['S No.', 'Value<br>Date', 'Transaction<br>Date', 'Cheque<br>Number', 'Transaction<br>Remarks', 'Withdrawal Amount<br>(INR )', 'Deposit Amount<br>(INR )', 'Balance<br>(INR )'], date: d => `${String(d).padStart(2, '0')}/11/2026`, row: (t, D, i) => [String(i + 1), D, D, '', t[1], inr(t[2]), inr(t[3]), inr(t[4])] },
+  Axis: { title: 'Axis Bank Ltd', head: ['Tran Date', 'Chq No', 'Particulars', 'Debit', 'Credit', 'Balance', 'Init. Br'], date: d => `${String(d).padStart(2, '0')}-11-2026`, row: (t, D) => [D, '', t[1], inr(t[2]), inr(t[3]), inr(t[4]), '1234'] },
+  'IDFC FIRST': { title: 'IDFC FIRST Bank', head: ['Transaction Date', 'Value Date', 'Particulars', 'Cheque No.', 'Debit', 'Credit', 'Balance'], date: d => `${String(d).padStart(2, '0')}-${MON[10]}-2026`, row: (t, D) => [D, D, t[1], '', inr(t[2]), inr(t[3]), inr(t[4])] },
+};
+function bankHtml(L) {
+  const list = L.newestFirst ? [...BS_TX].reverse() : BS_TX;
+  const td = c => `<td>${c}</td>`;
+  return `<html><body style="font-family:Arial;font-size:9px;margin:20px"><h3>${L.title}</h3><p>Account Statement for 01/11/2026 to 30/11/2026</p><p>Opening Balance : 50,000.00</p>
+  <table style="border-collapse:collapse;width:100%"><colgroup>${L.head.map(h => `<col style="width:${/Narr|Desc|Partic|Remarks/.test(h) ? '30%' : 'auto'}">`).join('')}</colgroup>
+  <tr>${L.head.map(h => `<th style="text-align:left;padding:3px">${h}</th>`).join('')}</tr>
+  ${list.map((t, i) => `<tr style="vertical-align:top">${L.row(t, L.date(t[0]), i).map(c => `<td style="padding:3px">${c}</td>`).join('')}</tr>`).join('')}
+  </table><p>Closing Balance : 1,12,517.50</p><p>Page 1 of 1 · This is a computer generated statement</p></body></html>`;
+}
+
+test('bank statement PDF: SBI, HDFC, ICICI, Axis and IDFC FIRST layouts', async () => {
+  const p = await newPage();
+  const maker = await p.context().newPage();
+  for (const [bank, L] of Object.entries(BS_BANK_LAYOUTS)) {
+    await maker.setContent(bankHtml(L));
+    const pdf = (await maker.pdf({ format: 'A4' })).toString('base64');
+    const r = await p.evaluate(async b64 => {
+      const bin = atob(b64), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+      const r = await bsParsePdf(u.buffer);
+      if (r.err) return { err: r.err };
+      const tx = [...r.tx].sort((a, b) => a.date - b.date);
+      return { bank: r.bank, closing: r.closing, tx: tx.map(x => [new Date(x.date).getDate(), x.amount, x.dir, bsPayee(x.nar), bsKind(x, { accounts: [], cards: [] }), x.bal]), nar0: tx[0].nar };
+    }, pdf);
+    assert.equal(r.err, undefined, bank + ': ' + r.err);
+    assert.equal(r.bank, bank, bank + ' detected');
+    assert.equal(r.closing, 112517.5, bank + ' closing balance');
+    assert.deepEqual(r.tx, [
+      [1, 450, 'dr', 'Swiggy', 'spend', 49550],
+      [2, 80000, 'cr', 'Acme Technologies PVT LTD', 'salary', 129550],
+      [5, 12345, 'dr', 'Bajaj Finance LTD', 'emi', 117205],
+      [7, 5000, 'dr', 'Zerodha Broking LTD', 'invest', 112205],
+      [10, 312.5, 'cr', 'Interest', 'interest', 112517.5],
+    ], bank + ' rows');
+    assert.match(r.nar0, /Payment from Phone/, bank + ': wrapped narration kept whole');
+  }
+  assert.deepEqual(p.errors, []);
+});
+
+test('bank statement: import CSV, confirm matches, add lines, link investment, undo', async () => {
+  const p = await newPage({ seed: {} });
+  const now = new Date(), D = d => { const x = new Date(now.getFullYear(), now.getMonth(), d); return `${String(x.getDate()).padStart(2, '0')}/${String(x.getMonth() + 1).padStart(2, '0')}/${x.getFullYear()}`; };
+  const csv = ['HDFC BANK Ltd. Statement', 'Date,Narration,Withdrawal Amt.,Deposit Amt.,Closing Balance',
+    `${D(1)},UPI-SWIGGY-SWIGGY@ICICI-ICIC0001-412345678901-PAYMENT,"2,400.00",,"47,600.00"`,
+    `${D(1)},NEFT CR-HDFC0000123-ACME CORP-SALARY,,"80,000.00","1,27,600.00"`,
+    `${D(2)},UPI-CHAI POINT-CHAIPOINT@YBL-YESB0001-412345678902-PAYMENT,999.00,,"1,26,601.00"`,
+    `${D(3)},NACH-DR-ZERODHA BROKING LTD-SIP 77821,"5,000.00",,"1,21,601.00"`,
+    `${D(4)},INT.PD:01-08-2026 TO 31-10-2026,,312.50,"1,21,913.50"`].join('\n');
+  await p.locator('button[aria-label="calc"]').click(); await p.waitForTimeout(400);
+  await p.locator('button:has-text("Bank Statement")').click(); await p.waitForTimeout(300);
+  await p.locator('button:has-text("Import statement")').first().click(); await p.waitForTimeout(300);
+  await p.locator('button:has-text("HDFC Savings")').click();
+  await p.locator('input[type="file"][accept*=".pdf"]').setInputFiles({ name: 'hdfc.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await p.locator('text=5 transactions found').waitFor();
+  await p.locator('button:has-text("Review 5 lines")').click(); await p.waitForTimeout(400);
+  // Suggestions are only suggestions: nothing is saved until confirmed.
+  assert.equal((await stored(p)).bankStmts[0].rows.filter(r => r.st === 'open').length, 5);
+  await p.locator('button:has-text("Confirm all 2 suggested matches")').click(); await p.waitForTimeout(300);
+  const row = name => p.locator('[data-bsrow="open"]').filter({ hasText: name });
+  await row('Chai Point').locator('button:has-text("Add expense")').click();
+  await p.locator('button:has-text("Add expense")').last().click(); await p.waitForTimeout(300);
+  await row('Zerodha').locator('button:has-text("Add to investment")').click();
+  await p.locator('button:has-text("Create holding")').click(); await p.waitForTimeout(300);
+  await row('Interest').locator('button:has-text("Add income")').click();
+  await p.locator('button:has-text("Add income")').last().click(); await p.waitForTimeout(500);
+  assert.match(await p.locator('#root').innerText(), /Nothing left to review/);
+  let d = await stored(p);
+  const rows = d.bankStmts[0].rows, by = k => rows.find(r => r.payee.includes(k));
+  assert.deepEqual(rows.map(r => r.st), ['done', 'done', 'done', 'done', 'done']);
+  assert.equal(by('Swiggy').how, 'match'); assert.equal(by('Swiggy').eid, 'a');
+  assert.equal(by('Acme').how, 'match'); assert.equal(by('Acme').eid, 'i1');
+  const chai = d.expenses.find(e => e.id === by('Chai').eid);
+  assert.deepEqual([chai.type, chai.amount, chai.accountId, chai.merchant], ['expense', 999, 'acc_bank', 'Chai Point']);
+  const inv = d.investments.find(i => i.id === by('Zerodha').ext.invId);
+  assert.deepEqual([inv.invested, inv.type], [5000, 'mf'], 'a SIP is a mutual fund');
+  assert.equal(d.expenses.find(e => e.id === by('Zerodha').eid).type, 'transfer-out', 'investment leaves the account as a transfer, not spending');
+  assert.equal(d.expenses.find(e => e.id === by('Interest').eid).category, 'interest');
+  // Undo puts everything back.
+  await p.locator('button:has-text("Done")').first().click(); await p.waitForTimeout(200);
+  await p.locator('[data-bsrow="done"]').filter({ hasText: 'Zerodha' }).locator('button:has-text("Undo")').click(); await p.waitForTimeout(400);
+  d = await stored(p);
+  assert.equal(d.investments.length, 0, 'holding removed');
+  assert.ok(!d.expenses.some(e => e.invId), 'transfer removed');
+  assert.equal(d.bankStmts[0].rows.find(r => r.payee.includes('Zerodha')).st, 'open');
+  assert.deepEqual(p.errors, []);
+});
+
 test('fonts: optional Settings fonts load only when needed', async () => {
   const p = await newPage();
   const links = () => p.evaluate(() => [...document.querySelectorAll('link[href*="fonts.googleapis.com/css2"]')].map(l => l.href).join(' '));

@@ -1202,7 +1202,7 @@ function restorePrefs(p){if(!p||typeof p!=="object")return;for(const[k,key]of Ob
 // Data fields that older backups did not carry: restored only when the file has them, so an old backup never blanks them.
 const BK_LATE_KEYS=["openingBalances","financeProfile","upcomingExpenses","alertThreshold","expensePlans","investmentPlans","reminderEnabled","reminderTime","incomeTracker"];
 function usePhotoSrc(photos){const[map,sMap]=useState({});useEffect(()=>{let live=true;(async()=>{const need=(photos||[]).filter(p=>p&&p.id&&!p.data&&!map[p.id]);if(!need.length)return;const m={};for(const p of need){try{const b=await idbGetFile(String(p.id));if(b)m[p.id]=await _blobToDataUrl(b)}catch(e){}}if(live&&Object.keys(m).length)sMap(mm=>({...mm,...m}))})();return()=>{live=false}},[photos]);return p=>(p&&p.data)||map[p&&p.id]||null}
-function buildBackupObj(dd){let sidebarOrder=null;try{const s=localStorage.getItem(SB_ORDER_KEY);if(s)sidebarOrder=JSON.parse(s)}catch(e){}return{version:"v3.2",exportedAt:new Date().toISOString(),expenses:dd.expenses,recurring:dd.recurring,accounts:dd.accounts,profiles:dd.profiles,cards:dd.cards||[],cardStatements:dd.cardStatements||[],bills:dd.bills||[],goals:dd.goals||[],budgetLoans:dd.budgetLoans||[],ledger:dd.ledger||[],categoryBudgets:dd.categoryBudgets||{},monthlyRestrictionLogs:dd.monthlyRestrictionLogs||[],investments:dd.investments||[],planThreshold:dd.planThreshold??null,monthEndRule:dd.monthEndRule||null,customExpenseCategories:dd.customExpenseCategories||[],customIncomeCategories:dd.customIncomeCategories||[],categoryOverrides:dd.categoryOverrides||{},categoryOrder:dd.categoryOrder||{expense:[],income:[]},sidebarOrder,myQuotes:dd.myQuotes||[],favLessons:dd.favLessons||[],budget:dd.budget,budgetPeriod:dd.budgetPeriod,morningEnabled:dd.morningEnabled||false,morningTime:dd.morningTime||"08:00",eveningEnabled:dd.eveningEnabled||false,eveningTime:dd.eveningTime||"21:00",currency:dd.currency,monthStartDay:dd.monthStartDay,fontSize:dd.fontSize||"medium",fontPrefs:dd.fontPrefs||null,aiProvider:gProv(),aiModel:gMdl()||null,merchantRules:dd.merchantRules||{},debtPlan:dd.debtPlan||null,las:dd.las||null,varExpensePlans:dd.varExpensePlans||{},varIncomePlans:dd.varIncomePlans||{},varSavingsPlans:dd.varSavingsPlans||{},advStats:dd.advStats||{},calculators:dd.calculators||{},groceryCategories:dd.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:dd.grocerySubDefaults||{},groceryStores:dd.groceryStores||[],groceryDefaultStore:dd.groceryDefaultStore||"",priceWatch:dd.priceWatch||PW_DEFAULT,threads:dd.threads||[],loanTracker:dd.loanTracker||[],goalInvest:dd.goalInvest||[],thresholdRules:dd.thresholdRules||[],netWorthSnapshots:dd.netWorthSnapshots||[],savingsPots:dd.savingsPots||[],savingsTarget:dd.savingsTarget??null,openingBalances:dd.openingBalances||[],financeProfile:dd.financeProfile||null,upcomingExpenses:dd.upcomingExpenses||[],alertThreshold:dd.alertThreshold??null,expensePlans:dd.expensePlans||[],investmentPlans:dd.investmentPlans||[],reminderEnabled:dd.reminderEnabled||false,reminderTime:dd.reminderTime||"21:00",incomeTracker:dd.incomeTracker||{},prefs:backupPrefs()}}
+function buildBackupObj(dd){let sidebarOrder=null;try{const s=localStorage.getItem(SB_ORDER_KEY);if(s)sidebarOrder=JSON.parse(s)}catch(e){}return{version:"v3.2",exportedAt:new Date().toISOString(),expenses:dd.expenses,recurring:dd.recurring,accounts:dd.accounts,profiles:dd.profiles,cards:dd.cards||[],cardStatements:dd.cardStatements||[],bills:dd.bills||[],goals:dd.goals||[],budgetLoans:dd.budgetLoans||[],ledger:dd.ledger||[],categoryBudgets:dd.categoryBudgets||{},monthlyRestrictionLogs:dd.monthlyRestrictionLogs||[],investments:dd.investments||[],planThreshold:dd.planThreshold??null,monthEndRule:dd.monthEndRule||null,customExpenseCategories:dd.customExpenseCategories||[],customIncomeCategories:dd.customIncomeCategories||[],categoryOverrides:dd.categoryOverrides||{},categoryOrder:dd.categoryOrder||{expense:[],income:[]},sidebarOrder,myQuotes:dd.myQuotes||[],favLessons:dd.favLessons||[],budget:dd.budget,budgetPeriod:dd.budgetPeriod,morningEnabled:dd.morningEnabled||false,morningTime:dd.morningTime||"08:00",eveningEnabled:dd.eveningEnabled||false,eveningTime:dd.eveningTime||"21:00",currency:dd.currency,monthStartDay:dd.monthStartDay,fontSize:dd.fontSize||"medium",fontPrefs:dd.fontPrefs||null,aiProvider:gProv(),aiModel:gMdl()||null,merchantRules:dd.merchantRules||{},debtPlan:dd.debtPlan||null,las:dd.las||null,varExpensePlans:dd.varExpensePlans||{},varIncomePlans:dd.varIncomePlans||{},varSavingsPlans:dd.varSavingsPlans||{},advStats:dd.advStats||{},calculators:dd.calculators||{},groceryCategories:dd.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:dd.grocerySubDefaults||{},groceryStores:dd.groceryStores||[],groceryDefaultStore:dd.groceryDefaultStore||"",priceWatch:dd.priceWatch||PW_DEFAULT,threads:dd.threads||[],loanTracker:dd.loanTracker||[],goalInvest:dd.goalInvest||[],bankStmts:dd.bankStmts||[],thresholdRules:dd.thresholdRules||[],netWorthSnapshots:dd.netWorthSnapshots||[],savingsPots:dd.savingsPots||[],savingsTarget:dd.savingsTarget??null,openingBalances:dd.openingBalances||[],financeProfile:dd.financeProfile||null,upcomingExpenses:dd.upcomingExpenses||[],alertThreshold:dd.alertThreshold??null,expensePlans:dd.expensePlans||[],investmentPlans:dd.investmentPlans||[],reminderEnabled:dd.reminderEnabled||false,reminderTime:dd.reminderTime||"21:00",incomeTracker:dd.incomeTracker||{},prefs:backupPrefs()}}
 async function buildBackupJSON(dd,withFiles=true){const j=buildBackupObj(dd);if(withFiles){try{j.statementFiles=await collectStmtFiles(j.cardStatements)}catch(e){j.statementFiles={}}try{j.expensePhotos=await collectPhotoFiles(j.expenses)}catch(e){j.expensePhotos={}}try{j.ledgerPhotos=await collectLedgerPhotoFiles(j.ledger)}catch(e){j.ledgerPhotos={}}try{j.lasPhotos=await collectLasPhotoFiles(j.las)}catch(e){j.lasPhotos={}}try{j.threadFiles=await collectThreadNoteFiles(j.threads)}catch(e){j.threadFiles={}}try{j.loanDocFiles=await collectLoanDocFiles(j.loanTracker)}catch(e){j.loanDocFiles={}}}return JSON.stringify(j,null,2)}
 async function gdUpload(json){const token=localStorage.getItem("gd_token");if(!token)throw new Error("Not connected to Google Drive");const fname=`expense-backup-${new Date().toISOString().slice(0,10)}.json`;const meta=JSON.stringify({name:fname,mimeType:"application/json"});const form=new FormData();form.append("metadata",new Blob([meta],{type:"application/json"}));form.append("file",new Blob([json],{type:"application/json"}));const res=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{method:"POST",headers:{Authorization:"Bearer "+token},body:form});if(!res.ok){const txt=await res.text().catch(()=>res.status);throw new Error("Upload failed ("+res.status+"): "+txt)}}
 
@@ -2231,7 +2231,7 @@ function App(){
   useEffect(()=>{bselSet([])},[v]);
   const navFromRef=useRef("home");
   const scrollRef=useRef(null);
-  const[d,sD]=useState({expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],bills:[],goals:[],budgetLoans:[],ledger:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},categoryOrder:{expense:[],income:[]},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,fontSize:"medium",loading:true,investmentPlans:[],investments:[],planThreshold:null,monthEndRule:null,monthlyRestrictionLogs:[],reminderEnabled:false,reminderTime:"21:00",rules:[],backupFreq:"off",backupGDrive:false,lastBackupAt:0,threads:[],loanTracker:[],goalInvest:[],netWorthSnapshots:[],savingsPots:[],savingsTarget:null,myQuotes:[],favLessons:[]});
+  const[d,sD]=useState({expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],bills:[],goals:[],budgetLoans:[],ledger:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},categoryOrder:{expense:[],income:[]},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,fontSize:"medium",loading:true,investmentPlans:[],investments:[],planThreshold:null,monthEndRule:null,monthlyRestrictionLogs:[],reminderEnabled:false,reminderTime:"21:00",rules:[],backupFreq:"off",backupGDrive:false,lastBackupAt:0,threads:[],loanTracker:[],goalInvest:[],bankStmts:[],netWorthSnapshots:[],savingsPots:[],savingsTarget:null,myQuotes:[],favLessons:[]});
   const dRef=useRef(null);dRef.current=d;
   const[atx,sAtx]=useState(null);const[reimbPrompt,sReimbPrompt]=useState(null);const[reimbT,sReimbT]=useState(null);
   // Editing a savings movement / a plain transfer -- both have their own editor,
@@ -2297,8 +2297,8 @@ function App(){
   const cu=usrs.find(u=>u.id===auid)||usrs[0];
   setUsers(usrs);setActiveUser(cu);
   const dk="etp-data-"+cu.id;
-  let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],cardStatements:[],bills:[],goals:[],budgetLoans:[],ledger:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},categoryOrder:{expense:[],income:[]},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,thresholdRules:[],expensePlans:[],investmentPlans:[],investments:[],planThreshold:null,monthEndRule:null,monthlyRestrictionLogs:[],openingBalances:[],reminderEnabled:false,reminderTime:"21:00",rules:[],backupFreq:"off",backupGDrive:false,lastBackupAt:0,merchantRules:{},debtPlan:null,las:null,varExpensePlans:{},varIncomePlans:{},varSavingsPlans:{},advStats:{},calculators:{},groceryCategories:GROC_CATS_DEFAULT,grocerySubDefaults:{},groceryStores:[],groceryDefaultStore:"",priceWatch:PW_DEFAULT,threads:[],loanTracker:[],goalInvest:[],netWorthSnapshots:[],savingsPots:[],savingsTarget:null,myQuotes:[],favLessons:[]};
-  try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,expenses:p.expenses||[],recurring:p.recurring||[],accounts:p.accounts&&p.accounts.length?p.accounts:[DA],profiles:p.profiles||[],cards:p.cards||[],cardStatements:p.cardStatements||[],bills:p.bills||[],goals:p.goals||[],budgetLoans:p.budgetLoans||[],ledger:p.ledger||[],categoryBudgets:p.categoryBudgets||{},customExpenseCategories:p.customExpenseCategories||[],customIncomeCategories:p.customIncomeCategories||[],categoryOverrides:p.categoryOverrides||{},categoryOrder:p.categoryOrder||{expense:[],income:[]},financeProfile:p.financeProfile||null,budget:p.budget??null,budgetPeriod:p.budgetPeriod||"monthly",currency:p.currency||"₹",monthStartDay:p.monthStartDay||1,fontSize:p.fontSize||"medium",fontPrefs:p.fontPrefs||null,upcomingExpenses:p.upcomingExpenses||[],alertThreshold:p.alertThreshold??null,thresholdRules:p.thresholdRules||[],expensePlans:p.expensePlans||[],investmentPlans:p.investmentPlans||[],investments:p.investments||[],planThreshold:p.planThreshold??null,monthEndRule:p.monthEndRule||null,monthlyRestrictionLogs:p.monthlyRestrictionLogs||[],openingBalances:p.openingBalances||[],reminderEnabled:p.reminderEnabled||false,reminderTime:p.reminderTime||"21:00",morningEnabled:p.morningEnabled||false,morningTime:p.morningTime||"08:00",eveningEnabled:p.eveningEnabled??(p.reminderEnabled||false),eveningTime:p.eveningTime||p.reminderTime||"21:00",rules:p.rules||[],backupFreq:p.backupFreq||"off",backupGDrive:p.backupGDrive||false,lastBackupAt:p.lastBackupAt||0,merchantRules:p.merchantRules||{},debtPlan:p.debtPlan||null,las:p.las||null,varExpensePlans:p.varExpensePlans||{},varIncomePlans:p.varIncomePlans||{},varSavingsPlans:p.varSavingsPlans||{},advStats:p.advStats||{},calculators:p.calculators||{},incomeTracker:p.incomeTracker||{},groceryCategories:p.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:p.grocerySubDefaults||{},groceryStores:p.groceryStores||[],groceryDefaultStore:p.groceryDefaultStore||"",priceWatch:p.priceWatch||PW_DEFAULT,threads:p.threads||[],loanTracker:p.loanTracker||[],goalInvest:p.goalInvest||[],netWorthSnapshots:p.netWorthSnapshots||[],savingsPots:p.savingsPots||[],savingsTarget:p.savingsTarget??null,myQuotes:p.myQuotes||[],favLessons:p.favLessons||[]};_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[];_catOv=i.categoryOverrides||{};_rowPrefs=(i.calculators||{}).rowPrefs||null;_catOrder=i.categoryOrder||{expense:[],income:[]};_grocCats=i.groceryCategories||GROC_CATS_DEFAULT;
+  let i={expenses:[],recurring:[],accounts:[DA],profiles:[],cards:[],cardStatements:[],bills:[],goals:[],budgetLoans:[],ledger:[],categoryBudgets:{},customExpenseCategories:[],customIncomeCategories:[],categoryOverrides:{},categoryOrder:{expense:[],income:[]},financeProfile:null,budget:null,budgetPeriod:"monthly",currency:"₹",monthStartDay:1,upcomingExpenses:[],alertThreshold:null,thresholdRules:[],expensePlans:[],investmentPlans:[],investments:[],planThreshold:null,monthEndRule:null,monthlyRestrictionLogs:[],openingBalances:[],reminderEnabled:false,reminderTime:"21:00",rules:[],backupFreq:"off",backupGDrive:false,lastBackupAt:0,merchantRules:{},debtPlan:null,las:null,varExpensePlans:{},varIncomePlans:{},varSavingsPlans:{},advStats:{},calculators:{},groceryCategories:GROC_CATS_DEFAULT,grocerySubDefaults:{},groceryStores:[],groceryDefaultStore:"",priceWatch:PW_DEFAULT,threads:[],loanTracker:[],goalInvest:[],bankStmts:[],netWorthSnapshots:[],savingsPots:[],savingsTarget:null,myQuotes:[],favLessons:[]};
+  try{const g=await window.storage.get(dk);if(g){const p=JSON.parse(g.value);i={...i,expenses:p.expenses||[],recurring:p.recurring||[],accounts:p.accounts&&p.accounts.length?p.accounts:[DA],profiles:p.profiles||[],cards:p.cards||[],cardStatements:p.cardStatements||[],bills:p.bills||[],goals:p.goals||[],budgetLoans:p.budgetLoans||[],ledger:p.ledger||[],categoryBudgets:p.categoryBudgets||{},customExpenseCategories:p.customExpenseCategories||[],customIncomeCategories:p.customIncomeCategories||[],categoryOverrides:p.categoryOverrides||{},categoryOrder:p.categoryOrder||{expense:[],income:[]},financeProfile:p.financeProfile||null,budget:p.budget??null,budgetPeriod:p.budgetPeriod||"monthly",currency:p.currency||"₹",monthStartDay:p.monthStartDay||1,fontSize:p.fontSize||"medium",fontPrefs:p.fontPrefs||null,upcomingExpenses:p.upcomingExpenses||[],alertThreshold:p.alertThreshold??null,thresholdRules:p.thresholdRules||[],expensePlans:p.expensePlans||[],investmentPlans:p.investmentPlans||[],investments:p.investments||[],planThreshold:p.planThreshold??null,monthEndRule:p.monthEndRule||null,monthlyRestrictionLogs:p.monthlyRestrictionLogs||[],openingBalances:p.openingBalances||[],reminderEnabled:p.reminderEnabled||false,reminderTime:p.reminderTime||"21:00",morningEnabled:p.morningEnabled||false,morningTime:p.morningTime||"08:00",eveningEnabled:p.eveningEnabled??(p.reminderEnabled||false),eveningTime:p.eveningTime||p.reminderTime||"21:00",rules:p.rules||[],backupFreq:p.backupFreq||"off",backupGDrive:p.backupGDrive||false,lastBackupAt:p.lastBackupAt||0,merchantRules:p.merchantRules||{},debtPlan:p.debtPlan||null,las:p.las||null,varExpensePlans:p.varExpensePlans||{},varIncomePlans:p.varIncomePlans||{},varSavingsPlans:p.varSavingsPlans||{},advStats:p.advStats||{},calculators:p.calculators||{},incomeTracker:p.incomeTracker||{},groceryCategories:p.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:p.grocerySubDefaults||{},groceryStores:p.groceryStores||[],groceryDefaultStore:p.groceryDefaultStore||"",priceWatch:p.priceWatch||PW_DEFAULT,threads:p.threads||[],loanTracker:p.loanTracker||[],goalInvest:p.goalInvest||[],bankStmts:p.bankStmts||[],netWorthSnapshots:p.netWorthSnapshots||[],savingsPots:p.savingsPots||[],savingsTarget:p.savingsTarget??null,myQuotes:p.myQuotes||[],favLessons:p.favLessons||[]};_custCE=i.customExpenseCategories||[];_custCI=i.customIncomeCategories||[];_catOv=i.categoryOverrides||{};_rowPrefs=(i.calculators||{}).rowPrefs||null;_catOrder=i.categoryOrder||{expense:[],income:[]};_grocCats=i.groceryCategories||GROC_CATS_DEFAULT;
   if(i.currency==="₹"){i.accounts=i.accounts.map(a=>a.currency==="$"?{...a,currency:"₹"}:a);const accMap=Object.fromEntries(i.accounts.map(a=>[a.id,a]));i.expenses=i.expenses.map(e=>e.currency==="$"?{...e,currency:accMap[e.accountId]?.currency||i.currency}:e)}
   if(!localStorage.getItem("etp-cash-unlinked")){const cashIds=new Set(i.accounts.filter(a=>a.id==="acc_default"||a.name==="Cash").map(a=>a.id));i.expenses=i.expenses.map(e=>cashIds.has(e.accountId)?{...e,accountId:null}:e);localStorage.setItem("etp-cash-unlinked","1")}}}catch(e){console.error("load",e)}
   // Backfill stmtChecked onto every pre-existing statement import: the flag was added after this
@@ -2339,7 +2339,7 @@ function App(){
   try{await window.storage.set(dk,JSON.stringify(strip(i)))}catch{}
 })()},[]);
 
-  const strip=x=>({expenses:x.expenses,recurring:x.recurring,accounts:x.accounts,profiles:x.profiles,cards:x.cards||[],cardStatements:x.cardStatements||[],bills:x.bills||[],goals:x.goals||[],budgetLoans:x.budgetLoans||[],ledger:x.ledger||[],categoryBudgets:x.categoryBudgets||{},monthlyRestrictionLogs:x.monthlyRestrictionLogs||[],openingBalances:x.openingBalances||[],customExpenseCategories:x.customExpenseCategories||[],customIncomeCategories:x.customIncomeCategories||[],categoryOverrides:x.categoryOverrides||{},categoryOrder:x.categoryOrder||{expense:[],income:[]},financeProfile:x.financeProfile||null,budget:x.budget,budgetPeriod:x.budgetPeriod,currency:x.currency,monthStartDay:x.monthStartDay,fontSize:x.fontSize||"medium",fontPrefs:x.fontPrefs||null,upcomingExpenses:x.upcomingExpenses||[],alertThreshold:x.alertThreshold??null,thresholdRules:x.thresholdRules||[],expensePlans:x.expensePlans||[],investmentPlans:x.investmentPlans||[],investments:x.investments||[],planThreshold:x.planThreshold??null,monthEndRule:x.monthEndRule||null,reminderEnabled:x.reminderEnabled||false,reminderTime:x.reminderTime||"21:00",morningEnabled:x.morningEnabled||false,morningTime:x.morningTime||"08:00",eveningEnabled:x.eveningEnabled||false,eveningTime:x.eveningTime||"21:00",backupFreq:x.backupFreq||"off",backupGDrive:x.backupGDrive||false,lastBackupAt:x.lastBackupAt||0,merchantRules:x.merchantRules||{},debtPlan:x.debtPlan||null,las:x.las||null,threads:x.threads||[],loanTracker:x.loanTracker||[],goalInvest:x.goalInvest||[],varExpensePlans:x.varExpensePlans||{},varIncomePlans:x.varIncomePlans||{},varSavingsPlans:x.varSavingsPlans||{},advStats:x.advStats||{},calculators:x.calculators||{},incomeTracker:x.incomeTracker||{},groceryCategories:x.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:x.grocerySubDefaults||{},groceryStores:x.groceryStores||[],groceryDefaultStore:x.groceryDefaultStore||"",priceWatch:x.priceWatch||PW_DEFAULT,netWorthSnapshots:x.netWorthSnapshots||[],savingsPots:x.savingsPots||[],savingsTarget:x.savingsTarget??null,myQuotes:x.myQuotes||[],favLessons:x.favLessons||[]});
+  const strip=x=>({expenses:x.expenses,recurring:x.recurring,accounts:x.accounts,profiles:x.profiles,cards:x.cards||[],cardStatements:x.cardStatements||[],bills:x.bills||[],goals:x.goals||[],budgetLoans:x.budgetLoans||[],ledger:x.ledger||[],categoryBudgets:x.categoryBudgets||{},monthlyRestrictionLogs:x.monthlyRestrictionLogs||[],openingBalances:x.openingBalances||[],customExpenseCategories:x.customExpenseCategories||[],customIncomeCategories:x.customIncomeCategories||[],categoryOverrides:x.categoryOverrides||{},categoryOrder:x.categoryOrder||{expense:[],income:[]},financeProfile:x.financeProfile||null,budget:x.budget,budgetPeriod:x.budgetPeriod,currency:x.currency,monthStartDay:x.monthStartDay,fontSize:x.fontSize||"medium",fontPrefs:x.fontPrefs||null,upcomingExpenses:x.upcomingExpenses||[],alertThreshold:x.alertThreshold??null,thresholdRules:x.thresholdRules||[],expensePlans:x.expensePlans||[],investmentPlans:x.investmentPlans||[],investments:x.investments||[],planThreshold:x.planThreshold??null,monthEndRule:x.monthEndRule||null,reminderEnabled:x.reminderEnabled||false,reminderTime:x.reminderTime||"21:00",morningEnabled:x.morningEnabled||false,morningTime:x.morningTime||"08:00",eveningEnabled:x.eveningEnabled||false,eveningTime:x.eveningTime||"21:00",backupFreq:x.backupFreq||"off",backupGDrive:x.backupGDrive||false,lastBackupAt:x.lastBackupAt||0,merchantRules:x.merchantRules||{},debtPlan:x.debtPlan||null,las:x.las||null,threads:x.threads||[],loanTracker:x.loanTracker||[],goalInvest:x.goalInvest||[],bankStmts:x.bankStmts||[],varExpensePlans:x.varExpensePlans||{},varIncomePlans:x.varIncomePlans||{},varSavingsPlans:x.varSavingsPlans||{},advStats:x.advStats||{},calculators:x.calculators||{},incomeTracker:x.incomeTracker||{},groceryCategories:x.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:x.grocerySubDefaults||{},groceryStores:x.groceryStores||[],groceryDefaultStore:x.groceryDefaultStore||"",priceWatch:x.priceWatch||PW_DEFAULT,netWorthSnapshots:x.netWorthSnapshots||[],savingsPots:x.savingsPots||[],savingsTarget:x.savingsTarget??null,myQuotes:x.myQuotes||[],favLessons:x.favLessons||[]});
 
   const pst=async(p)=>{let noRv=false;if(p&&p._noReview){noRv=true;p={...p};delete p._noReview}const n=_normMoney({...d,...p});if(!noRv&&p&&p.expenses&&p.expenses!==d.expenses)n.expenses=_rvMark(d.expenses,n.expenses);_recCut=planCut(n);_custCE=n.customExpenseCategories||[];_custCI=n.customIncomeCategories||[];_catOv=n.categoryOverrides||{};_rowPrefs=(n.calculators||{}).rowPrefs||null;_catOrder=n.categoryOrder||{expense:[],income:[]};_grocCats=n.groceryCategories||GROC_CATS_DEFAULT;sD(n);const dk=activeUser?"etp-data-"+activeUser.id:KS;try{await window.storage.set(dk,JSON.stringify(strip(n)))}catch(e){console.error(e);try{if(!window.__pstErrWarned){window.__pstErrWarned=true;alert("⚠ Could not save your data — device storage looks full. Recent changes may disappear when the app closes. Free up space, then make any small edit to retry saving.")}}catch(e2){}}};
   const pstRef=useRef(null);pstRef.current=pst;
@@ -2710,6 +2710,7 @@ function App(){
         v==="monthlyReport"&&t(MReport,{data:d,onClose:()=>sV(navFromRef.current)}),
         v==="budgetCalc"&&t(BudgetPage,{data:d,persist:pst,onClose:()=>sV("calculators"),onView:sV}),
         v==="reinvest"&&t(ReinvestDash,{data:d,persist:pst,onTx:sAtx,getFrom:()=>navFromRef.current,onClose:()=>sV(_rvOrigin||"calculators"),onView:(id)=>{navFromRef.current="reinvest";sV(id)}}),
+        v==="bankStmt"&&t(BankStmt,{data:d,persist:pst,onTx:sAtx,onClose:()=>sV(navFromRef.current||"calculators")}),
         v==="goalInvest"&&t(GoalInvest,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"calculators")}),
         v==="loanTracker"&&t(LoanTracker,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"calculators"),onView:(id)=>{navFromRef.current="loanTracker";sV(id)}}),
         v==="loanFlow"&&t(FlowDash,{data:d,persist:pst,onClose:()=>sV(navFromRef.current||"calculators"),onView:(id)=>{navFromRef.current="loanFlow";sV(id)}}),
@@ -12782,7 +12783,7 @@ const onFile=async e=>{
   }
 };
 const tryRestore=()=>{try{const o2=JSON.parse(txt);if(!o2.expenses||!Array.isArray(o2.expenses))throw new Error("Invalid format — missing expenses array");sConf(o2)}catch(err){sMsg("Error: "+err.message)}};
-const doRestore=async()=>{const o2=conf;sMsg("Restoring…");await Promise.all([restoreStmtFiles(o2.statementFiles),restoreStmtFiles(o2.expensePhotos),restoreStmtFiles(o2.ledgerPhotos),restoreStmtFiles(o2.lasPhotos),restoreStmtFiles(o2.threadFiles),restoreStmtFiles(o2.loanDocFiles)].map(p=>p.catch(()=>{})));if(Array.isArray(o2.sidebarOrder)){try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2.sidebarOrder))}catch(e){}}persist({_noReview:true,expenses:o2.expenses||[],recurring:o2.recurring||[],accounts:o2.accounts&&o2.accounts.length?o2.accounts:[DA],profiles:o2.profiles||[],cards:o2.cards||[],cardStatements:o2.cardStatements||[],bills:o2.bills||[],goals:o2.goals||[],budgetLoans:o2.budgetLoans||[],ledger:o2.ledger||[],categoryBudgets:o2.categoryBudgets||{},monthlyRestrictionLogs:o2.monthlyRestrictionLogs||[],investments:o2.investments||[],planThreshold:o2.planThreshold??null,monthEndRule:o2.monthEndRule||null,customExpenseCategories:o2.customExpenseCategories||[],customIncomeCategories:o2.customIncomeCategories||[],categoryOverrides:o2.categoryOverrides||{},categoryOrder:o2.categoryOrder||{expense:[],income:[]},budget:o2.budget??null,budgetPeriod:o2.budgetPeriod||"monthly",...(o2.morningEnabled!=null?{morningEnabled:o2.morningEnabled,morningTime:o2.morningTime||"08:00",eveningEnabled:o2.eveningEnabled||false,eveningTime:o2.eveningTime||"21:00"}:{}),currency:o2.currency||"$",monthStartDay:o2.monthStartDay||1,...(o2.fontSize?{fontSize:o2.fontSize}:{}),...(o2.fontPrefs?{fontPrefs:o2.fontPrefs}:{}),merchantRules:o2.merchantRules||{},debtPlan:o2.debtPlan||null,las:o2.las||null,varExpensePlans:o2.varExpensePlans||{},varIncomePlans:o2.varIncomePlans||{},varSavingsPlans:o2.varSavingsPlans||{},advStats:o2.advStats||{},calculators:o2.calculators||{},groceryCategories:o2.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:o2.grocerySubDefaults||{},groceryStores:o2.groceryStores||[],groceryDefaultStore:o2.groceryDefaultStore||"",priceWatch:o2.priceWatch||PW_DEFAULT,threads:o2.threads||[],loanTracker:o2.loanTracker||[],goalInvest:o2.goalInvest||[],thresholdRules:o2.thresholdRules||[],netWorthSnapshots:o2.netWorthSnapshots||[],savingsPots:o2.savingsPots||[],savingsTarget:o2.savingsTarget??null,myQuotes:o2.myQuotes||[],favLessons:o2.favLessons||[],...Object.fromEntries(BK_LATE_KEYS.filter(k=>k in o2).map(k=>[k,o2[k]]))});restorePrefs(o2.prefs);try{if(o2.aiProvider)sProv(o2.aiProvider);if("aiModel" in o2)sMdl(o2.aiModel||null);sAK(null)}catch(e){}sConf(null);sMsg("✓ Restored. Re-enter your AI API key in Settings (keys are never stored in backups)"+(o2.statementFiles?" (statement PDFs included)":""));sTxt("")};
+const doRestore=async()=>{const o2=conf;sMsg("Restoring…");await Promise.all([restoreStmtFiles(o2.statementFiles),restoreStmtFiles(o2.expensePhotos),restoreStmtFiles(o2.ledgerPhotos),restoreStmtFiles(o2.lasPhotos),restoreStmtFiles(o2.threadFiles),restoreStmtFiles(o2.loanDocFiles)].map(p=>p.catch(()=>{})));if(Array.isArray(o2.sidebarOrder)){try{localStorage.setItem(SB_ORDER_KEY,JSON.stringify(o2.sidebarOrder))}catch(e){}}persist({_noReview:true,expenses:o2.expenses||[],recurring:o2.recurring||[],accounts:o2.accounts&&o2.accounts.length?o2.accounts:[DA],profiles:o2.profiles||[],cards:o2.cards||[],cardStatements:o2.cardStatements||[],bills:o2.bills||[],goals:o2.goals||[],budgetLoans:o2.budgetLoans||[],ledger:o2.ledger||[],categoryBudgets:o2.categoryBudgets||{},monthlyRestrictionLogs:o2.monthlyRestrictionLogs||[],investments:o2.investments||[],planThreshold:o2.planThreshold??null,monthEndRule:o2.monthEndRule||null,customExpenseCategories:o2.customExpenseCategories||[],customIncomeCategories:o2.customIncomeCategories||[],categoryOverrides:o2.categoryOverrides||{},categoryOrder:o2.categoryOrder||{expense:[],income:[]},budget:o2.budget??null,budgetPeriod:o2.budgetPeriod||"monthly",...(o2.morningEnabled!=null?{morningEnabled:o2.morningEnabled,morningTime:o2.morningTime||"08:00",eveningEnabled:o2.eveningEnabled||false,eveningTime:o2.eveningTime||"21:00"}:{}),currency:o2.currency||"$",monthStartDay:o2.monthStartDay||1,...(o2.fontSize?{fontSize:o2.fontSize}:{}),...(o2.fontPrefs?{fontPrefs:o2.fontPrefs}:{}),merchantRules:o2.merchantRules||{},debtPlan:o2.debtPlan||null,las:o2.las||null,varExpensePlans:o2.varExpensePlans||{},varIncomePlans:o2.varIncomePlans||{},varSavingsPlans:o2.varSavingsPlans||{},advStats:o2.advStats||{},calculators:o2.calculators||{},groceryCategories:o2.groceryCategories||GROC_CATS_DEFAULT,grocerySubDefaults:o2.grocerySubDefaults||{},groceryStores:o2.groceryStores||[],groceryDefaultStore:o2.groceryDefaultStore||"",priceWatch:o2.priceWatch||PW_DEFAULT,threads:o2.threads||[],loanTracker:o2.loanTracker||[],goalInvest:o2.goalInvest||[],bankStmts:o2.bankStmts||[],thresholdRules:o2.thresholdRules||[],netWorthSnapshots:o2.netWorthSnapshots||[],savingsPots:o2.savingsPots||[],savingsTarget:o2.savingsTarget??null,myQuotes:o2.myQuotes||[],favLessons:o2.favLessons||[],...Object.fromEntries(BK_LATE_KEYS.filter(k=>k in o2).map(k=>[k,o2[k]]))});restorePrefs(o2.prefs);try{if(o2.aiProvider)sProv(o2.aiProvider);if("aiModel" in o2)sMdl(o2.aiModel||null);sAK(null)}catch(e){}sConf(null);sMsg("✓ Restored. Re-enter your AI API key in Settings (keys are never stored in backups)"+(o2.statementFiles?" (statement PDFs included)":""));sTxt("")};
 const prebuild=async()=>{try{const s=await window.storage.get(KB);if(!s){alert("No prebuild snapshot found");return}sTxt(s.value);sMsg("Loaded prebuild backup — review then tap Restore")}catch{alert("Error loading snapshot")}};
 return o("div",{style:{padding:`8px ${GUT}px 32px`},className:"st",children:[
   t(SH,{title:t("em",{children:"Backup & Restore"}),onBack:onClose}),
@@ -16616,6 +16617,531 @@ function ReinvestHomeCard({data,onView}){
         t("div",{style:{fontSize:11,color:late?c.ro:c.tm,marginTop:3},children:`${fs(pf.value,cur)} invested value`+(due.length?` · ${due.length} due${late?` (${late} overdue)`:" soon"}`:"")})]}),
       t("span",{style:{color:c.tm,fontSize:20},children:"›"})]})});
 }
+// === BANK STATEMENT (Calculators) — parsing & classifying ===
+// Reads a savings/current account statement (PDF text, Excel/CSV, or AI-read photos) into
+// {date, amount, dir:"dr"|"cr", nar, bal} rows, cleans the payee out of UPI/NEFT/IMPS/ACH codes and
+// suggests a kind (spending, EMI, investment, salary …). Nothing is written to your data here:
+// the review screen only suggests, and every change needs a tap.
+const BS_MON={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,sept:8,oct:9,nov:10,dec:11};
+// First date in the text: 01/11/2026, 01-11-26, 2026-11-01, 01-Nov-2026, 01 Nov 26, Nov 01, 2026.
+function bsDate(s){
+  s=String(s==null?"":s).trim();if(!s)return null;
+  let m,y,mo,d;
+  if((m=s.match(/\b(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})\b/))){y=+m[1];mo=+m[2]-1;d=+m[3]}
+  else if((m=s.match(/\b(\d{1,2})\s?[\/\-.]\s?(\d{1,2})\s?[\/\-.]\s?(\d{2,4})\b/))){d=+m[1];mo=+m[2]-1;y=+m[3]}
+  else if((m=s.match(/\b(\d{1,2})[\s\-\/.]*([A-Za-z]{3,9})[\s\-\/.,']*(\d{2,4})\b/))&&BS_MON[m[2].slice(0,3).toLowerCase()]!=null){d=+m[1];mo=BS_MON[m[2].slice(0,3).toLowerCase()];y=+m[3]}
+  else if((m=s.match(/\b([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})\b/))&&BS_MON[m[1].slice(0,3).toLowerCase()]!=null){mo=BS_MON[m[1].slice(0,3).toLowerCase()];d=+m[2];y=+m[3]}
+  else return null;
+  if(y<100)y+=2000;
+  if(!(mo>=0&&mo<12&&d>=1&&d<=31&&y>1990&&y<2100))return null;
+  const dt=new Date(y,mo,d,12,0,0,0);
+  return dt.getDate()===d?dt.getTime():null;
+}
+// Money cell → number. "1,23,456.78", "(500.00)", "500.00 Dr", "-500", "₹ 500". Returns {v, sign} or null.
+function bsNum(s){
+  let t=String(s==null?"":s).replace(/[ \s]+/g," ").trim();if(!t)return null;
+  let sign=0;
+  if(/\b(dr|debit)\.?$/i.test(t))sign=-1;else if(/\b(cr|credit)\.?$/i.test(t))sign=1;
+  t=t.replace(/\b(dr|cr|debit|credit)\.?$/i,"").replace(/(₹|rs\.?|inr)/gi,"").trim();
+  if(/^\(.*\)$/.test(t)){sign=-1;t=t.slice(1,-1)}
+  if(/^-/.test(t)){sign=-1;t=t.slice(1)}else if(/-$/.test(t)){sign=-1;t=t.slice(0,-1)}
+  t=t.replace(/,/g,"").trim();
+  if(!/^\d+(\.\d+)?$/.test(t))return null;
+  const v=parseFloat(t);return isFinite(v)?{v:_r2(v),sign}:null;
+}
+const bsIsAmt=s=>/^\(?-?(₹\s?)?\d{1,3}(,\d{2,3})*(\.\d{1,2})\)?(\s?(cr|dr)\.?)?$|^\(?-?\d+\.\d{2}\)?(\s?(cr|dr)\.?)?$/i.test(String(s||"").trim());
+const BS_BANKS=[["SBI",/state bank of india|\bsbi\b/i],["HDFC",/hdfc bank/i],["ICICI",/icici bank/i],["Axis",/axis bank/i],["IDFC FIRST",/idfc\s*first/i],["Kotak",/kotak/i],["Yes",/yes bank/i]];
+const bsBank=txt=>{for(const[n,re]of BS_BANKS)if(re.test(txt))return n;return null};
+// Header cell → column role.
+function bsRole(h){
+  h=String(h||"").toLowerCase().replace(/\s+/g," ").trim();if(!h)return null;
+  if(/value\s*d(ate|t)/.test(h))return"vdate";
+  if(/(txn|tran|transaction|post(ing)?|book(ing)?)\s*d(ate|t)|^date$|^dt\.?$|^date\b/.test(h))return"date";
+  if(/balance|bal\.?$/.test(h))return"bal";
+  if(/^(dr|cr)\s*\/\s*(cr|dr)$|^type$|dr\s*\/\s*cr|cr\s*\/\s*dr|debit\s*\/\s*credit|^dr or cr$/.test(h))return"drcr";
+  if(/withdraw|debit|^dr\.?\b|paid out|^dr amount/.test(h)&&!/credit|deposit/.test(h))return"dr";
+  if(/deposit|credit|^cr\.?\b|paid in/.test(h)&&!/debit|withdraw/.test(h))return"cr";
+  if(/narration|description|particulars|remarks|details|transaction info/.test(h))return"desc";
+  if(/amount|amt/.test(h))return"amt";
+  if(/chq|cheque|ref/.test(h))return"ref";
+  return null;
+}
+const bsHeaderScore=roles=>{const r=new Set(roles.filter(Boolean));return(r.has("date")||r.has("vdate")?1:0)+(r.has("desc")?1:0)+((r.has("dr")&&r.has("cr"))||r.has("amt")?1:0)+(r.has("bal")?1:0)};
+const BS_STOP=/^(opening|closing) balance|statement summary|^total\b|grand total|page \d+ of|end of statement|this is a computer|computer generated|^\*+/i;
+// Table rows (string[][]) → transactions. Used for Excel/CSV directly and for PDFs after their
+// text has been laid out into columns.
+function bsFromTable(rows){
+  rows=(rows||[]).map(r=>(r||[]).map(x=>String(x==null?"":x).replace(/\s+/g," ").trim()));
+  let hI=-1,roles=null,best=0;
+  for(let i=0;i<Math.min(rows.length,80);i++){const rr=rows[i].map(bsRole),sc=bsHeaderScore(rr);if(sc>best&&sc>=3){best=sc;hI=i;roles=rr;if(sc===4)break}}
+  if(hI<0)return{err:"Couldn't find the column headings (Date, Narration, Debit/Withdrawal, Credit/Deposit, Balance)."};
+  const col=k=>roles.indexOf(k);
+  let dI=col("date");if(dI<0)dI=col("vdate");
+  const nI=col("desc"),drI=col("dr"),crI=col("cr"),aI=col("amt"),tI=col("drcr"),bI=col("bal");
+  const head=rows.slice(0,hI).map(r=>r.join(" ")).join(" "),allTxt=head+" "+rows.slice(-12).map(r=>r.join(" ")).join(" ");
+  let opening=null,closing=null;
+  for(const r of rows){const j=r.join(" ");let m;if(opening==null&&(m=j.match(/opening balance[^\d\-(]*([\-(]?[\d,]+\.\d{1,2}\)?(\s?(cr|dr))?)/i))){const n=bsNum(m[1]);if(n)opening=n.sign<0?-n.v:n.v}if((m=j.match(/closing balance[^\d\-(]*([\-(]?[\d,]+\.\d{1,2}\)?(\s?(cr|dr))?)/i))){const n=bsNum(m[1]);if(n)closing=n.sign<0?-n.v:n.v}}
+  const tx=[];let skipped=0;
+  for(let i=hI+1;i<rows.length;i++){
+    const r=rows[i];if(!r.some(Boolean))continue;
+    if(bsHeaderScore(r.map(bsRole))>=3)continue; // header repeated on every PDF page
+    const joined=r.join(" ");
+    const ts=dI>=0?bsDate(r[dI]):null;
+    if(!ts){
+      // A narration that wrapped onto its own line belongs to the row above.
+      const txt=nI>=0?r[nI]:"";
+      if(tx.length&&txt&&!BS_STOP.test(joined)&&!r.some((x,j)=>j!==nI&&j!==col("ref")&&x&&bsIsAmt(x)))tx[tx.length-1].nar=(tx[tx.length-1].nar+" "+txt).trim();
+      continue;
+    }
+    if(BS_STOP.test(nI>=0?r[nI]:joined))continue;
+    let amt=null,dir=null;
+    const dr=drI>=0?bsNum(r[drI]):null,cr=crI>=0?bsNum(r[crI]):null;
+    if(dr&&dr.v>0&&!(cr&&cr.v>0)){amt=dr.v;dir="dr"}
+    else if(cr&&cr.v>0&&!(dr&&dr.v>0)){amt=cr.v;dir="cr"}
+    else if(aI>=0){const a=bsNum(r[aI]);if(a&&a.v>0){amt=a.v;const ty=tI>=0?String(r[tI]).toLowerCase():"";dir=/^(cr|c|credit|deposit)/.test(ty)?"cr":/^(dr|d|debit|withdraw)/.test(ty)?"dr":a.sign>0?"cr":a.sign<0?"dr":null}}
+    if(amt==null){skipped++;continue}
+    const b=bI>=0?bsNum(r[bI]):null;
+    tx.push({date:ts,amount:amt,dir,nar:nI>=0?r[nI]:joined,bal:b?(b.sign<0?-b.v:b.v):null});
+  }
+  bsFixDirs(tx,opening);
+  for(const x of tx)if(!x.dir){x.dir="dr";x.guess=true}
+  return{tx,opening,closing,bank:bsBank(allTxt),skipped};
+}
+// The running balance settles debit vs credit: a row whose amount equals the change in balance
+// takes that direction, whichever column the amount was printed in. Works for oldest-first and
+// newest-first statements.
+function bsFixDirs(tx,opening){
+  const withBal=tx.filter(x=>x.bal!=null).length;if(withBal<2&&opening==null)return;
+  const pass=(list,start)=>{let prev=start,hits=0;const dirs=[];for(const x of list){let d=null;if(prev!=null&&x.bal!=null){const delta=_r2(x.bal-prev);if(Math.abs(Math.abs(delta)-x.amount)<0.011){d=delta<0?"dr":"cr";hits++}}dirs.push(d);if(x.bal!=null)prev=x.bal}return{hits,dirs}};
+  const fwd=pass(tx,opening),rev=pass([...tx].reverse(),null);
+  const use=fwd.hits>=rev.hits?fwd.dirs:[...rev.dirs].reverse();
+  tx.forEach((x,i)=>{if(use[i]){x.dir=use[i];x.guess=false}});
+  // Newest-first: the first row's balance has no row before it; use the column guess (already set).
+}
+// --- PDF: lay the page text out into rows and columns, then reuse bsFromTable. ---
+let _pdfjsP=null;
+function ensurePdfjs(){
+  if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib);
+  if(_pdfjsP)return _pdfjsP;
+  const V="3.11.174",B="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/"+V+"/";
+  _pdfjsP=new Promise((res,rej)=>{const s=document.createElement("script");s.src=B+"pdf.min.js";s.crossOrigin="anonymous";s.onload=async()=>{const L=window.pdfjsLib;if(!L){_pdfjsP=null;return rej(new Error("PDF reader didn't load"))}
+    // A cross-origin worker can't be started directly; load its code into a blob URL instead.
+    try{const w=await fetch(B+"pdf.worker.min.js");const code=await w.text();L.GlobalWorkerOptions.workerSrc=URL.createObjectURL(new Blob([code],{type:"application/javascript"}))}catch(e){L.GlobalWorkerOptions.workerSrc=B+"pdf.worker.min.js"}
+    res(L)};s.onerror=()=>{_pdfjsP=null;rej(new Error("Couldn't load the PDF reader. Check your connection and try again."))};document.head.appendChild(s)});
+  return _pdfjsP;
+}
+// → {pages:[[{s,x0,x1,y,h}]]}. Throws {code:"password"|"badpassword"} for locked PDFs.
+async function bsPdfItems(buf,password){
+  const L=await ensurePdfjs();
+  let doc;
+  try{doc=await L.getDocument({data:new Uint8Array(buf),password:password||undefined,isEvalSupported:false}).promise}
+  catch(e){if(e&&e.name==="PasswordException"){const err=new Error(e.code===2?"Wrong password":"This PDF needs a password");err.code=e.code===2?"badpassword":"password";throw err}throw e}
+  const pages=[];
+  for(let p=1;p<=doc.numPages;p++){const pg=await doc.getPage(p);const tc=await pg.getTextContent();
+    pages.push(tc.items.filter(it=>it.str&&it.str.trim()).map(it=>{const x=it.transform[4],y=it.transform[5],h=Math.abs(it.transform[3])||it.height||8;return{s:it.str,x0:x,x1:x+(it.width||it.str.length*h*0.5),y,h}}))}
+  try{doc.destroy()}catch(e){}
+  return{pages};
+}
+// Group text items into lines; find the heading block (headings may stack over 2–3 lines); each
+// line with an amount starts a transaction row, and the wrapped lines under it (date split over
+// lines, long narration) join that row column by column. Cells are top-aligned in SBI, HDFC,
+// ICICI, Axis and IDFC FIRST statements.
+function bsPdfToRows(pages){
+  const out=[];let anchors=null,headTxt="";
+  const join=(l,gap)=>{const cs=[];for(const it of l.items){const last=cs[cs.length-1];if(last&&it.x0-last.x1<it.h*gap){last.s+=(it.x0-last.x1>it.h*0.1?" ":"")+it.s;last.x1=it.x1}else cs.push({s:it.s,x0:it.x0,x1:it.x1,y:l.y})}return cs};
+  const cellsOf=l=>{const cs=join(l,0.12);
+    // Split cells that are several amounts or dates run together ("80,000.00 1,29,550.00").
+    const res=[];for(const c2 of cs){const parts=c2.s.trim().split(/\s+/);if(parts.length>1){const w=(c2.x1-c2.x0)/Math.max(1,c2.s.length);let x=c2.x0;for(const pt of parts){res.push({s:pt,x0:x,x1:x+pt.length*w,y:c2.y});x+=(pt.length+1)*w}}else res.push(c2)}return res};
+  const hasVal=cs=>cs.some(c2=>bsIsAmt(c2.s)||bsDate(c2.s)!=null);
+  const cluster=cs=>{const g=[];for(const c2 of[...cs].sort((x,y)=>x.x0-y.x0)){const hit=g.find(a=>c2.x1>=a.x0-2&&c2.x0<=a.x1+2);if(hit){hit.parts.push(c2);hit.x0=Math.min(hit.x0,c2.x0);hit.x1=Math.max(hit.x1,c2.x1)}else g.push({x0:c2.x0,x1:c2.x1,parts:[c2]})}
+    return g.map(a=>({s:a.parts.sort((x,y)=>y.y-x.y||x.x0-y.x0).map(x=>x.s).join(" "),x0:a.x0,x1:a.x1})).sort((x,y)=>x.x0-y.x0)};
+  for(const items of pages){
+    const its=[...items].sort((a,b)=>b.y-a.y||a.x0-b.x0),lines=[];
+    for(const it of its){const L=lines.find(l=>Math.abs(l.y-it.y)<=Math.max(2,it.h*0.4));if(L){L.items.push(it)}else lines.push({y:it.y,h:it.h,items:[it]})}
+    lines.forEach(l=>{l.items.sort((a,b)=>a.x0-b.x0);l.cs=cellsOf(l);l.hs=join(l,0.32);l.txt=l.items.map(x=>x.s).join(" ")});
+    // Heading block: lines close to each other with no amounts or dates, read as one.
+    let hEnd=-1;
+    for(let i=0;i<lines.length&&hEnd<0;i++){
+      if(hasVal(lines[i].cs))continue;
+      const blk=[];for(let j=i;j<lines.length&&j<i+4;j++){if(hasVal(lines[j].cs))break;if(j>i&&Math.abs(lines[j-1].y-lines[j].y)>lines[j].h*1.8)break;blk.push(j)}
+      for(let n=blk.length;n>=1&&hEnd<0;n--){const cs=cluster(blk.slice(0,n).flatMap(j=>lines[j].hs));if(bsHeaderScore(cs.map(c2=>bsRole(c2.s)))>=3){anchors=cs.map(c2=>({role:bsRole(c2.s),s:c2.s,x0:c2.x0,x1:c2.x1}));hEnd=blk[n-1];if(!headTxt)headTxt=lines.slice(0,i).map(l=>l.txt).join(" ")}}
+    }
+    if(!anchors)continue;
+    if(!anchors.some(a=>a.role==="desc")){const i=anchors.findIndex(a=>a.role==null&&/transaction|remark|narr|partic|descr/i.test(a.s));if(i>=0)anchors[i].role="desc"}
+    if(!out.length)out.push(anchors.map(a=>({desc:"Narration",dr:"Withdrawal",cr:"Deposit",bal:"Balance",date:"Date",vdate:"Value Date",amt:"Amount",drcr:"Dr/Cr",ref:"Ref"})[a.role]||a.s));
+    const numCols=anchors.map((a,i)=>i).filter(i=>["dr","cr","bal","amt"].includes(anchors[i].role));
+    const dist=(c2,a)=>c2.x1<a.x0?a.x0-c2.x1:c2.x0>a.x1?c2.x0-a.x1:0;
+    const txtCols=anchors.map((a,i)=>i).filter(i=>!numCols.includes(i)).sort((x,y)=>anchors[x].x0-anchors[y].x0);
+    const place=(row,c2)=>{
+      // Text is left-aligned: it belongs to the last text column that starts at or before it.
+      if(!(bsIsAmt(c2.s)&&numCols.length)&&txtCols.length){let bi=txtCols[0];for(const i of txtCols)if(anchors[i].x0-3<=c2.x0)bi=i;if(numCols.some(i=>anchors[i].x0-3<=c2.x0&&anchors[i].x0>anchors[bi].x0)&&/^[\d,.()\-]+$/.test(c2.s)){}else{row[bi].push(c2.s);return}}
+      const pool=bsIsAmt(c2.s)&&numCols.length?numCols:anchors.map((a,i)=>i).filter(i=>!numCols.includes(i));let bi=pool[0],bd=Infinity;for(const i of pool){const cx=(c2.x0+c2.x1)/2,ac=(anchors[i].x0+anchors[i].x1)/2,sc=dist(c2,anchors[i])*10+Math.abs(cx-ac)*0.01;if(sc<bd){bd=sc;bi=i}}row[bi].push(c2.s)};
+    let cur=null,bottom=0;
+    for(const l of lines.slice(hEnd+1)){
+      if(BS_STOP.test(l.txt.trim())){if(cur)out.push(cur.map(a=>a.join(" ").trim()));cur=null;if(/opening balance|closing balance/i.test(l.txt))out.push([l.txt]);continue}
+      if(l.cs.some(c2=>bsIsAmt(c2.s))){if(cur)out.push(cur.map(a=>a.join(" ").trim()));cur=anchors.map(()=>[]);l.cs.forEach(c2=>place(cur,c2));bottom=l.y;continue}
+      if(cur&&bottom-l.y<=l.h*1.9){l.cs.forEach(c2=>place(cur,c2));bottom=l.y;continue}
+      if(cur){out.push(cur.map(a=>a.join(" ").trim()));cur=null}
+    }
+    if(cur)out.push(cur.map(a=>a.join(" ").trim()));
+  }
+  return{rows:out,headTxt};
+}
+async function bsParsePdf(buf,password){
+  const{pages}=await bsPdfItems(buf,password);
+  const nText=pages.reduce((a,p)=>a+p.length,0);
+  if(!nText)return{err:"This PDF has no text layer (it's a scan). Use Photos (AI) instead."};
+  const{rows,headTxt}=bsPdfToRows(pages);
+  if(!rows.length)return{err:"Couldn't find the transaction table in this PDF. Try the Excel/CSV export from your bank, or Photos (AI)."};
+  const r=bsFromTable(rows);
+  if(r.err)return r;
+  const flat=pages.map(p=>p.map(x=>x.s).join(" ")).join(" ");
+  if(!r.bank)r.bank=bsBank(headTxt+" "+flat.slice(0,4000));
+  if(r.closing==null){const m=flat.match(/closing balance[^\d\-(]{0,40}([\-(]?[\d,]+\.\d{1,2}\)?(\s?(cr|dr))?)/i);if(m){const n=bsNum(m[1]);if(n)r.closing=n.sign<0?-n.v:n.v}}
+  if(r.opening==null){const m=flat.match(/opening balance[^\d\-(]{0,40}([\-(]?[\d,]+\.\d{1,2}\)?(\s?(cr|dr))?)/i);if(m){const n=bsNum(m[1]);if(n)r.opening=n.sign<0?-n.v:n.v}}
+  if(r.opening!=null)bsFixDirs(r.tx,r.opening);
+  return r;
+}
+// --- Payee out of bank codes (UPI/NEFT/IMPS/POS/ACH) ---
+const BS_NOISE=new Set("UPI DR CR P2M P2A PAY PAYMENT PAYMENTS SENT RECEIVED COLLECT REQUEST NEFT IMPS RTGS MMT POS ACH NACH ECS INB IB MB NETBANKING NET BANKING TRF TRANSFER TO FROM BY REF NA NULL OK SUCCESS BANK UPIINTENT UPIAR IMPSAB VIA DEBIT CREDIT TXN TRANSACTION MOB MOBILE ONLINE INTERNET BIL BILLPAY ONL OTHERS OTHER NO REMARKS YBL OKAXIS OKICICI OKHDFCBANK OKSBI PAYTM IBL AXL APL".split(" "));
+const BS_BANKCODE=/^(YESB|ICIC|HDFC|SBIN|UTIB|KKBK|IDFB|PUNB|BARB|CNRB|UBIN|IBKL|INDB|FDRL|AIRP|PYTM|CITI|SCBL|HSBC|BKID|IOBA|MAHB|UCBA|CBIN|IDIB|KARB|RATN|AUBL|ESFB|JAKA)[A-Z0-9]*$/;
+const bsTitle=s=>s.toLowerCase().replace(/\b([a-z])/g,x=>x.toUpperCase()).replace(/\b(Ltd|Pvt|Llp|Upi|Atm|Emi|Sip|Neft|Imps|Hdfc|Icici|Sbi|Idfc|Nach|Ach)\b/g,x=>x.toUpperCase());
+function bsPayee(nar){
+  const raw=String(nar||"").replace(/\s+/g," ").replace(/([A-Za-z.])- (?=[A-Za-z])/g,"$1-").trim(),U=raw.toUpperCase();
+  if(!raw)return"Unknown";
+  if(/\bATM\b|\bATW\b|CASH ?WDL|CASH WITHDRAWAL|\bNWD\b|\bCWDR\b/.test(U))return"ATM withdrawal";
+  if(/^(INT\.?PD|INTEREST|CREDIT INTEREST|SB INT|INT CREDIT)|\bINTEREST (PAID|CREDIT|CAPITALI[SZ]ED)\b/.test(U))return"Interest";
+  let body=U.replace(/^(POS|PRCR|PCD|VPS|IPS|ECOM)\s*(\d+X+\d+|\d{12,19}|X+\d+)?\s*/,"");
+  const vpa=(raw.match(/([a-z0-9._\-]{2,})@[a-z][a-z0-9]{1,}/i)||[])[1];
+  const toks=body.split(/[\/|:*]+|\s-\s?|-(?=[A-Z])|\s{2,}/).map(x=>x.trim()).filter(Boolean);
+  const good=x=>{const w=x.replace(/[^A-Z ]/g,"").trim();if(w.replace(/\s/g,"").length<3)return false;if(/@/.test(x))return false;if(/^[A-Z]{4}0[A-Z0-9]{6}$/.test(x))return false;if(BS_BANKCODE.test(x.replace(/\s/g,"")))return false;if(w.split(" ").every(z=>BS_NOISE.has(z)||z.length<2))return false;if(/\bBANK\b/.test(w)&&w.split(" ").length<=4||/^STATE BANK/.test(w))return false;if(/^(PAYMENT|PAID|PAY|SENT|RECEIVED|COLLECT|REQUEST|TRANSFER|FUND TRANSFER|BY|TO)\b/.test(w))return false;if(/^(ACH|NACH|ECS)\s*[DC]?$/.test(w))return false;if((x.match(/\d/g)||[]).length>x.length*0.4)return false;return true};
+  let pick=toks.find(good);
+  if(pick){pick=pick.replace(/\b(ACH|NACH|ECS)\s*[DC]?\b/g,"").replace(/^[\s\-–.,*:]+|[\s\-–.,*:]+$/g,"").replace(/\s+/g," ").trim()}
+  if(!pick&&vpa)pick=vpa.replace(/[._\-]?\d+$/,"").replace(/[._\-]/g," ");
+  if(!pick)pick=U.replace(/\b\d+\b/g," ").replace(/\s+/g," ").trim()||raw;
+  return bsTitle(pick).slice(0,40);
+}
+// --- Kind suggestion ---
+const BS_KINDS={
+  spend:{l:"Spending",e:"🛒",dir:"dr"},cash:{l:"Cash withdrawal",e:"🏧",dir:"dr"},charges:{l:"Bank charges",e:"🏦",dir:"dr"},
+  card:{l:"Card bill",e:"💳",dir:"dr"},self:{l:"Own transfer",e:"🔁"},emi:{l:"Loan EMI",e:"🏠",dir:"dr"},invest:{l:"Investment",e:"📈",dir:"dr"},
+  salary:{l:"Salary",e:"💼",dir:"cr"},interest:{l:"Interest",e:"💰",dir:"cr"},refund:{l:"Refund / cashback",e:"↩️",dir:"cr"},
+  payout:{l:"Investment payout",e:"💸",dir:"cr"},loanin:{l:"Loan received",e:"🏦",dir:"cr"},income:{l:"Other income",e:"➕",dir:"cr"},
+};
+const BS_INV=/ZERODHA|GROWW|UPSTOX|KUVERA|\bSIP\b|MUTUAL ?FUND|\bMF\b|\bCAMS\b|KFIN|KARVY|ICCL|INDIAN CLEARING|BSE ?LTD|BSE STAR|NSE ?CLEARING|NSCCL|CLEARING CORP|\bPPF\b|\bNPS\b|\bSSY\b|SUKANYA|RECURRING DEP|\bRD (INST|DEP)|FD BOOK|TERM DEPOSIT|\bTD BOOK|\bSGB\b|SOVEREIGN GOLD|SMALLCASE|PAYTM MONEY|ANGEL (ONE|BROKING)|\bDHAN\b|INDMONEY|ET ?MONEY|5PAISA|MOTILAL|ICICI ?SEC|HDFC ?SEC|KOTAK ?SEC|NIPPON|AXIS ?MF|SBI ?MF|PARAG PARIKH|MIRAE/;
+const BS_LOAN=/\bEMI\b|LOAN|\bLN\b|BAJAJ ?FIN|HOME ?FIN|HOMELOAN|LIC ?HFL|TATA ?CAPITAL|HDB ?FIN|FULLERTON|MUTHOOT|MANAPPURAM|L ?& ?T FIN|ADITYA BIRLA FIN|CHOLAMANDALAM|MAHINDRA FIN|POONAWALLA|KREDITBEE|MONEYVIEW|NAVI ?FIN|CASHE|FIBE|LAZYPAY|SIMPL/;
+function bsKind(x,data){
+  const U=String(x.nar||"").toUpperCase(),dr=x.dir!=="cr";
+  const own=(data&&data.accounts||[]).map(a=>(String(a.name||"").match(/\d{4}\b/)||[])[0]).filter(Boolean);
+  const cards=(data&&data.cards||[]).map(cd=>cd.last4).filter(Boolean);
+  if(/\bSELF\b|OWN A\/?C|OWN ACCOUNT|\bSWEEP|INTERNAL TRANSFER|TRF TO OWN|FUND TRANSFER (TO|FROM) (SB|SAVINGS|A\/C)/.test(U)||own.some(l=>new RegExp("(X|\\*|\\b)"+l+"\\b").test(U)))return"self";
+  if(dr){
+    if(/\bATM\b|\bATW\b|CASH ?WDL|CASH WITHDRAWAL|\bNWD\b|\bCWDR\b/.test(U))return"cash";
+    if(/CREDIT ?CARD|CC ?PAY|CARD ?PAYMENT|\bCRED\b|CREDCLUB|SBI ?CARD|SBICARD|AMEX|BILLDESK.*CARD|AUTOPAY.*CARD/.test(U)||cards.some(l=>new RegExp("(X|\\*)"+l+"\\b").test(U)))return"card";
+    if(BS_INV.test(U))return"invest";
+    if(BS_LOAN.test(U)||/\b(N?ACH|ECS)\b/.test(U))return"emi";
+    if(/CHARGES?\b|CHRG|\bFEE\b|\bGST\b|SMS ALERT|\bAMC\b|MIN(IMUM)? ?BAL|PENAL|ANNUAL (FEE|CHARGE)|DEBIT CARD (ISSUANCE|ANNUAL)/.test(U))return"charges";
+    return"spend";
+  }
+  if(/SALARY|\bSAL\b|SAL CR|PAYROLL|A2AINT/.test(U))return"salary";
+  if(/INTEREST|\bINT\.?\s?PD|\bINT\.? ?CR|SB INT|INT CREDIT/.test(U))return"interest";
+  if(/DIVIDEND|\bDIV\b|REDEMPTION|REDEEM|MATURITY|FD CLOS|TD CLOS|PREMAT|\bACH ?C\b|NACH ?CR/.test(U)||BS_INV.test(U))return"payout";
+  if(/DISB|LOAN/.test(U)||BS_LOAN.test(U))return"loanin";
+  if(/REFUND|REVERSAL|\bREV\b|RVSL|CASHBACK|CASH BACK/.test(U))return"refund";
+  return"income";
+}
+// Category for a new expense: your own merchant memory first, then common Indian merchants.
+const BS_CAT=[["food",/SWIGGY|ZOMATO|DOMINO|MCDONALD|\bKFC\b|STARBUCKS|BURGER|PIZZA|RESTAURANT|CAFE|HOTEL|BIRYANI|EATCLUB|FAASOS|BEHROUZ|CHAAYOS/],["groceries",/BIGBASKET|BLINKIT|ZEPTO|DMART|AVENUE SUPER|INSTAMART|JIOMART|MORE RETAIL|RATNADEEP|SPENCER|NATURE.?S BASKET|SUPERMARKET|KIRANA/],["transport",/UBER|\bOLA\b|RAPIDO|NAMMA YATRI|METRO|FASTAG|HPCL|BPCL|IOCL|INDIAN OIL|PETROL|FUEL|SHELL|PARKING/],["travel_outstation",/IRCTC|MAKEMYTRIP|GOIBIBO|CLEARTRIP|INDIGO|AIR INDIA|AKASA|SPICEJET|VISTARA|REDBUS|ABHIBUS|YATRA|IXIGO|AIRBNB|OYO/],["subscriptions",/NETFLIX|SPOTIFY|PRIME VIDEO|AMZNPRIME|HOTSTAR|JIOCINEMA|YOUTUBE|GOOGLE PLAY|APPLE\.COM|ITUNES|SONYLIV|ZEE5|AUDIBLE|CHATGPT|OPENAI|ANTHROPIC|CLAUDE/],["bills",/AIRTEL|\bJIO\b|VODAFONE|\bVI\b|BSNL|ACT FIBER|ACTFIBERNET|HATHWAY|BESCOM|TSSPDCL|APSPDCL|MSEDCL|TATA POWER|ADANI (ELEC|GAS)|ELECTRICITY|WATER BOARD|BBPS|BROADBAND|\bDTH\b|TATA ?PLAY|GAS\b|INSURANCE|\bLIC\b|PREMIUM/],["health",/APOLLO|PHARMEASY|\b1MG\b|TATA 1MG|MEDPLUS|NETMEDS|HOSPITAL|CLINIC|DIAGNOSTIC|PHARMA|MEDICAL|LAB\b/],["entertainment",/BOOKMYSHOW|\bPVR\b|INOX|CINEPOLIS|DISTRICT/],["gym",/CULT\.?FIT|CULTFIT|\bGYM\b|FITNESS/],["shopping",/AMAZON|FLIPKART|MYNTRA|AJIO|NYKAA|MEESHO|CROMA|RELIANCE DIGITAL|DECATHLON|IKEA|TATA ?CLIQ|SHOPPERS STOP|LIFESTYLE|WESTSIDE|ZUDIO|H ?& ?M|UNIQLO/]];
+function bsGuessCat(x,mm){
+  const g=mm?mm(x.payee):null;if(g&&g.category)return g.category;
+  const U=String(x.nar||"").toUpperCase()+" "+String(x.payee||"").toUpperCase();
+  if(x.kind==="cash")return"other";if(x.kind==="charges"||x.kind==="emi")return"bills";
+  for(const[k,re]of BS_CAT)if(re.test(U))return k;return"other";
+}
+const bsIncCat=x=>x.kind==="salary"?"salary":x.kind==="interest"?"interest":x.kind==="refund"?(/CASHBACK|CASH BACK/i.test(x.nar)?"cashback":"income_other"):x.kind==="payout"?"trading":"income_other";
+// Stable id for a statement line so decisions survive re-importing the same file.
+const bsRowId=(x,i)=>{const s=x.date+"|"+x.amount+"|"+x.dir+"|"+String(x.nar||"").slice(0,60)+"|"+i;let h=0;for(let k=0;k<s.length;k++)h=(h*31+s.charCodeAt(k))|0;return"bsr_"+(h>>>0).toString(36)};
+// Your entries that could be this statement line: same account, same direction, same amount.
+const bsDirOf=e=>e.type==="income"||e.type==="transfer-in"||e.type==="reimbursement"?"cr":"dr";
+function bsCands(data,accId,x,used,days){
+  const W=(days||4)*864e5;
+  return(data.expenses||[]).filter(e=>!e.archived&&e.accountId===accId&&bsDirOf(e)===x.dir&&Math.abs((+e.amount||0)-x.amount)<0.011&&Math.abs(e.date-x.date)<=W&&!(used&&used.has(e.id))).sort((a,b)=>Math.abs(a.date-x.date)-Math.abs(b.date-x.date));
+}
+// Suggest one entry per open line: closest date first, never the same entry twice.
+function bsSuggest(data,st){
+  const used=new Set(st.rows.filter(r=>r.eid).map(r=>r.eid)),out={};
+  const open=st.rows.filter(r=>r.st==="open").sort((a,b)=>a.date-b.date);
+  for(const r of open){const c=bsCands(data,st.accountId,r,used,4);if(c.length){out[r.id]=c[0];used.add(c[0].id)}}
+  return out;
+}
+// --- Bank Statement screens ---
+// data.bankStmts=[{id,accountId,name,bank,from,to,opening,closing,createdAt,rows:[{id,date,amount,dir,nar,bal,guess,payee,kind,st,how,eid,ext}]}]
+// st: "open" | "done" | "ignored".  how: match | expense | income | transfer | card | emi | loanin | invest | payout | dup.
+// ext keeps what an action changed so Undo can put it back exactly.
+const bsBankAccts=data=>(data.accounts||[]).filter(a=>a.type!=="cash");
+function bsBuildStmt(data,accountId,r,name){
+  const seen={},others=(data.bankStmts||[]).filter(s=>s.accountId===accountId);
+  const handled={};for(const s of others)for(const x of s.rows||[])if(x.st!=="open")handled[x.id]=s.name;
+  const rows=r.tx.map(x=>{const k=x.date+"|"+x.amount+"|"+x.dir+"|"+String(x.nar||"").slice(0,60);seen[k]=(seen[k]||0)+1;const id=bsRowId(x,seen[k]);const payee=bsPayee(x.nar);const row={id,date:x.date,amount:x.amount,dir:x.dir,nar:String(x.nar||"").slice(0,240),bal:x.bal,guess:!!x.guess,payee,st:"open"};row.kind=bsKind(row,data);if(handled[id]){row.st="done";row.how="dup";row.ext={from:handled[id]}}return row});
+  const ds=rows.map(x=>x.date);
+  return{id:"bst_"+uid(),accountId,name,bank:r.bank||null,from:ds.length?Math.min(...ds):null,to:ds.length?Math.max(...ds):null,opening:r.opening??null,closing:r.closing??null,createdAt:Date.now(),rows};
+}
+function BankStmtCard({data,onView}){
+  const ss=data.bankStmts||[],open=ss.reduce((a,s)=>a+(s.rows||[]).filter(r=>r.st==="open").length,0);
+  return t("button",{onClick:()=>onView&&onView("bankStmt"),className:"w100 act98 trt",style:{display:"block",textAlign:"left",marginTop:14,padding:18,background:c.sfg,border:`1px solid ${open?c.ac+"55":c.brs}`,borderRadius:18,color:"inherit"},children:
+    o("div",{className:"f ia jb",children:[o("div",{className:"f ia",style:{gap:12},children:[t("span",{style:{width:42,height:42,borderRadius:12,background:c.sf2,display:"flex",alignItems:"center",justifyContent:"center",fontSize:21},children:"🧾"}),o("div",{className:"tl",children:[t("div",{style:{fontFamily:c.hf,fontSize:17,fontWeight:600,color:c.tx},children:"Bank Statement"}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:2},children:ss.length?`${ss.length} statement${ss.length===1?"":"s"}${open?` · ${open} line${open===1?"":"s"} to review`:" · all reviewed"}`:"Match your savings account statement, line by line"})]})]}),t("span",{style:{color:c.tm,fontSize:20},children:"›"})]})});
+}
+function BankStmt({data,persist,onClose,onTx}){
+  const ss=data.bankStmts||[];
+  const[v,sV]=useState({n:"list"});
+  useNavAction(v.n==="list"?"Import statement":null,()=>sV({n:"import"}));
+  const st=v.n==="review"?ss.find(s=>s.id===v.id):null;
+  if(v.n==="import")return t(BsImport,{data,onCancel:()=>sV({n:"list"}),onDone:s=>{persist({bankStmts:[s,...ss]});sV({n:"review",id:s.id})}});
+  if(st)return t(BsReview,{key:st.id,data,persist,st,onBack:()=>sV({n:"list"}),onTx});
+  const acc=id=>(data.accounts||[]).find(a=>a.id===id);
+  return o("div",{style:{padding:"8px 20px 150px"},children:[
+    o("div",{className:"f ia jb",style:{marginBottom:14},children:[t(BB,{onClick:onClose}),t("div",{style:{fontFamily:c.hf,fontSize:24},children:t("em",{children:"Bank Statement"})}),t("div",{style:{width:38}})]}),
+    t("div",{style:{fontSize:12.5,color:c.td,lineHeight:1.55,marginBottom:14},children:"Import your savings or current account statement (PDF, Excel/CSV or photos). Each line is matched to what you logged. You decide what to add, link to a loan or investment, or ignore. Nothing changes until you tap."}),
+    lnBtn("＋ Import statement",()=>sV({n:"import"}),true,{flex:"none",width:"100%",marginBottom:16}),
+    ss.length===0?t("div",{style:{padding:"26px 0",textAlign:"center",color:c.tm,fontSize:13},children:"No statements yet."}):
+    t("div",{children:ss.map(s=>{const a=acc(s.accountId),op=s.rows.filter(r=>r.st==="open").length,dn=s.rows.length-op;return t("button",{key:s.id,onClick:()=>sV({n:"review",id:s.id}),className:"w100 act98 trt",style:{display:"block",textAlign:"left",marginBottom:10,padding:14,background:c.sfg,border:`1px solid ${op?c.ac+"55":c.brs}`,borderRadius:14,color:"inherit"},children:[
+      o("div",{className:"f ia jb",style:{gap:8},children:[t("span",{className:"tru",style:{fontSize:14.5,fontWeight:600,color:c.tx},children:(a?a.emoji+" "+a.name:"Account")+(s.bank?" · "+s.bank:"")}),t("span",{style:{fontSize:12,color:op?c.ac:c.mt,flexShrink:0},children:op?op+" to review":"✓ Done"})]}),
+      t("div",{style:{fontSize:11.5,color:c.tm,marginTop:4},children:(s.from?lnFmtD(s.from)+" → "+lnFmtD(s.to):"")+" · "+s.rows.length+" lines · "+dn+" done"}),
+      t("div",{style:{height:5,borderRadius:999,background:c.sf2,marginTop:8,overflow:"hidden"},children:t("div",{style:{width:(s.rows.length?dn/s.rows.length*100:0)+"%",height:"100%",background:op?c.ac:c.mt}})})]})})})
+  ]});
+}
+function BsImport({data,onCancel,onDone}){
+  const accts=bsBankAccts(data);
+  const[accId,sAccId]=useState(accts[0]?accts[0].id:null);
+  const[busy,sBusy]=useState(null),[err,sErr]=useState(null),[pw,sPw]=useState(""),[needPw,sNeedPw]=useState(null);
+  const[res,sRes]=useState(null);const fileRef=useRef(null),photoRef=useRef(null),bufRef=useRef(null);
+  const finish=(r,name)=>{if(r.err){sErr(r.err);return}if(!r.tx||!r.tx.length){sErr("No transactions found in this file.");return}sRes({...r,name})};
+  const readPdf=async(name)=>{sBusy("Reading PDF…");sErr(null);try{finish(await bsParsePdf(bufRef.current,pw||undefined),name);sNeedPw(null)}catch(e){if(e&&(e.code==="password"||e.code==="badpassword")){sNeedPw({name,bad:e.code==="badpassword"})}else sErr("Couldn't read this PDF: "+(e&&e.message||e))}sBusy(null)};
+  const onFile=async e=>{const f=e.target.files&&e.target.files[0];e.target.value="";if(!f)return;sErr(null);sRes(null);sNeedPw(null);const nm=f.name||"Statement";
+    if(f.size>25e6){sErr("That file is over 25 MB.");return}
+    const buf=await f.arrayBuffer();bufRef.current=buf;
+    if(/\.pdf$/i.test(nm)||(f.type||"").includes("pdf")){await readPdf(nm);return}
+    try{sBusy("Reading file…");const X=window.XLSX;if(!X)throw new Error("Spreadsheet reader didn't load. Check your connection.");
+      const wb=/\.csv$/i.test(nm)?X.read(new TextDecoder().decode(buf),{type:"string",raw:false}):X.read(buf,{type:"array"});
+      let best=null;for(const sn of wb.SheetNames){const rows=X.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:false,defval:""});const r=bsFromTable(rows);if(!r.err&&(!best||r.tx.length>best.tx.length))best=r;if(!best&&r.err)best=best||null}
+      finish(best||{err:"Couldn't find the transaction table in this file."},nm)}catch(e2){sErr(/password|encrypt/i.test(String(e2&&e2.message))?"This spreadsheet is password-protected. Open it once, save it without a password, then import.":"Couldn't read this file: "+(e2&&e2.message||e2))}sBusy(null)};
+  const onPhotos=async e=>{const fs2=Array.from(e.target.files||[]);e.target.value="";if(!fs2.length)return;sErr(null);sRes(null);
+    if(!gAK()){sErr("Add an AI API key in Settings first, or import the PDF / Excel file instead.");return}
+    const all=[];let bank=null,opening=null,closing=null;
+    for(let i=0;i<fs2.length;i++){sBusy(`Reading photo ${i+1} of ${fs2.length}…`);
+      try{const{b64}=await normalizePhotoForAI(fs2[i]);
+        const r=await cAPI({max_tokens:8000,system:"You read bank account statements (Indian banks: SBI, HDFC, ICICI, Axis, IDFC FIRST and others) and copy every transaction exactly.",messages:[{role:"user",content:[{type:"image",source:{type:"base64",media_type:"image/jpeg",data:b64.split(",")[1]}},{type:"text",text:'Copy EVERY transaction row in this statement image, debits AND credits. Reply with ONLY one JSON object, no markdown: {"bank":"name or null","opening":number|null,"closing":number|null,"transactions":[{"date":"YYYY-MM-DD","narration":"full narration text as printed","debit":number|null,"credit":number|null,"balance":number|null}]}. Amounts are plain numbers without ₹ or commas. If no transactions are visible return {"transactions":[]}.'}]}]});
+        const txt=(r.content||[]).map(x=>x.text||"").join("");const m=txt.match(/\{[\s\S]*\}/);const j=m?JSON.parse(m[0]):{transactions:[]};
+        bank=bank||j.bank||null;if(opening==null&&j.opening!=null)opening=+j.opening;if(j.closing!=null)closing=+j.closing;
+        for(const x of j.transactions||[]){const ts=bsDate(x.date),dr=+x.debit||0,cr=+x.credit||0;if(!ts||!(dr>0||cr>0))continue;all.push({date:ts,amount:_r2(dr>0?dr:cr),dir:dr>0?"dr":"cr",nar:String(x.narration||""),bal:x.balance!=null&&isFinite(+x.balance)?_r2(+x.balance):null})}
+      }catch(e2){sErr(`Photo ${i+1}: `+(describeErr?describeErr(e2):(e2&&e2.message||e2)))}}
+    sBusy(null);if(all.length){bsFixDirs(all,opening);finish({tx:all,bank,opening,closing},fs2.length===1?(fs2[0].name||"Photo"):fs2.length+" photos")}};
+  const a=accts.find(x=>x.id===accId);
+  const dr=res?res.tx.filter(x=>x.dir==="dr"):[],cr=res?res.tx.filter(x=>x.dir==="cr"):[];
+  const sum=l=>l.reduce((s2,x)=>s2+x.amount,0);
+  return o("div",{style:{padding:"8px 20px 150px"},children:[
+    o("div",{className:"f ia jb",style:{marginBottom:14},children:[t(BB,{onClick:onCancel}),t("div",{style:{fontFamily:c.hf,fontSize:22},children:"Import statement"}),t("div",{style:{width:38}})]}),
+    accts.length===0?t("div",{style:{padding:16,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:14,fontSize:13,color:c.td,lineHeight:1.5},children:"Add your savings or current account first (Accounts → Add account), then import its statement here."}):o(Fragment,{children:[
+    lnLbl("WHICH ACCOUNT IS THIS STATEMENT FOR?"),
+    t("div",{className:"f fw",style:{gap:6},children:accts.map(x=>t("button",{key:x.id,onClick:()=>sAccId(x.id),className:"act95 tr",style:{padding:"8px 12px",borderRadius:999,fontSize:13,background:accId===x.id?c.sf3:"transparent",border:`1px solid ${accId===x.id?c.ac:c.brs}`,color:accId===x.id?c.tx:c.td},children:(x.emoji||"🏦")+" "+x.name}))}),
+    lnLbl("STATEMENT FILE"),
+    o("div",{className:"f",style:{gap:10},children:[lnBtn("📄 PDF / Excel / CSV",()=>fileRef.current&&fileRef.current.click(),true),lnBtn("📷 Photos (AI)",()=>photoRef.current&&photoRef.current.click())]}),
+    t("input",{ref:fileRef,type:"file",accept:".pdf,.xlsx,.xls,.csv,application/pdf",style:{display:"none"},onChange:onFile}),
+    t("input",{ref:photoRef,type:"file",accept:"image/*",multiple:true,style:{display:"none"},onChange:onPhotos}),
+    t("div",{style:{fontSize:11.5,color:c.tm,marginTop:8,lineHeight:1.5},children:"Works with SBI, HDFC, ICICI, Axis and IDFC FIRST statements, and most others with Date / Narration / Debit / Credit / Balance columns. The file is read on this phone and never uploaded. Photos are sent to your AI provider."}),
+    needPw&&o("div",{style:{marginTop:14,padding:14,background:c.sfg,border:`1px solid ${needPw.bad?c.ro+"88":c.ac+"55"}`,borderRadius:14},children:[
+      t("div",{style:{fontSize:13.5,fontWeight:600,color:c.tx,marginBottom:4},children:needPw.bad?"Wrong password, try again":"🔒 This PDF is password-protected"}),
+      t("div",{style:{fontSize:11.5,color:c.tm,marginBottom:8,lineHeight:1.45},children:"Banks usually use part of your name and date of birth, or your customer ID. It's only used to open the file here."}),
+      t("input",{type:"password",value:pw,autoFocus:true,onChange:e=>sPw(e.target.value),onKeyDown:e=>{if(e.key==="Enter"&&pw)readPdf(needPw.name)},placeholder:"Statement password",style:lnInp()}),
+      t("div",{className:"f",style:{marginTop:10},children:lnBtn("Open PDF",()=>pw&&readPdf(needPw.name),true,pw?undefined:{opacity:.45})})]}),
+    busy&&t("div",{style:{marginTop:14,fontSize:13,color:c.td},children:"⏳ "+busy}),
+    err&&t("div",{style:{marginTop:14,padding:"10px 12px",background:"#7f1d1d33",border:"1px solid #ef444488",borderRadius:12,fontSize:12.5,color:c.tx,lineHeight:1.5},children:err}),
+    res&&o("div",{style:{marginTop:16,padding:16,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16},children:[
+      t("div",{style:{fontSize:14.5,fontWeight:600,color:c.tx},children:(res.bank?res.bank+" · ":"")+res.tx.length+" transactions found"}),
+      t("div",{style:{fontSize:12,color:c.td,marginTop:4},children:lnFmtD(Math.min(...res.tx.map(x=>x.date)))+" → "+lnFmtD(Math.max(...res.tx.map(x=>x.date)))}),
+      o("div",{className:"f",style:{gap:10,marginTop:12},children:[giStat("MONEY OUT · "+dr.length,fm(sum(dr),data.currency),c.co),giStat("MONEY IN · "+cr.length,fm(sum(cr),data.currency),c.mt)]}),
+      res.closing!=null&&t("div",{style:{fontSize:11.5,color:c.tm,marginTop:8},children:"Closing balance on the statement: "+fm(res.closing,data.currency)}),
+      res.tx.some(x=>x.guess)&&t("div",{style:{fontSize:11.5,color:c.cr,marginTop:8,lineHeight:1.4},children:res.tx.filter(x=>x.guess).length+" line(s) had no clear debit/credit column and no balance to check against; they're marked as money out. You can flip them in the review."}),
+      t("div",{className:"f",style:{marginTop:14},children:lnBtn("Review "+res.tx.length+" lines →",()=>onDone(bsBuildStmt(data,accId,res,(a?a.name:"Account")+" · "+(res.name||"Statement"))),true)})]})
+    ]})
+  ]});
+}
+function BsReview({data,persist,st,onBack,onTx}){
+  const cur=data.currency,acc=(data.accounts||[]).find(a=>a.id===st.accountId);
+  const[flt,sFlt]=useState("open"),[kf,sKf]=useState(null),[sh,sSh]=useState(null),[nope,sNope]=useState(()=>new Set()),[openRow,sOpenRow]=useState(null),[showExtra,sShowExtra]=useState(false),[toast,sToast]=useState(null);
+  const sugg=useMemo(()=>bsSuggest(data,st),[data.expenses,st]);
+  const byId=useMemo(()=>Object.fromEntries((data.expenses||[]).map(e=>[e.id,e])),[data.expenses]);
+  const stmts=data.bankStmts||[];
+  // One write: the statement's rows plus whatever else the action touched (expenses, loans, investments).
+  const save=(rowPatch,extra)=>{const rows=st.rows.map(r=>rowPatch[r.id]?{...r,...rowPatch[r.id]}:r);persist({bankStmts:stmts.map(s=>s.id===st.id?{...s,rows}:s),...(extra||{})})};
+  const addEntries=(list,extra)=>({expenses:[...list,...(extra&&extra.expenses||data.expenses||[])].sort((a,b)=>b.date-a.date)});
+  const base=(r,more)=>({id:"bs_"+uid(),amount:r.amount,currency:cur,accountId:st.accountId,date:r.date,hasTime:false,source:"statement",stmtId:st.id,createdAt:Date.now(),...more});
+  const flash=m=>{sToast(m);setTimeout(()=>sToast(null),2600)};
+  // ---- actions ----
+  const doMatch=(r,e)=>{save({[r.id]:{st:"done",how:"match",eid:e.id,ext:null}});sSh(null)};
+  const confirmAll=()=>{const p={};let n=0;for(const r of st.rows){const e=r.st==="open"&&!nope.has(r.id)&&sugg[r.id];if(e){p[r.id]={st:"done",how:"match",eid:e.id,ext:null};n++}}save(p);flash(n+" matched")};
+  const doExpense=(r,f)=>{const e=base(r,{type:"expense",payMode:"account",cardId:null,category:f.category,merchant:f.merchant,note:f.note||null});save({[r.id]:{st:"done",how:"expense",eid:e.id,ext:{eids:[e.id]}}},addEntries([e]));sSh(null)};
+  const doIncome=(r,f)=>{const e=base(r,{type:"income",category:f.category,merchant:f.merchant,note:f.note||null});save({[r.id]:{st:"done",how:"income",eid:e.id,ext:{eids:[e.id]}}},addEntries([e]));sSh(null)};
+  const doTransfer=(r,dest)=>{const[k,id]=dest.split(":");
+    if(k==="card"){const cd=(data.cards||[]).find(x=>x.id===id);const e=base(r,{id:"cp_"+uid(),type:"card-payment",cardId:id,category:"other",merchant:`${cd?cd.name:"Card"} payment`,note:"Credit card bill payment",source:"card-payment"});save({[r.id]:{st:"done",how:"card",eid:e.id,ext:{eids:[e.id]}}},addEntries([e]));sSh(null);return}
+    const oth=(data.accounts||[]).find(x=>x.id===id),u=uid(),tid="xfer_"+u,out=r.dir==="dr";
+    const mine={id:(out?"xo_":"xi_")+u,type:out?"transfer-out":"transfer-in",amount:r.amount,currency:cur,accountId:st.accountId,category:"other",merchant:"Transfer",note:r.payee||null,date:r.date,source:"transfer",transferId:tid,stmtId:st.id};
+    const theirs={...mine,id:(out?"xi_":"xo_")+u,type:out?"transfer-in":"transfer-out",accountId:id};
+    save({[r.id]:{st:"done",how:"transfer",eid:mine.id,ext:{eids:[mine.id,theirs.id],to:oth?oth.name:""}}},addEntries([mine,theirs]));sSh(null)};
+  const doEmi=(r,f)=>{const L=(data.loanTracker||[]).find(x=>x.id===f.loanId);if(!L)return;const ls=loanState(L),r0=ls.rows.find(x=>x.n===f.n),K=LOAN_KINDS[L.kind]||{l:"Loan"};
+    const extra=r0&&r.amount>r0.emi+0.005?lnR2(r.amount-r0.emi):0,ppId="pp_"+uid();
+    const exp={...lnMakeExpense(data,L,r.amount,"acc:"+st.accountId,r.date,`EMI ${f.n}/${ls.rows.length} · ${L.purpose||K.l}`),stmtId:st.id};
+    const loans=(data.loanTracker||[]).map(x=>x.id!==L.id?x:{...x,payments:[...(x.payments||[]),{n:f.n,date:r.date,amount:extra?r0.emi:r.amount,expenseId:exp.id}],...(extra?{prepayments:[...(x.prepayments||[]),{id:ppId,date:r.date,amount:extra,mode:"tenure"}]}:{})});
+    save({[r.id]:{st:"done",how:"emi",eid:exp.id,ext:{eids:[exp.id],loanId:L.id,n:f.n,ppId:extra?ppId:null,lender:L.lender||K.l}}},{...addEntries([exp]),loanTracker:loans});sSh(null)};
+  const doLoanIn=(r,f)=>{const L=(data.loanTracker||[]).find(x=>x.id===f.loanId);if(!L)return;const lent=L.direction==="lent";
+    const e=base(r,{type:"transfer-in",category:"other",merchant:L.lender||"Loan",note:lent?"Loan repayment received":"Loan money received",loanId:L.id,transferId:"xfer_"+uid()});
+    let loans=null,n=null;if(lent&&L.kind!=="od"&&L.kind!=="flexi"){const ls=loanState(L);if(ls.next){n=ls.next.n;loans=(data.loanTracker||[]).map(x=>x.id!==L.id?x:{...x,payments:[...(x.payments||[]),{n,date:r.date,amount:r.amount,expenseId:null}]})}}
+    save({[r.id]:{st:"done",how:"loanin",eid:e.id,ext:{eids:[e.id],loanId:L.id,n,lender:L.lender||"loan"}}},{...addEntries([e]),...(loans?{loanTracker:loans}:{})});sSh(null)};
+  const doInvest=(r,f)=>{let invs=data.investments||[],invId=f.invId,created=false,name="";
+    if(!invId){invId="inv_"+uid();created=true;name=f.name;invs=[...invs,{id:invId,type:f.type,name:f.name,emoji:invType(f.type).emoji,invested:r.amount,startDate:r.date,rate:null,current:null,maturityDate:null,payFreq:0,exitValue:null,exitDate:null,note:"From bank statement",payouts:[],valueLog:[],createdAt:Date.now(),...(f.loanId?{loanId:f.loanId}:{})}]}
+    else{invs=invs.map(x=>{if(x.id!==invId)return x;name=x.name;return{...x,invested:_r2((+x.invested||0)+r.amount)}})}
+    const e=f.log?base(r,{type:"transfer-out",category:"other",merchant:name,note:"Investment · "+name,invId,transferId:"xfer_"+uid()}):null;
+    save({[r.id]:{st:"done",how:"invest",eid:e?e.id:null,ext:{eids:e?[e.id]:[],invId,created,amount:r.amount,name}}},{...(e?addEntries([e]):{}),investments:invs});sSh(null)};
+  const doPayout=(r,f)=>{const pid="rp_"+uid();let name="";const invs=(data.investments||[]).map(x=>{if(x.id!==f.invId)return x;name=x.name;return{...x,payouts:[...(x.payouts||[]),{id:pid,date:r.date,amount:r.amount,note:"From bank statement"}]}});
+    const e=f.log?base(r,{type:"income",category:f.category||"trading",merchant:name,note:"Payout · "+name}):null;
+    save({[r.id]:{st:"done",how:"payout",eid:e?e.id:null,ext:{eids:e?[e.id]:[],invId:f.invId,pid,name}}},{...(e?addEntries([e]):{}),investments:invs});sSh(null)};
+  const ignore=r=>save({[r.id]:{st:"ignored"}});
+  const setKind=(r,k)=>{save({[r.id]:{kind:k,...(BS_KINDS[k].dir&&BS_KINDS[k].dir!==r.dir&&r.guess?{dir:BS_KINDS[k].dir}:{})}});sSh(null)};
+  const flip=r=>save({[r.id]:{dir:r.dir==="dr"?"cr":"dr",guess:false,kind:bsKind({...r,dir:r.dir==="dr"?"cr":"dr"},data)}});
+  const undo=r=>{const x=r.ext||{},patch={[r.id]:{st:"open",how:null,eid:null,ext:null}},extra={};
+    if(x.eids&&x.eids.length&&r.how!=="match"){const del=new Set(x.eids);extra.expenses=(data.expenses||[]).filter(e=>!del.has(e.id))}
+    if(x.loanId&&(r.how==="emi"||(r.how==="loanin"&&x.n!=null)))extra.loanTracker=(data.loanTracker||[]).map(L=>L.id!==x.loanId?L:{...L,payments:(L.payments||[]).filter(p=>p.n!==x.n),prepayments:x.ppId?(L.prepayments||[]).filter(p=>p.id!==x.ppId):L.prepayments});
+    if(r.how==="invest")extra.investments=x.created?(data.investments||[]).filter(i=>i.id!==x.invId):(data.investments||[]).map(i=>i.id!==x.invId?i:{...i,invested:_r2((+i.invested||0)-x.amount)});
+    if(r.how==="payout")extra.investments=(data.investments||[]).map(i=>i.id!==x.invId?i:{...i,payouts:(i.payouts||[]).filter(p=>p.id!==x.pid)});
+    save(patch,extra)};
+  // ---- view ----
+  const rows=st.rows.filter(r=>(flt==="all"||r.st===flt)&&(!kf||r.kind===kf)).sort((a,b)=>b.date-a.date);
+  const nOpen=st.rows.filter(r=>r.st==="open").length,nDone=st.rows.filter(r=>r.st==="done").length,nIgn=st.rows.filter(r=>r.st==="ignored").length;
+  const nSugg=st.rows.filter(r=>r.st==="open"&&!nope.has(r.id)&&sugg[r.id]).length;
+  const kinds=[...new Set(st.rows.map(r=>r.kind))];
+  const sumDr=st.rows.filter(r=>r.dir==="dr").reduce((a,r)=>a+r.amount,0),sumCr=st.rows.filter(r=>r.dir==="cr").reduce((a,r)=>a+r.amount,0);
+  const endTs=st.to!=null?new Date(new Date(st.to).setHours(23,59,59,999)).getTime():null;
+  const appBal=acc&&endTs!=null?ab(acc,(data.expenses||[]).filter(e=>e.date<=endTs),(data.openingBalances||[]).filter(b=>b.date<=endTs)):null;
+  const lastBal=(()=>{if(st.closing!=null)return st.closing;const w=st.rows.filter(r=>r.bal!=null);if(!w.length)return null;const mx=Math.max(...w.map(r=>r.date));const same=w.filter(r=>r.date===mx);return same[same.length-1].bal})();
+  const matchedIds=new Set(st.rows.filter(r=>r.eid).map(r=>r.eid));
+  const notOnStmt=st.from!=null?(data.expenses||[]).filter(e=>!e.archived&&e.accountId===st.accountId&&e.date>=new Date(st.from).setHours(0,0,0,0)&&e.date<=endTs&&!matchedIds.has(e.id)&&!Object.values(sugg).some(s=>s&&s.id===e.id)).sort((a,b)=>b.date-a.date):[];
+  const chip=(k,l,n)=>t("button",{key:k,onClick:()=>sFlt(k),className:"act95 tr",style:{flex:1,padding:"8px 0",borderRadius:10,fontSize:12,fontWeight:600,border:"none",background:flt===k?c.sf3:"transparent",color:flt===k?c.tx:c.td},children:l+(n!=null?" · "+n:"")});
+  const small=(l,fn,primary,col)=>t("button",{onClick:fn,className:"act95 tr",style:{padding:"7px 12px",borderRadius:999,fontSize:12,fontWeight:600,border:primary?"none":`1px solid ${col||c.brs}`,background:primary?c.ac:"transparent",color:primary?"#0a0a0a":(col||c.td),whiteSpace:"nowrap"},children:l});
+  const ACT={spend:["Add expense","expense"],cash:["Add expense","expense"],charges:["Add expense","expense"],card:["Card bill paid","transfer"],self:["Own transfer","transfer"],emi:["Log loan EMI","emi"],invest:["Add to investment","invest"],salary:["Add income","income"],interest:["Add income","income"],refund:["Add income","income"],income:["Add income","income"],payout:["Record payout","payout"],loanin:["Loan money in","loanin"]};
+  const doneText=r=>{const x=r.ext||{},e=r.eid&&byId[r.eid];switch(r.how){case"match":return"Matched: "+(e?(e.merchant||e.payee||e.note||co(e.category).label)+" · "+lnFmtD(e.date):"entry");case"expense":return"Added as expense"+(e?" · "+co(e.category).label:"");case"income":return"Added as income";case"card":return"Added as card bill payment";case"transfer":return"Transfer "+(r.dir==="dr"?"to ":"from ")+(x.to||"account");case"emi":return"EMI #"+x.n+" logged on "+(x.lender||"loan");case"loanin":return(x.n!=null?"Repayment #"+x.n+" from ":"Loan money from ")+(x.lender||"loan");case"invest":return(x.created?"New holding: ":"Added to ")+x.name;case"payout":return"Payout on "+x.name;case"dup":return"Already handled in "+(x.from||"another statement");default:return"Done"}};
+  const rowEl=r=>{const k=BS_KINDS[r.kind]||BS_KINDS.spend,s=r.st==="open"&&!nope.has(r.id)?sugg[r.id]:null,isOpen=openRow===r.id,a=ACT[r.kind]||ACT.spend;
+    return o("div",{key:r.id,"data-bsrow":r.st,style:{padding:"12px 14px",borderBottom:`1px solid ${c.brs}`,opacity:r.st==="ignored"?.55:1},children:[
+      o("button",{onClick:()=>sOpenRow(isOpen?null:r.id),className:"w100 act99",style:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:10,background:"transparent",border:"none",padding:0,color:"inherit",textAlign:"left"},children:[
+        o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:14,fontWeight:600,color:c.tx},children:r.payee}),t("div",{style:{fontSize:11,color:c.tm,marginTop:2},children:lnFmtD(r.date)+(r.bal!=null?" · bal "+fs(r.bal,cur):"")})]}),
+        o("div",{style:{textAlign:"right",flexShrink:0},children:[t("div",{style:{fontFamily:'var(--nf)',fontSize:14.5,color:r.dir==="cr"?c.mt:c.tx},children:(r.dir==="cr"?"+ ":"− ")+fm(r.amount,cur)}),r.guess&&t("div",{style:{fontSize:10,color:c.cr},children:"direction guessed"})]})]}),
+      isOpen&&t("div",{style:{fontSize:11,color:c.td,marginTop:6,lineHeight:1.4,wordBreak:"break-word",fontFamily:"ui-monospace,Menlo,monospace"},children:r.nar}),
+      o("div",{className:"f ia fw",style:{gap:6,marginTop:8},children:[
+        t("button",{onClick:()=>r.st==="open"&&sSh({k:"kind",r}),className:"act95 tr",style:{padding:"4px 9px",borderRadius:999,fontSize:11,background:c.sf2,border:`1px solid ${c.brs}`,color:c.td},children:k.e+" "+k.l+(r.st==="open"?" ▾":"")}),
+        r.st==="open"&&isOpen&&small("⇅ Flip in/out",()=>flip(r))]}),
+      r.st==="done"&&o("div",{className:"f ia jb",style:{gap:8,marginTop:8},children:[t("button",{onClick:()=>{const e=r.eid&&byId[r.eid];if(e&&onTx)onTx(e)},className:"act99 tru",style:{background:"transparent",border:"none",padding:0,fontSize:12,color:c.mt,textAlign:"left",minWidth:0},children:"✓ "+doneText(r)}),r.how!=="dup"&&small("Undo",()=>undo(r))]}),
+      r.st==="ignored"&&o("div",{className:"f ia jb",style:{marginTop:8},children:[t("span",{style:{fontSize:12,color:c.tm},children:"Ignored"}),small("Undo",()=>save({[r.id]:{st:"open"}}))]}),
+      r.st==="open"&&s&&o("div",{style:{marginTop:8,padding:"8px 10px",background:c.ac+"14",border:`1px solid ${c.ac}40`,borderRadius:10},children:[
+        t("div",{style:{fontSize:12,color:c.tx,marginBottom:6},children:"Looks like your entry: "+(s.merchant||s.payee||s.note||co(s.category).label)+" · "+lnFmtD(s.date)}),
+        o("div",{className:"f fw",style:{gap:6},children:[small("✓ Confirm",()=>doMatch(r,s),true),small("Not this",()=>sNope(p=>new Set([...p,r.id])))]})]}),
+      r.st==="open"&&!s&&o("div",{className:"f fw",style:{gap:6,marginTop:8},children:[small(a[0],()=>sSh({k:a[1],r}),true),small("Match…",()=>sSh({k:"match",r})),small("Ignore",()=>ignore(r))]})
+    ]})};
+  const sheet=sh&&(sh.k==="kind"?t(Sht,{onClose:()=>sSh(null),children:o(Fragment,{children:[lnSheetTitle("What is this line?",sh.r.payee+" · "+(sh.r.dir==="cr"?"+":"−")+fm(sh.r.amount,cur)),
+      t("div",{className:"f fw",style:{gap:6},children:Object.entries(BS_KINDS).filter(([k,v])=>!v.dir||v.dir===sh.r.dir||sh.r.guess).map(([k,v])=>t("button",{key:k,onClick:()=>setKind(sh.r,k),className:"act95 tr",style:{padding:"9px 12px",borderRadius:999,fontSize:13,background:sh.r.kind===k?c.sf3:"transparent",border:`1px solid ${sh.r.kind===k?c.ac:c.brs}`,color:sh.r.kind===k?c.tx:c.td},children:v.e+" "+v.l}))})]})})
+    :t(BsActSheet,{data,st,r:sh.r,mode:sh.k,onClose:()=>sSh(null),onMatch:e=>doMatch(sh.r,e),onExpense:f=>doExpense(sh.r,f),onIncome:f=>doIncome(sh.r,f),onTransfer:d=>doTransfer(sh.r,d),onEmi:f=>doEmi(sh.r,f),onLoanIn:f=>doLoanIn(sh.r,f),onInvest:f=>doInvest(sh.r,f),onPayout:f=>doPayout(sh.r,f),onSwitch:k=>sSh({k,r:sh.r})}));
+  return o("div",{style:{padding:"8px 20px 150px"},children:[
+    o("div",{className:"f ia jb",style:{marginBottom:12,gap:10},children:[t(BB,{onClick:onBack}),t("div",{className:"tru",style:{fontFamily:c.hf,fontSize:20,flex:1,textAlign:"center"},children:(acc?acc.emoji+" "+acc.name:"Statement")}),t("div",{style:{width:38}})]}),
+    o("div",{style:{padding:16,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,marginBottom:12},children:[
+      t("div",{style:{fontSize:12,color:c.td},children:(st.bank?st.bank+" · ":"")+(st.from?lnFmtD(st.from)+" → "+lnFmtD(st.to):"")}),
+      o("div",{className:"f",style:{gap:10,marginTop:10},children:[giStat("MONEY OUT",fm(sumDr,cur),c.co),giStat("MONEY IN",fm(sumCr,cur),c.mt),giStat("REVIEWED",(nDone+nIgn)+"/"+st.rows.length)]}),
+      t("div",{style:{height:6,borderRadius:999,background:c.sf2,marginTop:10,overflow:"hidden"},children:t("div",{style:{width:(st.rows.length?(nDone+nIgn)/st.rows.length*100:0)+"%",height:"100%",background:nOpen?c.ac:c.mt}})}),
+      lastBal!=null&&appBal!=null&&(()=>{const diff=_r2(appBal-lastBal);return t("div",{style:{fontSize:12,color:Math.abs(diff)<0.01?c.mt:c.td,marginTop:10,lineHeight:1.5},children:Math.abs(diff)<0.01?`✓ App balance matches the statement (${fm(lastBal,cur)}) on ${lnFmtD(st.to)}.`:`Statement balance on ${lnFmtD(st.to)}: ${fm(lastBal,cur)} · in the app: ${fm(appBal,cur)} (${diff>0?"+":"−"}${fm(Math.abs(diff),cur)}).${nOpen?" Review the open lines first.":" Use Reconcile to correct the opening balance if it's still off."}`})})()]}),
+    nSugg>0&&t("button",{onClick:confirmAll,className:"w100 act98 tr",style:{marginBottom:12,padding:"12px 0",background:c.ac,color:"#0a0a0a",border:"none",borderRadius:12,fontWeight:700,fontSize:13.5},children:`✓ Confirm all ${nSugg} suggested match${nSugg===1?"":"es"}`}),
+    o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,marginBottom:8},children:[chip("open","To review",nOpen),chip("done","Done",nDone),chip("ignored","Ignored",nIgn),chip("all","All")]}),
+    kinds.length>1&&t("div",{className:"f",style:{gap:6,overflowX:"auto",paddingBottom:6,marginBottom:6},children:[null,...kinds].map(k=>t("button",{key:k||"all",onClick:()=>sKf(k),className:"act95 tr",style:{padding:"5px 10px",borderRadius:999,fontSize:11.5,whiteSpace:"nowrap",background:kf===k?c.sf3:"transparent",border:`1px solid ${kf===k?c.ac:c.brs}`,color:kf===k?c.tx:c.td},children:k?BS_KINDS[k].e+" "+BS_KINDS[k].l+" · "+st.rows.filter(r=>r.kind===k&&(flt==="all"||r.st===flt)).length:"All types"}))}),
+    rows.length===0?t("div",{style:{padding:"24px 0",textAlign:"center",color:c.tm,fontSize:13},children:flt==="open"?"🎉 Nothing left to review.":"Nothing here."}):
+    t("div",{style:{background:c.sfg,borderRadius:14,border:`1px solid ${c.brs}`,overflow:"hidden"},children:rows.map(rowEl)}),
+    notOnStmt.length>0&&o("div",{style:{marginTop:18},children:[
+      t("button",{onClick:()=>sShowExtra(!showExtra),className:"w100 f ia jb act98 trt",style:{padding:"12px 14px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:showExtra?"14px 14px 0 0":14,color:c.tx,fontSize:13},children:[t("span",{children:"In the app, not on this statement · "+notOnStmt.length}),t("span",{style:{color:c.tm},children:showExtra?"▴":"▾"})]}),
+      showExtra&&o("div",{style:{background:c.sfg,border:`1px solid ${c.brs}`,borderTop:"none",borderRadius:"0 0 14px 14px",overflow:"hidden"},children:[t("div",{style:{fontSize:11.5,color:c.tm,padding:"8px 14px",lineHeight:1.4},children:"Logged against this account in the statement period, but no line matches. Maybe the wrong account, amount or date, or a duplicate. Tap one to fix it."}),
+        ...notOnStmt.map(e=>t("button",{key:e.id,onClick:()=>onTx&&onTx(e),className:"w100 f ia jb act98 trt",style:{gap:10,padding:"10px 14px",background:"transparent",border:"none",borderTop:`1px solid ${c.brs}`,color:"inherit",textAlign:"left"},children:[o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:13,color:c.tx},children:e.merchant||e.payee||e.note||co(e.category).label}),t("div",{style:{fontSize:11,color:c.tm},children:lnFmtD(e.date)})]}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:bsDirOf(e)==="cr"?c.mt:c.tx},children:(bsDirOf(e)==="cr"?"+ ":"− ")+fm(e.amount,cur)})]}))]})]}),
+    toast&&t("div",{style:{position:"fixed",left:"50%",transform:"translateX(-50%)",bottom:"calc(var(--nav-clear) + 10px)",zIndex:60,background:c.sfg,border:`1px solid ${c.ac}66`,borderRadius:999,padding:"9px 16px",fontSize:13,color:c.tx,boxShadow:"0 8px 24px rgba(0,0,0,.3)"},children:"✓ "+toast}),
+    sheet
+  ]});
+}
+function BsActSheet({data,st,r,mode,onClose,onMatch,onExpense,onIncome,onTransfer,onEmi,onLoanIn,onInvest,onPayout,onSwitch}){
+  const cur=data.currency,mm=useMemo(()=>buildMerchantMemory(data.expenses||[],data.merchantRules),[data.expenses,data.merchantRules]);
+  const head=lnSheetTitle({match:"Match to an entry",expense:"Add as expense",income:"Add as income",transfer:r.kind==="card"?"Card bill payment":"Own transfer",emi:"Log loan EMI",loanin:"Loan money in",invest:"Add to investment",payout:"Record payout"}[mode]||"",r.payee+" · "+lnFmtD(r.date)+" · "+(r.dir==="cr"?"+":"−")+fm(r.amount,cur));
+  const pill=(on,l,fn,key)=>t("button",{key,onClick:fn,className:"act95 tr",style:{padding:"9px 12px",borderRadius:12,fontSize:13,textAlign:"left",background:on?c.sf3:"transparent",border:`1px solid ${on?c.ac:c.brs}`,color:on?c.tx:c.td},children:l});
+  const foot=(lbl,ok,fn)=>o("div",{className:"f",style:{gap:10,marginTop:18},children:[lnBtn("Cancel",onClose),lnBtn(lbl,()=>ok&&fn(),true,ok?undefined:{opacity:.45})]});
+  const[f,sF]=useState(()=>{const g=bsGuessCat(r,mm);return{merchant:(mm(r.payee)&&mm(r.payee).merchant)||r.payee,category:mode==="income"?bsIncCat(r):g,note:"",dest:null,loanId:null,n:null,invId:null,name:r.payee,type:/SIP|MUTUAL|MF\b|CAMS|KFIN/i.test(r.nar)?"mf":/ZERODHA|UPSTOX|GROWW|ANGEL|DHAN|ICCL|CLEARING/i.test(r.nar)?"stock":/FD|TERM DEP/i.test(r.nar)?"fd":/NPS/i.test(r.nar)?"nps":/SGB|GOLD/i.test(r.nar)?"gold":"other",log:true,q:""}});
+  const set=(k,v)=>sF(p=>({...p,[k]:v}));
+  if(mode==="match"){
+    const used=new Set((data.bankStmts||[]).flatMap(s=>s.rows).filter(x=>x.eid).map(x=>x.eid));
+    const q=f.q.trim().toLowerCase();
+    const list=(data.expenses||[]).filter(e=>!e.archived&&e.accountId===st.accountId&&bsDirOf(e)===r.dir&&!used.has(e.id)&&Math.abs(e.date-r.date)<=20*864e5&&(q?((e.merchant||"")+" "+(e.note||"")+" "+e.amount).toLowerCase().includes(q):Math.abs(e.amount-r.amount)<=Math.max(1,r.amount*0.1))).sort((a,b)=>Math.abs(a.amount-r.amount)-Math.abs(b.amount-r.amount)||Math.abs(a.date-r.date)-Math.abs(b.date-r.date)).slice(0,40);
+    return t(Sht,{onClose,children:o(Fragment,{children:[head,
+      t("input",{value:f.q,onChange:e=>set("q",e.target.value),placeholder:"Search merchant, note or amount",style:lnInp()}),
+      t("div",{style:{fontSize:11,color:c.tm,margin:"6px 0 8px"},children:q?"Searching this account, ±20 days":"Same account, similar amount, ±20 days"}),
+      list.length===0?t("div",{style:{padding:"18px 0",textAlign:"center",fontSize:13,color:c.tm},children:"No entry fits. Add it instead."}):
+      t("div",{style:{maxHeight:"46vh",overflowY:"auto",border:`1px solid ${c.brs}`,borderRadius:12},children:list.map(e=>t("button",{key:e.id,onClick:()=>onMatch(e),className:"w100 f ia jb act98 trt",style:{gap:10,padding:"10px 12px",background:"transparent",border:"none",borderBottom:`1px solid ${c.brs}`,color:"inherit",textAlign:"left"},children:[o("div",{className:"minw0",children:[t("div",{className:"tru",style:{fontSize:13,color:c.tx},children:e.merchant||e.payee||e.note||co(e.category).label}),t("div",{style:{fontSize:11,color:c.tm},children:lnFmtD(e.date)+(Math.abs(e.amount-r.amount)>=0.01?" · differs by "+fm(Math.abs(e.amount-r.amount),cur):"")})]}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13},children:fm(e.amount,cur)})]}))}),
+      t("div",{className:"f",style:{marginTop:14},children:lnBtn("Cancel",onClose)})]})});
+  }
+  if(mode==="expense"||mode==="income"){
+    const cats=mode==="income"?[...CI,...(data.customIncomeCategories||[])]:[...CE,...(data.customExpenseCategories||[])];
+    return t(Sht,{onClose,children:o(Fragment,{children:[head,
+      lnLbl(mode==="income"?"FROM":"MERCHANT"),t("input",{value:f.merchant,onChange:e=>set("merchant",e.target.value),style:lnInp()}),
+      lnLbl("CATEGORY"),t("select",{value:f.category,onChange:e=>set("category",e.target.value),style:lnInp(),children:cats.map(x=>t("option",{key:x.id,value:x.id,children:(x.emoji||"")+" "+x.label}))}),
+      lnLbl("NOTE (OPTIONAL)"),t("input",{value:f.note,onChange:e=>set("note",e.target.value),placeholder:"e.g. dinner with family",style:lnInp()}),
+      t("div",{style:{fontSize:11,color:c.tm,marginTop:8,lineHeight:1.4},children:`Logged on ${lnFmtD(r.date)} from your ${((data.accounts||[]).find(a=>a.id===st.accountId)||{}).name||"bank"} account.`}),
+      foot(mode==="income"?"Add income":"Add expense",!!f.merchant.trim(),()=>(mode==="income"?onIncome:onExpense)({merchant:f.merchant.trim(),category:f.category,note:f.note.trim()}))]})});
+  }
+  if(mode==="transfer"){
+    const accts=(data.accounts||[]).filter(a=>a.id!==st.accountId),cards=r.dir==="dr"?(data.cards||[]):[];
+    return t(Sht,{onClose,children:o(Fragment,{children:[head,
+      t("div",{style:{fontSize:12,color:c.td,marginBottom:10,lineHeight:1.45},children:r.dir==="dr"?"Where did the money go? It won't count as spending.":"Which of your accounts did it come from? It won't count as income."}),
+      cards.length>0&&lnLbl("CREDIT CARD BILL"),cards.length>0&&t("div",{className:"f fw",style:{gap:6},children:cards.map(cd=>pill(f.dest==="card:"+cd.id,"💳 "+cd.name+(cd.last4?" ··"+cd.last4:""),()=>set("dest","card:"+cd.id),cd.id))}),
+      lnLbl(r.dir==="dr"?"TO ACCOUNT":"FROM ACCOUNT"),accts.length?t("div",{className:"f fw",style:{gap:6},children:accts.map(a=>pill(f.dest==="acc:"+a.id,(a.emoji||"🏦")+" "+a.name,()=>set("dest","acc:"+a.id),a.id))}):t("div",{style:{fontSize:12,color:c.tm},children:"No other accounts."}),
+      foot("Save transfer",!!f.dest,()=>onTransfer(f.dest))]})});
+  }
+  if(mode==="emi"){
+    const loans=(data.loanTracker||[]).filter(L=>L.direction!=="lent"&&L.kind!=="od"&&L.kind!=="flexi"&&!loanState(L).closed);
+    const L=loans.find(x=>x.id===f.loanId)||(loans.length===1?loans[0]:null),ls=L?loanState(L):null;
+    const unpaid=ls?ls.unpaid:[],near=unpaid.length?unpaid.reduce((b,x)=>Math.abs(x.due-r.date)<Math.abs(b.due-r.date)?x:b,unpaid[0]):null;
+    const n=f.n!=null&&unpaid.some(x=>x.n===f.n)?f.n:(near?near.n:null),row=unpaid.find(x=>x.n===n);
+    return t(Sht,{onClose,children:o(Fragment,{children:[head,
+      loans.length===0?o("div",{children:[t("div",{style:{fontSize:13,color:c.td,lineHeight:1.5,marginBottom:12},children:"No open EMI loans in Loan Tracker. Add the loan there first (Calculators → Loan Tracker), or log this line as an expense."}),lnBtn("Add as expense instead",()=>onSwitch("expense"),true,{flex:"none",width:"100%"})]}):o(Fragment,{children:[
+      lnLbl("WHICH LOAN?"),t("div",{className:"f fw",style:{gap:6},children:loans.map(x=>{const s2=loanState(x);return pill(L&&L.id===x.id,(x.lender||"Loan")+(x.purpose?" · "+x.purpose:"")+" · EMI "+fs(s2.next?s2.next.emi:0,cur),()=>{set("loanId",x.id);set("n",null)},x.id)})}),
+      L&&lnLbl("INSTALMENT"),L&&t("select",{value:n??"",onChange:e=>set("n",+e.target.value),style:lnInp(),children:unpaid.slice(0,60).map(x=>t("option",{key:x.n,value:x.n,children:`#${x.n} · due ${lnFmtD(x.due)} · ${fm(x.emi,cur)}`}))}),
+      row&&Math.abs(row.emi-r.amount)>0.01&&t("div",{style:{fontSize:11.5,color:c.td,marginTop:6,lineHeight:1.45},children:r.amount>row.emi?`The EMI is ${fm(row.emi,cur)}. The extra ${fm(r.amount-row.emi,cur)} is recorded as a part payment.`:`Less than the EMI of ${fm(row.emi,cur)}. The instalment is still marked paid with ${fm(r.amount,cur)}.`}),
+      L&&t("div",{style:{fontSize:11,color:c.tm,marginTop:8,lineHeight:1.4},children:"Also logs an expense (Bills · EMI) from this account, like paying it in Loan Tracker."}),
+      foot("Log EMI",!!(L&&row),()=>onEmi({loanId:L.id,n}))]})]})});
+  }
+  if(mode==="loanin"){
+    const loans=(data.loanTracker||[]).filter(L=>!loanState(L).closed);const L=loans.find(x=>x.id===f.loanId);
+    return t(Sht,{onClose,children:o(Fragment,{children:[head,
+      t("div",{style:{fontSize:12,color:c.td,marginBottom:10,lineHeight:1.45},children:"Money from a loan you took (disbursal), or a repayment from someone you lent to. It's recorded on this account but not counted as income."}),
+      loans.length===0?t("div",{style:{fontSize:13,color:c.tm},children:"No loans in Loan Tracker yet."}):t("div",{className:"f fw",style:{gap:6},children:loans.map(x=>pill(f.loanId===x.id,(x.direction==="lent"?"🤝 Lent to ":"🏦 ")+(x.lender||"Loan")+(x.purpose?" · "+x.purpose:""),()=>set("loanId",x.id),x.id))}),
+      L&&L.direction==="lent"&&t("div",{style:{fontSize:11.5,color:c.td,marginTop:8},children:"The next instalment on this loan is marked received."}),
+      foot("Save",!!L,()=>onLoanIn({loanId:L.id}))]})});
+  }
+  if(mode==="invest"){
+    const invs=(data.investments||[]).filter(x=>x.exitValue==null);
+    return t(Sht,{onClose,children:o(Fragment,{children:[head,
+      lnLbl("ADD TO A HOLDING"),invs.length?t("div",{className:"f fw",style:{gap:6,maxHeight:"28vh",overflowY:"auto"},children:invs.map(x=>pill(f.invId===x.id,(x.emoji||invType(x.type).emoji)+" "+x.name,()=>set("invId",f.invId===x.id?null:x.id),x.id))}):t("div",{style:{fontSize:12,color:c.tm},children:"No holdings yet."}),
+      !f.invId&&o(Fragment,{children:[lnLbl("OR CREATE A NEW ONE"),t("input",{value:f.name,onChange:e=>set("name",e.target.value),placeholder:"e.g. Nifty 50 index fund",style:lnInp()}),
+        t("div",{className:"f fw",style:{gap:6,marginTop:8},children:INV_TYPES.map(x=>pill(f.type===x.id,x.emoji+" "+x.label,()=>set("type",x.id),x.id))})]}),
+      lnToggle(f.log,()=>set("log",!f.log),"Also take it out of this account","A transfer out of the account, not counted as spending"),
+      foot(f.invId?"Add to holding":"Create holding",!!(f.invId||f.name.trim()),()=>onInvest({invId:f.invId,name:f.name.trim(),type:f.type,log:f.log}))]})});
+  }
+  if(mode==="payout"){
+    const invs=data.investments||[];
+    return t(Sht,{onClose,children:o(Fragment,{children:[head,
+      lnLbl("WHICH HOLDING PAID OUT?"),invs.length?t("div",{className:"f fw",style:{gap:6,maxHeight:"30vh",overflowY:"auto"},children:invs.map(x=>pill(f.invId===x.id,(x.emoji||invType(x.type).emoji)+" "+x.name,()=>set("invId",x.id),x.id))}):o("div",{children:[t("div",{style:{fontSize:12.5,color:c.tm,marginBottom:10},children:"No holdings yet. Add it as income instead."}),lnBtn("Add as income instead",()=>onSwitch("income"),true,{flex:"none",width:"100%"})]}),
+      invs.length>0&&lnToggle(f.log,()=>set("log",!f.log),"Also add to this account as income","Dividend / interest / redemption counted as income"),
+      invs.length>0&&foot("Record payout",!!f.invId,()=>onPayout({invId:f.invId,log:f.log,category:/INT/i.test(r.nar)?"interest":"trading"}))]})});
+  }
+  return null;
+}
 // === GOAL INVESTING (Calculators) ===
 // Fully manual: you set each goal's target and log every amount you put in (or take out).
 // Progress = sum of the log; nothing here reads or writes your expenses or accounts.
@@ -16751,7 +17277,7 @@ function GoalInvest({data,persist,onClose}){
     sheet
   ]});
 }
-const CALCULATORS=[{id:"loans",label:"Loan Tracker",emoji:"🏦",component:LoanTrackerCard},{id:"reinvest",label:"Reinvestments",emoji:"📈",component:ReinvestCard},{id:"flow",label:"Where loan money went",emoji:"🧭",component:FlowCard},{id:"budget",label:"Monthly Budget",emoji:"🧮",component:BudgetCalculator},{id:"goalInvest",label:"Goal Investing",emoji:"🎯",component:GoalInvestCard}];
+const CALCULATORS=[{id:"loans",label:"Loan Tracker",emoji:"🏦",component:LoanTrackerCard},{id:"reinvest",label:"Reinvestments",emoji:"📈",component:ReinvestCard},{id:"flow",label:"Where loan money went",emoji:"🧭",component:FlowCard},{id:"budget",label:"Monthly Budget",emoji:"🧮",component:BudgetCalculator},{id:"goalInvest",label:"Goal Investing",emoji:"🎯",component:GoalInvestCard},{id:"bankStmt",label:"Bank Statement",emoji:"🧾",component:BankStmtCard}];
 function CalculatorsScreen({data,persist,onView}){
   const[edit,sEdit]=useState(false);
   // Saved order (data.calcOrder) first; calculators added later fall in at the end.
