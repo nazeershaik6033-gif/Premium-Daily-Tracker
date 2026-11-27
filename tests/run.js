@@ -409,7 +409,7 @@ test('bank statement: import CSV, confirm matches, add lines, link investment, u
 
 test('Zerodha Portfolio: funds log, equity tradebook, holdings, closed trade with charges, notes', async () => {
   const p = await newPage({ seed: {} });
-  await p.locator('button[aria-label="calc"]').click(); await p.waitForTimeout(400);
+  await p.locator('button[aria-label="Wealth Tracker"]').click(); await p.waitForTimeout(400);
   await p.locator('button:has-text("Zerodha Portfolio")').click(); await p.waitForTimeout(300);
   await p.locator('button:has-text("Funds")').first().click();
   await p.locator('button:has-text("Add funds / withdrawal")').click();
@@ -450,6 +450,61 @@ assert.match(sheet, /Profit before charges\s*\+₹8,000/); assert.match(sheet, /
   assert.deepEqual(zj.meta.INFY, { type: 'swing', target: 1800, sl: 1400, plan: '' });
   const tcs = Object.entries(zj.notes)[0][1];
   assert.deepEqual([tcs.tags, tcs.mistakes], [['Breakout'], ['Sold too early']]);
+  assert.deepEqual(p.errors, []);
+});
+
+test('Home header: pie chart opens Wealth Tracker (loans, reinvest, Zerodha); search on other screens', async () => {
+  const p = await newPage({ seed: {} });
+  assert.equal(await p.locator('button[aria-label="Search"]').count(), 0, 'no search on Home');
+  await p.locator('button[aria-label="Wealth Tracker"]').click(); await p.waitForTimeout(400);
+  const txt = await p.locator('#root').innerText();
+  for (const k of ['Wealth Tracker', 'Zerodha Portfolio', 'Loan Tracker', 'Reinvestments']) assert.match(txt, new RegExp(k));
+  assert.equal(await p.locator('button[aria-label="Search"]').count(), 1, 'search back off Home');
+  await p.locator('button[aria-label="calc"]').click(); await p.waitForTimeout(300);
+  const calc = await p.locator('#root').innerText();
+  assert.doesNotMatch(calc, /Zerodha Portfolio|Loan Tracker/, 'moved out of Calculators');
+  assert.match(calc, /Bank Statement/);
+  assert.deepEqual(p.errors, []);
+});
+
+test('Bank Statement ↔ Zerodha funds: link instead of duplicate, pull the rest, totals, undo', async () => {
+  const now = new Date(), D = d => new Date(now.getFullYear(), now.getMonth(), d, 12).getTime();
+  const p = await newPage({ seed: { zjournal: { fills: [], funds: [{ id: 'mine', kind: 'in', amount: 20000, date: D(3), note: 'typed by me' }], mf: [], meta: {}, prices: {}, notes: {} } } });
+  const Ds = d => { const x = new Date(D(d)); return `${String(x.getDate()).padStart(2, '0')}/${String(x.getMonth() + 1).padStart(2, '0')}/${x.getFullYear()}`; };
+  const csv = ['Date,Narration,Withdrawal Amt.,Deposit Amt.,Closing Balance',
+    `${Ds(2)},NEFT-ZERODHA BROKING LTD-PAYIN,"20,000.00",,"30,000.00"`,
+    `${Ds(4)},IMPS-ZERODHA BROKING-FUNDS,"5,000.00",,"25,000.00"`,
+    `${Ds(6)},NEFT CR-ZERODHA BROKING LTD-PAYOUT,,"3,000.00","28,000.00"`].join('\n');
+  await p.locator('button[aria-label="calc"]').click(); await p.waitForTimeout(400);
+  await p.locator('button:has-text("Bank Statement")').click(); await p.waitForTimeout(300);
+  await p.locator('button:has-text("Import statement")').first().click(); await p.waitForTimeout(300);
+  await p.locator('button:has-text("HDFC Savings")').click();
+  await p.locator('input[type="file"][accept*=".pdf"]').setInputFiles({ name: 'hdfc.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await p.locator('button:has-text("Review 3 lines")').click(); await p.waitForTimeout(400);
+  const row = t => p.locator('[data-bsrow="open"]').filter({ hasText: t });
+  assert.match(await row('20,000').innerText(), /Already in your Zerodha funds log/);
+  await row('20,000').locator('button:has-text("Link")').click(); await p.waitForTimeout(300);
+  let zj = (await stored(p)).zjournal;
+  assert.equal(zj.funds.length, 1, 'linked, not duplicated'); assert.ok(zj.funds[0].src);
+  // The rest from the Zerodha side.
+  await p.locator('button[aria-label="back"]').first().click(); await p.waitForTimeout(200);
+  await p.locator('button[aria-label="back"]').first().click(); await p.waitForTimeout(200);
+  await p.goto(base); await mounted(p);
+  await p.locator('button[aria-label="Wealth Tracker"]').click(); await p.waitForTimeout(300);
+  await p.locator('button:has-text("Zerodha Portfolio")').click(); await p.waitForTimeout(300);
+  await p.locator('button:has-text("Funds")').first().click(); await p.waitForTimeout(200);
+  assert.match(await p.locator('#root').innerText(), /2 NOT IN THE LOG/);
+  await p.locator('button:has-text("Add all")').click(); await p.waitForTimeout(400);
+  const txt = await p.locator('#root').innerText();
+  assert.match(txt, /matches your bank statements/);
+  zj = (await stored(p)).zjournal;
+  assert.deepEqual(zj.funds.map(f => [f.kind, f.amount]).sort(), [['in', 20000], ['in', 5000], ['out', 3000]]);
+  // Deleting a funds entry that came from the bank reopens the bank line.
+  await p.locator('button:has-text("Withdrawn to bank")').click();
+  await p.locator('button:has-text("Delete")').click(); await p.waitForTimeout(300);
+  const d = await stored(p);
+  assert.equal(d.zjournal.funds.length, 2);
+  assert.equal(d.bankStmts[0].rows.find(r => r.dir === 'cr').st, 'open');
   assert.deepEqual(p.errors, []);
 });
 
