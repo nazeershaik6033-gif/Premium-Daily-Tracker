@@ -619,6 +619,32 @@ test('Goal form: by-when chips give a monthly plan; sheet keeps the typed field 
   assert.deepEqual(p.errors, []);
 });
 
+test('Reinvestments that are also Zerodha holdings are counted once (assets, loans, Where it went)', async () => {
+  const now = Date.now(), d = 864e5;
+  const zj = { fills: [{ id: 'a', sym: 'QPOWER', ts: now - 20 * d, exch: 'NSE', side: 'buy', qty: 20, price: 1000, oid: 'o1' }],
+    funds: [{ id: 'f1', kind: 'in', amount: 60000, date: now - 30 * d }], mf: [], meta: { QPOWER: { type: 'invest' } }, prices: { QPOWER: { ltp: 1100 } }, notes: {} };
+  const L = { id: 'L1', lender: 'APGVB', kind: 'personal', principal: 100000, rate: 11, tenure: 24, emiStart: now - 60 * d, sanction: now - 90 * d, createdAt: now - 90 * d, payments: [] };
+  const inv = (id, name, type, invested, current) => ({ id, name, type, invested, current, loanId: 'L1', startDate: now - 20 * d, createdAt: now - 20 * d, payouts: [], valueLog: [] });
+  const p = await newPage({ seed: { zjournal: zj, loanTracker: [L], investments: [inv('r1', 'QPOWER', 'stock', 20000, 22000), inv('r2', 'Zerodha', 'other', 40000, 40000), inv('r3', 'SBI FD', 'fd', 30000, 30500)] } });
+  const calc = () => p.evaluate(async () => { const x = JSON.parse((await window.storage.get('etp-data-u_t')).value), W = wtStats(x), A = ffAll(x);
+    return { dups: [...riZjDups(x).keys()].sort(), rVal: W.rVal, extra: Math.round(W.assets - W.zVal), earn: A.sums[0].g.earn, zInv: zjLoanShares(x).get('L1').invested }; });
+  // QPOWER and "Zerodha" are the Zerodha account; only the FD is added on top of it.
+  assert.deepEqual(await calc(), { dups: ['r1', 'r2'], rVal: 30500, extra: 30500, earn: 70000, zInv: 40000 });
+  // The holding takes the reinvestment's loan and says it is counted once.
+  await p.locator('button[aria-label="Wealth Tracker"]').click(); await p.waitForTimeout(300);
+  assert.match(await p.locator('#root').innerText(), /2 reinvestments are also in Zerodha Portfolio/);
+  await p.locator('button:has-text("Zerodha Portfolio")').click(); await p.waitForTimeout(300);
+  await p.locator('button:has-text("Holdings")').first().click(); await p.waitForTimeout(200);
+  await p.locator('button:has-text("QPOWER")').click(); await p.waitForTimeout(300);
+  const sheet = await p.locator('body').innerText();
+  assert.match(sheet, /Also in Reinvestments as “QPOWER” — counted once, here/); assert.match(sheet, /Funded by APGVB/);
+  // "Not the same" puts it back as its own reinvestment.
+  await p.evaluate(async () => { const k = 'etp-data-u_t', x = JSON.parse((await window.storage.get(k)).value); x.investments[0].zjSame = false; await window.storage.set(k, JSON.stringify(x)); });
+  await p.reload(); await mounted(p);
+  assert.deepEqual((await calc()).dups, ['r2']);
+  assert.deepEqual(p.errors, []);
+});
+
 test('Studio theme: white page, flat bordered cards, upright headings', async () => {
   const p = await newPage({ seed: {} });
   await p.evaluate(() => localStorage.setItem('etp-theme', 'studio')); await p.reload(); await mounted(p);

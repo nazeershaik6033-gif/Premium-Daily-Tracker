@@ -14570,7 +14570,39 @@ function LnOdSheet({L,data,kind,onClose,onSave}){
 // Extra fields: payouts:[{id,date,amount,note}] (interest/dividends/coupons received), valueLog:[{id,date,value}] (value updates).
 // Returns = current value + payouts − invested. They are compared with what the loan charges for the same money.
 const RI_YR=365*864e5;
-const riOf=(data,loanId)=>(data.investments||[]).filter(i=>i.loanId===loanId);
+// A reinvestment that is the same holding as something in Zerodha Portfolio is counted once, in Zerodha
+// (its tradebook and price are the better record). See riZjDups.
+const riOf=(data,loanId)=>{const d=riZjDups(data);return(data.investments||[]).filter(i=>i.loanId===loanId&&!d.has(i.id))};
+const riDupsOf=(data,loanId)=>{const d=riZjDups(data);return(data.investments||[]).filter(i=>(loanId===undefined?!!i.loanId:i.loanId===loanId)&&d.has(i.id)).map(inv=>({inv,m:d.get(inv.id)}))};
+// --- Reinvestments that duplicate Zerodha holdings ---
+// Matched by the stock symbol (stocks, gold, ETFs), by the fund name (mutual funds), or a reinvestment that is the
+// Zerodha account itself ("Zerodha", "Kite"). inv.zjSame: false = "not the same", {sym}|{mf} = linked by hand.
+const zjSymN=x=>String(x||"").toUpperCase().replace(/-(EQ|BE|BZ|SM|ST)$/,"").replace(/[^A-Z0-9&]/g,"");
+const zjMfN=x=>String(x||"").toLowerCase().replace(/\b(fund|direct|regular|plan|growth|option|idcw|dividend|scheme|the|of|mf)\b/g," ").replace(/[^a-z0-9]+/g," ").trim();
+let _riDupC={i:null,z:null,v:null};
+function riZjDups(data){
+  const inv=data.investments,z0=data.zjournal;
+  if(_riDupC.v&&_riDupC.i===inv&&_riDupC.z===z0)return _riDupC.v;
+  const out=new Map(),zj=zjOf(data);
+  if(inv&&inv.length&&(zj.fills.length||zj.mf.length||zj.funds.length)){
+    const syms=new Map();for(const f of zj.fills){const k=zjSymN(f.sym);if(k.length>=3&&!syms.has(k))syms.set(k,f.sym)}
+    const mfs=zj.mf.map(m=>({m,k:zjMfN(m.name)})).filter(x=>x.k.length>=4);
+    for(const h of inv){
+      const z=h.zjSame;if(z===false)continue;
+      if(z&&z.sym&&syms.has(zjSymN(z.sym))){out.set(h.id,{sym:syms.get(zjSymN(z.sym)),label:z.sym,how:"hand"});continue}
+      if(z&&z.mf){const m=zj.mf.find(x=>x.id===z.mf);if(m){out.set(h.id,{mf:m.id,label:m.name,how:"hand"});continue}}
+      const name=String(h.name||""),tp=h.type;if(tp==="fd"||tp==="nps")continue;
+      if(/\b(zerodha|kite)\b/i.test(name)&&zj.funds.length){out.set(h.id,{acct:true,label:"your Zerodha account"});continue}
+      if(tp==="stock"||tp==="gold"||tp==="other"){
+        const toks=name.toUpperCase().split(/[^A-Z0-9&]+/).filter(Boolean);
+        const hit=syms.get(zjSymN(name))||(tp!=="other"?toks.map(x=>syms.get(zjSymN(x))).find(Boolean):null);
+        if(hit){out.set(h.id,{sym:hit,label:hit});continue}
+      }
+      if(tp==="mf"||tp==="other"){const k=zjMfN(name),m=k.length>=4&&mfs.find(x=>x.k===k||x.k.includes(k)||k.includes(x.k));if(m)out.set(h.id,{mf:m.m.id,label:m.m.name})}
+    }
+  }
+  _riDupC={i:inv,z:z0,v:out};return out;
+}
 const riPct=x=>x==null?"—":(x>=0?"":"−")+Math.abs(x).toFixed(2)+"%";
 const riSigned=(x,cur)=>(x>=0?"+":"−")+fm(Math.abs(x),cur);
 // Stocks and mutual funds don't pay interest: they take a sell (exit) value instead of an expected rate.
@@ -14849,7 +14881,29 @@ function RiEntrySheet({data,inv,kind,entry,onClose,onSave,onDelete}){
   ]})});
 }
 // Details of one reinvestment: numbers vs the loan, full history, and every action.
-function RiDetailSheet({L,data,inv,onClose,onAct}){
+// Reinvestments that are also Zerodha holdings: listed, but counted once (in Zerodha).
+function RiDupCard({data,loanId,onOpen,onNotSame}){
+  const list=riDupsOf(data,loanId),cur=data.currency;if(!list.length)return null;
+  return o("div",{style:{padding:"14px 16px 6px",background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,marginBottom:12},children:[
+    t("div",{style:{fontFamily:'var(--nf)',fontSize:10,color:c.tm,letterSpacing:1.2},children:"ALSO IN ZERODHA · COUNTED ONCE"}),
+    t("div",{style:{fontSize:11.5,color:c.td,margin:"4px 0 4px",lineHeight:1.45},children:`${list.length===1?"This holding is":"These holdings are"} in Zerodha Portfolio too, so ${list.length===1?"it is":"they are"} counted there, not added again.`}),
+    ...list.map(({inv,m})=>o("div",{key:inv.id,className:"f ia jb",style:{gap:10,padding:"10px 0",borderTop:`1px solid ${c.brs}`},children:[
+      o("button",{onClick:onOpen?()=>onOpen(inv):undefined,className:"tl minw0 act98",style:{flex:1,background:"transparent",border:"none",padding:0,color:"inherit",textAlign:"left"},children:[t("div",{className:"tru",style:{fontSize:13.5,fontWeight:600,color:c.tx},children:inv.name}),t("div",{className:"tru",style:{fontSize:11,color:c.tm,marginTop:2},children:fs(+inv.invested||0,cur)+" · same as "+m.label+(m.how==="hand"?" (linked by you)":"")})]}),
+      onNotSame&&t("button",{onClick:()=>onNotSame(inv),className:"act95 trt",style:{flexShrink:0,padding:"6px 10px",borderRadius:999,background:"transparent",border:`1px solid ${c.brs}`,color:c.td,fontSize:11.5},children:"Not the same"})]}))]});
+}
+// On a reinvestment: link it to (or unlink it from) the same holding in Zerodha.
+function RiZjLink({data,inv,onSet}){
+  const zj=zjOf(data);if(!onSet||!(zj.fills.length||zj.mf.length)||inv.type==="fd"||inv.type==="nps")return null;
+  const m=riZjDups(data).get(inv.id),[pick,sPick]=useState(false);
+  const syms=[...new Set(zj.fills.map(f=>f.sym))].sort(),mfs=zj.mf;
+  if(m)return o("div",{style:{marginTop:12,padding:"10px 12px",borderRadius:12,background:c.sk+"14",border:`1px solid ${c.sk}33`,fontSize:12.5,color:c.td,lineHeight:1.45},children:[
+    "💹 Same as ",t("b",{style:{color:c.tx},children:m.label})," in Zerodha — counted there once, not added again. ",
+    t("button",{onClick:()=>onSet({zjSame:false}),className:"act95",style:{background:"transparent",border:"none",color:c.ac,fontSize:12.5,fontWeight:600,padding:0},children:"Not the same"})]});
+  return o("div",{style:{marginTop:12},children:[
+    t("button",{onClick:()=>sPick(!pick),className:"act95",style:{background:"transparent",border:"none",color:c.ac,fontSize:12.5,fontWeight:600,padding:0},children:pick?"Cancel":"💹 Also in Zerodha? Link it so it's counted once ›"}),
+    pick&&t("div",{className:"f fw",style:{gap:6,marginTop:8},children:[...syms.map(x=>[{sym:x},x]),...mfs.map(x=>[{mf:x.id},x.name])].map(([v,l])=>t("button",{key:l,onClick:()=>{onSet({zjSame:v});sPick(false)},className:"act95 trt",style:{padding:"6px 11px",borderRadius:999,fontSize:12,background:c.sf2,border:`1px solid ${c.brs}`,color:c.tx},children:l}))})]});
+}
+function RiDetailSheet({L,data,inv,onClose,onAct,onSet}){
   const cur=data.currency,s=riStats(inv,lnCurRate(L)),tp=invType(inv.type),good=s.net>=0,mkt=riMarket(inv.type),pl=s.closed?"Realised P&L":mkt?"Unrealised P&L":"Total return";
   const hist=[{k:"start",date:inv.startDate||inv.createdAt,l:mkt?"Bought":"Invested",v:"−"+fm(s.P,cur),col:c.tx},
     ...(s.closed?[{k:"exit",date:s.end,l:mkt?"Sold":"Exited",v:"+"+fm(s.value,cur),col:c.mt}]:[]),
@@ -14868,6 +14922,7 @@ function RiDetailSheet({L,data,inv,onClose,onAct}){
     kv(mkt?"Buy value":"Invested",fm(s.P,cur)),kv(s.closed?(mkt?"Exit (sell) value":"Exit value"):"Current value",fm(s.value,cur)),kv(mkt?"Dividends received":"Payouts received",fm(s.payouts,cur),c.mt),kv(pl,riSigned(s.ret,cur)+(s.pnlPct!=null?" · "+(s.pnlPct>=0?"+":"−")+Math.abs(s.pnlPct).toFixed(1)+"%":""),s.ret>=0?c.mt:c.co),kv("Loan cost for this money",fm(s.cost,cur),c.gd),
     o("div",{className:"f",style:{gap:8,marginTop:14},children:[act(mkt?"+ Dividend":"+ Payout",()=>onAct("pay"),true),!s.closed&&act("Update value",()=>onAct("val"))]}),
     o("div",{className:"f",style:{gap:8,marginTop:8},children:[act("✏️ Edit",()=>onAct("edit")),act("Remove",()=>onAct("del"),false)]}),
+    t(RiZjLink,{data,inv,onSet}),
     t("div",{style:{fontFamily:'var(--nf)',fontSize:9.5,color:c.tm,letterSpacing:1,margin:"18px 0 4px"},children:"HISTORY · TAP AN ENTRY TO EDIT"}),
     ...hist.map((h,i)=>t("button",{key:h.k+(h.e?h.e.id:i),onClick:()=>h.e&&onAct(h.k==="pay"?"pay":"val",h.e),className:"w100 f ia jb act99 trt",style:{padding:"9px 0",background:"transparent",border:"none",borderBottom:`1px solid ${c.brs}`,color:"inherit",textAlign:"left",gap:10},children:[o("div",{className:"tl minw0",children:[t("div",{className:"tru",style:{fontSize:13,color:c.tx},children:h.l}),t("div",{style:{fontSize:11,color:c.tm},children:lnFmtD(h.date)})]}),t("span",{style:{fontFamily:'var(--nf)',fontSize:13,color:h.col,flexShrink:0},children:h.v})]}))
   ]})});
@@ -14939,6 +14994,7 @@ function LnDetail({L,data,persist,onBack,initTab,onView}){
     o("div",{className:"f ia fw",style:{gap:6,marginTop:8},children:[riMarket(inv.type)?t(LnPill,{col:s.ret>=0?c.mt:c.co,children:`${s.closed?"Realised":"Unrealised"} ${riSigned(s.ret,cur)}${s.pnlPct!=null?" · "+(s.pnlPct>=0?"+":"−")+Math.abs(s.pnlPct).toFixed(1)+"%":""}`}):t(LnPill,{col:s.annual==null?c.tm:s.annual>=lnCurRate(L)?c.mt:c.co,children:s.annual==null?"Too early for a yearly %":`${riPct(s.annual)} vs ${riPct(L.rate||0)} / yr`}),t(LnPill,{col:good?c.mt:c.co,children:(good?"Ahead ":"Behind ")+fm(Math.abs(s.net),cur)})]})]})};
   const riTab=o(Fragment,{children:[
     t(ZjLoanCard,{data,loanId:L.id,onItem:onView&&(it=>ffGoAuto({src:"zj",zj:{sym:it.sym||null}},onView))}),
+    t(RiDupCard,{data,loanId:L.id,onOpen:inv=>sSheet({k:"ri",id:inv.id}),onNotSame:inv=>updInv(inv.id,{zjSame:false})}),
     (ri.items.length>0||ri.trade!==0)&&riSummaryCard(ri,cur,null,()=>sTab("flow")),
     lnCard([
       o("div",{key:"h",className:"f ia jb",style:{marginBottom:6},children:[t("span",{style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx},children:"Reinvestments"}),t("button",{onClick:()=>sSheet({k:"riAdd"}),"aria-label":"Add reinvestment",className:"act90 trt",style:{width:30,height:30,borderRadius:15,border:"none",background:c.ac,color:(c.onAc||"#0a0a0a"),fontSize:18,lineHeight:1},children:"+"})]}),
@@ -15115,7 +15171,7 @@ function LnDetail({L,data,persist,onBack,initTab,onView}){
     sheet&&sheet.k==="od"&&t(LnOdSheet,{L,data,kind:sheet.kind,onClose:()=>sSheet(null),onSave:doOd}),
     sheet&&sheet.k==="riAdd"&&t(RiFormSheet,{L,data,onClose:()=>sSheet(null),onSave:p=>{const id="inv_"+uid();persist({investments:[...invs,{...p,id,loanId:L.id,payouts:[],valueLog:p.valueLog||[],createdAt:Date.now()}]});sTab("reinvest");sSheet({k:"ri",id})}}),
     sheet&&sheet.k==="riLink"&&t(RiLinkSheet,{L,data,onClose:()=>sSheet(null),onLink:id=>{updInv(id,{loanId:L.id});sTab("reinvest");sSheet({k:"ri",id})}}),
-    sheet&&sheet.k==="ri"&&riFind(sheet.id)&&t(RiDetailSheet,{L,data,inv:riFind(sheet.id),onClose:()=>sSheet(null),onAct:(a,e)=>sSheet({k:"ri_"+a,id:sheet.id,e})}),
+    sheet&&sheet.k==="ri"&&riFind(sheet.id)&&t(RiDetailSheet,{L,data,inv:riFind(sheet.id),onClose:()=>sSheet(null),onAct:(a,e)=>sSheet({k:"ri_"+a,id:sheet.id,e}),onSet:p=>updInv(sheet.id,p)}),
     sheet&&sheet.k==="ri_edit"&&riFind(sheet.id)&&t(RiFormSheet,{L,data,inv:riFind(sheet.id),onClose:()=>sSheet({k:"ri",id:sheet.id}),onSave:p=>{updInv(sheet.id,p);sSheet({k:"ri",id:sheet.id})}}),
     sheet&&(sheet.k==="ri_pay"||sheet.k==="ri_val")&&riFind(sheet.id)&&t(RiEntrySheet,{data,inv:riFind(sheet.id),kind:sheet.k==="ri_pay"?"pay":"val",entry:sheet.e,onClose:()=>sSheet({k:"ri",id:sheet.id}),onSave:e=>riSaveEntry(riFind(sheet.id),sheet.k==="ri_pay"?"pay":"val",e),onDelete:()=>riDelEntry(riFind(sheet.id),sheet.k==="ri_pay"?"pay":"val",sheet.e)}),
     sheet&&sheet.k==="ri_del"&&riFind(sheet.id)&&t(Sht,{onClose:()=>sSheet({k:"ri",id:sheet.id}),children:o(Fragment,{children:[lnSheetTitle("Remove this reinvestment?","Unlink keeps it in My Investments but stops comparing it with this loan. Delete removes the holding everywhere, including its payout and value history."),
@@ -15491,10 +15547,10 @@ function ffPools(data){
 // Everything that came out of a pool, newest first: stored entries plus holdings linked to a loan (shown as "Invested").
 function ffRows(data){
   const ids=new Set(ffPools(data).map(p=>p.id)),es=ffEntriesRaw(data),rows=[];
-  const moved=new Set(es.filter(e=>e.ref&&e.ref.k==="inv").map(e=>e.ref.id));
+  const moved=new Set(es.filter(e=>e.ref&&e.ref.k==="inv").map(e=>e.ref.id)),dup=riZjDups(data);
   for(const e of es)if(ids.has(e.loanId))rows.push({...e,amount:ffNum(e.amount),derived:false});
   for(const h of data.investments||[]){
-    if(!h.loanId||!ids.has(h.loanId)||moved.has(h.id))continue;
+    if(!h.loanId||!ids.has(h.loanId)||moved.has(h.id)||dup.has(h.id))continue;
     rows.push({id:"inv:"+h.id,loanId:h.loanId,type:"invest",amount:ffNum(h.invested),date:h.startDate||h.createdAt||0,toId:null,toName:"",note:h.name||"",src:"inv",lock:true,off:false,ref:{k:"inv",id:h.id},derived:true,h});
   }
   rows.push(...ffAutoRows(data,ids,es));
@@ -16654,6 +16710,7 @@ function ReinvestDash({data,persist,onClose,onView,getFrom,onTx}){
   const overview=o(Fragment,{children:[
     t(FfOverviewCard,{data,onOpen:()=>onView("loanFlow")}),
     t(ZjLoanCard,{data,onOpen:()=>{_zjJump="holdings";onView("zerodha")}}),
+    t(RiDupCard,{data,onNotSame:inv=>updInv(inv.id,{zjSame:false})}),
     t(RiTradingCard,{tr:pf.tr,loans:pf.loans,cur,onManage:()=>sSh({k:"trade"}),onDays:()=>sTab("trading")}),
     pts.length>1&&lnCard([t("div",{key:"t",style:{fontFamily:c.hf,fontSize:16,fontWeight:600,color:c.tx,marginBottom:10},children:"Invested vs worth"}),t(RiChart,{key:"c",pts,cur})],{animation:RI_ANIM,animationDelay:"60ms"}),
     lnCard([
@@ -16712,7 +16769,7 @@ function ReinvestDash({data,persist,onClose,onView,getFrom,onTx}){
     sh&&sh.k==="pick"&&t(Sht,{onClose:()=>sSh(null),children:o(Fragment,{children:[lnSheetTitle("Which loan funded it?","Pick the loan the money came from — the reinvestment is compared against that loan's rate."),
       ...(pf.loans.length?pf.loans.map(L=>t("button",{key:L.id,onClick:()=>sSh({k:"form",L}),className:"w100 f ia act99 trt",style:{padding:"12px 4px",gap:12,background:"transparent",border:"none",borderBottom:`1px solid ${c.brs}`,color:"inherit",textAlign:"left"},children:[t("span",{style:{fontSize:20,width:28,textAlign:"center"},children:(LOAN_KINDS[L.kind]||{}).e}),o("div",{className:"tl",children:[t("div",{style:{fontSize:14,color:c.tx},children:L.lender||"Loan"}),t("div",{style:{fontSize:11.5,color:c.tm,marginTop:1},children:`${fs(L.principal||0,cur)} · ${lnCurRate(L).toFixed(2)}%`+(L.purpose?" · "+L.purpose:"")})]})]})):[t("div",{key:"n",style:{fontSize:13,color:c.td,padding:"10px 0",lineHeight:1.5},children:"Add a loan in the Loan Tracker first — reinvestments are tracked against the loan that funded them."})])]})}),
     sh&&sh.k==="form"&&t(RiFormSheet,{L:sh.L,data,onClose:()=>sSh(null),onSave:pt=>savedNew(sh.L,pt)}),
-    sh&&sh.k==="ri"&&find(sh.id)&&t(RiDetailSheet,{L:find(sh.id).L,data,inv:find(sh.id).inv,onClose:()=>sSh(null),onAct:(a,e)=>sSh({k:"ri_"+a,id:sh.id,e})}),
+    sh&&sh.k==="ri"&&find(sh.id)&&t(RiDetailSheet,{L:find(sh.id).L,data,inv:find(sh.id).inv,onClose:()=>sSh(null),onAct:(a,e)=>sSh({k:"ri_"+a,id:sh.id,e}),onSet:p=>updInv(sh.id,p)}),
     sh&&sh.k==="ri_edit"&&find(sh.id)&&t(RiFormSheet,{L:find(sh.id).L,data,inv:find(sh.id).inv,onClose:()=>sSh({k:"ri",id:sh.id}),onSave:p=>{updInv(sh.id,p);sSh({k:"ri",id:sh.id})}}),
     sh&&(sh.k==="ri_pay"||sh.k==="ri_val")&&find(sh.id)&&t(RiEntrySheet,{data,inv:find(sh.id).inv,kind:sh.k==="ri_pay"?"pay":"val",entry:sh.e,onClose:()=>sSh(null),onSave:e=>saveEntry(find(sh.id).inv,sh.k==="ri_pay"?"pay":"val",e),onDelete:()=>delEntry(find(sh.id).inv,sh.k==="ri_pay"?"pay":"val",sh.e)}),
     sh&&sh.k==="ri_del"&&find(sh.id)&&t(Sht,{onClose:()=>sSh({k:"ri",id:sh.id}),children:o(Fragment,{children:[lnSheetTitle("Remove this reinvestment?","Unlink keeps it in My Investments but stops comparing it with a loan. Delete removes the holding everywhere."),
@@ -17397,19 +17454,29 @@ function zjUnlinkBank(data,fid,rowId){
 // holdings, MF and free cash) in proportion to what was put in.
 let _zjShC={z:null,v:null};
 function zjLoanShares(data){
-  const z0=data.zjournal;if(_zjShC.v&&_zjShC.z===z0)return _zjShC.v;
-  const v=zjLoanShares0(data);_zjShC={z:z0,v};return v;
+  const z0=data.zjournal,i0=data.investments;if(_zjShC.v&&_zjShC.z===z0&&_zjShC.i===i0)return _zjShC.v;
+  const v=zjLoanShares0(data);_zjShC={z:z0,i:i0,v};return v;
+}
+// The loan a Zerodha holding was bought with: its own "Bought with", else the loan of the reinvestment that duplicates it.
+function zjDupLoans(data){
+  const sym=new Map(),mf=new Map(),acct=new Map();
+  for(const{inv,m}of riDupsOf(data)){if(!inv.loanId)continue;
+    if(m.sym&&!sym.has(m.sym))sym.set(m.sym,inv.loanId);else if(m.mf&&!mf.has(m.mf))mf.set(m.mf,inv.loanId);else if(m.acct)acct.set(inv.loanId,lnR2((acct.get(inv.loanId)||0)+(+inv.invested||0)))}
+  return{sym,mf,acct};
 }
 function zjLoanShares0(data){
   const zj=zjOf(data);if(!zj.fills.length&&!zj.funds.length&&!zj.mf.length)return new Map();
+  const D=zjDupLoans(data),symLoan=sym=>(zj.meta[sym]||{}).loanId||D.sym.get(sym)||null;
   const S=zjSummary(zj),px=sym=>zj.prices[sym]&&zj.prices[sym].ltp>0?+zj.prices[sym].ltp:null,by=new Map();
   const slot=id=>by.get(id)||by.set(id,{funds:0,dInv:0,dVal:0,booked:0,items:[],fdate:0}).get(id);
   for(const f of zj.funds)if(f.loanId){const x=slot(f.loanId);x.funds+=(f.kind==="out"?-1:1)*(+f.amount||0);if(f.kind!=="out"&&f.date&&(!x.fdate||f.date<x.fdate))x.fdate=f.date}
+  // A reinvestment like "Zerodha ₹1L" under a loan stands for loan money sent to Zerodha, unless that loan's funds are tagged already.
+  for(const[lid,amt]of D.acct)if(!zj.funds.some(f=>f.loanId===lid)){const x=slot(lid);x.funds+=amt}
   let tInv=0,tVal=0;
-  for(const t2 of S.trips){const lid=(zj.meta[t2.sym]||{}).loanId;if(!lid)continue;const x=slot(lid);
+  for(const t2 of S.trips){const lid=symLoan(t2.sym);if(!lid)continue;const x=slot(lid);
     if(t2.open){const p=px(t2.sym),v=p!=null?p*t2.qty:t2.cost;x.dInv+=t2.cost;x.dVal+=v;tInv+=t2.cost;tVal+=v;x.items.push({name:t2.sym,sym:t2.sym,inv:t2.cost,val:v,date:t2.openTs||0})}
     x.booked+=t2.net}
-  for(const m of zj.mf)if(m.loanId){const x=slot(m.loanId),v=m.current!=null&&m.current!==""?+m.current:+m.invested||0;x.dInv+=+m.invested||0;x.dVal+=v;tInv+=+m.invested||0;tVal+=v;x.items.push({name:m.name,mf:m.id,inv:+m.invested||0,val:v,date:m.date||m.createdAt||0})}
+  for(const m of zj.mf){const mlid=m.loanId||D.mf.get(m.id);if(!mlid)continue;const x=slot(mlid),v=m.current!=null&&m.current!==""?+m.current:+m.invested||0;x.dInv+=+m.invested||0;x.dVal+=v;tInv+=+m.invested||0;tVal+=v;x.items.push({name:m.name,mf:m.id,inv:+m.invested||0,val:v,date:m.date||m.createdAt||0})}
   const poolCap=S.capital-tInv,poolVal=S.value+S.mfVal+S.cash-tVal,ratio=poolCap>0?poolVal/poolCap:1;
   for(const[id,x]of by){const rest=Math.max(0,x.funds-x.dInv);x.rest=_r2(rest);x.restVal=_r2(rest*ratio);x.invested=_r2(x.dInv+rest);x.value=_r2(x.dVal+rest*ratio+x.booked);x.gain=_r2(x.value-x.invested);x.pct=x.invested>0?x.gain/x.invested*100:0}
   return by;
@@ -17470,7 +17537,7 @@ function wtStats(data){
   const shares=zjLoanShares(data),perLoan=loans.map(x=>{const g=(pf.groups||[]).find(g2=>g2.L&&g2.L.id===x.id),zsh=shares.get(x.id);const v=(g?(g.sm.value||0):0)+(zsh?zsh.value:0),inv=(g?(g.sm.P||0):0)+(zsh?zsh.invested:0);return{...x,assetVal:_r2(v),assetInv:_r2(inv),assetGain:_r2(v-inv),yrCost:_r2(x.out*x.rate/100)}});
   const zRet=zs&&zs.roc!=null?zs.roc:null,rRet=pf.P>0?(pf.ret||0)/pf.P*100:null;
   const flow=ffAll(data);
-  return{cur,assets,zVal,rVal,liab,net:_r2(assets-liab),debtRatio:assets>0?liab/assets*100:null,wRate,yrCost,emiMo,incMo,spendMo,emiInc:incMo>0?emiMo/incMo*100:null,debtFree,loans:perLoan,zs,pf,zRet,rRet,toReceive:ln.toReceive||0,overdue:ln.overdueN||0,flow,
+  return{cur,assets,zVal,rVal,liab,dups:riDupsOf(data).filter(x=>x.inv.loanId).length,net:_r2(assets-liab),debtRatio:assets>0?liab/assets*100:null,wRate,yrCost,emiMo,incMo,spendMo,emiInc:incMo>0?emiMo/incMo*100:null,debtFree,loans:perLoan,zs,pf,zRet,rRet,toReceive:ln.toReceive||0,overdue:ln.overdueN||0,flow,
     intLeft:_r2(loans.reduce((a,x)=>a+x.intLeft,0)),paid:_r2(loans.reduce((a,x)=>a+x.paid,0))};
 }
 function LasCard({data,onView}){
@@ -17524,7 +17591,8 @@ function WealthTracker({data,onClose,onView}){
     o("div",{className:"f ia jb",style:{marginBottom:6},children:[t(BB,{onClick:onClose}),t("div",{style:{fontFamily:c.hf,fontSize:24},children:t("em",{children:"Wealth Tracker"})}),t("div",{style:{width:38}})]}),
     o("div",{className:"f",style:{gap:10,padding:16,background:c.sfg,border:`1px solid ${c.brs}`,borderRadius:16,marginTop:10},children:[giStat("ASSETS",giM(Math.round(W.assets),cur),c.mt),giStat("LIABILITIES",giM(Math.round(W.liab),cur),W.liab?c.co:null),giStat("NET",zjSign(Math.round(W.net),cur),zjCol(W.net))]}),
     o("div",{className:"f",style:{gap:4,padding:4,background:c.sfg,borderRadius:12,border:`1px solid ${c.brs}`,marginTop:12},children:[tabBtn("assets","Assets"),tabBtn("liab","Liabilities"),tabBtn("stats","Stats")]}),
-    tab==="assets"&&o(Fragment,{children:[t(ZerodhaCard,{data,onView}),t(ReinvestCard,{data,onView})]}),
+    tab==="assets"&&o(Fragment,{children:[t(ZerodhaCard,{data,onView}),t(ReinvestCard,{data,onView}),
+      W.dups>0&&t("div",{style:{fontSize:11.5,color:c.tm,margin:"10px 4px 0",lineHeight:1.45},children:`${W.dups} reinvestment${W.dups===1?" is":"s are"} also in Zerodha Portfolio, so ${W.dups===1?"it is":"they are"} counted once (in Zerodha). See Reinvestments to change that.`})]}),
     tab==="liab"&&o(Fragment,{children:[t(LoanTrackerCard,{data,onView}),t(LasCard,{data,onView})]}),
     tab==="stats"&&stats(),
     ai&&t(WtAiSheet,{data,W,onClose:()=>sAi(false)})
@@ -17914,7 +17982,7 @@ function ZjSheet({data,zj,S,sh,put,putAll,onClose,onOpen,onView}){
   const[f,sF]=useState(()=>{
     if(sh.k==="fund"){const x=sh.f;return{kind:x?x.kind:"in",amount:x?String(x.amount):"",date:lnYMD(x?x.date:Date.now()),note:x?x.note||"":"",loanId:x?x.loanId||null:null}}
     if(sh.k==="fill")return{sym:sh.sym||"",side:sh.side||"buy",qty:"",price:"",date:lnYMD(Date.now())};
-    if(sh.k==="pos"){const m=zj.meta[sh.sym]||{};return{loanId:m.loanId||null,type:m.type||"invest",target:m.target?String(m.target):"",sl:m.sl?String(m.sl):"",plan:m.plan||"",ltp:zj.prices[sh.sym]?String(zj.prices[sh.sym].ltp):""}}
+    if(sh.k==="pos"){const m=zj.meta[sh.sym]||{};return{loanId:m.loanId||zjDupLoans(data).sym.get(sh.sym)||null,type:m.type||"invest",target:m.target?String(m.target):"",sl:m.sl?String(m.sl):"",plan:m.plan||"",ltp:zj.prices[sh.sym]?String(zj.prices[sh.sym].ltp):""}}
     if(sh.k==="trip"){const n=zj.notes[sh.id]||{};return{tags:n.tags||[],mistakes:n.mistakes||[],note:n.note||""}}
     if(sh.k==="mf"){const m=sh.mf;return{name:m?m.name:"",invested:m?String(m.invested):"",current:m&&m.current!=null?String(m.current):"",viaZ:m?m.viaZ!==false:true,add:"",loanId:m?m.loanId||null:null}}
     if(sh.k==="prices")return Object.fromEntries(S.open.filter(t2=>!sh.only||sh.only.includes(t2.sym)).map(t2=>[t2.sym,zj.prices[t2.sym]?String(zj.prices[t2.sym].ltp):""]));
@@ -17955,6 +18023,7 @@ function ZjSheet({data,zj,S,sh,put,putAll,onClose,onOpen,onView}){
         rr!=null&&t("div",{style:{fontSize:12,color:c.td,marginTop:6},children:`Risk ${zjMoney(_r2((t2.avg-sl)*t2.qty),cur)} · reward ${zjMoney(_r2((tg-t2.avg)*t2.qty),cur)} · R:R 1:${rr.toFixed(1)}`})]}),
       lnLbl(f.type==="swing"?"TRADE PLAN":"WHY YOU OWN IT"),t("textarea",{value:f.plan,rows:2,onChange:e=>set("plan",e.target.value),placeholder:f.type==="swing"?"Entry reason, exit rule…":"Thesis, review date…",style:{...lnInp(),resize:"none",fontFamily:"var(--tf)"}}),
       loanPick("BOUGHT WITH","Pick the loan if borrowed money paid for this stock."),
+      (()=>{const d=riDupsOf(data).filter(x=>x.m.sym===sh.sym);return d.length?t("div",{style:{fontSize:11.5,color:c.td,marginTop:8,lineHeight:1.45},children:`💹 Also in Reinvestments as “${d.map(x=>x.inv.name).join("”, “")}” — counted once, here.`}):null})(),
       t(ZjFundedBy,{data,loanId:f.loanId,cost:t2.cost,value:val!=null?val:(zj.prices[sh.sym]?zj.prices[sh.sym].ltp*t2.qty:null),since:t2.openTs,onOpen:onView&&f.loanId?()=>{onClose();if(f.loanId==="las")onView("las");else{_lnJump={id:f.loanId,tab:"reinvest"};onView("loanTracker")}}:null}),
       o("div",{className:"f",style:{gap:10,marginTop:12},children:[lnBtn("＋ Buy more",()=>onOpen({k:"fill",side:"buy",sym:sh.sym})),lnBtn("Sell",()=>onOpen({k:"fill",side:"sell",sym:sh.sym}))]}),
       lnLbl("TRADES IN THIS POSITION"),t("div",{style:{border:`1px solid ${c.brs}`,borderRadius:12,overflow:"hidden"},children:fills.map((x,i)=>o("div",{key:x.id,className:"f ia jb",style:{gap:8,padding:"8px 12px",borderBottom:i<fills.length-1?`1px solid ${c.brs}`:"none",fontSize:12.5},children:[t("span",{style:{color:x.side==="buy"?c.mt:c.co},children:(x.side==="buy"?"Buy ":"Sell ")+x.qty+" @ "+zjMoney(x.price,cur)}),o("span",{className:"f ia",style:{gap:8,color:c.tm},children:[lnFmtD(x.ts),x.src==="manual"&&t("button",{onClick:()=>{put({fills:zj.fills.filter(y=>y.id!==x.id)})},"aria-label":"Delete trade",className:"act90",style:{background:"transparent",border:"none",color:c.ro,fontSize:14,padding:0},children:"✕"})]})]}))}),
