@@ -156,12 +156,21 @@ test('UPI receipt: amount, merchant and reference', async () => {
     '#TRACKERPRO-UPI\nPaid to\nSwiggy\n₹450\nCompleted\n26 Nov 2026, 1:15 pm\nUPI transaction ID\n123456789012\nHDFC Bank XX1234',
     'Payment Successful\nZomato Ltd\nRs. 1,249.50\nUPI Ref No: 432198765432\nFrom: State Bank of India - 5678',
     'Paid to\nAmazon\n3299\nSend money\nPhonePe',
-  ].map(t => { const x = parseUPIReceipt(t); return { amount: x.amount, merchant: x.merchant, ref: x.ref }; }));
-  assert.deepEqual(r[0], { amount: 450, merchant: 'Swiggy', ref: '123456789012' });
+    'Paid to\nAmazon\n3,299\nSend money\nPhonePe',
+    'Kiwi\n7450\nSend Money\nTo Swiggy\nswiggy@icici',
+    'Kiwi\n2450\nSend Money\nTo Swiggy\nAmount 2450',
+    'Paid to\nSwiggy\n450₹\nCompleted',
+  ].map(t => { const x = parseUPIReceipt(t); return { amount: x.amount, alt: x.alt, merchant: x.merchant, ref: x.ref }; }));
+  assert.deepEqual(r[0], { amount: 450, alt: null, merchant: 'Swiggy', ref: '123456789012' });
   assert.equal(r[1].amount, 1249.5);
   assert.equal(r[1].ref, '432198765432');
-  assert.equal(r[2].amount, 3299);
+  // No ₹ in the text and no comma: the ₹ was read as the leading 3 (₹299), the long reading kept as alt.
+  assert.deepEqual([r[2].amount, r[2].alt], [299, 3299]);
   assert.equal(r[2].merchant, 'Amazon');
+  assert.deepEqual([r[3].amount, r[3].alt], [3299, null], 'a comma means the number is real');
+  assert.deepEqual([r[4].amount, r[4].alt], [450, 7450], '₹ read as 7');
+  assert.deepEqual([r[5].amount, r[5].alt], [2450, 450], 'the same number elsewhere on the receipt wins');
+  assert.deepEqual([r[6].amount, r[6].alt], [450, null], '₹ after the number');
 });
 
 test('voice amount and AI dates', async () => {
@@ -235,12 +244,62 @@ test('Stats: month-end report and this-vs-last-month render with drivers', async
   await p.goto(base + '?view=stats'); await mounted(p);
   const me = await p.locator('#stsec-monthend').innerText();
   assert.match(me, /MONTH-END REPORT/);
-  assert.match(me, /Croma/, 'one-entry or merchant driver for shopping');
-  assert.match(me, /Over budget|budget/, 'budget column shown');
+  assert.doesNotMatch(me, /WHAT MOVED/, 'starts minimised: summary only');
+  await p.locator('#stsec-monthend button:has-text("Show what moved")').click();
+  const meFull = await p.locator('#stsec-monthend').innerText();
+  assert.match(meFull, /WHAT MOVED/);
+  assert.match(meFull, /Croma/, 'one-entry or merchant driver for shopping');
+  assert.match(meFull, /Over budget|budget/, 'budget column shown');
   const cmp = await p.locator('#stsec-mcmp').innerText();
   assert.match(cmp, /THIS VS LAST MONTH/);
   await p.locator('#stsec-mcmp button:has-text("Full months")').click();
   assert.match(await p.locator('#stsec-mcmp').innerText(), /compared with/);
+  assert.deepEqual(p.errors, []);
+});
+
+test('UPI receipt: a dot on + instead of a pop-up, the option sits in the + menu', async () => {
+  const p = await newPage({ seed: {} });
+  assert.equal(await p.locator('button:has-text("Add from UPI receipt")').count(), 0, 'no floating button on open');
+  assert.equal(await p.locator('.nb-dot').count(), 1, 'dot on +');
+  await p.locator('.nb-fab').click();
+  await p.waitForTimeout(300);
+  assert.equal(await p.locator('.nb-pop:has-text("UPI")').count(), 1, 'UPI option in the + menu');
+  assert.equal(await p.locator('.nb-dot').count(), 0, 'dot cleared once seen');
+  await p.locator('.nb-pop:has-text("add")').first().click();
+  await p.waitForTimeout(400);
+  assert.equal(await p.locator('button:has-text("From UPI receipt")').count(), 1, 'small chip on the Add screen');
+  assert.deepEqual(p.errors, []);
+});
+
+test('Goal Investing: manual target and log, % done / left, saved', async () => {
+  const p = await newPage({ seed: {} });
+  await p.locator('button[aria-label="calc"]').click();
+  await p.waitForTimeout(400);
+  await p.locator('button:has-text("Goal Investing")').click();
+  await p.waitForTimeout(400);
+  await p.locator('button:has-text("New goal")').first().click();
+  await p.locator('input[placeholder="e.g. House down payment"]').fill('House');
+  const nums = p.locator('input[inputmode="decimal"]');
+  await nums.nth(0).fill('100000');
+  await nums.nth(1).fill('25000');
+  await p.locator('button:has-text("Create goal")').click();
+  await p.waitForTimeout(400);
+  let txt = await p.locator('#root').innerText();
+  assert.match(txt, /25%/); assert.match(txt, /75% left/); assert.match(txt, /₹75,000\b/);
+  await p.locator('button:has-text("Add money")').first().click();
+  await p.locator('input[inputmode="decimal"]').first().fill('15000');
+  await p.locator('button:has-text("Save")').last().click();
+  await p.waitForTimeout(400);
+  await p.locator('button:has-text("Withdraw")').click();
+  await p.locator('input[inputmode="decimal"]').first().fill('5000');
+  await p.locator('button:has-text("Save")').last().click();
+  await p.waitForTimeout(600);
+  txt = await p.locator('#root').innerText();
+  assert.match(txt, /35%/, '25k + 15k − 5k of 1L'); assert.match(txt, /65% left/); assert.match(txt, /₹65,000\b/);
+  const g = (await stored(p)).goalInvest;
+  assert.equal(g.length, 1);
+  assert.equal(g[0].target, 100000);
+  assert.deepEqual(g[0].entries.map(e => [e.kind, e.amount]).sort(), [['in', 15000], ['in', 25000], ['out', 5000]]);
   assert.deepEqual(p.errors, []);
 });
 
