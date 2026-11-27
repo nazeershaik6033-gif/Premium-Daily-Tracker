@@ -407,6 +407,52 @@ test('bank statement: import CSV, confirm matches, add lines, link investment, u
   assert.deepEqual(p.errors, []);
 });
 
+test('Zerodha Portfolio: funds log, equity tradebook, holdings, closed trade with charges, notes', async () => {
+  const p = await newPage({ seed: {} });
+  await p.locator('button[aria-label="calc"]').click(); await p.waitForTimeout(400);
+  await p.locator('button:has-text("Zerodha Portfolio")').click(); await p.waitForTimeout(300);
+  await p.locator('button:has-text("Funds")').first().click();
+  await p.locator('button:has-text("Add funds / withdrawal")').click();
+  await p.locator('input[inputmode="decimal"]').first().fill('100000');
+  await p.locator('button:has-text("Save")').last().click(); await p.waitForTimeout(300);
+  const tb = ['symbol,isin,trade_date,exchange,segment,series,trade_type,auction,quantity,price,trade_id,order_id,order_execution_time',
+    'TCS,INE467B01029,2026-01-05,NSE,EQ,EQ,buy,false,10,3500,1,11,2026-01-05T10:00:00',
+    'TCS,INE467B01029,2026-02-10,NSE,EQ,EQ,buy,false,10,3300,2,12,2026-02-10T10:00:00',
+    'TCS,INE467B01029,2026-03-02,NSE,EQ,EQ,sell,false,20,3800,3,13,2026-03-02T10:00:00',
+    'INFY,INE009A01021,2026-05-04,NSE,EQ,EQ,buy,false,20,1500,4,14,2026-05-04T10:00:00',
+    'NIFTY2560524750PE,,2026-06-02,NSE,FO,,sell,false,75,326.8,5,15,2026-06-02T09:21:55'].join('\n');
+  await p.locator('button:has-text("Holdings")').first().click();
+  await p.locator('input[type="file"][accept=".csv,.xlsx,.xls"]').setInputFiles({ name: 'tradebook-EQ.csv', mimeType: 'text/csv', buffer: Buffer.from(tb) });
+  await p.locator('text=/4 trades added.*1 F&O rows left out/').waitFor();
+  // Import again: nothing doubles up.
+  await p.locator('input[type="file"][accept=".csv,.xlsx,.xls"]').setInputFiles({ name: 'tradebook-EQ.csv', mimeType: 'text/csv', buffer: Buffer.from(tb) });
+  await p.locator('text=/0 trades added, 4 already here/').waitFor();
+  let txt = await p.locator('#root').innerText();
+  assert.match(txt, /INFY/); assert.doesNotMatch(txt, /TCS/, 'TCS fully sold, so not a holding');
+  await p.locator('button:has-text("INFY")').click();
+  await p.locator('button:has-text("Positional")').last().click();
+  const inputs = p.locator('input[inputmode="decimal"]');
+  await inputs.nth(0).fill('1650'); await inputs.nth(1).fill('1400'); await inputs.nth(2).fill('1800');
+  assert.match(await p.locator('text=/R:R 1:/').innerText(), /R:R 1:3\.0/);
+  await p.locator('button:has-text("Save")').last().click(); await p.waitForTimeout(300);
+  txt = await p.locator('#root').innerText();
+  assert.match(txt, /\+₹3,000 \(10\.0%\)/, 'unrealised on INFY at 1650');
+  await p.locator('button:has-text("Closed")').click(); await p.waitForTimeout(200);
+  await p.locator('button:has-text("TCS")').click(); await p.waitForTimeout(200);
+  const sheet = await p.locator('body').innerText();
+assert.match(sheet, /Profit before charges\s*\+₹8,000/); assert.match(sheet, /STT/); assert.match(sheet, /DP charges/);
+  await p.locator('button:has-text("Breakout")').click(); await p.locator('button:has-text("Sold too early")').click();
+  await p.locator('button:has-text("Save")').last().click(); await p.waitForTimeout(300);
+  await p.locator('button:has-text("Overview")').click(); await p.waitForTimeout(200);
+  assert.match(await p.locator('#root').innerText(), /CAPITAL\s*₹100,000/);
+  const zj = (await stored(p)).zjournal;
+  assert.equal(zj.fills.length, 4); assert.equal(zj.funds[0].amount, 100000);
+  assert.deepEqual(zj.meta.INFY, { type: 'swing', target: 1800, sl: 1400, plan: '' });
+  const tcs = Object.entries(zj.notes)[0][1];
+  assert.deepEqual([tcs.tags, tcs.mistakes], [['Breakout'], ['Sold too early']]);
+  assert.deepEqual(p.errors, []);
+});
+
 test('fonts: optional Settings fonts load only when needed', async () => {
   const p = await newPage();
   const links = () => p.evaluate(() => [...document.querySelectorAll('link[href*="fonts.googleapis.com/css2"]')].map(l => l.href).join(' '));
