@@ -629,6 +629,36 @@ test('Studio theme: white page, flat bordered cards, upright headings', async ()
   assert.deepEqual(p.errors, []);
 });
 
+test('Studio Dark theme: true black page, #1C1C1E flat cards, upright headings, white nav button', async () => {
+  const p = await newPage({ seed: {} });
+  await p.evaluate(() => localStorage.setItem('etp-theme', 'studioDark')); await p.reload(); await mounted(p);
+  const r = await p.evaluate(() => ({ theme: document.body.dataset.theme, bg: getComputedStyle(document.body).backgroundColor, fab: getComputedStyle(document.documentElement).getPropertyValue('--nb-ac').trim() }));
+  assert.deepEqual(r, { theme: 'studioDark', bg: 'rgb(0, 0, 0)', fab: '#F5F5F7' });
+  await p.locator('button[aria-label="Wealth Tracker"]').click(); await p.waitForTimeout(300);
+  assert.equal(await p.locator('em:has-text("Wealth Tracker")').evaluate(e => getComputedStyle(e).fontStyle), 'normal');
+  // Picked from Settings like any other theme.
+  await p.locator('button').first().click(); await p.waitForTimeout(300);
+  await p.locator('text=/^Settings$/').first().click(); await p.waitForTimeout(400);
+  await p.locator('button:has-text("Studio")').filter({ hasText: 'White' }).click(); await p.waitForTimeout(300);
+  assert.equal(await p.evaluate(() => document.body.dataset.theme), 'studio');
+  await p.locator('button:has-text("Studio Dark")').click(); await p.waitForTimeout(300);
+  assert.equal(await p.evaluate(() => localStorage.getItem('etp-theme')), 'studioDark');
+  assert.deepEqual(p.errors, []);
+});
+
+test('Settings: month-end report boxes stay inside their card even with Safari-wide number fields', async () => {
+  const p = await newPage({ seed: {} });
+  await p.addStyleTag({ content: 'input[type=number]{width:180px}' });
+  await p.locator('button').first().click(); await p.waitForTimeout(300);
+  await p.locator('text=/^Settings$/').first().click(); await p.waitForTimeout(500);
+  const r = await p.getByText('MONTH-END REPORT', { exact: true }).evaluate(h => {
+    const card = h.nextElementSibling, cr = card.getBoundingClientRect();
+    return [...card.querySelectorAll('input')].map(i => { const b = i.parentElement.getBoundingClientRect(); return [b.left >= cr.left, b.right <= cr.right + 0.5]; });
+  });
+  assert.deepEqual(r, [[true, true], [true, true]]);
+  assert.deepEqual(p.errors, []);
+});
+
 test('Zerodha filters: search, alerts, saved view, bulk + undo, grouping with subtotals', async () => {
   const now = Date.now(), d = n => now - n * 864e5;
   const F = (id, sym, ts, side, qty, price) => ({ id, sym, ts, exch: 'NSE', side, qty, price, oid: id, src: 'tradebook' });
