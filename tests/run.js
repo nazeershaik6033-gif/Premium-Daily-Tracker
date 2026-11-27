@@ -545,6 +545,80 @@ test('Zerodha ↔ loans: tagged holdings count exactly, tagged funds share the r
   assert.deepEqual(p.errors, []);
 });
 
+test('Zerodha holding: Buy more and Sell open a fresh trade form (no blank screen); Funded-by shows the loan', async () => {
+  const now = Date.now();
+  const zj = { fills: [{ id: 'a', sym: 'QPOWER', ts: now - 21 * 864e5, exch: 'NSE', side: 'buy', qty: 20, price: 1364.9, oid: 'o1' }],
+    funds: [], mf: [], meta: { QPOWER: { type: 'invest', loanId: 'las' } }, prices: { QPOWER: { ltp: 1450 } }, notes: {} };
+  const p = await newPage({ seed: { zjournal: zj, las: { loan: 90000, rate: 10.5, ltv: 45, holdings: [], txns: [] } } });
+  await p.locator('button[aria-label="Wealth Tracker"]').click(); await p.waitForTimeout(300);
+  await p.locator('button:has-text("Zerodha Portfolio")').click(); await p.waitForTimeout(300);
+  await p.locator('button:has-text("Holdings")').first().click(); await p.waitForTimeout(200);
+  await p.locator('button:has-text("QPOWER")').click(); await p.waitForTimeout(300);
+  let txt = await p.locator('body').innerText();
+  assert.match(txt, /Funded by LAS/); assert.match(txt, /LOAN COST/); assert.match(txt, /ahead of the loan|behind the loan/);
+  assert.ok(await p.locator('button:has-text("📈 LAS")').count(), 'LAS is a "Bought with" choice');
+  await p.getByRole('button', { name: 'Sell', exact: true }).click(); await p.waitForTimeout(300);
+  txt = await p.locator('body').innerText();
+  assert.match(txt, /Add a buy or sell/); assert.match(txt, /QUANTITY/);
+  await p.locator('input[inputmode="decimal"]').nth(0).fill('5'); await p.locator('input[inputmode="decimal"]').nth(1).fill('1500');
+  await p.locator('button:has-text("Save")').last().click(); await p.waitForTimeout(300);
+  const fills = (await stored(p)).zjournal.fills;
+  assert.deepEqual(fills.filter(f => f.side === 'sell').map(f => [f.sym, f.qty, f.price]), [['QPOWER', 5, 1500]]);
+  assert.deepEqual(p.errors, []);
+});
+
+test('Where it went: LAS fills in from the LAS tracker and Zerodha tags; hero + loan cards', async () => {
+  const now = Date.now();
+  const zj = { fills: [{ id: 'a', sym: 'GOLDBEES', ts: now - 9e8, exch: 'NSE', side: 'buy', qty: 100, price: 100, oid: 'o1' }],
+    funds: [{ id: 'f1', kind: 'in', amount: 30000, date: now - 1e9, loanId: 'las' }], mf: [], meta: { GOLDBEES: { type: 'invest', loanId: 'las' } }, prices: {}, notes: {} };
+  const las = { loan: 50000, rate: 10.5, ltv: 45, holdings: [{ id: 'h', name: 'NIFTYBEES', value: 125000 }], txns: [{ id: 'i1', type: 'interest', amount: 400, date: now - 5e8 }, { id: 'i2', type: 'interest', amount: 450, date: now - 2e8 }, { id: 'r1', type: 'repay', amount: 10000, date: now - 1e8 }] };
+  const p = await newPage({ seed: { zjournal: zj, las } });
+  const r = await p.evaluate(async () => { const d = JSON.parse((await window.storage.get('etp-data-u_t')).value); const A = ffAll(d), s = A.sums.find(x => x.pool.id === 'las'); return { base: s.base, earn: s.g.earn, int: s.intAmt, prin: s.by.get('own_prin'), idle: s.idle, n: s.n }; });
+  // Drawn 60,000 (50,000 owed + 10,000 repaid): 30,000 went into Zerodha, 850 interest, 10,000 repaid.
+  assert.deepEqual(r, { base: 60000, earn: 30000, int: 850, prin: 10000, idle: 19150, n: 5 });
+  await p.locator('button[aria-label="Wealth Tracker"]').click(); await p.waitForTimeout(300);
+  await p.getByRole('button', { name: 'Stats', exact: true }).click(); await p.waitForTimeout(200);
+  await p.locator('button:has-text("Where loan money went")').click(); await p.waitForTimeout(500);
+  let txt = await p.locator('#root').innerText();
+  assert.match(txt, /BORROWED · 1 LOAN/); assert.match(txt, /50%/); assert.match(txt, /LTV 40% · from LAS tracker/);
+  assert.doesNotMatch(txt, /Nothing recorded yet/);
+  await p.locator('button:has-text("LAS")').first().click(); await p.waitForTimeout(300);
+  txt = await p.locator('#root').innerText();
+  assert.match(txt, /OWED NOW/); assert.match(txt, /LAS interest/); assert.match(txt, /GOLDBEES/);
+  // A LAS interest line paid from your own pocket can be taken out.
+  await p.locator('button:has-text("LAS interest")').first().click(); await p.waitForTimeout(200);
+  await p.locator('button:has-text("Not from LAS money")').click(); await p.waitForTimeout(300);
+  const after = await p.evaluate(async () => { const d = JSON.parse((await window.storage.get('etp-data-u_t')).value); return ffAll(d).sums[0].intAmt; });
+  assert.ok(after === 400 || after === 450, 'one interest line left: ' + after);
+  assert.deepEqual(p.errors, []);
+});
+
+test('Goal form: by-when chips give a monthly plan; sheet keeps the typed field on screen', async () => {
+  const p = await newPage({ seed: {} });
+  await p.locator('button[aria-label="calc"]').click(); await p.waitForTimeout(400);
+  await p.locator('button:has-text("Goal Investing")').click(); await p.waitForTimeout(400);
+  await p.locator('button:has-text("New goal")').first().click(); await p.waitForTimeout(300);
+  await p.locator('input[placeholder="e.g. House down payment"]').fill('Car');
+  await p.locator('input[inputmode="decimal"]').nth(0).fill('400000');
+  await p.locator('input[inputmode="decimal"]').nth(1).fill('40000');
+  await p.locator('button:has-text("3 yrs")').click(); await p.waitForTimeout(200);
+  assert.match(await p.locator('body').innerText(), /₹10,000 a month for 36 months/);
+  const fs = await p.locator('input[placeholder="e.g. House down payment"]').evaluate(e => parseFloat(getComputedStyle(e).fontSize));
+  assert.ok(fs >= 16, 'inputs are 16px so iOS does not zoom on focus');
+  // A short visible area (keyboard up): the sheet fits it, and focusing a field scrolls it into view.
+  await p.setViewportSize({ width: 390, height: 460 }); await p.waitForTimeout(300);
+  await p.locator('.shn div[style*="overflow-y"]').first().evaluate(e => { e.scrollTop = 9999; });
+  await p.locator('input[placeholder="e.g. House down payment"]').focus(); await p.waitForTimeout(900);
+  const vis = await p.evaluate(() => { const r = document.querySelector('input[placeholder="e.g. House down payment"]').getBoundingClientRect(), b = [...document.querySelectorAll('button')].find(x => x.textContent === 'Create goal').getBoundingClientRect(); return { top: r.top, bottom: r.bottom, btn: b.bottom, h: innerHeight }; });
+  assert.ok(vis.top > 40 && vis.bottom < vis.h, 'name field visible ' + JSON.stringify(vis));
+  assert.ok(vis.btn <= vis.h, 'Create goal visible');
+  await p.setViewportSize({ width: 390, height: 844 });
+  await p.locator('button:has-text("Create goal")').click(); await p.waitForTimeout(400);
+  const g = (await stored(p)).goalInvest[0];
+  assert.equal(g.name, 'Car'); assert.equal(g.target, 400000); assert.ok(g.targetDate > Date.now() + 1000 * 864e5);
+  assert.deepEqual(p.errors, []);
+});
+
 test('Studio theme: white page, flat bordered cards, upright headings', async () => {
   const p = await newPage({ seed: {} });
   await p.evaluate(() => localStorage.setItem('etp-theme', 'studio')); await p.reload(); await mounted(p);
