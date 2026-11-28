@@ -252,6 +252,11 @@ test('Stats: month-end report and this-vs-last-month render with drivers', async
   assert.match(meFull, /Over budget|budget/, 'budget column shown');
   const cmp = await p.locator('#stsec-mcmp').innerText();
   assert.match(cmp, /THIS VS LAST MONTH/);
+  assert.match(cmp, /Spent ₹/, 'collapsed: one-line summary');
+  assert.doesNotMatch(cmp, /BIGGEST CHANGES/, 'starts collapsed');
+  await p.locator('#stsec-mcmp button[aria-label="Expand this vs last month"]').click();
+  assert.match(await p.locator('#stsec-mcmp').innerText(), /BIGGEST CHANGES/);
+  assert.equal(await p.evaluate(() => localStorage.getItem('etp-mcmp-open')), '1', 'open state remembered');
   await p.locator('#stsec-mcmp button:has-text("Full months")').click();
   assert.match(await p.locator('#stsec-mcmp').innerText(), /compared with/);
   assert.deepEqual(p.errors, []);
@@ -734,6 +739,159 @@ test('Zerodha filters: search, alerts, saved view, bulk + undo, grouping with su
   await p.locator('button[aria-label="Filters and sort"]').click();
   await p.getByRole('button', { name: '🧾 From bank statement', exact: true }).click(); await p.locator('button:has-text("Done")').last().click(); await p.waitForTimeout(200);
   txt = await root(); assert.match(txt, /1 of 2 shown/); assert.match(txt, /Withdrawn to bank/);
+  assert.deepEqual(p.errors, []);
+});
+
+// ---------- threads ----------
+const threadSeed = () => {
+  const now = new Date(), D = (m, d) => new Date(now.getFullYear(), now.getMonth() + m, d, 12).getTime();
+  const X = (id, amount, category, m, d, merchant, threadId, more = {}) => ({ id, type: 'expense', amount, category, date: D(m, d), merchant, currency: '₹', accountId: 'acc_bank', threadId, ...more });
+  return {
+    expenses: [
+      X('t1', 3200, 'medical', 0, 3, 'Apollo Clinic', 'th_a'), X('t2', 1800, 'medical', -1, 12, 'Apollo Pharmacy', 'th_a'),
+      X('c1', 12500, 'bike', 0, 2, 'Bajaj Service', 'th_b'), X('c2', 3000, 'transport', -1, 4, 'HP Petrol', 'th_b'),
+      { ...X('f1', 25000, 'salary', 0, 5, 'Client A', 'th_c'), type: 'income' },
+    ],
+    threads: [
+      { id: 'th_a', name: 'Pregnancy', emoji: '🤰', budget: 15000, notes: [{ id: 'n1', text: 'Next scan on the 14th', parentId: null, photos: [], files: [], createdAt: D(0, 4) }], createdAt: D(-3, 1), groupId: 'tg_f' },
+      { id: 'th_b', name: 'Car upkeep', emoji: '🚗', budget: 14000, notes: [], createdAt: D(-2, 1) },
+      { id: 'th_c', name: 'Freelance', emoji: '💼', notes: [], createdAt: D(-2, 1) },
+      { id: 'th_d', name: 'Old trip', emoji: '🏖️', notes: [], createdAt: D(-9, 1), archived: true },
+    ],
+    threadGroups: [{ id: 'tg_f', name: 'Family', color: '#F49BD0' }],
+  };
+};
+test('Threads: header opens the Threads section; sidebar has AI instead and no thread list', async () => {
+  const p = await newPage({ seed: threadSeed() });
+  assert.equal(await p.locator('button[title="AI tools"]').count(), 0, 'no ✨ in the header');
+  await p.locator('button').first().click(); await p.waitForTimeout(400);
+  const sb = await p.locator('body').innerText();
+  assert.doesNotMatch(sb, /New Thread/, 'threads left the sidebar');
+  assert.doesNotMatch(sb, /Car upkeep/);
+  assert.equal(await p.locator('button[aria-label="AI tools"]').count(), 1, 'AI tile at the top of the sidebar');
+  await p.keyboard.press('Escape'); await p.goto(base); await mounted(p);
+  await p.locator('button[aria-label="Threads"]').click(); await p.waitForTimeout(400);
+  const txt = await p.locator('#root').innerText();
+  for (const k of ['Threads', 'Pregnancy', 'Car upkeep', 'Freelance', 'OVER BUDGET', 'Family', '1 archived thread']) assert.match(txt, new RegExp(k), k);
+  assert.doesNotMatch(txt, /Old trip/, 'archived threads are hidden by default');
+  assert.deepEqual(p.errors, []);
+});
+test('Threads: search reaches entries and notes; filters, groups, pin and archive', async () => {
+  const p = await newPage({ seed: threadSeed() });
+  await p.goto(base + '?view=threads'); await mounted(p);
+  const cards = () => p.locator('[data-thread]').evaluateAll(els => els.map(e => e.getAttribute('data-thread')));
+  await p.locator('input[aria-label="Search threads"]').fill('apollo');
+  assert.deepEqual(await cards(), ['th_a'], 'entry merchant finds its thread');
+  assert.match(await p.locator('[data-thread="th_a"]').innerText(), /2 entries match/);
+  await p.locator('input[aria-label="Search threads"]').fill('scan');
+  assert.deepEqual(await cards(), ['th_a'], 'note text finds its thread');
+  await p.locator('input[aria-label="Search threads"]').fill('');
+  await p.locator('button:has-text("OVER BUDGET")').click();
+  assert.deepEqual(await cards(), ['th_b'], 'over-budget filter');
+  await p.locator('button:has-text("Clear all")').click();
+  await p.locator('button:has-text("Family")').first().click();
+  assert.deepEqual(await cards(), ['th_a'], 'group chip');
+  await p.locator('button:has-text("All")').first().click();
+  // pin Car upkeep from its actions sheet: it moves to the top
+  await p.locator('[data-thread="th_b"] button[aria-label="Thread actions"]').click();
+  await p.locator('button:has-text("Pin to top")').click(); await p.waitForTimeout(300);
+  let st = await stored(p);
+  assert.equal(st.threads.find(x => x.id === 'th_b').pinned, true, 'pin saved');
+  await p.locator('button:has-text("Hide it from the list")').click(); await p.waitForTimeout(300);
+  st = await stored(p);
+  assert.equal(st.threads.find(x => x.id === 'th_b').archived, true, 'archive saved');
+  assert.ok(!(await cards()).includes('th_b'), 'archived thread leaves the active list');
+  await p.locator('button:has-text("2 archived threads")').click();
+  assert.deepEqual((await cards()).sort(), ['th_b', 'th_d']);
+  assert.deepEqual(p.errors, []);
+});
+test('Thread detail: Entries · Notes · Insights tabs, search, sort and month filter', async () => {
+  const p = await newPage({ seed: threadSeed() });
+  await p.goto(base + '?view=threads'); await mounted(p);
+  await p.locator('button[aria-label="Open Pregnancy"]').click(); await p.waitForTimeout(400);
+  let txt = await p.locator('#root').innerText();
+  for (const k of ['Pregnancy', 'Family', 'THIS MONTH', 'AVG / MONTH', 'Apollo Clinic', 'Apollo Pharmacy']) assert.match(txt, new RegExp(k), k);
+  await p.locator('input[aria-label="Search entries"]').fill('pharmacy');
+  txt = await p.locator('#root').innerText();
+  assert.match(txt, /Apollo Pharmacy/); assert.doesNotMatch(txt, /Apollo Clinic/);
+  await p.locator('input[aria-label="Search entries"]').fill('');
+  await p.locator('button:has-text("This month")').first().click();
+  txt = await p.locator('#root').innerText();
+  assert.match(txt, /Apollo Clinic/); assert.doesNotMatch(txt, /Apollo Pharmacy/);
+  await p.getByRole('tab', { name: /Notes/ }).click();
+  assert.match(await p.locator('#root').innerText(), /Next scan on the 14th/);
+  await p.getByRole('tab', { name: /Insights/ }).click();
+  txt = await p.locator('#root').innerText();
+  assert.match(txt, /MONTH BY MONTH/); assert.match(txt, /TOP MERCHANTS/);
+  assert.deepEqual(p.errors, []);
+});
+
+// ---------- groceries ----------
+const grocSeed = () => {
+  const now = new Date(), D = (m, d) => new Date(now.getFullYear(), now.getMonth() + m, d, 12).getTime();
+  const it = (n, q, u, p, s) => ({ n, q, u, p, s, mrp: null, disc: null });
+  const G = (id, m, d, merchant, amount, items) => ({ id, type: 'expense', amount, category: 'groceries', date: D(m, d), merchant, currency: '₹', accountId: 'acc_bank', grocery: true, groceryItems: items });
+  return {
+    expenses: [
+      G('g1', 0, 1, 'DMart', 1000, [it('Sona Rice 5kg', 1, 'pc', 400, 'Staples'), it('Amul Milk', 4, 'L', 60, 'Dairy'), it('Sunflower Oil 1L', 2, 'pc', 150, 'Oils & Ghee')]),
+      G('g2', -1, 3, 'BigBasket', 1300, [it('Sona Rice 5kg', 2, 'pc', 390, 'Staples'), it('Amul Milk', 8, 'L', 60, 'Dairy')]),
+      G('g3', -2, 4, 'DMart', 1100, [it('Sona Rice 5kg', 1, 'pc', 380, 'Staples'), it('Amul Milk', 8, 'L', 58, 'Dairy'), it('Sunflower Oil 1L', 2, 'pc', 140, 'Oils & Ghee')]),
+      { id: 'u1', type: 'expense', amount: 640, category: 'shopping', date: D(0, 1), merchant: 'DMART', currency: '₹', accountId: 'acc_bank' },
+    ],
+    groceryPlan: { staples: [{ id: 'gst_rice', name: 'Sona Rice', qty: 10, unit: 'kg', aliases: [] }], lists: {} },
+  };
+};
+test('Groceries: staples planned vs bought, items this month, unlisted charges reconcile', async () => {
+  const p = await newPage({ seed: grocSeed() });
+  const split = await p.evaluate(() => {
+    const e = { amount: 1000, groceryItems: [{ n: 'A', q: 1, u: 'pc', p: 400 }, { n: 'B', q: 2, u: 'pc', p: 150 }] };
+    const parts = grocSubSplit(e); return { sum: parts.reduce((a, x) => a + x.amt, 0), unl: parts.find(x => x.sub === GROC_UNLISTED).amt };
+  });
+  assert.equal(split.sum, 1000, 'breakdown adds up to the bill'); assert.equal(split.unl, 300, 'gap kept as unlisted');
+  assert.equal(await p.evaluate(() => grocQtyIn({ n: 'Sunflower Oil 1L', q: 2, u: 'pc' }, 'L')), 2, 'pack size read from the name');
+  await p.goto(base + '?view=groceries'); await mounted(p);
+  await p.getByRole('tab', { name: 'Plan' }).click();
+  let txt = await p.locator('#root').innerText();
+  assert.match(txt, /Sona Rice/); assert.match(txt, /5 kg of 10 kg/, 'one 5 kg pack counts as 5 kg'); assert.match(txt, /5 kg left/);
+  assert.match(txt, /Amul Milk/, 'suggested as a staple from history');
+  assert.match(txt, /1 grocery spend needs items/, 'the DMART card spend is flagged');
+  await p.getByRole('tab', { name: 'Items' }).click();
+  txt = await p.locator('#root').innerText();
+  assert.match(txt, /Unlisted \/ charges/); assert.match(txt, /Sunflower Oil 1L/); assert.match(txt, /2 L/);
+  await p.getByRole('tab', { name: 'Shop list' }).click();
+  await p.locator('button:has-text("Next month")').click();
+  txt = await p.locator('#root').innerText();
+  assert.match(txt, /Sona Rice/); assert.match(txt, /10 kg · Staple/);
+  assert.deepEqual(p.errors, []);
+});
+test('Groceries: add items to a spend logged elsewhere — amount stays, gap becomes unlisted', async () => {
+  const p = await newPage({ seed: grocSeed() });
+  await p.goto(base + '?view=groceries'); await mounted(p);
+  await p.locator('button:has-text("grocery spend needs items")').click(); await p.waitForTimeout(300);
+  await p.locator('button[aria-label="Add items to DMART"]').click(); await p.waitForTimeout(300);
+  assert.match(await p.locator('body').innerText(), /Add items to this bill/);
+  await p.locator('input[placeholder="Item name"]').first().fill('Toor Dal');
+  await p.locator('div:has(> span:text-is("PAID")) input').first().fill('160');
+  assert.match(await p.locator('body').innerText(), /Unlisted \/ charges/);
+  await p.locator('button:has-text("Save items")').click(); await p.waitForTimeout(400);
+  const e = (await stored(p)).expenses.find(x => x.id === 'u1');
+  assert.equal(e.amount, 640, 'expense amount unchanged');
+  assert.equal(e.groceryItems.length, 1); assert.equal(e.groceryItems[0].n, 'Toor Dal'); assert.equal(e.grocery, true, 'now counts in Groceries');
+  assert.doesNotMatch(await p.locator('#root').innerText(), /Add items to DMART/, 'leaves the needs-items list');
+  assert.deepEqual(p.errors, []);
+});
+
+test('Add expense: Grocery category offers Add items; the items save on the expense', async () => {
+  const p = await newPage({ seed: grocSeed() });
+  await p.goto(base + '?action=add'); await mounted(p);
+  await p.getByText('Grocery', { exact: true }).first().click();
+  await p.locator('button[aria-label="Add items"]').click(); await p.waitForTimeout(300);
+  await p.locator('input[placeholder="Item name"]').first().fill('Basmati Rice 1kg');
+  await p.locator('div:has(> span:text-is("QTY")) input').first().fill('2');
+  await p.locator('div:has(> span:text-is("PAID")) input').first().fill('120');
+  await p.locator('button:has-text("Use these items")').click(); await p.waitForTimeout(300);
+  assert.match(await p.locator('#root').innerText(), /1 item on this bill/);
+  assert.doesNotMatch(await p.locator('#root').innerText(), /Break into subcategories/, 'the old splitter is gone');
   assert.deepEqual(p.errors, []);
 });
 
