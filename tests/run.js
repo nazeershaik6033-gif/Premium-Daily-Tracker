@@ -769,6 +769,8 @@ test('Threads: header opens the Threads section; sidebar has AI instead and no t
   assert.doesNotMatch(sb, /New Thread/, 'threads left the sidebar');
   assert.doesNotMatch(sb, /Car upkeep/);
   assert.equal(await p.locator('button[aria-label="AI tools"]').count(), 1, 'AI tile at the top of the sidebar');
+  assert.equal(await p.locator('button[aria-label="Groceries"]').count(), 1, 'Groceries tile at the top of the sidebar');
+  assert.doesNotMatch(sb, /ADVANCED/, 'Advanced tile replaced');
   await p.keyboard.press('Escape'); await p.goto(base); await mounted(p);
   await p.locator('button[aria-label="Threads"]').click(); await p.waitForTimeout(400);
   const txt = await p.locator('#root').innerText();
@@ -892,6 +894,94 @@ test('Add expense: Grocery category offers Add items; the items save on the expe
   await p.locator('button:has-text("Use these items")').click(); await p.waitForTimeout(300);
   assert.match(await p.locator('#root').innerText(), /1 item on this bill/);
   assert.doesNotMatch(await p.locator('#root').innerText(), /Break into subcategories/, 'the old splitter is gone');
+  assert.deepEqual(p.errors, []);
+});
+
+// ---------- money moves ----------
+const moneySeed = () => {
+  const now = new Date(), D = (d, m = 0) => new Date(now.getFullYear(), now.getMonth() + m, d, 12).getTime();
+  return {
+    accounts: [{ id: 'acc_cash', name: 'Cash', type: 'cash', currency: '₹', emoji: '💵' }, { id: 'acc_bank', name: 'HDFC Savings', type: 'checking', currency: '₹', emoji: '🏦' }],
+    cards: [{ id: 'cardA', name: 'HDFC Regalia', last4: '1234', limit: 200000 }],
+    savingsPots: [{ id: 'pot_e', name: 'Emergency', opening: 0, createdAt: D(1) }],
+    expenses: [
+      { id: 'i1', type: 'income', amount: 80000, category: 'salary', date: D(1), accountId: 'acc_bank', currency: '₹', merchant: 'Salary' },
+      { id: 'e2', type: 'expense', amount: 2000, category: 'shopping', date: D(2), cardId: 'cardA', accountId: null, currency: '₹', merchant: 'Amazon' },
+      { id: 'xo_1', type: 'transfer-out', amount: 5000, accountId: 'acc_bank', category: 'other', merchant: 'Transfer', date: D(3), source: 'transfer', transferId: 'xfer_1', currency: '₹' },
+      { id: 'xi_1', type: 'transfer-in', amount: 5000, accountId: 'acc_cash', category: 'other', merchant: 'Transfer', date: D(3), source: 'transfer', transferId: 'xfer_1', currency: '₹' },
+      { id: 'ls1', type: 'income', amount: 2500, category: 'savings_deposit', date: D(4), accountId: 'acc_bank', currency: '₹', merchant: 'RD' },
+      { id: 'lend1', type: 'expense', amount: 1000, category: 'food', date: D(5), accountId: 'acc_bank', currency: '₹', merchant: 'Dinner', lends: [{ personId: 'ld_r', entryId: 'le1', amount: 600 }] },
+    ],
+    ledger: [{ id: 'ld_r', name: 'Ravi', entries: [{ id: 'le1', kind: 'gave', amount: 600, date: D(5), expenseId: 'lend1' }, { id: 'le2', kind: 'got', amount: 250, date: D(6) }] }],
+  };
+};
+const balances = p => p.evaluate(async () => { const d = JSON.parse((await window.storage.get('etp-data-u_t')).value); const o = {}; for (const a of d.accounts) o[a.name] = ab(a, d.expenses, d.openingBalances); for (const pt of d.savingsPots || []) o['pot:' + pt.name] = savPotBal(pt, d.expenses); o.income = d.expenses.filter(e => e.type === 'income').reduce((s, e) => s + e.amount, 0); return o; });
+test('Money: Cash keeps its transfers on a fresh device; lent shows what is still outstanding', async () => {
+  const p = await newPage({ seed: moneySeed() });
+  assert.equal((await balances(p)).Cash, 5000, 'transfer into an account named Cash is not unlinked on load');
+  const txt = await p.locator('#root').innerText();
+  assert.match(txt, /LENT · OUTSTANDING/); assert.match(txt, /₹600\.00 lent · ₹250\.00 back · ₹350\.00/);
+  assert.doesNotMatch(txt, /NET INCL\. CARDPAY/);
+  assert.deepEqual(p.errors, []);
+});
+test('Move money: ATM, card bill, new savings place and Zerodha funds move balances, never totals', async () => {
+  const p = await newPage({ seed: moneySeed() });
+  const move = async () => { await p.goto(base); await mounted(p); await p.locator('.nb-fab, button[aria-label*="add" i]').first().click(); await p.waitForTimeout(250); await p.locator('button:has-text("move")').first().click(); await p.waitForTimeout(300); };
+  const b0 = await balances(p);
+  await move(); await p.locator('button:has-text("🏧 ATM withdrawal")').click(); await p.locator('input[aria-label="Amount"]').fill('1500'); await p.locator('button:has-text("Transfer ₹")').click(); await p.waitForTimeout(300);
+  let b = await balances(p); assert.equal(b.Cash, b0.Cash + 1500); assert.equal(b['HDFC Savings'], b0['HDFC Savings'] - 1500);
+  await move(); await p.getByRole('tab', { name: /Pay card bill/ }).click(); await p.locator('input[aria-label="Amount"]').fill('2000'); await p.locator('button:has-text("Pay card bill ₹")').click(); await p.waitForTimeout(300);
+  await move(); await p.getByRole('tab', { name: /To savings/ }).click(); await p.locator('button:has-text("New savings place")').click(); await p.locator('input[aria-label="Savings place name"]').fill('Post office RD'); await p.locator('input[aria-label="Amount"]').fill('700'); await p.locator('button:has-text("Save ₹")').click(); await p.waitForTimeout(300);
+  await move(); await p.getByRole('tab', { name: /To investments/ }).click(); await p.locator('input[aria-label="Amount"]').fill('3000'); await p.locator('button:has-text("Add funds ₹")').click(); await p.waitForTimeout(300);
+  b = await balances(p);
+  assert.equal(b['HDFC Savings'], b0['HDFC Savings'] - 1500 - 2000 - 700 - 3000, 'every move leaves the bank');
+  assert.equal(b['pot:Post office RD'], 700); assert.equal(b.income, b0.income, 'no move is income');
+  const st = await stored(p);
+  assert.equal(st.expenses.filter(e => e.type === 'expense').length, 2, 'no move is an expense');
+  assert.equal(st.zjournal.funds[0].amount, 3000, 'Zerodha funds entry added');
+  assert.deepEqual(p.errors, []);
+});
+test('Savings: old "Savings" income entries convert into moves; undo and redo the conversion', async () => {
+  const p = await newPage({ seed: moneySeed() });
+  const b0 = await balances(p);
+  await p.locator('button').first().click(); await p.waitForTimeout(300);
+  await p.locator('button:has-text("Set money aside"), button:has-text(" pot")').first().click(); await p.waitForTimeout(400);
+  await p.locator('button:has-text("FIX →")').click(); await p.locator('button:has-text("Convert 1")').click(); await p.waitForTimeout(400);
+  let b = await balances(p);
+  assert.equal(b.income, b0.income - 2500, 'no longer income'); assert.equal(b['HDFC Savings'], b0['HDFC Savings'] - 5000); assert.equal(b['pot:Emergency'], 2500);
+  await p.locator('button[aria-label="Undo"]').click(); await p.waitForTimeout(400);
+  b = await balances(p); assert.equal(b.income, b0.income, 'undo restores'); assert.equal(b['pot:Emergency'], 0);
+  await p.locator('button[aria-label="Redo"]').click(); await p.waitForTimeout(400);
+  assert.equal((await balances(p))['pot:Emergency'], 2500, 'redo re-applies');
+  assert.deepEqual(p.errors, []);
+});
+test('Goal investing: places per goal; Wealth statement with manual entry and section filter', async () => {
+  const now = new Date(), D = (m, d) => new Date(now.getFullYear(), now.getMonth() + m, d, 12).getTime();
+  const p = await newPage({ seed: {
+    zjournal: { fills: [], funds: [{ id: 'f1', date: D(-1, 3), amount: 50000, kind: 'in' }], mf: [], meta: {}, prices: {}, notes: {} },
+    loanTracker: [{ id: 'L1', kind: 'personal', lender: 'HDFC', principal: 100000, rate: 12, tenure: 24, sanction: D(-2, 1), emiStart: D(-1, 5), emi: 4707, payments: [{ n: 1, date: D(-1, 5), amount: 4707 }], prepayments: [], odTxns: [] }],
+    goalInvest: [{ id: 'gi1', name: 'Trip', emoji: '✈️', target: 60000, createdAt: D(-2, 1), entries: [] }],
+  } });
+  await p.locator('button[aria-label="Wealth Tracker"]').click(); await p.waitForTimeout(400);
+  await p.getByRole('button', { name: 'Stats', exact: true }).click();
+  await p.getByRole('tab', { name: 'Statement' }).click(); await p.waitForTimeout(300);
+  let txt = await p.locator('#root').innerText();
+  for (const k of ['OPENING', 'CREDITS', 'DEBITS', 'CLOSING', 'Loan taken', 'Funds added', 'EMI #1 · principal']) assert.match(txt, new RegExp(k), k);
+  const closing = async () => Number(await p.locator('[data-closing]').getAttribute('data-closing'));
+  const c0 = await closing();
+  await p.locator('button:has-text("Manual entry")').click(); await p.locator('input[aria-label="Description"]').fill('Gold'); await p.locator('input[aria-label="Amount"]').fill('20000'); await p.locator('button:has-text("Save")').last().click(); await p.waitForTimeout(300);
+  assert.equal(await closing(), c0 + 20000, 'manual credit raises the closing balance');
+  await p.locator('button:has-text("Zerodha")').first().click();
+  assert.equal(await p.locator('[data-stmt]').evaluateAll(els => els.every(e => e.getAttribute('data-stmt') === 'zerodha')), true, 'section filter');
+  await p.locator('button[aria-label="calc"]').click(); await p.waitForTimeout(400);
+  await p.locator('text=Goal Investing').first().click(); await p.locator('text=Trip').first().click();
+  await p.locator('button:has-text("＋ Add money")').click(); await p.locator('input[inputmode="decimal"]').first().fill('5000');
+  await p.locator('button:has-text("Other place")').click(); await p.locator('input[aria-label="Place name"]').fill('SBI RD');
+  await p.locator('button:has-text("Save")').last().click(); await p.waitForTimeout(300);
+  txt = await p.locator('#root').innerText();
+  assert.match(txt, /WHERE IT'S KEPT/); assert.match(txt, /SBI RD/);
+  const g = (await stored(p)).goalInvest[0];
+  assert.equal(g.places[0].name, 'SBI RD'); assert.equal(g.entries[0].placeId, g.places[0].id);
   assert.deepEqual(p.errors, []);
 });
 
