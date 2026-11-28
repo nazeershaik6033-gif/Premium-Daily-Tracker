@@ -769,6 +769,8 @@ test('Threads: header opens the Threads section; sidebar has AI instead and no t
   assert.doesNotMatch(sb, /New Thread/, 'threads left the sidebar');
   assert.doesNotMatch(sb, /Car upkeep/);
   assert.equal(await p.locator('button[aria-label="AI tools"]').count(), 1, 'AI tile at the top of the sidebar');
+  assert.equal(await p.locator('button[aria-label="Groceries"]').count(), 1, 'Groceries tile at the top of the sidebar');
+  assert.doesNotMatch(sb, /ADVANCED/, 'Advanced tile replaced');
   await p.keyboard.press('Escape'); await p.goto(base); await mounted(p);
   await p.locator('button[aria-label="Threads"]').click(); await p.waitForTimeout(400);
   const txt = await p.locator('#root').innerText();
